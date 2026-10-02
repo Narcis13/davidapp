@@ -1,0 +1,30 @@
+# Gates for gates.sh: one per line, a name then a shell command run from the repository root.
+# $LOGS is the folder the logs go to; build there so a running server's build is never touched.
+# Keep the commands the ones CI runs. Examples for a few stacks; keep the ones that apply.
+
+# Node / TypeScript
+typecheck  npm run --silent typecheck
+lint       npm run --silent lint
+test       npm test --silent
+build      npx vite build --outDir "$LOGS/dist" --emptyOutDir
+
+# Python
+# types    uv run mypy .
+# lint     uv run ruff check .
+# test     uv run pytest -q
+
+# Go
+# vet      go vet ./...
+# test     go test ./...
+# build    go build -o "$LOGS/bin/" ./...
+
+# Rust
+# lint     cargo clippy --all-targets -- -D warnings
+# test     cargo test
+# build    cargo build --release --target-dir "$LOGS/target"
+
+# Print the test counts after the gates, so PROGRESS.md can quote them.
+@summary test (tests|passed|failed|pass |fail )
+
+# A warning that doesn't fail the gate but is still a finding. The regex is one word.
+@warn build chunks.are.larger chunk size warning
