@@ -1,0 +1,14 @@
+# Screens for sweep.sh: one per line, a name, a path, a viewport, then any cdp.mjs flags.
+# Viewports: desktop (1440x900), tablet (820x1180, touch), phone (390x844, touch), WxH, or pdf.
+# A line with {id} repeats for every id passed to sweep.sh (a document, a record, a user).
+
+# The element the app scrolls in, if the page itself doesn't. Leave it out otherwise.
+# @pane main.scroller
+
+# home             /                        desktop --full
+# phone-home       /                        phone
+# settings         /settings                desktop --full
+# dark-home        /                        desktop --dark
+# {id}             /items/{id}              desktop --full
+# {id}-phone       /items/{id}              phone --scroll
+# {id}-print       /items/{id}?print=1      pdf
