@@ -35,7 +35,7 @@ try {
     // loudness: mean and peak volume of the audio track
     const vol = await run(ffmpegPath(), ['-hide_banner', '-nostats', '-i', mp4, '-map', '0:a', '-af', 'volumedetect', '-f', 'null', '-']);
     if (vol.code !== 0) throw new Error(`volumedetect failed for ${clip.slug}: ${vol.stderr}`);
-    const levels = vol.stderr.split('\n').filter((l) => /mean_volume|max_volume|n_samples/.test(l)).map((l) => l.replace(/^\[.*?\]\s*/, '').trim());
+    const levels = vol.stderr.split('\n').filter((l) => /mean_volume|max_volume|n_samples: [1-9]/.test(l)).map((l) => l.replace(/^\[.*?\]\s*/, '').trim());
     writeFileSync(join(out, 'reports', `${clip.slug}.audio.txt`), `${clip.slug}.mp4 audio track (ffmpeg volumedetect)\n${levels.join('\n')}\n`);
 
     // contact sheets: one frame per second, 16 to a sheet, in time order (left to right, top to bottom)

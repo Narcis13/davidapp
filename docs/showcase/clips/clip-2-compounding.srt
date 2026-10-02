@@ -1,0 +1,19 @@
+1
+00:00:00,400 --> 00:00:04,600
+This clip started from a library, not a blank page
+
+2
+00:00:05,300 --> 00:00:12,600
+Most of what you see was written for clip one
+
+3
+00:00:13,300 --> 00:00:20,600
+The database records where every asset came from
+
+4
+00:00:21,300 --> 00:00:26,600
+Edits make new versions. Old clips keep the ones they pinned
+
+5
+00:00:27,600 --> 00:00:31,500
+Next clip: reuse all of it

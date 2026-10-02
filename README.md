@@ -40,7 +40,7 @@ Everything is stored under `./data` (git-ignored): `studio.db`, asset thumbnails
 builds the library and clips without rendering.
 
 ```bash
-npm test              # 51 tests: asset contract, text layout, database, render pipeline, HTTP API, MCP
+npm test              # 56 tests: asset contract, text layout, database, render pipeline, HTTP API, MCP
 npm run verify        # version pinning and determinism, checked by frame hash through MCP
 npm run report:reuse  # which clip created what, and what later clips reused
 ```

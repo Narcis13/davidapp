@@ -27,9 +27,12 @@ the screen sweep (`.claude/goal-loop/screens`) and a scripted workflow.
 | D7 | A used asset composes ≥ 2 others, ≥ 3 levels deep | [reports/composition-depth.txt](reports/composition-depth.txt) |
 | D8 | An asset of clip 1 edited through MCP into a new version; clip 1 unchanged; a clip pinning the new version differs | [reports/versioning.json](reports/versioning.json) |
 | D9 | Two renders of the same clip give the same frame hashes | [reports/determinism.json](reports/determinism.json) |
-| D11 | Studio screens at 1440×900 and 390×844 | [studio/](studio): `library`, `playground`, `clips`, `editor`, `renders`, `gallery`, `lineage`, each `-desktop` and `-phone` |
-| D12 | Playground and render workflows driven in a browser | [studio/workflow-playground.gif](studio/workflow-playground.gif), [studio/workflow-render.gif](studio/workflow-render.gif) and the numbered stills next to them |
+| D11 | Studio screens at 1440×900 and 390×844 | [studio/](studio): `library`, `playground`, `clips`, `editor`, `renders`, `gallery`, `gallery-player`, `lineage`, each `-desktop` and `-phone`; a render in progress: [studio/renders-live-desktop.png](studio/renders-live-desktop.png) |
+| D12 | Playground and render workflows driven in a real browser (Claude in Chrome, recorded with its GIF tool) | [studio/workflow-playground.gif](studio/workflow-playground.gif): change a colour and a word, safe zone, format, exact frame · [studio/workflow-render.gif](studio/workflow-render.gif): scrub the clip, start a render from the editor, watch the queue, play the result in the gallery |
 | D13 | Render speed, measured | [reports/render-speed.md](reports/render-speed.md) |
 | D16 | Preview and render come from the same asset code | [studio/preview-vs-render.png](studio/preview-vs-render.png) |
 
 D10 (MCP end to end), D14 (tests) and D17 (isolation) are checked by the test suite: `npm test`.
+
+`clip-1-repinned`, the fourth clip in `reuse.txt` and in the lineage screenshots, is the copy of
+clip 1 that `npm run verify` makes to show what version 2 of the word reveal changes.
