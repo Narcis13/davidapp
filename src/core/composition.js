@@ -45,6 +45,7 @@ export function normalizeComposition(input) {
   if (!Number.isInteger(fps) || fps < 1 || fps > 60) err('fps', 'fps must be an integer between 1 and 60');
   const duration = input.duration;
   if (!num(duration) || duration <= 0 || duration > MAX_CLIP_SECONDS) err('duration', `duration must be a number of seconds between 0 and ${MAX_CLIP_SECONDS}`);
+  else if (Number.isInteger(fps) && Math.round(duration * fps) < 1) err('duration', 'the clip is shorter than one frame');
   const background = input.background ?? '#000000';
   if (!isColor(background)) err('background', 'background must be a CSS color');
   const seed = input.seed ?? 1;

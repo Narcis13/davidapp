@@ -156,3 +156,25 @@ test('static files, the app shell, and requests that must be refused', async () 
   assert.equal((await get('/api/assets', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{not json' })).status, 400);
   assert.equal((await get('/somewhere', { method: 'DELETE' })).status, 405);
 });
+
+test('requests from another site, or addressed to another host, are refused', async () => {
+  const source = DOT.replace('A dot that slides', 'A dot that glides');
+  const foreign = await get('/api/assets', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://evil.example' }, body: JSON.stringify({ name: 'drive-by', source }) });
+  assert.equal(foreign.status, 403);
+  const form = await get('/api/assets', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ name: 'drive-by', source }) });
+  assert.equal(form.status, 415);
+  assert.equal((await get('/api/assets/drive-by')).status, 404, 'nothing was created');
+  const own = await get('/api/assets/validate', { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify({ name: 'dot', source }) });
+  assert.equal(own.status, 200, 'the studio page itself may post');
+  // a Host header the server does not answer to (what DNS rebinding would send)
+  const { request } = await import('node:http');
+  const status = await new Promise((resolve, reject) => {
+    const req = request(`${base}/api/status`, { headers: { host: 'evil.example' } }, (res) => { res.resume(); resolve(res.statusCode); });
+    req.on('error', reject);
+    req.end();
+  });
+  assert.equal(status, 403);
+  assert.equal((await post('/api/frame/asset', { ref: 'dot@1', width: 9000, height: 9000 })).status, 400);
+  assert.equal((await get('/api/assets?limit=abc&offset=x')).status, 200);
+  assert.equal((await get('/media/thumbs/%')).status, 400);
+});

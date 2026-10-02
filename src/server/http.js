@@ -4,6 +4,7 @@
 
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
+import { pipeline } from 'node:stream';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { ROOT, FONTS_DIR, fontManifest } from '../render/host.js';
@@ -15,10 +16,14 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
   '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2', '.ico': 'image/x-icon',
 };
-const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409 };
+const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415 };
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 
-/** @param {any} studio @param {{ log?: (line: string) => void, author?: string }} [o] */
-export function createStudioServer(studio, { log = () => {}, author = process.env.STUDIO_AUTHOR ?? 'studio-user' } = {}) {
+/**
+ * hosts: the Host names the server answers to (default: loopback names only), or null for any.
+ * @param {any} studio @param {{ log?: (line: string) => void, author?: string, hosts?: string[] | null }} [o]
+ */
+export function createStudioServer(studio, { log = () => {}, author = process.env.STUDIO_AUTHOR ?? 'studio-user', hosts = LOCAL_HOSTS } = {}) {
   const { library, clips, renders, lineage } = studio;
   const UI = join(ROOT, 'src', 'ui');
   const CORE = join(ROOT, 'src', 'core');
@@ -32,22 +37,27 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
 
   /** Serve a file under `base`, refusing anything that resolves outside it. Supports Range. */
   function file(req, res, base, rel, { cache = 'no-cache' } = {}) {
-    const full = resolve(base, normalize(decodeURIComponent(rel)).replace(/^([/\\])+/, ''));
+    let decoded;
+    try { decoded = decodeURIComponent(rel); } catch { return send(res, 400, { error: 'Malformed path' }); }
+    const full = resolve(base, normalize(decoded).replace(/^([/\\])+/, ''));
     if (full !== base && !full.startsWith(base + sep)) return send(res, 403, { error: 'Forbidden' });
     if (!existsSync(full) || !statSync(full).isFile()) return send(res, 404, { error: `Not found: ${rel}` });
     const { size } = statSync(full);
-    const headers = { 'content-type': TYPES[extname(full).toLowerCase()] ?? 'application/octet-stream', 'accept-ranges': 'bytes', 'cache-control': cache };
+    // nosniff + sandbox: an SVG image asset opened directly must not run script on this origin
+    const headers = { 'content-type': TYPES[extname(full).toLowerCase()] ?? 'application/octet-stream', 'accept-ranges': 'bytes', 'cache-control': cache, 'x-content-type-options': 'nosniff', ...(extname(full).toLowerCase() === '.svg' && base !== UI ? { 'content-security-policy': 'sandbox' } : {}) };
+    // pipeline closes the file when the client goes away (video scrubbing aborts requests all the time)
+    const stream = (opts) => pipeline(createReadStream(full, opts), res, () => {});
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
     if (range && (range[1] || range[2])) {
       const start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
       const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
       if (start > end || start >= size) return send(res, 416, { error: 'Range not satisfiable' }, { 'content-range': `bytes */${size}` });
       res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 });
-      return createReadStream(full, { start, end }).pipe(res);
+      return stream({ start, end });
     }
     res.writeHead(200, { ...headers, 'content-length': size });
     if (req.method === 'HEAD') return res.end();
-    return createReadStream(full).pipe(res);
+    return stream();
   }
 
   async function body(req) {
@@ -55,7 +65,12 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     let size = 0;
     for await (const c of req) { size += c.length; if (size > 8e6) throw new StudioError('Request body too large'); chunks.push(c); }
     if (!chunks.length) return {};
-    try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new StudioError('The request body is not valid JSON'); }
+    // JSON only: a form post from another site cannot carry this content type without a preflight
+    if (!String(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) throw new StudioError('Send the request body as application/json', 'unsupported');
+    let data;
+    try { data = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new StudioError('The request body is not valid JSON'); }
+    if (data === null || typeof data !== 'object' || Array.isArray(data)) throw new StudioError('The request body must be a JSON object');
+    return data;
   }
 
   const fonts = () => fontManifest().map((f) => ({ family: f.family, slug: f.slug, license: f.license, files: f.files.map((x) => ({ url: `/fonts/${x.file}`, weight: x.weight, style: x.style })) }));
@@ -96,7 +111,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       query: query.get('query') ?? undefined, type: query.get('type') || undefined, kind: query.get('kind') || undefined,
       tags: query.get('tag') ? query.get('tag').split(',').filter(Boolean) : undefined, format: query.get('format') || undefined,
       originClip: query.get('origin') || undefined, usedByClip: query.get('usedBy') || undefined, derivedFrom: query.get('derivedFrom') || undefined,
-      limit: Number(query.get('limit') ?? 100), offset: Number(query.get('offset') ?? 0),
+      limit: int(query.get('limit') ?? 100, 100, 1, 200), offset: int(query.get('offset') ?? 0, 0, 0, 1e9),
     })],
     ['POST', /^\/api\/assets\/validate$/, async ({ data }) => {
       const d = await studio.draftBundle({ slug: data.name ?? 'draft', source: data.source });
@@ -123,7 +138,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       return { asset: r.asset, warnings: r.warnings };
     }],
     // the exact frame, drawn by the renderer (PNG)
-    ['POST', /^\/api\/frame\/asset$/, async ({ data, res }) => png(res, (await studio.assetFrame({ ref: data.ref, params: data.params, t: data.t, duration: data.duration, format: data.format, width: data.width, height: data.height, background: data.background, maxSize: data.maxSize })).png)],
+    ['POST', /^\/api\/frame\/asset$/, async ({ data, res }) => png(res, (await studio.assetFrame({ ref: data.ref, source: data.source, slug: data.name, params: data.params, t: data.t, duration: data.duration, format: data.format, width: data.width, height: data.height, background: data.background, maxSize: data.maxSize })).png)],
     ['POST', /^\/api\/frame\/clip$/, async ({ data, res }) => png(res, (await studio.clipFrame({ clip: data.clip, composition: data.composition, t: data.t, maxSize: data.maxSize })).png)],
     ['POST', /^\/api\/audio\/asset$/, async ({ data, req, res }) => {
       // an audio asset on its own, as a one-item clip
@@ -161,14 +176,29 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/remix$/, async ({ params, data }) => (await clips.remixClip({ slug: params[0], newSlug: data.name, format: data.format, title: data.title, author: data.author ?? author })).clip],
 
     // renders, gallery, lineage
-    ['GET', /^\/api\/renders$/, ({ query }) => ({ renders: renders.list({ status: query.get('status') || undefined, clip: query.get('clip') || undefined, limit: Number(query.get('limit') ?? 50) }) })],
+    ['GET', /^\/api\/renders$/, ({ query }) => ({ renders: renders.list({ status: query.get('status') || undefined, clip: query.get('clip') || undefined, limit: int(query.get('limit') ?? 50, 50, 1, 200) }) })],
     ['GET', /^\/api\/renders\/(\d+)$/, ({ params }) => renders.get(Number(params[0]))],
     ['POST', /^\/api\/renders\/(\d+)\/cancel$/, ({ params }) => renders.cancel(Number(params[0]))],
     ['GET', /^\/api\/gallery$/, () => ({ renders: renders.gallery() })],
     ['GET', /^\/api\/lineage$/, () => ({ ...lineage.graph(), report: lineage.report() })],
   ];
 
+  /** Only answer requests addressed to this machine, and refuse writes that come from another site's page. */
+  function guard(req) {
+    const host = String(req.headers.host ?? '').toLowerCase();
+    if (hosts && !hosts.includes(host.replace(/:\d+$/, ''))) throw new StudioError(`This studio answers only to ${hosts.join(', ')}`, 'forbidden');
+    const origin = req.headers.origin;
+    if (origin && req.method !== 'GET' && req.method !== 'HEAD') {
+      let same = false;
+      try { same = new URL(origin).host.toLowerCase() === host; } catch { /* not a URL */ }
+      if (!same) throw new StudioError('Requests from other origins are not accepted', 'forbidden');
+    }
+  }
+
+  const int = (v, fallback, min, max) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : fallback; };
+
   async function handle(req, res) {
+    guard(req);
     const url = new URL(req.url, 'http://localhost');
     const path = url.pathname;
     if (path.startsWith('/api/')) {

@@ -13,7 +13,9 @@ import { createStudioServer } from './http.js';
 const port = Number(process.env.PORT ?? 8787);
 const host = process.env.HOST ?? '127.0.0.1';
 const studio = createStudio({ role: 'server', runner: true });
-const server = createStudioServer(studio, { log: (line) => console.log(line) });
+// loopback names by default; binding another address on purpose (HOST=0.0.0.0) opens it to whoever can reach it
+const loopback = ['127.0.0.1', 'localhost', '::1'].includes(host);
+const server = createStudioServer(studio, { log: (line) => console.log(line), hosts: loopback ? undefined : null });
 const pidFile = join(studio.dataDir, 'server.pid');
 
 server.listen(port, host, () => {

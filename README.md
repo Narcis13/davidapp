@@ -19,7 +19,7 @@ the next one reused it.
 |---|---|---|---|---|
 | [![clip 1](docs/showcase/clips/clip-1-every-frame.poster.png)](docs/showcase/clips/clip-1-every-frame.mp4) | [**Every frame is a function**](docs/showcase/clips/clip-1-every-frame.mp4) | vertical 1080×1920 | 28 assets: easing, spring, a theme, eight text animations, backgrounds, a code window, counters, a logo, a synthesized soundtrack | nothing: it is the first |
 | [![clip 2](docs/showcase/clips/clip-2-compounding.poster.png)](docs/showcase/clips/clip-2-compounding.mp4) | [**The library compounds**](docs/showcase/clips/clip-2-compounding.mp4) | horizontal 1920×1080 | 7 assets: a second theme, a grid, a scramble title, a lower third, a bar chart, a lineage diagram, a versioning diagram | 24 from clip 1, one of them (`text-word-reveal`) edited into version 2 |
-| [![clip 3](docs/showcase/clips/clip-3-release-notes.poster.png)](docs/showcase/clips/clip-3-release-notes.mp4) | [**What's new in Fablecut**](docs/showcase/clips/clip-3-release-notes.mp4) | square 1080×1080 | 4 assets: a bullet-list template, a badge, a formats diagram, a baked whoosh | 25 from clip 1 and 5 from clip 2 |
+| [![clip 3](docs/showcase/clips/clip-3-release-notes.poster.png)](docs/showcase/clips/clip-3-release-notes.mp4) | [**What's new in Fablecut**](docs/showcase/clips/clip-3-release-notes.mp4) | square 1080×1080 | 5 assets: a bullet-list template, a badge, a formats diagram, and two forks of clip 1 assets (a confetti burst, a baked whoosh) | 24 from clip 1 and 5 from clip 2, as they are |
 
 Contact sheets, ffprobe reports, the reuse report and the verification results are in
 [docs/showcase](docs/showcase/INDEX.md).
@@ -103,7 +103,7 @@ asset({
   and stores it as an immutable version. Editing makes version 2; whatever pinned version 1 keeps it.
 
 The full contract (the `f` object, the standard library, parameter types, audio and value assets)
-is in [docs/ASSET_CONTRACT.md](docs/ASSET_CONTRACT.md). The 38 showcase assets in
+is in [docs/ASSET_CONTRACT.md](docs/ASSET_CONTRACT.md). The 39 showcase asset sources in
 [showcase/assets](showcase/assets) are worked examples.
 
 ## Use it from Claude Code (MCP)

@@ -2,14 +2,15 @@
 // them. The HTTP server, the MCP server, the CLI and the tests all go through this.
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { FORMATS, makeRef } from '../core/engine.js';
 import { openDb, json } from '../db/db.js';
+import { mapParams } from '../core/schema.js';
 import { WorkerPool } from '../render/pool.js';
 import { ROOT } from '../render/host.js';
 import { mixToWav } from '../render/video.js';
-import { createLibrary, StudioError } from './library.js';
+import { createLibrary, StudioError, SLUG_RE } from './library.js';
 import { createClips } from './clips.js';
 import { createRenders } from './renders.js';
 import { createLineage } from './lineage.js';
@@ -35,7 +36,10 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   mkdirSync(framesDir, { recursive: true });
 
   function sizeOf({ format, width, height }, formats) {
-    if (width && height) return { width, height };
+    if (width && height) {
+      if (![width, height].every((v) => Number.isInteger(v) && v >= 16 && v <= 3840)) throw new StudioError('width and height must be integers between 16 and 3840');
+      return { width, height };
+    }
     const name = format ?? (formats?.includes('horizontal') || !formats?.length ? 'horizontal' : formats[0]);
     const f = FORMATS[name];
     if (!f) throw new StudioError(`Unknown format "${name}"; use ${Object.keys(FORMATS).join(', ')} or give width and height`);
@@ -44,14 +48,41 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
 
   const fail = (e) => { throw e instanceof StudioError ? e : new StudioError(e.message, 'rejected', { logs: e.logs }); };
 
-  /** A bundle holding saved assets plus one unsaved draft (validated first). */
-  async function draftBundle({ slug = 'draft', source, params }) {
+  /** A bundle holding saved assets plus one unsaved draft (validated first, with its default parameters). */
+  async function draftBundle({ slug = 'draft', source }) {
+    if (!SLUG_RE.test(slug)) throw new StudioError(`"${slug}" is not a valid asset name: use lowercase letters, digits and dashes`);
     const existing = library.versionRow(slug);
     const version = (existing?.latest_version ?? 0) + 1;
-    const v = await library.validate({ slug, version, source, params });
+    const v = await library.validate({ slug, version, source });
     const ref = makeRef(slug, version);
     const b = library.bundle([...new Set(Object.values(v.deps))]);
     return { ref, validation: v, bundle: { ...b, key: sha1(`draft|${source}|${b.key}`), assets: { ...b.assets, [ref]: { source, deps: v.deps } } } };
+  }
+
+  /**
+   * What a worker needs to draw one asset: a saved version (ref) or a draft (source). Assets and
+   * images named in the parameters are pinned and bundled too.
+   */
+  async function loadAsset({ ref, source, slug, params = {} }) {
+    const extra = [];
+    const pin = (schema) => mapParams(schema, params, ['asset', 'image'], (value) => {
+      const row = library.requireVersion(value);
+      extra.push(makeRef(row.slug, row.version));
+      return extra[extra.length - 1];
+    });
+    if (source !== undefined) {
+      const d = await draftBundle({ slug, source });
+      const m = d.validation.meta;
+      const pinned = pin(m.schema);
+      const more = extra.length ? library.bundle(extra) : null;
+      const bundle = more ? { ...d.bundle, key: sha1(d.bundle.key + more.key), assets: { ...more.assets, ...d.bundle.assets }, images: { ...more.images, ...d.bundle.images } } : d.bundle;
+      return { bundle, target: d.ref, formats: m.formats, natural: m.duration, params: pinned };
+    }
+    const row = library.requireVersion(ref);
+    if (row.type !== 'function') throw new StudioError(`${ref} is a ${row.type} asset; only function assets render frames`);
+    const target = makeRef(row.slug, row.version);
+    const pinned = pin(json(row.schema, {}));
+    return { bundle: library.bundle([target, ...extra]), target, formats: json(row.formats, []), natural: row.duration, params: pinned };
   }
 
   /**
@@ -59,40 +90,22 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
    * → { png (Buffer), width, height, hash?, ref }
    */
   async function assetFrame({ ref, source, slug, params = {}, t, duration, format, width, height, background, maxSize, hash, fps = 30, seed = 1 }) {
-    let bundle, target, formats, natural;
-    if (source !== undefined) {
-      const d = await draftBundle({ slug, source, params });
-      bundle = d.bundle; target = d.ref; formats = d.validation.meta.formats; natural = d.validation.meta.duration;
-    } else {
-      const row = library.requireVersion(ref);
-      if (row.type !== 'function') throw new StudioError(`${ref} is a ${row.type} asset; only function assets render frames`);
-      target = makeRef(row.slug, row.version); formats = json(row.formats, []); natural = row.duration;
-      bundle = library.bundle([target]);
-    }
-    const size = sizeOf({ format, width, height }, formats);
-    const d = duration ?? natural ?? 3;
-    const r = await pool.run('assetFrame', { ref: target, params, t: t ?? Math.round(d * 0.6 * fps) / fps, duration: d, ...size, fps, seed, background: background ?? '#101018', output: 'png', maxSize, hash }, { bundle, timeout: 20000 }).catch(fail);
-    return { ...r, png: Buffer.from(r.png), ref: target };
+    const a = await loadAsset({ ref, source, slug, params });
+    const size = sizeOf({ format, width, height }, a.formats);
+    const d = duration ?? a.natural ?? 3;
+    const r = await pool.run('assetFrame', { ref: a.target, params: a.params, t: t ?? Math.round(d * 0.6 * fps) / fps, duration: d, ...size, fps, seed, background: background ?? '#101018', output: 'png', maxSize, hash }, { bundle: a.bundle, timeout: 20000 }).catch(fail);
+    return { ...r, png: Buffer.from(r.png), ref: a.target };
   }
 
   /** A filmstrip of one asset across its duration → { png, width, height, times, ref }. */
   async function assetSheet({ ref, source, slug, params = {}, count = 8, cols, duration, format, width, height, cellWidth, fps = 30, seed = 1 }) {
-    let bundle, target, formats, natural;
-    if (source !== undefined) {
-      const d = await draftBundle({ slug, source, params });
-      bundle = d.bundle; target = d.ref; formats = d.validation.meta.formats; natural = d.validation.meta.duration;
-    } else {
-      const row = library.requireVersion(ref);
-      if (row.type !== 'function') throw new StudioError(`${ref} is a ${row.type} asset; only function assets render frames`);
-      target = makeRef(row.slug, row.version); formats = json(row.formats, []); natural = row.duration;
-      bundle = library.bundle([target]);
-    }
-    const size = sizeOf({ format, width, height }, formats);
-    const d = duration ?? natural ?? 3;
+    const a = await loadAsset({ ref, source, slug, params });
+    const size = sizeOf({ format, width, height }, a.formats);
+    const d = duration ?? a.natural ?? 3;
     const n = Math.max(1, Math.min(24, count));
     const times = Array.from({ length: n }, (_, i) => Math.round(((i + 0.5) / n) * d * fps) / fps);
-    const r = await pool.run('assetSheet', { ref: target, params, times, duration: d, ...size, fps, seed, cols: cols ?? Math.min(n, size.width > size.height ? 4 : 6), cellWidth: cellWidth ?? (size.width > size.height ? 480 : 270) }, { bundle, timeout: 40000 }).catch(fail);
-    return { ...r, png: Buffer.from(r.png), times, ref: target };
+    const r = await pool.run('assetSheet', { ref: a.target, params: a.params, times, duration: d, ...size, fps, seed, cols: cols ?? Math.min(n, size.width > size.height ? 4 : 6), cellWidth: cellWidth ?? (size.width > size.height ? 480 : 270) }, { bundle: a.bundle, timeout: 40000 }).catch(fail);
+    return { ...r, png: Buffer.from(r.png), times, ref: a.target };
   }
 
   async function compositionOf({ clip, composition }) {
@@ -137,13 +150,21 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     return out;
   }
 
+  const mixing = new Map();
   /** The clip's audio mixed to a WAV file (cached) → path. */
   async function clipAudio({ clip, composition }) {
     const comp = await compositionOf({ clip, composition });
     const { audio } = await clips.bundleFor(comp);
     const file = join(dataDir, 'cache', 'audio', `mix-${sha1(JSON.stringify([audio.inputs, comp.duration]))}.wav`);
-    if (!existsSync(file)) await mixToWav(audio.inputs, comp.duration, file);
-    return file;
+    if (existsSync(file)) return file;
+    // one mix at a time per file, written under a temp name so a reader never gets half a WAV
+    let job = mixing.get(file);
+    if (!job) {
+      const tmp = file.replace(/\.wav$/, `.${process.pid}.${Date.now()}.tmp.wav`);
+      job = mixToWav(audio.inputs, comp.duration, tmp).then(() => { renameSync(tmp, file); return file; }).finally(() => mixing.delete(file));
+      mixing.set(file, job);
+    }
+    return job;
   }
 
   /** Write a PNG under the data dir's frames/ folder and return its path. */

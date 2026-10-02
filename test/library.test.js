@@ -197,3 +197,48 @@ test('image assets: bake-style import, use from code through f.image, and closur
   assert.deepEqual(user.asset.deps, { 'dot-still': 'dot-still@1' });
   assert.deepEqual(user.warnings, []);
 });
+
+test('a scratch layer starts clean on every frame, whatever the previous frame left on it', async () => {
+  // the asset leaves a clip region and a fill style on its layer without save/restore
+  await t.studio.library.createAsset({ slug: 'leaky-layer', author: AUTHOR, source: `asset({ description: 'Draws through a scratch layer and leaves its state dirty.', tags: ['test'], duration: 2,
+    render(f) {
+      const L = f.offscreen(f.width, f.height);
+      L.ctx.fillRect(0, 0, 40, 40);
+      L.ctx.beginPath(); L.ctx.rect(f.t * 100, 0, 60, f.height); L.ctx.clip();
+      L.ctx.fillStyle = f.t > 1 ? '#ff0000' : '#00ff00';
+      L.ctx.fillRect(0, 0, f.width, f.height);
+      f.ctx.drawImage(L.canvas, 0, 0);
+    } });` });
+  const comp = { width: 320, height: 180, fps: 10, duration: 2, tracks: [{ type: 'visual', items: [{ id: 'x', asset: 'leaky-layer', start: 0, duration: 2 }] }] };
+  const forward = await t.studio.frameHashes({ composition: comp, times: [0.2, 1.5] });
+  const backward = await t.studio.frameHashes({ composition: comp, times: [1.5, 0.2] });
+  assert.equal(forward[1].hash, backward[0].hash);
+  assert.equal(forward[0].hash, backward[1].hash);
+});
+
+test('cached layouts and schema defaults cannot be changed by an asset', async () => {
+  const mutate = (body) => `asset({ description: 'Tries to change shared data it was handed.', tags: ['test'], duration: 1,
+    params: { items: { type: 'array', of: { type: 'number' }, default: [3, 1, 2] } },
+    render(f, p) { ${body} } });`;
+  await rejects(t.studio.library.createAsset({ slug: 'sorts-default', author: AUTHOR, source: mutate('p.items.sort(); f.ctx.fillRect(0, 0, p.items[0], 5);') }), /rejected[\s\S]*(read.only|frozen|Cannot assign)/i);
+  const layout = `'use strict'; const L = f.lib.text.layout(f.ctx, 'shared', { size: 40 }); L.words[0].x += 8; f.lib.text.fill(f.ctx, L, 0, 0);`;
+  await rejects(t.studio.library.createAsset({ slug: 'moves-layout', author: AUTHOR, source: mutate(layout) }), /rejected[\s\S]*(read.only|frozen|Cannot assign)/i);
+});
+
+test('one alias cannot be pinned to two versions', async () => {
+  const src = `asset({ description: 'Pins dot twice, differently.', tags: ['test'], uses: ['dot@1'], params: { shape: { type: 'asset', default: 'dot' } }, render(f, p) { f.use(p.shape); } });`;
+  await rejects(t.studio.library.createAsset({ slug: 'double-pin', author: AUTHOR, source: src }), /"dot" is already pinned to dot@1, but the default of parameter "shape" asks for dot@2/);
+});
+
+test('two edits of the same clip at once: one is saved, the other is told to retry', async () => {
+  const C = t.studio.clips;
+  await C.createClip({ slug: 'contended', author: AUTHOR, composition: { width: 320, height: 180, fps: 10, duration: 2, tracks: [{ id: 'a', type: 'visual', items: [] }] } });
+  const add = (id) => C.editClip('contended', [{ op: 'add_item', track: 'a', item: { id, asset: 'dot', start: 0, duration: 1 } }]);
+  const results = await Promise.allSettled([add('one'), add('two')]);
+  assert.deepEqual(results.map((r) => r.status).sort(), ['fulfilled', 'rejected']);
+  assert.match(results.find((r) => r.status === 'rejected').reason.message, /changed by someone else/);
+  assert.equal(C.getClip('contended').composition.tracks[0].items.length, 1);
+  await rejects(C.createClip({ slug: 'tiny', author: AUTHOR, composition: { width: 320, height: 180, fps: 10, duration: 0.01, tracks: [] } }), /shorter than one frame/);
+  await rejects(C.remixClip({ slug: 'contended', newSlug: 'contended-wide', format: 'cinema', author: AUTHOR }), /Unknown format "cinema"/);
+  await rejects(C.createClip({ slug: 'bad-param-type', author: AUTHOR, composition: { width: 320, height: 180, fps: 10, duration: 1, tracks: [{ type: 'visual', items: [{ id: 'b', asset: 'badge', start: 0, duration: 1, params: { text: 5 } }] }] } }), /item "b": params\.text: expected a string/);
+});

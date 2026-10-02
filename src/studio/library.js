@@ -1,8 +1,8 @@
 // The asset library: versioned, immutable assets in SQLite. Function assets are validated in a
 // render worker (compiled, test frames drawn, determinism checked) before a version is accepted.
 
-import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef, parseRef } from '../core/engine.js';
 import { staticCheck } from '../core/static-check.js';
@@ -24,6 +24,12 @@ export class StudioError extends Error {
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
+
+/** A sibling temp name for a data-relative path: files are written there and renamed once the row exists. */
+const tempOf = (rel) => { const i = rel.lastIndexOf('/'); return `${rel.slice(0, i + 1)}.tmp-${randomBytes(6).toString('hex')}-${rel.slice(i + 1)}`; };
+
+/** Two writers racing for the same name or version: say so, instead of a raw SQLite error. */
+const raceOf = (e, slug) => (/UNIQUE constraint/i.test(String(e?.message)) ? new StudioError(`"${slug}" was saved by someone else at the same moment; try again.`, 'conflict') : e);
 
 const VERSION_COLS = `v.id AS version_id, v.version, v.kind, v.title, v.description, v.tags, v.duration, v.formats, v.schema, v.uses, v.deps,
   v.source, v.source_hash, v.file, v.mime, v.meta, v.thumb, v.author, v.note, v.parent_version, v.clip_id, v.engine, v.created_at AS version_created_at,
@@ -201,6 +207,7 @@ export function createLibrary(ctx) {
   /**
    * Compile, pin and test unsaved source. Nothing is written.
    * Returns { meta, deps, warnings, frames, thumb (PNG Buffer), logs }.
+   * @param {{ slug: string, version: number, source: string, params?: any }} o
    */
   async function validate({ slug, version, source, params }) {
     const problems = staticCheck(source);
@@ -220,7 +227,9 @@ export function createLibrary(ctx) {
       if (depSlug === slug) throw new StudioError(`The asset was rejected: ${what} refers to "${spec}", which is this asset itself`, 'rejected');
       const row = versionRow(spec);
       if (!row) throw new StudioError(`The asset was rejected: ${what} refers to "${spec}", which is not in the library. Create it first, or use search_assets to find the right name.`, 'rejected');
-      deps[alias] = makeRef(row.slug, row.version);
+      const pinned = makeRef(row.slug, row.version);
+      if (deps[alias] && deps[alias] !== pinned) throw new StudioError(`The asset was rejected: "${alias}" is already pinned to ${deps[alias]}, but ${what} asks for ${pinned}. Use the same reference in both places.`, 'rejected');
+      deps[alias] = pinned;
       return row;
     };
     for (const [alias, spec] of Object.entries(meta.uses)) {
@@ -256,10 +265,14 @@ export function createLibrary(ctx) {
     if (prev && prev.source_hash === hash) throw new StudioError(`The source is identical to ${makeRef(slug, prev.version)}; nothing to save.`, 'conflict');
     const version = (existing?.latest_version ?? 0) + 1;
     const v = await validate({ slug, version, source, params });
+    // an immutable version's files must never be overwritten by a save that then loses the race:
+    // write under a temp name, rename once the transaction has claimed the version
     const thumb = `thumbs/${slug}@${version}.png`;
-    writeFileSync(join(dataDir, thumb), v.thumb);
+    const thumbTmp = join(dataDir, tempOf(thumb));
+    writeFileSync(thumbTmp, v.thumb);
     const at = now();
-    transaction(db, () => {
+    try {
+      transaction(db, () => {
       let assetId = existing?.id;
       if (!assetId) {
         assetId = q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at) VALUES (?, ?, 0, ?, ?, ?)')
@@ -276,7 +289,12 @@ export function createLibrary(ctx) {
       for (const [alias, dep] of Object.entries(v.deps)) q('INSERT INTO asset_deps (version_id, dep_version_id, alias) VALUES (?, ?, ?)').run(versionId, versionRow(dep).version_id, alias);
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
       reindex(assetId, { slug, title: m.title, description: m.description, tags: m.tags, source });
-    });
+      });
+      renameSync(thumbTmp, join(dataDir, thumb));
+    } catch (e) {
+      rmSync(thumbTmp, { force: true });
+      throw raceOf(e, slug);
+    }
     return { asset: getAsset(makeRef(slug, version), { includeSource: false }), warnings: v.warnings, logs: v.logs, frames: v.frames, thumbPath: join(dataDir, thumb), thumb: v.thumb };
   }
 
@@ -324,19 +342,23 @@ export function createLibrary(ctx) {
     const from = derivedFrom ? requireVersion(derivedFrom) : null;
     const version = (existing?.latest_version ?? 0) + 1;
     const file = `files/${slug}@${version}${e}`;
-    writeFileSync(join(dataDir, file), bytes);
+    const fileTmp = join(dataDir, tempOf(file));
+    let thumbTmp = null;
+    writeFileSync(fileTmp, bytes);
+    try {
     const info = { ...meta, license: license ?? meta.license ?? 'original', bytes: bytes.length };
     let thumb = null, duration = null;
     if (type === 'image') {
-      const img = await loadImage(join(dataDir, file));
+      const img = await loadImage(fileTmp);
       info.width = img.width; info.height = img.height;
       const k = Math.min(1, 640 / Math.max(img.width, img.height));
       const c = createCanvas(Math.max(1, Math.round(img.width * k)), Math.max(1, Math.round(img.height * k)));
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       thumb = `thumbs/${slug}@${version}.png`;
-      writeFileSync(join(dataDir, thumb), c.toBuffer('image/png'));
+      thumbTmp = join(dataDir, tempOf(thumb));
+      writeFileSync(thumbTmp, c.toBuffer('image/png'));
     } else {
-      const p = await probeSummary(join(dataDir, file));
+      const p = await probeSummary(fileTmp);
       if (!p.audio) throw new StudioError('The file has no audio stream');
       duration = p.duration; info.sampleRate = p.audio.sampleRate; info.channels = p.audio.channels;
     }
@@ -349,6 +371,13 @@ export function createLibrary(ctx) {
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
       reindex(assetId, { slug, title, description: description.trim(), tags, source: '' });
     });
+    renameSync(fileTmp, join(dataDir, file));
+    if (thumbTmp) renameSync(thumbTmp, join(dataDir, thumb));
+    } catch (err) {
+      rmSync(fileTmp, { force: true });
+      if (thumbTmp) rmSync(thumbTmp, { force: true });
+      throw raceOf(err, slug);
+    }
     return { asset: getAsset(makeRef(slug, version)) };
   }
 
@@ -371,12 +400,13 @@ export function createLibrary(ctx) {
       const at = now();
       const description = `${fam.family}: an open-licensed (${fam.license}) typeface bundled with the studio. Weights: ${weights}. Use it by family name in any parameter of type "font".`;
       const tags = ['font', ...fam.tags];
-      transaction(db, () => {
+      // two processes can start on an empty database at once: the loser's insert is simply not needed
+      try { transaction(db, () => {
         const assetId = q('INSERT INTO assets (slug, type, latest_version, created_at) VALUES (?, ?, 1, ?)').run(fam.slug, 'font', at).lastInsertRowid;
         q(`INSERT INTO asset_versions (asset_id, version, title, description, tags, file, mime, meta, thumb, author, engine, created_at) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .run(assetId, fam.family, description, JSON.stringify(tags), fam.files[0].file, 'font/woff2', JSON.stringify({ family: fam.family, files: fam.files, license: fam.license, licenseFile: `fonts/${fam.licenseFile}`, source: fam.source }), thumb, 'library', ENGINE_VERSION, at);
         reindex(assetId, { slug: fam.slug, title: fam.family, description, tags, source: '' });
-      });
+      }); } catch (e) { if (!/UNIQUE constraint/i.test(String(e?.message))) throw e; }
     }
   }
 

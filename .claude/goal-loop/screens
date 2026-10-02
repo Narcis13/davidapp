@@ -1,0 +1,27 @@
+# Screens for sweep.sh: one per line, a name, a path, a viewport, then any cdp.mjs flags.
+# Viewports: desktop (1440x900), phone (390x844, touch). The page itself scrolls (no @pane).
+#
+# These lines name the showcase data (asset text-word-reveal, clip clip-1-every-frame), so run the
+# sweep against a data dir built by `npm run showcase` (or `serve.sh seed`):
+#   bash .claude/skills/goal-loop/scripts/sweep.sh http://127.0.0.1:8791 "$TMPDIR/sweep"
+# For the small fixture library of scripts/dev-seed.mjs use ./screens.fixture (SCREENS=…).
+# On an empty data dir the id-less screens (/, /clips, /renders, /gallery, /lineage) show their empty states.
+
+library               /                                 desktop --full
+library-filtered      "/?q=text&kind=visual"            desktop
+asset                 /assets/text-word-reveal          desktop --full
+clips                 /clips                            desktop --full
+editor                /clips/clip-1-every-frame         desktop --full
+renders               /renders                          desktop
+gallery               /gallery                          desktop --full
+gallery-open          /gallery                          desktop --js "document.querySelector('[data-testid=gallery-card]')?.click()"
+lineage               /lineage                          desktop --full
+
+library-phone         /                                 phone --scroll
+asset-phone           /assets/text-word-reveal          phone --scroll
+clips-phone           /clips                            phone --scroll
+editor-phone          /clips/clip-1-every-frame         phone --scroll
+renders-phone         /renders                          phone
+gallery-phone         /gallery                          phone
+gallery-open-phone    /gallery                          phone --js "document.querySelector('[data-testid=gallery-card]')?.click()"
+lineage-phone         /lineage                          phone --scroll

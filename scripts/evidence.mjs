@@ -4,7 +4,7 @@
 //
 //   STUDIO_DATA=<dir> node scripts/evidence.mjs [out-dir]        (default out-dir: docs/showcase)
 
-import { copyFileSync, mkdirSync, writeFileSync, statSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync, statSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { cpus } from 'node:os';
 import { createStudio } from '../src/studio/studio.js';
@@ -22,17 +22,19 @@ try {
   const speed = [];
   for (const clip of clips) {
     const r = studio.renders.list({ clip: clip.slug, status: 'done', limit: 1 })[0];
-    if (!r) { console.log(`- ${clip.slug}: no finished render, skipped`); continue; }
+    if (!r) { console.error(`✖ ${clip.slug} has no finished render`); process.exitCode = 1; continue; }
     const mp4 = join(out, 'clips', `${clip.slug}.mp4`);
     copyFileSync(r.outputPath, mp4);
     copyFileSync(r.posterPath, join(out, 'clips', `${clip.slug}.poster.png`));
     if (r.srt) copyFileSync(join(studio.dataDir, r.srt), join(out, 'clips', `${clip.slug}.srt`));
 
     const probe = await run(ffprobePath(), ['-v', 'error', '-print_format', 'json', '-show_entries', 'format=format_name,duration,size,bit_rate:stream=index,codec_type,codec_name,profile,width,height,pix_fmt,r_frame_rate,nb_frames,sample_rate,channels,channel_layout,color_space', mp4]);
+    if (probe.code !== 0) throw new Error(`ffprobe failed for ${clip.slug}: ${probe.stderr}`);
     writeFileSync(join(out, 'reports', `${clip.slug}.ffprobe.json`), probe.stdout);
 
     // loudness: mean and peak volume of the audio track
     const vol = await run(ffmpegPath(), ['-hide_banner', '-nostats', '-i', mp4, '-map', '0:a', '-af', 'volumedetect', '-f', 'null', '-']);
+    if (vol.code !== 0) throw new Error(`volumedetect failed for ${clip.slug}: ${vol.stderr}`);
     const levels = vol.stderr.split('\n').filter((l) => /mean_volume|max_volume|n_samples/.test(l)).map((l) => l.replace(/^\[.*?\]\s*/, '').trim());
     writeFileSync(join(out, 'reports', `${clip.slug}.audio.txt`), `${clip.slug}.mp4 audio track (ffmpeg volumedetect)\n${levels.join('\n')}\n`);
 
@@ -98,7 +100,6 @@ Target: a 30-second 1080p clip in under 5 minutes. Measured: every 32-second cli
 under ten seconds.
 `);
   console.log(`evidence → ${out}`);
-  if (!existsSync(join(out, 'reports', 'reuse.txt'))) process.exitCode = 1;
 } finally {
   await studio.close();
 }

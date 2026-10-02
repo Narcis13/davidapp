@@ -56,6 +56,7 @@ export async function mixToWav(inputs, duration, outPath) {
 export async function renderVideo({ bundle, audio = [], outPath, workers = defaultWorkers(), signal, onProgress = () => {}, hashFrames = [], preset = 'medium', crf = 18 }) {
   const comp = bundle.composition;
   const total = Math.round(comp.duration * comp.fps);
+  if (total < 1) throw new RenderError('The clip is shorter than one frame');
   const wantHash = new Set(hashFrames);
   const args = ['-y', '-hide_banner', '-loglevel', 'warning', '-nostats',
     '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${comp.width}x${comp.height}`, '-framerate', String(comp.fps), '-i', 'pipe:0'];

@@ -8,7 +8,7 @@ import { ENGINE_VERSION, makeRef } from '../core/engine.js';
 import { toSrt } from '../core/composition.js';
 import { renderVideo } from '../render/video.js';
 import { probeSummary } from '../render/ffmpeg.js';
-import { json, now } from '../db/db.js';
+import { json, now, transaction } from '../db/db.js';
 import { StudioError } from './library.js';
 
 const STALE_MS = 45000;
@@ -31,7 +31,7 @@ export function createRenders(ctx, library, clips) {
     if (!s) stmts.set(sql, (s = db.prepare(sql)));
     return s;
   };
-  let timer = null, busy = false, current = null;
+  let timer = null, busy = false, current = null, stopping = false;
 
   function shape(row) {
     if (!row) return null;
@@ -55,11 +55,14 @@ export function createRenders(ctx, library, clips) {
     const visual = comp.tracks.some((t) => t.type !== 'audio' && t.items.length);
     if (!visual) throw new StudioError(`Clip "${clip}" has nothing on its visual tracks yet; add items before rendering.`);
     const total = Math.round(comp.duration * comp.fps);
-    const id = q(`INSERT INTO renders (clip_id, clip_revision, composition, status, frames_total, engine, requested_by, created_at) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?)`)
-      .run(row.id, row.revision, row.composition, total, ENGINE_VERSION, requestedBy, now()).lastInsertRowid;
-    const ins = q('INSERT OR IGNORE INTO render_assets (render_id, version_id) SELECT ?, version_id FROM clip_assets WHERE clip_id = ?');
-    ins.run(id, row.id);
-    if (timer) setImmediate(tick);
+    if (total < 1) throw new StudioError(`Clip "${clip}" is shorter than one frame.`);
+    const id = transaction(db, () => {
+      const rid = q(`INSERT INTO renders (clip_id, clip_revision, composition, status, frames_total, engine, requested_by, created_at) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?)`)
+        .run(row.id, row.revision, row.composition, total, ENGINE_VERSION, requestedBy, now()).lastInsertRowid;
+      q('INSERT OR IGNORE INTO render_assets (render_id, version_id) SELECT ?, version_id FROM clip_assets WHERE clip_id = ?').run(rid, row.id);
+      return rid;
+    });
+    if (timer) setImmediate(() => { tick().catch(() => {}); });
     return get(id);
   }
 
@@ -79,12 +82,10 @@ export function createRenders(ctx, library, clips) {
 
   /** Ask for a render to stop. A queued job is cancelled at once; a running one stops within a second. */
   function cancel(id) {
-    const r = get(id);
-    if (r.status === 'queued') q("UPDATE renders SET status = 'cancelled', finished_at = ? WHERE id = ? AND status = 'queued'").run(now(), id);
-    else if (r.status === 'running') {
-      q('UPDATE renders SET cancel_requested = 1 WHERE id = ?').run(id);
-      if (current?.id === id) current.abort.abort();
-    }
+    get(id);
+    // a job claimed between the two statements is no longer queued, so the second one catches it
+    const dequeued = q("UPDATE renders SET status = 'cancelled', finished_at = ? WHERE id = ? AND status = 'queued'").run(now(), id).changes;
+    if (!dequeued && q("UPDATE renders SET cancel_requested = 1 WHERE id = ? AND status = 'running'").run(id).changes && current?.id === id) current.abort.abort();
     return get(id);
   }
 
@@ -106,6 +107,15 @@ export function createRenders(ctx, library, clips) {
     const outPath = join(dataDir, `${base}.mp4`);
     let lastWrite = 0;
     const lines = [];
+    // Every write is guarded by "still running, still mine": if another runner declared this job
+    // dead, or it was cancelled from another process, this one stops instead of overwriting that.
+    const mine = "id = ? AND status = 'running' AND runner = ?";
+    const beat = () => {
+      const r = q(`UPDATE renders SET heartbeat = ? WHERE ${mine} RETURNING cancel_requested`).get(now(), row.id, runnerId);
+      if (!r || r.cancel_requested) abort.abort();
+    };
+    // the heartbeat runs for the whole job: audio synthesis and worker start-up report no progress
+    const pulse = setInterval(() => { try { beat(); } catch { /* the database was busy; the next beat will do */ } }, 2000);
     try {
       const prep0 = performance.now();
       const { bundle, audio } = await clips.bundleFor(comp);
@@ -117,8 +127,8 @@ export function createRenders(ctx, library, clips) {
           const t = Date.now();
           if (t - lastWrite < 400 && done < total) return;
           lastWrite = t;
-          const r = q('UPDATE renders SET frames_done = ?, progress = ?, heartbeat = ? WHERE id = ? RETURNING cancel_requested').get(done, done / total, now(), row.id);
-          if (r?.cancel_requested) abort.abort();
+          const r = q(`UPDATE renders SET frames_done = ?, progress = ?, heartbeat = ? WHERE ${mine} RETURNING cancel_requested`).get(done, done / total, now(), row.id, runnerId);
+          if (!r || r.cancel_requested) abort.abort();
         },
       });
       if (result.log) lines.push(`ffmpeg: ${result.log}`);
@@ -140,23 +150,27 @@ export function createRenders(ctx, library, clips) {
         realtimeFactor: Math.round((comp.duration / result.seconds) * 100) / 100,
         probe, frameHashes: result.hashes, audioInputs: audio.inputs.length, beats: audio.beats.length, posterFrame,
       };
-      q(`UPDATE renders SET status = 'done', progress = 1, frames_done = ?, output = ?, poster = ?, srt = ?, log = ?, stats = ?, finished_at = ?, heartbeat = ? WHERE id = ?`)
-        .run(total, `${base}.mp4`, `${base}.png`, srtText ? `${base}.srt` : null, lines.join('\n'), JSON.stringify(stats), now(), now(), row.id);
+      const done = q(`UPDATE renders SET status = 'done', progress = 1, frames_done = ?, output = ?, poster = ?, srt = ?, error = NULL, log = ?, stats = ?, finished_at = ?, heartbeat = ? WHERE ${mine}`)
+        .run(total, `${base}.mp4`, `${base}.png`, srtText ? `${base}.srt` : null, lines.join('\n'), JSON.stringify(stats), now(), now(), row.id, runnerId);
+      if (!done.changes) for (const ext of ['mp4', 'png', 'srt']) rmSync(join(dataDir, `${base}.${ext}`), { force: true });
     } catch (e) {
       rmSync(outPath, { force: true });
+      // stopping the runner puts its job back in the queue; a cancel or a failure ends it
       const cancelled = e.cancelled || abort.signal.aborted;
-      q('UPDATE renders SET status = ?, error = ?, log = ?, finished_at = ? WHERE id = ?')
-        .run(cancelled ? 'cancelled' : 'failed', cancelled ? null : String(e.message ?? e), lines.join('\n'), now(), row.id);
+      if (cancelled && stopping) q(`UPDATE renders SET status = 'queued', runner = NULL, progress = 0, frames_done = 0 WHERE ${mine} AND cancel_requested = 0`).run(row.id, runnerId);
+      q(`UPDATE renders SET status = ?, error = ?, log = ?, finished_at = ? WHERE ${mine}`)
+        .run(cancelled ? 'cancelled' : 'failed', cancelled ? null : String(e.message ?? e), lines.join('\n'), now(), row.id, runnerId);
     } finally {
+      clearInterval(pulse);
       current = null;
     }
   }
 
   async function tick() {
-    if (busy) return;
+    if (busy || stopping) return;
     busy = true;
     try {
-      for (;;) {
+      while (!stopping) {
         // a runner that died mid-render leaves a job "running" with an old heartbeat
         const stale = new Date(Date.now() - STALE_MS).toISOString();
         q("UPDATE renders SET status = 'failed', error = 'The process rendering this clip stopped before it finished.', finished_at = ? WHERE status = 'running' AND (heartbeat IS NULL OR heartbeat < ?)").run(now(), stale);
@@ -171,6 +185,7 @@ export function createRenders(ctx, library, clips) {
 
   /** Start claiming queued jobs in this process. */
   function startRunner() {
+    stopping = false;
     if (timer) return;
     timer = setInterval(() => { tick().catch(() => {}); }, 700);
     timer.unref();
@@ -178,9 +193,11 @@ export function createRenders(ctx, library, clips) {
   }
 
   async function stopRunner() {
+    stopping = true;
     if (timer) clearInterval(timer);
     timer = null;
-    if (current) { current.abort.abort(); while (busy) await new Promise((r) => setTimeout(r, 50)); }
+    current?.abort.abort();
+    while (busy) await new Promise((r) => setTimeout(r, 50));
   }
 
   /** Resolve when the render reaches a final state (or after timeoutMs, with whatever state it is in). */

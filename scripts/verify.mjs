@@ -38,7 +38,8 @@ try {
 
   const renders = (await call('list_renders', { clip: CLIP, status: 'done', limit: 100 })).renders;
   const first = renders[renders.length - 1];
-  const fps = 30;
+  const comp = (await call('get_clip', { clip: CLIP })).composition;
+  const fps = comp.fps;
   const frames = Object.keys(first.stats.frameHashes).map(Number);
   const times = frames.map((f) => f / fps);
   const now = await call('frame_hashes', { clip: CLIP, times });
@@ -49,7 +50,6 @@ try {
   if (!clips.some((c) => c.slug === COPY)) await call('repin_clip', { clip: CLIP, name: COPY, only: [ASSET] });
   const copyAssets = (await call('list_clip_assets', { clip: COPY })).assets.filter((a) => a.direct && a.ref.startsWith(`${ASSET}@`)).map((a) => a.ref);
   check(copyAssets.includes(`${ASSET}@${asset.version}`), `${COPY} pins ${copyAssets.join(', ')} directly`);
-  const comp = (await call('get_clip', { clip: CLIP })).composition;
   const item = comp.tracks.flatMap((t) => t.items).find((i) => i.asset === `${ASSET}@1`);
   // v2 changed how words arrive, so compare while they are arriving; once they have settled the
   // two versions draw the same thing, and outside the item nothing may differ at all

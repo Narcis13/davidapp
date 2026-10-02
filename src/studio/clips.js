@@ -2,9 +2,9 @@
 // clip is saved, so an old clip keeps rendering the same frames after its assets move on.
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ENGINE_VERSION, SAMPLE_RATE, makeRef, parseRef } from '../core/engine.js';
+import { ENGINE_VERSION, FORMATS, SAMPLE_RATE, makeRef, parseRef } from '../core/engine.js';
 import { normalizeComposition, itemsOf, reformat } from '../core/composition.js';
 import { mapParams, resolveParams, walkParams } from '../core/schema.js';
 import { hashSeed } from '../core/rng.js';
@@ -14,6 +14,13 @@ import { json, now, transaction } from '../db/db.js';
 import { SLUG_RE, StudioError } from './library.js';
 
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
+
+/** Write a cache file so that nobody can read it half-written. */
+function writeAtomic(path, data) {
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, data);
+  renameSync(tmp, path);
+}
 
 export function createClips(ctx, library) {
   const { db, dataDir, pool } = ctx;
@@ -37,12 +44,17 @@ export function createClips(ctx, library) {
     const problems = [];
     const refs = new Set(), fonts = new Set();
     const pin = (ref, where) => {
-      let wanted = ref;
-      if (repin) {
-        const { slug } = parseRef(ref);
-        if (repin === true || repin.includes(slug)) wanted = slug;
+      let wanted = ref, row;
+      try {
+        if (repin) {
+          const { slug } = parseRef(ref);
+          if (repin === true || repin.includes(slug)) wanted = slug;
+        }
+        row = library.versionRow(wanted);
+      } catch (e) {
+        problems.push(`${where}: ${e.message}`);
+        return null;
       }
-      const row = library.versionRow(wanted);
       if (!row) { problems.push(`${where}: no asset "${wanted}" in the library`); return null; }
       return row;
     };
@@ -103,19 +115,22 @@ export function createClips(ctx, library) {
         beatFile = join(audioDir, `${sha1(`${item.asset}|${item.duration}`)}.beats.json`);
         if (wantBeats && !existsSync(beatFile)) {
           const mono = await decodeMono(path);
-          writeFileSync(beatFile, JSON.stringify(detectBeats(mono.subarray(0, Math.round(item.duration * SAMPLE_RATE)), SAMPLE_RATE)));
+          writeAtomic(beatFile, JSON.stringify(detectBeats(mono.subarray(0, Math.round(item.duration * SAMPLE_RATE)), SAMPLE_RATE)));
         }
       } else {
         const seed = hashSeed(composition.seed, item.id);
-        const b = library.bundle([item.asset]);
+        // assets named in the item's params are part of what the synth needs
+        const extra = [];
+        walkParams(json(row.schema, {}), item.params, ['asset', 'image'], (value) => { if (parseRef(value).version !== null) extra.push(value); });
+        const b = library.bundle([item.asset, ...extra]);
         const key = sha1(JSON.stringify([ENGINE_VERSION, Object.keys(b.assets).sort(), item.asset, item.params, item.duration, seed]));
         path = join(audioDir, `${key}.wav`);
         beatFile = join(audioDir, `${key}.beats.json`);
-        if (!existsSync(path) || !existsSync(beatFile)) {
+        if (!existsSync(path)) {
           const r = await pool.run('audio', { ref: item.asset, params: item.params, duration: item.duration, seed }, { bundle: b, timeout: 120000 });
           const left = new Float32Array(r.left), right = new Float32Array(r.right);
-          writeFileSync(path, encodeWav(left, right, SAMPLE_RATE));
-          writeFileSync(beatFile, JSON.stringify(detectBeats(left, SAMPLE_RATE)));
+          writeAtomic(beatFile, JSON.stringify(detectBeats(left, SAMPLE_RATE)));
+          writeAtomic(path, encodeWav(left, right, SAMPLE_RATE));
         }
       }
       inputs.push({ id: item.id, path, start: item.start, duration: item.duration, gain: item.gain ?? 1, fadeIn: item.fadeIn ?? 0, fadeOut: item.fadeOut ?? 0 });
@@ -215,11 +230,14 @@ export function createClips(ctx, library) {
     const c = p.composition;
     const at = now();
     const from = remixedFrom ? clipRow(remixedFrom) : null;
-    transaction(db, () => {
+    try { transaction(db, () => {
       const id = q(`INSERT INTO clips (slug, title, description, format, width, height, fps, duration, composition, revision, remixed_from, author, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`).run(slug, title ?? slug, description, c.format, c.width, c.height, c.fps, c.duration, JSON.stringify(c), from?.id ?? null, author, at, at).lastInsertRowid;
       writeUsage(id, p.refs, p.fonts);
-    });
+    }); } catch (e) {
+      if (/UNIQUE constraint/i.test(String(e?.message))) throw new StudioError(`A clip named "${slug}" already exists. Use update_clip to change it.`, 'conflict');
+      throw e;
+    }
     return { clip: getClip(slug), checked };
   }
 
@@ -233,8 +251,10 @@ export function createClips(ctx, library) {
       if (doCheck && p.refs.length) checked = await check(c);
     }
     transaction(db, () => {
-      q('UPDATE clips SET title = ?, description = ?, format = ?, width = ?, height = ?, fps = ?, duration = ?, composition = ?, revision = revision + 1, updated_at = ? WHERE id = ?')
-        .run(title ?? row.title, description ?? row.description, c.format, c.width, c.height, c.fps, c.duration, JSON.stringify(c), now(), row.id);
+      // the check above ran without the lock: only write if nobody saved this clip in the meantime
+      const done = q('UPDATE clips SET title = ?, description = ?, format = ?, width = ?, height = ?, fps = ?, duration = ?, composition = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?')
+        .run(title ?? row.title, description ?? row.description, c.format, c.width, c.height, c.fps, c.duration, JSON.stringify(c), now(), row.id, row.revision);
+      if (!done.changes) throw new StudioError(`Clip "${slug}" was changed by someone else while this edit was being checked (it was revision ${row.revision}). Load it again and re-apply the edit.`, 'conflict');
       if (p) writeUsage(row.id, p.refs, p.fonts);
     });
     return { clip: getClip(slug), checked };
@@ -294,6 +314,7 @@ export function createClips(ctx, library) {
   /** A new clip in another format from an existing one. Assets re-flow from the new frame size and safe zones. */
   async function remixClip({ slug, newSlug, format, title, author }) {
     const row = clipRow(slug);
+    if (!FORMATS[format]) throw new StudioError(`Unknown format "${format}"; use ${Object.keys(FORMATS).join(', ')}`);
     return createClip({ slug: newSlug, title: title ?? `${row.title} (${format})`, description: `Remix of "${row.title}" in ${format} format.`, author, composition: reformat(json(row.composition), format), remixedFrom: slug });
   }
 

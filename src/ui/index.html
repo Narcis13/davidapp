@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0b10">
+<title>Fablecut</title>
+<link rel="icon" href="/ui/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/ui/base.css">
+<link rel="stylesheet" href="/ui/screens.css">
+<script type="module" src="/ui/app.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="Fablecut, library">
+    <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#ffd166"/><path d="M11 8.5v15l13-7.5z" fill="#0b0b10"/></svg>
+    <span>Fablecut</span>
+  </a>
+  <nav class="nav" aria-label="Main" data-testid="nav">
+    <a href="/" data-nav="library" data-testid="nav-library"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.2"/><rect x="11" y="3" width="6" height="6" rx="1.2"/><rect x="3" y="11" width="6" height="6" rx="1.2"/><rect x="11" y="11" width="6" height="6" rx="1.2"/></svg><span>Library</span></a>
+    <a href="/clips" data-nav="clips" data-testid="nav-clips"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="1.6"/><path d="M6 4v12M14 4v12M2.5 8H6M2.5 12H6M14 8h3.5M14 12h3.5"/></svg><span>Clips</span></a>
+    <a href="/renders" data-nav="renders" data-testid="nav-renders"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14"/><circle cx="7" cy="5.5" r="1.6" class="fill"/><circle cx="13" cy="10" r="1.6" class="fill"/><circle cx="9" cy="14.5" r="1.6" class="fill"/></svg><span>Renders</span><b class="nav-badge" data-testid="render-badge" hidden>0</b></a>
+    <a href="/gallery" data-nav="gallery" data-testid="nav-gallery"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="1.6"/><path d="M8.2 7.2v5.6l4.8-2.8z" class="fill"/></svg><span>Gallery</span></a>
+    <a href="/lineage" data-nav="lineage" data-testid="nav-lineage"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="4.5" r="2"/><circle cx="5" cy="15.5" r="2"/><circle cx="15" cy="10" r="2"/><path d="M5 6.5v7M5 10h3.5a4.5 4.5 0 0 0 4.5 0"/></svg><span>Lineage</span></a>
+  </nav>
+</header>
+<main id="main" tabindex="-1"></main>
+</body>
+</html>

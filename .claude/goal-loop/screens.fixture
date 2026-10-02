@@ -1,0 +1,27 @@
+# The studio's screens against the fixture data of scripts/dev-seed.mjs (assets scene, dot, kick…;
+# clips demo and demo-vertical). Same list as ./screens, with fixture slugs:
+#   SCREENS=.claude/goal-loop/screens.fixture bash .claude/skills/goal-loop/scripts/sweep.sh http://127.0.0.1:8792 "$TMPDIR/sweep"
+
+library               /                              desktop --full
+library-filtered      "/?q=dot&kind=visual&tag=shape"  desktop
+asset                 /assets/scene                  desktop --full
+asset-value           /assets/easing                 desktop
+asset-audio           /assets/kick                   desktop
+asset-font            /assets/font-inter             desktop
+clips                 /clips                         desktop --full
+editor                /clips/demo-vertical           desktop --full
+editor-custom         /clips/demo                    desktop
+renders               /renders                       desktop
+gallery               /gallery                       desktop
+gallery-open          /gallery                       desktop --js "document.querySelector('[data-testid=gallery-card]')?.click()"
+lineage               /lineage                       desktop --full
+
+library-phone         /                              phone --scroll
+asset-phone           /assets/scene                  phone --scroll
+asset-font-phone      /assets/font-inter             phone
+clips-phone           /clips                         phone --scroll
+editor-phone          /clips/demo-vertical           phone --scroll
+renders-phone         /renders                       phone
+gallery-phone         /gallery                       phone
+gallery-open-phone    /gallery                       phone --js "document.querySelector('[data-testid=gallery-card]')?.click()"
+lineage-phone         /lineage                       phone --scroll

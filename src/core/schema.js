@@ -47,7 +47,10 @@ const EXTRA = {
 
 function typeDefault(def) {
   switch (def.type) {
-    case 'number': case 'integer': return Math.min(Math.max(0, def.min ?? 0), def.max ?? Infinity);
+    case 'number': case 'integer': {
+      const v = Math.min(Math.max(0, def.min ?? 0), def.max ?? Infinity);
+      return def.type === 'integer' ? Math.ceil(v) : v;
+    }
     case 'boolean': return false;
     case 'string': case 'text': return '';
     case 'enum': return def.options[0];
@@ -58,6 +61,11 @@ function typeDefault(def) {
     case 'object': return Object.fromEntries(Object.entries(def.fields).map(([k, d]) => [k, d.default]));
     default: return null;
   }
+}
+
+function deepFreeze(v) {
+  if (v !== null && typeof v === 'object' && !Object.isFrozen(v)) { Object.freeze(v); for (const x of Object.values(v)) deepFreeze(x); }
+  return v;
 }
 
 function normalizeDef(raw, path) {
@@ -86,6 +94,8 @@ function normalizeDef(raw, path) {
   const errors = [];
   def.default = check(def, def.default, `${path}.default`, errors, { strict: true });
   if (errors.length) throw new SchemaError(errors[0].message, errors[0].path);
+  // defaults are handed to every frame by reference, so an asset must not be able to change them
+  deepFreeze(def.default);
   return def;
 }
 
@@ -149,9 +159,9 @@ function check(def, value, path, errors, opts) {
 function resolveInto(schema, values, path, errors, opts) {
   const out = {};
   for (const key of Object.keys(values)) {
-    if (!(key in schema)) errors.push({ path: path ? `${path}.${key}` : key, message: `unknown parameter (known: ${Object.keys(schema).join(', ') || 'none'})` });
+    if (!Object.hasOwn(schema, key)) errors.push({ path: path ? `${path}.${key}` : key, message: `unknown parameter (known: ${Object.keys(schema).join(', ') || 'none'})` });
   }
-  for (const [key, def] of Object.entries(schema)) out[key] = check(def, values[key], path ? `${path}.${key}` : key, errors, opts);
+  for (const [key, def] of Object.entries(schema)) out[key] = check(def, Object.hasOwn(values, key) ? values[key] : undefined, path ? `${path}.${key}` : key, errors, opts);
   return out;
 }
 
@@ -176,7 +186,7 @@ export function walkParams(schema, values, types, visit, path = '') {
     else if (def.type === 'array' && Array.isArray(value)) value.forEach((v, i) => one(def.of, v, `${p}[${i}]`));
     else if (def.type === 'object' && isPlain(value)) walkParams(def.fields, value, types, visit, p);
   };
-  for (const [key, def] of Object.entries(schema)) one(def, values?.[key] === undefined ? def.default : values[key], path ? `${path}.${key}` : key);
+  for (const [key, def] of Object.entries(schema)) one(def, values && Object.hasOwn(values, key) && values[key] !== undefined ? values[key] : def.default, path ? `${path}.${key}` : key);
 }
 
 /** Return a copy of `values` with every value of the given types replaced by map(value, def). */
@@ -189,6 +199,6 @@ export function mapParams(schema, values, types, map) {
     return value;
   };
   const out = { ...values };
-  for (const [key, def] of Object.entries(schema)) if (key in out) out[key] = one(def, out[key]);
+  for (const [key, def] of Object.entries(schema)) if (Object.hasOwn(out, key)) out[key] = one(def, out[key]);
   return out;
 }

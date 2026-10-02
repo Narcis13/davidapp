@@ -61,8 +61,11 @@ export function createText() {
     let w = widths.get(key);
     if (w === undefined) {
       if (widths.size > 20000) widths.clear();
+      // measuring must not leave the context's font changed: a cache miss would then draw differently from a hit
+      const prev = ctx.font;
       ctx.font = font;
       w = ctx.measureText(str).width;
+      ctx.font = prev;
       widths.set(key, w);
     }
     return w;
@@ -72,8 +75,10 @@ export function createText() {
     const key = `${font}\n\u0000metrics`;
     let m = widths.get(key);
     if (!m) {
+      const prev = ctx.font;
       ctx.font = font;
       const tm = ctx.measureText('Hgjpx');
+      ctx.font = prev;
       const asc = tm.fontBoundingBoxAscent ?? tm.actualBoundingBoxAscent ?? size * 0.8;
       const desc = tm.fontBoundingBoxDescent ?? tm.actualBoundingBoxDescent ?? size * 0.2;
       m = { asc, desc };
@@ -133,9 +138,10 @@ export function createText() {
 
     // maxLines: drop the overflow and end the last kept line with an ellipsis
     let truncated = false;
-    if (o.maxLines && lines.length > o.maxLines) {
+    const maxLines = Number.isFinite(o.maxLines) ? Math.max(1, Math.floor(o.maxLines)) : 0;
+    if (maxLines && lines.length > maxLines) {
       truncated = true;
-      lines.length = o.maxLines;
+      lines.length = maxLines;
       const last = lines[lines.length - 1];
       while (last.words.length) {
         const w = last.words[last.words.length - 1];
@@ -209,6 +215,11 @@ export function createText() {
       L = build(ctx, paragraphs, Math.floor(lo * 2) / 2, o);
     }
     L.text = str;
+    // layouts are shared between frames and assets through the cache, so nobody may change one
+    for (const list of [L.lines, L.words, L.glyphs]) { for (const item of list) Object.freeze(item); Object.freeze(list); }
+    for (const line of L.lines) Object.freeze(line.words);
+    for (const word of L.words) Object.freeze(word.glyphs);
+    Object.freeze(L);
     if (layouts.size > 2000) layouts.clear();
     layouts.set(key, L);
     return L;

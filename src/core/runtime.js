@@ -95,34 +95,47 @@ export function describeError(err) {
   return err instanceof Error ? err.message : String(err);
 }
 
-/** Count save()/restore() so a child that leaves the stack unbalanced can't leak state to its parent. */
+/**
+ * Count save()/restore() so a child that leaves the stack unbalanced can't leak state to its
+ * parent, and can't pop saves that belong to its caller (the floor).
+ */
 function track(ctx) {
   if (ctx.__saveDepth) return ctx;
-  let depth = 0;
+  let depth = 0, floor = 0;
   const save = ctx.save.bind(ctx), restore = ctx.restore.bind(ctx);
+  const reset = typeof ctx.reset === 'function' ? ctx.reset.bind(ctx) : null;
   ctx.save = () => { depth++; save(); };
-  ctx.restore = () => { if (depth > 0) { depth--; restore(); } };
+  ctx.restore = () => { if (depth > floor) { depth--; restore(); } };
   ctx.__saveDepth = () => depth;
+  ctx.__floor = (n) => { const old = floor; floor = n; return old; };
+  /** Back to a blank canvas in its default state: nothing an earlier frame did may survive. */
+  ctx.__reset = () => {
+    floor = 0;
+    if (reset) { depth = 0; reset(); return; }
+    while (depth > 0) { depth--; restore(); }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.filter = 'none';
+    ctx.shadowColor = 'rgba(0,0,0,0)';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.fillStyle = '#000000';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+    ctx.setLineDash([]);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.beginPath();
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  };
   return ctx;
 }
 
-function resetState(ctx) {
-  while (ctx.__saveDepth() > 0) ctx.restore();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.filter = 'none';
-  ctx.shadowColor = 'rgba(0,0,0,0)';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-  ctx.lineWidth = 1;
-  ctx.lineCap = 'butt';
-  ctx.lineJoin = 'miter';
-  ctx.setLineDash([]);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-}
+const resetState = (ctx) => ctx.__reset();
 
 /**
  * host: {
@@ -192,7 +205,6 @@ export function createRuntime(host) {
     }
     layerIndex++;
     resetState(layer.ctx);
-    layer.ctx.clearRect(0, 0, w, h);
     return layer;
   }
 
@@ -244,7 +256,9 @@ export function createRuntime(host) {
         const target = o.ctx ?? ctx;
         const depth = target.__saveDepth();
         target.save();
+        const floor = target.__floor(depth + 1);
         try {
+          target.beginPath();
           if (o.x || o.y) target.translate(o.x ?? 0, o.y ?? 0);
           if (o.alpha !== undefined) target.globalAlpha *= Math.min(1, Math.max(0, o.alpha));
           return invoke(child, params, {
@@ -253,6 +267,7 @@ export function createRuntime(host) {
             safe: boxed ? { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: cw, height: ch } : env.safe,
           });
         } finally {
+          target.__floor(floor);
           while (target.__saveDepth() > depth) target.restore();
         }
       },
@@ -392,7 +407,7 @@ export function createRuntime(host) {
         if (tr.type === 'audio' || tr.hidden) continue;
         for (const item of tr.items) {
           if (!activeAt(item, frame, fps)) continue;
-          const lt = t - item.start;
+          const lt = Math.max(0, t - item.start);
           let opacity = item.opacity ?? 1;
           if (item.fadeIn > 0) opacity *= Math.min(1, lt / item.fadeIn);
           if (item.fadeOut > 0) opacity *= Math.min(1, (item.duration - lt) / item.fadeOut);
@@ -404,7 +419,9 @@ export function createRuntime(host) {
           const target = layered ? offscreen(width, height).ctx : ctx;
           const depth = target.__saveDepth();
           target.save();
+          const floor = target.__floor(depth + 1);
           try {
+            target.beginPath();
             if (box) target.translate(box.x, box.y);
             const w = box ? box.width : width, h = box ? box.height : height;
             invoke(e, item.params, {
@@ -416,6 +433,7 @@ export function createRuntime(host) {
             if (err instanceof AssetError) err.message = `item "${item.id}" at ${t.toFixed(3)}s: ${err.message}`;
             throw err;
           } finally {
+            target.__floor(floor);
             while (target.__saveDepth() > depth) target.restore();
           }
           if (layered) {
