@@ -20,7 +20,15 @@ asset({
     const wordH = mark * 0.62, tagH = mark * (wide ? 0.42 : 0.62), gap = mark * 0.16;
     const total = mark + gap + wordH + gap * 0.6 + tagH;
     let y = safe.y + (safe.height - total) / 2;
-    f.use('logo-mark', { tile: th.accent, ink: th.bg, dot: th.accent2, scale: 0.92 }, { x: safe.x + (safe.width - mark) / 2, y, width: mark, height: mark, hold: true, alpha: p.outDur > 0 ? Math.min(1, (f.duration - f.t) / p.outDur) : 1 });
+    // the mark is drawn on its own layer, so it fades out as one piece instead of shape by shape
+    // (with a margin, because the pop overshoots its box)
+    const pad = Math.ceil(mark * 0.15);
+    const layer = f.offscreen(mark + pad * 2, mark + pad * 2);
+    f.use('logo-mark', { tile: th.accent, ink: th.bg, dot: th.accent2, scale: 0.92 }, { ctx: layer.ctx, x: pad, y: pad, width: mark, height: mark, hold: true });
+    f.ctx.save();
+    f.ctx.globalAlpha = p.outDur > 0 ? Math.max(0, Math.min(1, (f.duration - f.t) / p.outDur)) : 1;
+    f.ctx.drawImage(layer.canvas, safe.x + (safe.width - mark) / 2 - pad, y - pad);
+    f.ctx.restore();
     y += mark + gap;
     f.use('text-char-reveal', { text: p.wordmark, font: th.fonts.headline, weight: 700, size: wordH, color: th.ink, tracking: -0.02, stagger: 0.05, drop: 0.4, spin: 0, outDur: p.outDur },
       { x: safe.x, y, width: safe.width, height: wordH, at: 0.55 });

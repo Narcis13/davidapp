@@ -1,7 +1,8 @@
 // Clip 3 · "What's new" · square 1080×1080 · 32 s at 120 bpm.
 // Release notes built from a template. It reuses clip 1 (kinetic words, captions, music, logo…)
 // and clip 2 (chart, lower third, scramble, grid, the v2 word reveal), and adds only a bullet
-// template, a badge, a formats diagram and a baked whoosh.
+// template, a badge, a formats diagram, a baked whoosh and a confetti burst forked from clip 1's
+// sparkle field.
 
 const MAIN = { x: 0.0556, y: 0.15, width: 0.8889, height: 0.66 };
 const label = { x: 0.0556, y: 0.085, width: 0.8889, height: 0.75 };
@@ -17,11 +18,12 @@ export default {
       { id: 'bg', asset: 'bg-gradient-drift', start: 0, duration: 32, params: { colors: ['#7b3ff2', '#3d5afe', '#ffd166'], intensity: 0.3, beatPulse: 0.14, speed: 0.14 } },
       { id: 'grid', asset: 'bg-grid', start: 0, duration: 32, params: { color: '#ffd166', opacity: 0.1, cell: 90 } },
       { id: 'sparks', asset: 'sparkle-field', start: 26.6, duration: 5.4, params: { count: 70, shape: 'diamond' } },
+      { id: 'confetti', asset: 'confetti-burst', start: 27.05, duration: 3.6, params: { originY: 0.4 } },
     ] },
     { id: 'main', name: 'Scenes', type: 'visual', items: [
       { id: 'bars', asset: 'beat-bars', start: 0, duration: 4.2, params: { height: 0.8, bars: 24, decay: 0.26 }, box: { x: MAIN.x, y: 0.72, width: MAIN.width, height: 0.1 } },
       { id: 'notes', asset: 'template-bullets', start: 4, duration: 9, box: MAIN, params: { kicker: 'RELEASE NOTES', title: 'Three ideas,\n*one studio*', bullets: ['Assets are *functions* with parameters', 'Clips *pin* the versions they use', 'An AI edits both through *MCP*'], stagger: 1.5, firstAt: 1.4 } },
-      { id: 'chart', asset: 'chart-bars', start: 13, duration: 7, box: { x: MAIN.x, y: 0.2, width: MAIN.width, height: 0.6 }, params: { title: 'Assets behind each clip', rows: [{ label: 'Clip 1', value: 28, value2: 0 }, { label: 'Clip 2', value: 7, value2: 24 }, { label: 'Clip 3', value: 4, value2: 29 }], series: ['written for it', 'reused'] } },
+      { id: 'chart', asset: 'chart-bars', start: 13, duration: 7, box: { x: MAIN.x, y: 0.2, width: MAIN.width, height: 0.6 }, params: { title: 'Assets behind each clip', rows: [{ label: 'Clip 1', value: 28, value2: 0 }, { label: 'Clip 2', value: 7, value2: 24 }, { label: 'Clip 3', value: 5, value2: 29 }], series: ['written for it', 'reused'] } },
       { id: 'formats', asset: 'format-frames', start: 20, duration: 7, box: { x: MAIN.x, y: 0.36, width: MAIN.width, height: 0.45 }, params: { cycle: 1.5 } },
       { id: 'logo', asset: 'logo-sting', start: 27, duration: 5, box: MAIN, params: { tagline: 'Made with *code*, built from *parts*', outDur: 0.6 } },
     ] },
@@ -39,7 +41,7 @@ export default {
         { start: 4.4, end: 12.6, text: 'A template with content slots: fill in the copy, keep the motion' },
         { start: 13.3, end: 19.6, text: 'Each clip writes less and reuses more' },
         { start: 20.3, end: 26.6, text: 'Assets lay out from the frame, so a remix just re-flows' },
-        { start: 27.6, end: 31.5, text: 'Every clip leaves the next one a head start' },
+        { start: 27.6, end: 31.5, text: 'Every clip leaves the next one a head start 🚀' },
       ] } },
     ] },
     { id: 'music', name: 'Music', type: 'audio', items: [

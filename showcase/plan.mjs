@@ -47,6 +47,8 @@ export const steps = [
   { tool: 'create_clip', args: { name: C3, title: "What's new in Fablecut", description: 'Square release notes built from a bullet-list template. Reuses kinetic type, captions, music and the logo from clip 1 and the chart, lower third, scramble and grid from clip 2.', format: 'square', fps: 30, duration: 32 } },
   { tool: 'bake_asset', args: { ref: 'sfx-whoosh', name: 'whoosh-hit', description: 'A darker, punchier whoosh baked to a WAV file from the sfx-whoosh audio asset, for scene changes.', params: { brightness: 1800, peak: 0.62, gain: 0.6 }, duration: 0.8, tags: ['sfx', 'transition', 'whoosh', 'baked'], for_clip: C3 } },
   ...['badge-pill', 'template-bullets', 'format-frames'].map((n) => create(n, C3)),
+  // a fork: clip 1's sparkle field, turned into a burst
+  { tool: 'fork_asset', args: { ref: 'sparkle-field@1', name: 'confetti-burst', source: '@file:assets/confetti-burst.js', note: 'Forked from sparkle-field: particles burst from a point and fall under gravity.', for_clip: C3 } },
   { tool: 'update_clip', args: { clip: C3, composition: clip3 } },
   render(C3),
 ];

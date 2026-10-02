@@ -7,7 +7,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { connect, callTool, inlineFiles } from '../scripts/mcp.mjs';
-import { EASING, DOT, LABEL } from './helpers.js';
+import { EASING, DOT, LABEL, TONE } from './helpers.js';
 
 let client, dataDir;
 const call = (name, args) => callTool(client, name, args);
@@ -139,6 +139,29 @@ test('compose a clip, look at it, render it to MP4 and list what it used', async
   assert.notDeepEqual(changed.json.frames.map((f) => f.hash), hashes.json.frames.map((f) => f.hash));
 
   assert.match((await call('reuse_report')).text, /Clip 1 · mcp-demo[\s\S]*Clip 2 · mcp-demo-latest[\s\S]*from mcp-demo/);
+});
+
+test('bake a frame into an image asset and an audio asset into a sound, and use the sound in a clip', async () => {
+  const img = await call('bake_asset', { ref: 'dot@1', name: 'dot-still', description: 'A still of the dot asset, baked to a PNG.', width: 64, height: 64, t: 1 });
+  assert.ok(!img.isError, img.text);
+  assert.equal(img.json.added.type, 'image');
+  assert.equal(img.json.added.forkedFrom, 'dot@1');
+  assert.equal(img.images.length, 1);
+
+  assert.ok(!(await call('create_asset', { name: 'kick', source: TONE })).isError);
+  const snd = await call('bake_asset', { ref: 'kick', name: 'kick-baked', description: 'One second of the kick pattern, baked to a WAV.', duration: 1 });
+  assert.ok(!snd.isError, snd.text);
+  assert.equal(snd.json.added.type, 'sound');
+  assert.equal(snd.json.added.forkedFrom, 'kick@1');
+  assert.ok(Math.abs(snd.json.duration - 1) < 0.05);
+
+  const edited = await call('edit_clip', { clip: 'mcp-demo', operations: [{ op: 'add_track', track: { id: 'sound', type: 'audio' } }, { op: 'add_item', track: 'sound', item: { id: 'hit', asset: 'kick-baked', start: 0.5, duration: 1, gain: 0.8 } }] });
+  assert.ok(!edited.isError, edited.text);
+  const render = await call('start_render', { clip: 'mcp-demo', wait_seconds: 60 });
+  assert.equal(render.json.status, 'done', render.json.error ?? '');
+  assert.equal(render.json.log, undefined, 'ffmpeg wrote warnings');
+  const used = (await call('list_clip_assets', { clip: 'mcp-demo' })).json.assets;
+  assert.ok(used.some((a) => a.ref === 'kick-baked@1' && a.type === 'sound'));
 });
 
 test('the CLI helper inlines @file: arguments', () => {

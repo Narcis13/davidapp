@@ -183,7 +183,11 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       return send(res, 404, { error: `No route for ${req.method} ${path}` });
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed' });
-    if (path.startsWith('/media/')) return file(req, res, studio.dataDir, path.slice(7));
+    // only what the studio produces for viewing: never the database or the caches
+    // each folder is its own root, so "renders/..\studio.db" cannot climb out of it
+    const media = /^\/media\/(thumbs|files|renders)\/(.+)$/.exec(path);
+    if (media) return file(req, res, join(studio.dataDir, media[1]), media[2]);
+    if (path.startsWith('/media/')) return send(res, 404, { error: `Not found: ${path}` });
     if (path.startsWith('/fonts/')) return file(req, res, FONTS_DIR, path.slice(7), { cache: 'max-age=86400' });
     if (path.startsWith('/core/')) return file(req, res, CORE, path.slice(6));
     if (path.startsWith('/ui/')) return file(req, res, UI, path.slice(4));
