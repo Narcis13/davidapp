@@ -1,0 +1,19 @@
+1
+00:00:00,400 --> 00:00:03,800
+Clip three: mostly borrowed parts
+
+2
+00:00:04,400 --> 00:00:12,600
+A template with content slots: fill in the copy, keep the motion
+
+3
+00:00:13,300 --> 00:00:19,600
+Each clip writes less and reuses more
+
+4
+00:00:20,300 --> 00:00:26,600
+Assets lay out from the frame, so a remix just re-flows
+
+5
+00:00:27,600 --> 00:00:31,500
+Every clip leaves the next one a head start 🚀

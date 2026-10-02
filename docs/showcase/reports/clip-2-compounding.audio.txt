@@ -1,0 +1,4 @@
+clip-2-compounding.mp4 audio track (ffmpeg volumedetect)
+n_samples: 3072000
+mean_volume: -16.4 dB
+max_volume: -2.1 dB

@@ -1,0 +1,228 @@
+{
+ "asset": "text-word-reveal",
+ "editedVia": "MCP update_asset",
+ "versions": [
+  {
+   "ref": "text-word-reveal@1",
+   "madeForClip": "clip-1-every-frame",
+   "note": null
+  },
+  {
+   "ref": "text-word-reveal@2",
+   "madeForClip": "clip-2-compounding",
+   "note": "Words rise from behind a mask by default; adds the mode parameter (mask, rise, pop)."
+  }
+ ],
+ "clip": "clip-1-every-frame",
+ "pins": [
+  "text-word-reveal@1"
+ ],
+ "firstRender": 1,
+ "framesCompared": 18,
+ "unchangedAfterEdit": true,
+ "repinnedCopy": "clip-1-repinned",
+ "repinnedPins": [
+  "text-word-reveal@2"
+ ],
+ "item": {
+  "id": "idea",
+  "start": 4,
+  "duration": 6
+ },
+ "framesWhileWordsArrive": [
+  {
+   "t": 4.167,
+   "frame": 125,
+   "onScreen": true,
+   "v1": "835975e301fb7848a2763f4c6101a67a2b3df86a8042a1ef785f648d8ca2e63f",
+   "v2": "11bb02b0b41e14dc3cd8d742f21ee5b3a4a69b72c48f147d8e62c9c156bdb92a",
+   "changed": true
+  },
+  {
+   "t": 4.3,
+   "frame": 129,
+   "onScreen": true,
+   "v1": "9b63505194450f5d5351d84e30c1945eaccc7960fa0a3e7cce273dfda6139d4f",
+   "v2": "1c00b72e80e95fcc21eb84040a050cf02f062a86b25e21fde83b6556f4d1faad",
+   "changed": true
+  },
+  {
+   "t": 4.467,
+   "frame": 134,
+   "onScreen": true,
+   "v1": "8418d94d0fc42a0d9deba0f998ef846bdf331c2d1684c92b6fb1397302470d7d",
+   "v2": "1dbd8b006d10d770ef584d99c59a609bac2c808af348616cf7699e7a4aeea098",
+   "changed": true
+  },
+  {
+   "t": 4.6,
+   "frame": 138,
+   "onScreen": true,
+   "v1": "34ea1f0c697cec570dfe1976cac020f2741511c119e9b138e95ce1faf8f9a641",
+   "v2": "6376750d606bef3bf3b205779d69f54715a277d38798b3dcf851cba990aab36a",
+   "changed": true
+  },
+  {
+   "t": 4.767,
+   "frame": 143,
+   "onScreen": true,
+   "v1": "b785b9dccd7770f03f95a83c9135afea27a9c356b6897e026bbbbdf4421921bd",
+   "v2": "d0c2ba3c1a79ce9816cd6dc6d094b933eaf462c12b3389da7d9c942653a07531",
+   "changed": true
+  },
+  {
+   "t": 4.9,
+   "frame": 147,
+   "onScreen": true,
+   "v1": "84c96fdbbb943df34acc8227968153d209e976767d11e83e7e8ec7c867add632",
+   "v2": "3a9a1cc23ec29542cca4ce2551a43d13b92b23c28352bf1f0d5f2511b958ccc6",
+   "changed": true
+  }
+ ],
+ "sampledFrames": [
+  {
+   "t": 0,
+   "frame": 0,
+   "onScreen": false,
+   "v1": "6d2eeccbb216f9939dc7c13ccb2cd2067f830104f48007c8071e4dabe8bd357a",
+   "v2": "6d2eeccbb216f9939dc7c13ccb2cd2067f830104f48007c8071e4dabe8bd357a",
+   "changed": false
+  },
+  {
+   "t": 1,
+   "frame": 30,
+   "onScreen": false,
+   "v1": "c8900d2504e616e65f354030ffcad83a8331a14bc12df2506e75da71d656c28e",
+   "v2": "c8900d2504e616e65f354030ffcad83a8331a14bc12df2506e75da71d656c28e",
+   "changed": false
+  },
+  {
+   "t": 3,
+   "frame": 90,
+   "onScreen": false,
+   "v1": "555170ca58c57b0895db6c5da9cbd23f7359b12ae74971219af1039d81faf0cd",
+   "v2": "555170ca58c57b0895db6c5da9cbd23f7359b12ae74971219af1039d81faf0cd",
+   "changed": false
+  },
+  {
+   "t": 5,
+   "frame": 150,
+   "onScreen": true,
+   "v1": "8fdb0561b183d5702d981e42dc83100ff647c0f6308ec2455c4d05a0c5bcd003",
+   "v2": "3ec0dced29142b61a07a243fb2f15f5ae7560a59f3d4512224c26c1d4f1edb13",
+   "changed": true
+  },
+  {
+   "t": 7,
+   "frame": 210,
+   "onScreen": true,
+   "v1": "782f9e92acac28c99ae67ab347f84543c49a83fc4f53234a006bd4ad159af5af",
+   "v2": "782f9e92acac28c99ae67ab347f84543c49a83fc4f53234a006bd4ad159af5af",
+   "changed": false
+  },
+  {
+   "t": 9,
+   "frame": 270,
+   "onScreen": true,
+   "v1": "1d2f93f43cbe4bc7ae1652631222303714b9ffd3a2758323dfc23755762f1598",
+   "v2": "1d2f93f43cbe4bc7ae1652631222303714b9ffd3a2758323dfc23755762f1598",
+   "changed": false
+  },
+  {
+   "t": 11,
+   "frame": 330,
+   "onScreen": false,
+   "v1": "9a618129cdf344cca594b77d8a6bf7b8e358c1ea19d95c22e9c3a921dbf56fb6",
+   "v2": "9a618129cdf344cca594b77d8a6bf7b8e358c1ea19d95c22e9c3a921dbf56fb6",
+   "changed": false
+  },
+  {
+   "t": 13,
+   "frame": 390,
+   "onScreen": false,
+   "v1": "42ca2a9c88bf56f5ab40b16b9e2f06a80d04309453a4aa0c426ac56d19a81cfe",
+   "v2": "42ca2a9c88bf56f5ab40b16b9e2f06a80d04309453a4aa0c426ac56d19a81cfe",
+   "changed": false
+  },
+  {
+   "t": 15,
+   "frame": 450,
+   "onScreen": false,
+   "v1": "30a36678bf83e1af52c805b08b0372dadf34cdbf67fa340fedb0d8c5273a683a",
+   "v2": "30a36678bf83e1af52c805b08b0372dadf34cdbf67fa340fedb0d8c5273a683a",
+   "changed": false
+  },
+  {
+   "t": 17,
+   "frame": 510,
+   "onScreen": false,
+   "v1": "f46af9f209bd6da247378df84ea491f3073a75b3038920b62134b79c2ae505d5",
+   "v2": "f46af9f209bd6da247378df84ea491f3073a75b3038920b62134b79c2ae505d5",
+   "changed": false
+  },
+  {
+   "t": 19,
+   "frame": 570,
+   "onScreen": false,
+   "v1": "471a153917813a7ff4616ea42683de16a3cabb985f7f106ca598c634af1b8996",
+   "v2": "471a153917813a7ff4616ea42683de16a3cabb985f7f106ca598c634af1b8996",
+   "changed": false
+  },
+  {
+   "t": 21,
+   "frame": 630,
+   "onScreen": false,
+   "v1": "30185a5ad941bb46aa49cda70c954b6420ebe93be4da7eba74f9d42e59e3b6ce",
+   "v2": "30185a5ad941bb46aa49cda70c954b6420ebe93be4da7eba74f9d42e59e3b6ce",
+   "changed": false
+  },
+  {
+   "t": 23,
+   "frame": 690,
+   "onScreen": false,
+   "v1": "765fe07c331d9b06f412e3cd365d2b2d1b0a77be227ac479de1f4c9c63e94c77",
+   "v2": "765fe07c331d9b06f412e3cd365d2b2d1b0a77be227ac479de1f4c9c63e94c77",
+   "changed": false
+  },
+  {
+   "t": 25,
+   "frame": 750,
+   "onScreen": false,
+   "v1": "76c6cf0943e2d437a57ae8f8fef117f4209c8a7d7806ab8325924d09156456b0",
+   "v2": "76c6cf0943e2d437a57ae8f8fef117f4209c8a7d7806ab8325924d09156456b0",
+   "changed": false
+  },
+  {
+   "t": 27,
+   "frame": 810,
+   "onScreen": false,
+   "v1": "17e99852a38e57a474b2266d708072132b6193ba6cee041f82f5d43215f7bf5c",
+   "v2": "17e99852a38e57a474b2266d708072132b6193ba6cee041f82f5d43215f7bf5c",
+   "changed": false
+  },
+  {
+   "t": 29,
+   "frame": 870,
+   "onScreen": false,
+   "v1": "5de4138dcfe7a3b3986a5d7b3d5d8a72868b61063daa0822f14622e9184a612b",
+   "v2": "5de4138dcfe7a3b3986a5d7b3d5d8a72868b61063daa0822f14622e9184a612b",
+   "changed": false
+  },
+  {
+   "t": 31,
+   "frame": 930,
+   "onScreen": false,
+   "v1": "546bc645d122f6e8a767ad1635af3660f51a87fa61010236ab160ea714f13c3d",
+   "v2": "546bc645d122f6e8a767ad1635af3660f51a87fa61010236ab160ea714f13c3d",
+   "changed": false
+  },
+  {
+   "t": 31.967,
+   "frame": 959,
+   "onScreen": false,
+   "v1": "c151414f6feecd5b1251dd4c955a790c6064c4d54876541a7e73b526861713dc",
+   "v2": "c151414f6feecd5b1251dd4c955a790c6064c4d54876541a7e73b526861713dc",
+   "changed": false
+  }
+ ]
+}

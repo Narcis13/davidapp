@@ -1,0 +1,13 @@
+Text-animation assets in the library: 9
+
+- text-captions (v1): Subtitles from timed cues, shown in a rounded pill inside the safe zone (bottom, middle or top). The current word is highlighted karaoke-style. Cues are exported to SRT with the render.. Used by: clip-1-every-frame, clip-2-compounding, clip-3-release-notes, clip-1-repinned
+- text-char-reveal (v1): Per-character text reveal. Used by: clip-1-every-frame, clip-2-compounding, clip-3-release-notes, clip-1-repinned
+- text-counter (v1): Animated number. Used by: clip-1-every-frame, clip-2-compounding, clip-3-release-notes, clip-1-repinned
+- text-highlight (v1): Text whose *emphasized* words get a marker swept behind them (style "marker"), a line drawn under them ("underline"), or a box drawn around them ("box"), one after another once the copy has faded in.. Used by: clip-1-every-frame, clip-2-compounding, clip-1-repinned
+- text-kinetic (v1): Kinetic typography. Used by: clip-1-every-frame, clip-3-release-notes, clip-1-repinned
+- text-line-reveal (v1): Per-line text reveal. Used by: clip-1-every-frame, clip-2-compounding, clip-3-release-notes, clip-1-repinned
+- text-scramble (v1): Decoder text effect. Used by: clip-2-compounding, clip-3-release-notes
+- text-typewriter (v1): Typewriter text. Used by: clip-1-every-frame, clip-2-compounding, clip-3-release-notes, clip-1-repinned
+- text-word-reveal (v2): Per-word text reveal. Used by: clip-1-every-frame, clip-2-compounding, clip-3-release-notes, clip-1-repinned
+
+Used by the showcase clips: 9 of 9 (text-captions, text-char-reveal, text-counter, text-highlight, text-kinetic, text-line-reveal, text-scramble, text-typewriter, text-word-reveal)

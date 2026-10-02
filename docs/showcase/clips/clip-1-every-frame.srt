@@ -1,0 +1,23 @@
+1
+00:00:00,300 --> 00:00:03,800
+No editor was opened to make this
+
+2
+00:00:04,300 --> 00:00:09,600
+Each asset is a JavaScript function of time and parameters
+
+3
+00:00:10,300 --> 00:00:15,600
+The studio calls it once for every frame
+
+4
+00:00:16,300 --> 00:00:21,600
+Thirty frames a second, straight into FFmpeg
+
+5
+00:00:22,300 --> 00:00:27,200
+Seeded randomness: render it twice, get the same pixels
+
+6
+00:00:28,200 --> 00:00:31,500
+And every asset stays in the library

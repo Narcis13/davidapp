@@ -1,0 +1,4 @@
+clip-3-release-notes.mp4 audio track (ffmpeg volumedetect)
+n_samples: 3072000
+mean_volume: -16.7 dB
+max_volume: -1.4 dB

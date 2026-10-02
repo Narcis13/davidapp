@@ -1,0 +1,17 @@
+Composition depth: assets used by clips that compose other assets
+
+clip-1-every-frame:
+  code-window@1 composes 4 assets (text-typewriter@1, easing@1, spring@1, theme-ember@1); deepest chain, 3 levels: code-window@1 → text-typewriter@1 → text-block@1
+  logo-sting@1 composes 4 assets (logo-mark@1, text-char-reveal@1, text-word-reveal@1, theme-ember@1); deepest chain, 3 levels: logo-sting@1 → logo-mark@1 → easing@1
+  stat-trio@1 composes 3 assets (text-counter@1, text-line-reveal@1, theme-ember@1); deepest chain, 3 levels: stat-trio@1 → text-counter@1 → easing@1
+
+clip-2-compounding:
+  chart-bars@1 composes 4 assets (text-line-reveal@1, text-counter@1, easing@1, theme-ember@1); deepest chain, 3 levels: chart-bars@1 → text-line-reveal@1 → easing@1
+  logo-sting@1 composes 4 assets (logo-mark@1, text-char-reveal@1, text-word-reveal@1, theme-ember@1); deepest chain, 3 levels: logo-sting@1 → logo-mark@1 → easing@1
+  lower-third@1 composes 4 assets (text-line-reveal@1, text-typewriter@1, easing@1, theme-ember@1); deepest chain, 3 levels: lower-third@1 → text-line-reveal@1 → easing@1
+
+clip-3-release-notes:
+  chart-bars@1 composes 4 assets (text-line-reveal@1, text-counter@1, easing@1, theme-ember@1); deepest chain, 3 levels: chart-bars@1 → text-line-reveal@1 → easing@1
+  logo-sting@1 composes 4 assets (logo-mark@1, text-char-reveal@1, text-word-reveal@1, theme-ember@1); deepest chain, 3 levels: logo-sting@1 → logo-mark@1 → easing@1
+  lower-third@1 composes 4 assets (text-line-reveal@1, text-typewriter@1, easing@1, theme-ember@1); deepest chain, 3 levels: lower-third@1 → text-line-reveal@1 → easing@1
+  template-bullets@1 composes 4 assets (badge-pill@1, text-line-reveal@1, text-word-reveal@2, theme-ember@1); deepest chain, 3 levels: template-bullets@1 → badge-pill@1 → spring@1

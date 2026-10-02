@@ -1,0 +1,23 @@
+Reuse report: 4 clip(s), 40 asset(s) in the library (fonts not counted)
+
+Clip 1 · clip-1-every-frame — "Every frame is a function" (vertical 1080×1920, 32s)
+  uses 28 assets: 28 created for this clip, 0 reused from earlier clips (0 as-is, 0 as a new version, 0 as a fork)
+  created (28): beat-bars@1, bg-gradient-drift@1, code-window@1, logo-sting@1, music-loop@1, progress-segments@1, sfx-whoosh@1, sparkle-field@1, stat-trio@1, text-captions@1, text-char-reveal@1, text-highlight@1, text-kinetic@1, text-line-reveal@1, text-word-reveal@1, watermark@1, drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-counter@1, text-typewriter@1, theme-ember@1, fablecut-mark@1
+
+Clip 2 · clip-2-compounding — "The library compounds" (horizontal 1920×1080, 32s)
+  uses 31 assets: 7 created for this clip, 24 reused from earlier clips (23 as-is, 1 as a new version, 0 as a fork)
+  from clip-1-every-frame (24): bg-gradient-drift@1, logo-sting@1, music-loop@1, progress-segments@1, sfx-whoosh@1, text-captions@1, text-highlight@1, text-line-reveal@1, text-word-reveal@2 [new version], watermark@1, drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-typewriter@1, text-word-reveal@1, theme-ember@1, fablecut-mark@1
+  created (7): bg-grid@1, chart-bars@1, lineage-flow@1, lower-third@1, pin-diagram@1, text-scramble@1, theme-tide@1
+
+Clip 3 · clip-3-release-notes — "What's new in Fablecut" (square 1080×1080, 32s)
+  uses 34 assets: 3 created for this clip, 31 reused from earlier clips (29 as-is, 0 as a new version, 2 as a fork)
+  from clip-1-every-frame (26): beat-bars@1, bg-gradient-drift@1, confetti-burst@1 [fork of sparkle-field@1], logo-sting@1, music-loop@1, progress-segments@1, sparkle-field@1, text-captions@1, text-kinetic@1, theme-ember@1, watermark@1, whoosh-hit@1 [fork of sfx-whoosh@1], drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-line-reveal@1, text-typewriter@1, text-word-reveal@1, fablecut-mark@1
+  from clip-2-compounding (5): bg-grid@1, chart-bars@1, lower-third@1, text-scramble@1, text-word-reveal@2
+  created (3): format-frames@1, template-bullets@1, badge-pill@1
+
+Clip 4 · clip-1-repinned — "Every frame is a function (latest assets)" (vertical 1080×1920, 32s) · remix of clip-1-every-frame
+  uses 29 assets: 0 created for this clip, 29 reused from earlier clips (29 as-is, 0 as a new version, 0 as a fork)
+  from clip-1-every-frame (28): beat-bars@1, bg-gradient-drift@1, code-window@1, logo-sting@1, music-loop@1, progress-segments@1, sfx-whoosh@1, sparkle-field@1, stat-trio@1, text-captions@1, text-char-reveal@1, text-highlight@1, text-kinetic@1, text-line-reveal@1, watermark@1, drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-counter@1, text-typewriter@1, text-word-reveal@1, theme-ember@1, fablecut-mark@1
+  from clip-2-compounding (1): text-word-reveal@2
+
+Most reused: easing (3 later clips), spring (3 later clips), text-block (3 later clips), theme-ember (3 later clips), text-word-reveal (3 later clips), text-char-reveal (3 later clips), text-line-reveal (3 later clips), text-typewriter (3 later clips), text-counter (3 later clips), text-captions (3 later clips)

@@ -9,33 +9,33 @@ Code create and edit assets and clips; three showcase clips prove the compoundin
 
 Started 2026-10-02 on branch `main` at `53f094f`.
 
-**Next:** integrate and verify the studio UI the subagent built (`src/ui`, sweep with `.claude/goal-loop/screens`), then M8: build the showcase into a clean data dir, `npm run evidence` + `npm run verify` into `docs/showcase/`, drive the playground and a render in the built-in browser, README.
+**Next:** nothing owed. The goal is complete; every contract item is pass. To regenerate the evidence: `STUDIO_DATA=<empty dir> npm run showcase && npm run evidence && npm run verify`.
 
 ## Contract (Done means)
 
 | # | criterion | verified by | evidence | status |
 |---|---|---|---|---|
-| G1 | Every gate in `.claude/goal-loop/gates` passes (typecheck, lint, tests) | `gates.sh` | Log | open |
-| G2 | Zero console/network problems on every studio screen at 1440×900 and 390×844 | `sweep.sh` + built-in browser console | Log, `docs/showcase/studio/` | open |
-| G3 | Showcase reproducible from the repo: `npm run showcase` rebuilds library + 3 clips from an empty data dir through the MCP server | final audit on empty data | `showcase/`, Log | open |
-| D1 | Three showcase clips made in order through the MCP pipeline, each 30–120 s, ≥1 vertical 1080×1920 and ≥1 horizontal 1920×1080, zero errors in render and server logs | `showcase/build.mjs` (MCP client) + render rows (`log` empty, status done) + server log grep | `docs/showcase/clips/*.mp4`, `docs/showcase/reports/renders.json` | open |
-| D2 | Clip 1 creates its own assets; clip 2 reuses ≥3 clip-1 assets; clip 3 reuses assets from clip 1 and clip 2; DB records it; lineage view shows it; a script prints it | `npm run report:reuse` + lineage screenshot | `docs/showcase/reports/reuse.txt`, `docs/showcase/studio/lineage-*.png` | open |
-| D3 | Each clip is a valid MP4: H.264 + AAC, expected resolution/fps, ≥30 s, yuv420p, faststart | `ffprobe` JSON per clip | `docs/showcase/reports/<clip>.ffprobe.json` | open |
-| D4 | Each clip has a non-silent audio track | `ffmpeg volumedetect` mean/max volume | `docs/showcase/reports/<clip>.audio.txt` | open |
-| D5 | Each clip's contact sheet (FFmpeg `tile`) looked at frame by frame: nothing blank, broken, clipped, garbled or overflowing | FFmpeg tile sheets from the MP4s, read with the Read tool | `docs/showcase/sheets/<clip>-*.png`, Log | open |
-| D6 | ≥6 distinct text-animation assets in the library; the three clips use ≥4 of them | `search_assets tags:[text-animation]` + reuse report | `docs/showcase/reports/text-animations.txt` | open |
-| D7 | An asset used in a clip composes ≥2 other assets, ≥3 levels deep | `list_clip_assets` depth + `get_asset` deps | `docs/showcase/reports/composition-depth.txt` | open |
-| D8 | Versioning holds: a clip-1 asset is edited through MCP into a new version; clip 1 re-renders to the same frame hashes; a clip pinning the new version differs | `scripts/verify.mjs` (MCP `frame_hashes` before/after + repinned copy) | `docs/showcase/reports/versioning.json` | open |
-| D9 | Rendering is deterministic: two renders of the same clip give identical sampled frame hashes | two full renders, compare `stats.frameHashes` | `docs/showcase/reports/determinism.json` | open |
-| D10 | MCP server works end to end: scripted client searches, creates, edits to a new version, renders a frame to PNG, starts a render that completes; a broken asset is rejected with a useful error and nothing crashes; registered in `.mcp.json` | `test/mcp.test.js` over stdio | Log (test names), `.mcp.json` | open |
-| D11 | Studio UI works: library search + filter, asset playground (param change updates preview), clip preview with scrubbing, render queue with a live render, gallery playing a finished clip, lineage view; at 1440×900 and 390×844 | sweep + interactions driven with `cdp.mjs --js` and the built-in browser | `docs/showcase/studio/*.png` | open |
-| D12 | Asset-playground workflow and starting a render from the UI are driven in a real browser and recorded (GIF, or screenshot sequence) | built-in browser (`mcp__Claude_Browser__*`) | `docs/showcase/studio/workflow-*.png` | open |
-| D13 | Render speed measured: seconds to render a 30 s 1080p clip on this machine, with method; target < 5 min | render stats of the showcase clips (wall clock, frames/s, workers) | `docs/showcase/reports/render-speed.md` | open |
-| D14 | Tests cover the asset contract (schema validation, determinism, composition, version pinning), composition→frames, the DB layer, the MCP tools | `npm test` | `test/*.test.js`, Log | open |
-| D15 | README explains running the studio, writing an asset, using the MCP server from Claude Code, making a clip; links the three clips | read it | `README.md` | open |
-| D16 | Same asset code drives preview and render (one runtime, `src/core`), preview frame ≈ rendered frame | side-by-side of browser preview vs server frame | `docs/showcase/studio/preview-vs-render.png` | open |
-| D17 | Asset code runs isolated with timeouts; a bad asset can't crash server or studio | tests (endless loop, throw) + UI check with a failing asset | Log | open |
-| D18 | Repo hygiene: no DB/scratch/caches committed; fonts' licenses in repo; MP4s committed only if < 50 MB each | `git status`, `ls -la docs/showcase/clips` | Log | open |
+| G1 | Every gate in `.claude/goal-loop/gates` passes (typecheck, lint, tests) | `gates.sh` | Log | pass |
+| G2 | Zero console/network problems on every studio screen at 1440×900 and 390×844 | `sweep.sh` + built-in browser console | Log, `docs/showcase/studio/` | pass |
+| G3 | Showcase reproducible from the repo: `npm run showcase` rebuilds library + 3 clips from an empty data dir through the MCP server | final audit on empty data | `showcase/`, Log | pass |
+| D1 | Three showcase clips made in order through the MCP pipeline, each 30–120 s, ≥1 vertical 1080×1920 and ≥1 horizontal 1920×1080, zero errors in render and server logs | `showcase/build.mjs` (MCP client) + render rows (`log` empty, status done) + server log grep | `docs/showcase/clips/*.mp4`, `docs/showcase/reports/renders.json`, Log | pass |
+| D2 | Clip 1 creates its own assets; clip 2 reuses ≥3 clip-1 assets; clip 3 reuses assets from clip 1 and clip 2; DB records it; lineage view shows it; a script prints it | `npm run report:reuse` + lineage screenshot | `docs/showcase/reports/reuse.txt`, `docs/showcase/studio/lineage-*.png` | pass |
+| D3 | Each clip is a valid MP4: H.264 + AAC, expected resolution/fps, ≥30 s, yuv420p, faststart | `ffprobe` JSON per clip | `docs/showcase/reports/<clip>.ffprobe.json` | pass |
+| D4 | Each clip has a non-silent audio track | `ffmpeg volumedetect` mean/max volume | `docs/showcase/reports/<clip>.audio.txt` | pass |
+| D5 | Each clip's contact sheet (FFmpeg `tile`) looked at frame by frame: nothing blank, broken, clipped, garbled or overflowing | FFmpeg tile sheets from the MP4s, read with the Read tool | `docs/showcase/sheets/<clip>-*.png`, Log | pass |
+| D6 | ≥6 distinct text-animation assets in the library; the three clips use ≥4 of them | `search_assets tags:[text-animation]` + reuse report | `docs/showcase/reports/text-animations.txt` | pass |
+| D7 | An asset used in a clip composes ≥2 other assets, ≥3 levels deep | `list_clip_assets` depth + `get_asset` deps | `docs/showcase/reports/composition-depth.txt` | pass |
+| D8 | Versioning holds: a clip-1 asset is edited through MCP into a new version; clip 1 re-renders to the same frame hashes; a clip pinning the new version differs | `scripts/verify.mjs` (MCP `frame_hashes` before/after + repinned copy) | `docs/showcase/reports/versioning.json` | pass |
+| D9 | Rendering is deterministic: two renders of the same clip give identical sampled frame hashes | two full renders, compare `stats.frameHashes` | `docs/showcase/reports/determinism.json` | pass |
+| D10 | MCP server works end to end: scripted client searches, creates, edits to a new version, renders a frame to PNG, starts a render that completes; a broken asset is rejected with a useful error and nothing crashes; registered in `.mcp.json` | `test/mcp.test.js` over stdio | Log (test names), `.mcp.json` | pass |
+| D11 | Studio UI works: library search + filter, asset playground (param change updates preview), clip preview with scrubbing, render queue with a live render, gallery playing a finished clip, lineage view; at 1440×900 and 390×844 | sweep + interactions driven with `cdp.mjs --js` and the built-in browser | `docs/showcase/studio/*.png` | pass |
+| D12 | Asset-playground workflow and starting a render from the UI are driven in a real browser and recorded (GIF, or screenshot sequence) | Claude in Chrome on this machine, recorded with its GIF tool | `docs/showcase/studio/workflow-playground.gif`, `workflow-render.gif` | pass |
+| D13 | Render speed measured: seconds to render a 30 s 1080p clip on this machine, with method; target < 5 min | render stats of the showcase clips (wall clock, frames/s, workers) | `docs/showcase/reports/render-speed.md` | pass |
+| D14 | Tests cover the asset contract (schema validation, determinism, composition, version pinning), composition→frames, the DB layer, the MCP tools | `npm test` | `test/*.test.js`, Log | pass |
+| D15 | README explains running the studio, writing an asset, using the MCP server from Claude Code, making a clip; links the three clips | read it | `README.md` | pass |
+| D16 | Same asset code drives preview and render (one runtime, `src/core`), preview frame ≈ rendered frame | side-by-side of browser preview vs server frame | `docs/showcase/studio/preview-vs-render.png` | pass |
+| D17 | Asset code runs isolated with timeouts; a bad asset can't crash server or studio | tests (endless loop, throw) + UI check with a failing asset | Log | pass |
+| D18 | Repo hygiene: no DB/scratch/caches committed; fonts' licenses in repo; MP4s committed only if < 50 MB each | `git status`, `ls -la docs/showcase/clips` | Log | pass |
 
 Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
@@ -44,12 +44,12 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 1. [x] **Engine**: asset contract + runtime (`src/core`), text layout, schema, seeded RNG, Node host with vm sandbox, worker pool with watchdog (D14, D17)
 2. [x] **Library + clips + render pipeline**: SQLite schema, versioned assets with validation, pinned clips, audio synth + beat detection, parallel frame render → FFmpeg, queue with progress/cancel (D14, D9 groundwork)
 3. [x] **MCP server**: 25 tools, `.mcp.json`, scripted stdio client test (D10)
-4. [ ] **Studio server + UI**: HTTP API, library, playground, clip editor, queue, gallery, lineage; preview worker running the same runtime (D11, D16, G2)
+4. [x] **Studio server + UI**: HTTP API, library, playground, clip editor, queue, gallery, lineage; preview worker running the same runtime (D11, D16, G2)
 5. [x] **Showcase clip 1** (vertical): 28 assets (easing, spring, themes, 8 text animations, graphics, scenes, synth music, a baked image) + composition; renders in ~6 s (D1–D7; evidence is collected in M8)
 6. [x] **Showcase clip 2** (horizontal): 7 new assets, 24 reused from clip 1, `text-word-reveal` edited to v2 through MCP (D2, D8)
 7. [x] **Showcase clip 3** (square): 3 new assets + a baked sound, 25 reused from clip 1 and 5 from clip 2 (D2)
-8. [ ] **Verification + docs**: verify script (versioning, determinism, reuse, speed), contact sheets read, browser-driven workflows, README, reviewer pass (D8, D9, D12, D13, D15)
-9. [ ] **Final audit**: clean data dir, rebuild showcase from the repo, all gates, full sweep, every contract item checked
+8. [x] **Verification + docs**: verify script (versioning, determinism, reuse, speed), contact sheets read, browser-driven workflows, README, reviewer pass (D8, D9, D12, D13, D15)
+9. [x] **Final audit**: clean data dir, rebuild showcase from the repo, all gates, full sweep, every contract item checked
 
 ## Decisions
 
@@ -70,6 +70,8 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - **A reused version is credited to the clip it was made for**: clip 3 using `text-word-reveal@2` counts as reuse from clip 2.
 - Additions beyond the brief: `validate_asset` dry-run filmstrips, clip contact sheets without encoding, `bake_asset` (frame → image asset with lineage), `remix_clip`, `repin_clip`, SRT export from `cues` params, `value` asset previews, per-render sampled frame hashes.
 
+- **Reviewer pass (backend)**: fixed: API guard (loopback Host, same-origin writes, JSON-only bodies), file streams closed on abort, `/media` limited to thumbs/files/renders, queue heartbeat for the whole job with ownership-guarded writes and clean runner shutdown, revision-guarded clip saves, version files written under temp names and renamed after the transaction, atomic audio cache, scratch layers and contexts fully reset per frame (`ctx.reset()`), restore floor for child assets, frozen layout cache and schema defaults, alias collisions when pinning, asset-typed params bundled for single-asset frames, zero-frame clips rejected, input coercion (400s instead of 500s). Not changed: the `vm` sandbox is still not a security boundary against hostile asset code (asset code can reach the host realm through the objects it is given; real containment needs a separate process under Node's permission model), wall clock reachable through `Intl`, unbounded `f.offscreen` sizes, `repin_clip only:[x]` being a silent no-op for an indirect dependency, very long unbroken words being slow to fit. *(worth doing before exposing the studio beyond localhost)*
+
 ## Blocked
 
 - *(none)*
@@ -84,6 +86,8 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - Errors thrown inside a vm context are from another realm: no `instanceof Error`.
 - Don't write `\n` or `\t` inside `node - <<'EOF'` patch scripts: they land in the file as real newlines/tabs. Use the Edit tool for lines with escapes.
 - Text animations settle into the same pixels in v1 and v2 of `text-word-reveal`; the versions differ only while words arrive, so `verify.mjs` compares frames from the first second of the item.
+- Claude in Chrome drives a hidden window here: `requestAnimationFrame` does not fire (so drive the scrub bar, not Play), and a screenshot can time out unless a `javascript_tool` call precedes it. Refs from `find` are safer than coordinates because the viewport size drifts.
+- `clip-1-repinned` in the library is made by `npm run verify` (clip 1 with the word reveal moved to v2); it is the fourth clip in the lineage view and in `reuse.txt`.
 - FFmpeg `fps=1` contact sheets sample just before each beat, so `beat-bars` look flat there; they do jump (see the clip sheets rendered with `render_clip_frame`).
 - `node --test` needs the glob `"test/*.test.js"` on Windows (a bare `test/` is taken as a module path).
 
@@ -93,3 +97,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - 2026-10-02: M1–M3 done. Gates: typecheck PASS, lint PASS, test PASS (40 tests: core 15, library 12, pipeline 8, mcp 5). Verified by tests: broken assets rejected with asset name + line; endless loop killed by watchdog; version pinning by frame hash; MP4 probes as h264/yuv420p/aac with faststart; two renders give equal sampled hashes; MCP client over stdio creates, edits, renders.
 - 2026-10-02: M4 server side (HTTP API, Range media, preview worker running `src/core` in a Web Worker: checked headless, clip + asset frames draw). UI screens delegated to a subagent (`src/ui`), still running.
 - 2026-10-02: M5–M7: 38 showcase assets and 3 compositions authored; `showcase/build.mjs` replays 49 MCP calls on an empty data dir in ~23 s including the three renders (clip 1: 6.3 s, clip 2: 7.9 s, clip 3: 4.6 s for 32 s each, 8 workers). Looked at every frame of all six FFmpeg contact sheets (16 tiles each): no blank, clipped or overflowing frames; fixed along the way: lost code indentation (text layout now keeps leading whitespace), a visible box from the kinetic flash, low-contrast stat labels, tiny lower-thirds and badge digits, a pink accent on a pink background. `scripts/verify.mjs`: clip 1 unchanged after the v2 edit (18 hashes), re-pinned copy differs while the words arrive, second renders of all three clips match the first (18 hashes each). Gates: typecheck PASS, lint PASS, test PASS (42).
+- 2026-10-02: M4 done: UI built by a subagent (7 screens, generated param controls, timeline with drag/trim, lineage matrix); I added exact frames for drafts and asset-typed params, a sensible starting frame in the playground, and the lineage cell for a clip holding two versions of one asset. Sweep on the showcase data: 17 screens at 1440×900 and 390×844, 0 problems; server log: 0 ERROR lines. Read the library, playground, editor, lineage screenshots at both sizes.
+- 2026-10-02: reviewer agent on the backend: 30 findings, fixed the ones listed under Decisions, with regression tests (foreign origin/host refused, leaky scratch layer deterministic, frozen layout/defaults, alias collision, concurrent clip edits, zero-frame clip). Gates: typecheck PASS, lint PASS, test PASS (56). Showcase rebuilt and re-verified after the engine changes.
+- 2026-10-02: M8: playground and render workflows driven in Claude in Chrome (real Chrome on this machine): changed a colour and a word (preview updated live), safe zone, format switch, exact frame; scrubbed clip 3 in the editor, started a render from the editor, watched it go 0/960 → 103/960 → done on /renders, played it in the gallery (readyState 4, 1080×1080, 32 s). Console: no errors or warnings; 153 network requests, none failed or ≥ 400. Two GIFs exported. Also headless: cancel a running render from the queue (running → cancelled at 196/960) and edit source → validate → draft preview → exact frame of the draft → save as new version (badge-pill@2).
+- 2026-10-02: M9 final audit on an empty data dir: `npm run showcase` (51 MCP calls, exit 0, no error/warn lines in the build log; renders 6.4 s / 7.8 s / 4.6 s), `npm run verify` (9 checks pass: clip 1 unchanged after the v2 edit on 18 hashes, re-pinned copy differs on 6 of 6 entrance frames and matches on 15 of 15 others, second renders of all three clips match the first on 18 hashes each), `npm run evidence` (three MP4s 17.3 / 20.9 / 12.2 MB, h264 + aac, yuv420p, 30 fps, 32.0 s; mean volume −16.5 / −16.4 / −16.7 dB; ffmpeg log empty on every render). Read all six FFmpeg contact sheets again (96 frames): no blank, broken, clipped or garbled frames, no text outside the safe zones. Sweep on the final data: 17 screens, 0 problems; server log: 0 ERROR lines. Gates: typecheck PASS, lint PASS, test PASS (56). Servers stopped, Chrome tab closed, scratch GIFs removed from Downloads.
