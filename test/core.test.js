@@ -118,6 +118,22 @@ test('text: fit shrinks the size until the block fits the box', () => {
   assert.ok(larger.height > 300.5 || larger.width > 600.5);
 });
 
+test('text: fit shrinks a long word rather than breaking it', () => {
+  const T = createText();
+  const L = T.layout(ctx, 'Compounding', { font: 'Inter', weight: 800, size: 300, maxWidth: 500, fit: true });
+  assert.equal(L.lines.length, 1);
+  assert.ok(!L.broken && L.width <= 500.5 && L.size < 300);
+});
+
+test('text: leading whitespace is kept as indentation', () => {
+  const T = createText();
+  const L = T.layout(ctx, 'a {\n  b\n}', { font: 'JetBrains Mono', size: 40 });
+  assert.equal(L.lines.length, 3);
+  const cell = T.measure(ctx, 'a', { font: 'JetBrains Mono', size: 40 });
+  assert.ok(Math.abs(L.words[2].x - 2 * cell) < 0.5, `indent is ${L.words[2].x}, expected ${2 * cell}`);
+  assert.equal(L.words[3].x, 0);
+});
+
 test('text: maxLines truncates with an ellipsis; fit avoids truncation', () => {
   const T = createText();
   const text = 'one two three four five six seven eight nine ten';

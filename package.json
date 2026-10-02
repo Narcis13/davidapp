@@ -30,6 +30,11 @@
     "test": "node --test --test-reporter=spec --test-timeout=120000 \"test/*.test.js\"",
     "studio": "node src/server/index.js",
     "mcp": "node src/mcp/server.js",
-    "fonts": "node scripts/vendor-fonts.mjs"
+    "fonts": "node scripts/vendor-fonts.mjs",
+    "showcase": "node showcase/build.mjs",
+    "seed": "node showcase/build.mjs --no-render",
+    "report:reuse": "node scripts/mcp.mjs call reuse_report",
+    "verify": "node scripts/verify.mjs",
+    "evidence": "node scripts/evidence.mjs"
   }
 }

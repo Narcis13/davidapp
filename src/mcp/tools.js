@@ -147,11 +147,11 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     },
     {
       name: 'bake_asset',
-      title: 'Bake a frame into an image asset',
-      description: 'Render one frame of a visual asset and store it as an image asset (with lineage back to its source), for use as a texture, logo or still.',
+      title: 'Bake an asset into a file asset',
+      description: 'Render one frame of a visual asset and store it as an image asset, or synthesize an audio asset and store it as a WAV sound asset. The new asset keeps its lineage back to the source. Use it for textures, logos, stills and one-shot sounds.',
       input: {
         ref: REF,
-        name: z.string().describe('Name of the new image asset'),
+        name: z.string().describe('Name of the new image or sound asset'),
         description: z.string(),
         params: PARAMS.optional(),
         t: z.number().min(0).optional(),
@@ -164,6 +164,14 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         author: AUTHOR,
       },
       run: async (a) => {
+        const src = library.getAsset(a.ref, { includeSource: false });
+        if (src.kind === 'audio') {
+          // an audio asset bakes to a WAV sound asset
+          const duration = a.duration ?? src.duration ?? 2;
+          const wav = await studio.clipAudio({ composition: { width: 320, height: 180, fps: 30, duration, tracks: [{ type: 'audio', items: [{ id: 'bake', asset: src.ref, start: 0, duration, params: a.params ?? {} }] }] } });
+          const r = await library.addFileAsset({ slug: a.name, type: 'sound', path: wav, description: a.description, tags: a.tags ?? ['baked'], forClip: a.for_clip, author: who(a.author), derivedFrom: src.ref, meta: { bakedFrom: src.ref, params: a.params ?? {} } });
+          return { json: { added: compactAsset(r.asset), duration: r.asset.duration } };
+        }
         const frame = await studio.assetFrame({ ref: a.ref, params: a.params, t: a.t, duration: a.duration, width: a.width ?? 1080, height: a.height ?? 1080, background: a.transparent === false ? '#101018' : 'rgba(0,0,0,0)' });
         const r = await library.addFileAsset({ slug: a.name, type: 'image', data: frame.png, ext: '.png', description: a.description, tags: a.tags ?? ['baked'], forClip: a.for_clip, author: who(a.author), derivedFrom: frame.ref, meta: { bakedFrom: frame.ref, params: a.params ?? {} } });
         return { json: { added: compactAsset(r.asset) }, images: [image(`baked-${a.name}`, frame.png)] };

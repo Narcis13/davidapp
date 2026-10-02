@@ -69,10 +69,11 @@ test('a queued render can be cancelled, and a running one stops', async () => {
   const queued = t.studio.renders.enqueue({ clip: 'demo' });
   assert.equal(t.studio.renders.cancel(queued.id).status, 'cancelled');
 
-  await t.studio.clips.createClip({ slug: 'long', title: 'Long', author: AUTHOR, composition: { ...smallComposition({ duration: 60, fps: 30 }), tracks: [{ id: 'main', type: 'visual', items: [{ id: 'scene', asset: 'scene', start: 0, duration: 60 }] }] } });
+  await t.studio.clips.createClip({ slug: 'long', title: 'Long', author: AUTHOR, check: false, composition: { format: 'horizontal', fps: 30, duration: 120, tracks: [{ id: 'main', type: 'visual', items: [{ id: 'scene', asset: 'scene', start: 0, duration: 120 }] }] } });
   const job = t.studio.renders.enqueue({ clip: 'long' });
   t.studio.renders.startRunner();
-  for (let i = 0; i < 200 && t.studio.renders.get(job.id).framesDone < 5; i++) await new Promise((r) => setTimeout(r, 50));
+  // 3600 full-HD frames take long enough that the cancel always lands mid-render
+  for (let i = 0; i < 400 && t.studio.renders.get(job.id).framesDone < 5; i++) await new Promise((r) => setTimeout(r, 25));
   t.studio.renders.cancel(job.id);
   const end = await t.studio.renders.wait(job.id, 30000);
   assert.equal(end.status, 'cancelled');

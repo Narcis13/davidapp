@@ -76,7 +76,7 @@ export function normalizeDefinition(raw) {
 }
 
 /** Point an error at the asset and line it came from. */
-function annotate(err, ref) {
+function annotate(err, ref, lineOffset = 0) {
   if (err instanceof AssetError && err.chain.length) {
     err.chain.unshift(ref);
     return err;
@@ -84,7 +84,7 @@ function annotate(err, ref) {
   const where = /([a-z0-9-]+@[\w.]+\.js):(\d+):(\d+)/.exec(String(err?.stack ?? ''));
   // errors thrown inside a sandbox come from another realm, so no instanceof here
   const text = err && typeof err.message === 'string' ? `${!err.name || err.name === 'Error' || err.name === 'AssetError' ? '' : `${err.name}: `}${err.message}` : String(err);
-  const out = new AssetError(text + (where ? ` (${where[1]}:${where[2]}:${where[3]})` : ''), [ref]);
+  const out = new AssetError(text + (where ? ` (${where[1]}:${Math.max(1, Number(where[2]) - lineOffset)}:${where[3]})` : ''), [ref]);
   out.cause = err;
   return out;
 }
@@ -128,6 +128,7 @@ function resetState(ctx) {
  * host: {
  *   evaluate(source, filename) → the object passed to asset({...}),
  *   createCanvas(width, height) → a canvas with getContext('2d'),
+ *   lineOffset: lines the host's wrapper adds before the source (for error locations),
  * }
  */
 export function createRuntime(host) {
@@ -142,7 +143,7 @@ export function createRuntime(host) {
 
   function compile(ref, source, deps = {}) {
     let raw;
-    try { raw = host.evaluate(source, `${ref}.js`); } catch (e) { throw annotate(e, ref); }
+    try { raw = host.evaluate(source, `${ref}.js`); } catch (e) { throw annotate(e, ref, host.lineOffset); }
     let def;
     try { def = normalizeDefinition(raw); } catch (e) { throw annotate(e, ref); }
     return { ref, def, deps };
@@ -268,7 +269,7 @@ export function createRuntime(host) {
     try {
       return fn(f, p);
     } catch (err) {
-      throw annotate(err, e.ref);
+      throw annotate(err, e.ref, host.lineOffset);
     }
   }
 

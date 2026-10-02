@@ -290,7 +290,7 @@ export function createLibrary(ctx) {
   const createAsset = (o) => saveFunction({ ...o, mode: 'create' });
   const updateAsset = (o) => saveFunction({ ...o, mode: 'update' });
 
-  /** A new asset that starts from another one's source (optionally changed). Lineage is kept. */
+  /** A new asset that starts from another one's source (optionally changed). Lineage is kept. @param {any} o */
   async function forkAsset({ ref, slug, source, author, forClip, note, params }) {
     const from = requireVersion(ref);
     if (from.type !== 'function') throw new StudioError(`${ref} is a ${from.type} asset; only function assets can be forked`);

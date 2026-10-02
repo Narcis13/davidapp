@@ -23,7 +23,8 @@ export function createLineage(ctx, library, clips) {
       const assets = clips.clipAssets(c.slug).filter((a) => a.type !== 'font').map((a) => {
         const row = library.versionRow(a.ref);
         const root = rootOrigin(row.asset_id);
-        const from = a.relation === 'created' ? (a.forkedFrom && root !== c.id ? slugOf.get(root) ?? null : null) : a.originClip;
+        // a reused version counts for the clip that version was made for (else the asset's first clip)
+        const from = a.relation === 'created' ? (a.forkedFrom && root !== c.id ? slugOf.get(root) ?? null : null) : a.relation === 'reused' ? a.versionMadeFor ?? a.originClip : a.originClip;
         const how = a.relation === 'created' ? (from ? 'fork' : 'created') : a.relation === 'new-version' ? 'new-version' : a.originClip === null ? 'library' : 'as-is';
         return { ref: a.ref, slug: a.slug, version: a.version, type: a.type, kind: a.kind, direct: a.direct, depth: a.depth, how, from, forkedFrom: a.forkedFrom, title: a.title };
       });

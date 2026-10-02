@@ -24,9 +24,11 @@ export function graphemes(text) {
 
 /** Split text into paragraphs of tokens. With markup, *asterisks* mark emphasis and \* is a literal. */
 function tokenize(text, markup) {
+  /** @type {any[]} */
   const paragraphs = [];
   let em = false;
   for (const para of String(text).split('\n')) {
+    /** @type {any} */
     const tokens = [];
     let cur = '', space = false, curEm = em;
     const flush = (glue) => {
@@ -43,6 +45,8 @@ function tokenize(text, markup) {
       cur += ch;
     }
     flush(false);
+    // leading whitespace is indentation (code keeps its shape); a tab counts as two spaces
+    tokens.indent = /^[ \t]*/.exec(para)[0].replace(/\t/g, '  ').length;
     paragraphs.push(tokens);
   }
   return paragraphs;
@@ -101,16 +105,19 @@ export function createText() {
     };
 
     const lines = [];
+    let broken = false;
     for (const tokens of paragraphs) {
-      let cur = { words: [], width: 0 };
+      let cur = { words: [], width: (tokens.indent ?? 0) * width(ctx, base, ' ') };
       const push = () => { lines.push(cur); cur = { words: [], width: 0 }; };
       for (const tok of tokens) {
         let word = makeWord(tok.text, tok.em);
         let gap = tok.space && cur.words.length ? spaceW : 0;
         if (wrap && cur.words.length && cur.width + gap + word.width > maxWidth + 0.01) { push(); gap = 0; }
+        else if (wrap && !cur.words.length && cur.width + word.width > maxWidth + 0.01) cur.width = 0; // an indent that leaves no room is dropped
         // a single word wider than the box breaks between graphemes rather than overflowing
         while (wrap && word.width > maxWidth + 0.01 && word.glyphs.length > 1) {
           let n = 1;
+          broken = true;
           while (n < word.glyphs.length - 1 && word.glyphs[n].x + word.glyphs[n].width <= maxWidth) n++;
           const head = makeWord(word.glyphs.slice(0, n).map((g) => g.ch).join(''), tok.em);
           cur.words.push({ ...head, lx: cur.width + gap, gap });
@@ -148,7 +155,7 @@ export function createText() {
     const blockWidth = lines.reduce((m, l) => Math.max(m, l.width), 0);
     const boxWidth = Number.isFinite(maxWidth) ? maxWidth : blockWidth;
     const align = o.align ?? 'left';
-    const out = { size, font: base, lineHeight, ascent: asc, descent: desc, width: blockWidth, boxWidth, height: lines.length * lineHeight, truncated, lines: [], words: [], glyphs: [], length: 0 };
+    const out = { size, font: base, lineHeight, ascent: asc, descent: desc, width: blockWidth, boxWidth, height: lines.length * lineHeight, truncated, broken, lines: [], words: [], glyphs: [], length: 0 };
     let pos = 0;
     lines.forEach((l, li) => {
       const x = align === 'center' ? (boxWidth - l.width) / 2 : align === 'right' ? boxWidth - l.width : 0;
@@ -190,7 +197,8 @@ export function createText() {
     if (hit) return hit;
     const paragraphs = tokenize(str, !!o.markup);
     const maxWidth = o.maxWidth ?? Infinity, maxHeight = o.maxHeight ?? Infinity;
-    const fits = (L) => L.width <= maxWidth + 0.5 && L.height <= maxHeight + 0.5 && !L.truncated;
+    // fitting prefers a smaller size over cutting a word in two or dropping lines
+    const fits = (L) => L.width <= maxWidth + 0.5 && L.height <= maxHeight + 0.5 && !L.truncated && !L.broken;
     let L = build(ctx, paragraphs, o.size, o);
     if (o.fit && !fits(L)) {
       let lo = Math.min(o.minSize ?? 8, o.size), hi = o.size;

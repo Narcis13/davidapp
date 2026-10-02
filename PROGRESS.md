@@ -9,7 +9,7 @@ Code create and edit assets and clips; three showcase clips prove the compoundin
 
 Started 2026-10-02 on branch `main` at `53f094f`.
 
-**Next:** M4 — HTTP server + studio UI (`src/server`, `src/ui`), then `.claude/goal-loop/serve.sh` and `screens`.
+**Next:** integrate and verify the studio UI the subagent built (`src/ui`, sweep with `.claude/goal-loop/screens`), then M8: build the showcase into a clean data dir, `npm run evidence` + `npm run verify` into `docs/showcase/`, drive the playground and a render in the built-in browser, README.
 
 ## Contract (Done means)
 
@@ -45,9 +45,9 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 2. [x] **Library + clips + render pipeline**: SQLite schema, versioned assets with validation, pinned clips, audio synth + beat detection, parallel frame render → FFmpeg, queue with progress/cancel (D14, D9 groundwork)
 3. [x] **MCP server**: 25 tools, `.mcp.json`, scripted stdio client test (D10)
 4. [ ] **Studio server + UI**: HTTP API, library, playground, clip editor, queue, gallery, lineage; preview worker running the same runtime (D11, D16, G2)
-5. [ ] **Showcase clip 1** (vertical): its assets (easing, text-animation family, backgrounds, synth music) + composition + render (D1–D7)
-6. [ ] **Showcase clip 2** (horizontal): reuses ≥3 clip-1 assets, a clip-1 asset gets a v2 through MCP (D2, D8)
-7. [ ] **Showcase clip 3**: reuses assets from clips 1 and 2 (D2)
+5. [x] **Showcase clip 1** (vertical): 28 assets (easing, spring, themes, 8 text animations, graphics, scenes, synth music, a baked image) + composition; renders in ~6 s (D1–D7; evidence is collected in M8)
+6. [x] **Showcase clip 2** (horizontal): 7 new assets, 24 reused from clip 1, `text-word-reveal` edited to v2 through MCP (D2, D8)
+7. [x] **Showcase clip 3** (square): 3 new assets + a baked sound, 25 reused from clip 1 and 5 from clip 2 (D2)
 8. [ ] **Verification + docs**: verify script (versioning, determinism, reuse, speed), contact sheets read, browser-driven workflows, README, reviewer pass (D8, D9, D12, D13, D15)
 9. [ ] **Final audit**: clean data dir, rebuild showcase from the repo, all gates, full sweep, every contract item checked
 
@@ -64,6 +64,10 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - **Emoji use the system emoji font** (Segoe UI Emoji on Windows) via fallback: the open Noto Color Emoji subsets (COLRv1) did not render in Skia's Node build. Text layout treats emoji/ZWJ sequences as single graphemes. Emoji pixels therefore depend on the OS.
 - **Typecheck gate** is `tsc --checkJs` (non-strict) over everything except `src/ui`; the UI is covered by ESLint and the browser sweep. Plain JS + JSDoc, no build step, so the browser loads `src/core` directly.
 - **Clip edits bump a revision; renders snapshot the composition** they were made from, so the gallery can always say exactly what was rendered.
+- **The showcase is a replayable plan** (`showcase/plan.mjs`): an ordered list of MCP tool calls that `showcase/build.mjs` sends to the real MCP server over stdio. Building it into an empty data dir reproduces the library, the lineage and the three renders. While authoring I rebuilt from scratch on every iteration, so the committed history is clean (each asset at v1, one v2).
+- **Square 1080×1080 for clip 3** (the brief's bonus format), so the three clips cover all three formats.
+- **Strict render logs**: any line FFmpeg writes at warning level fails the showcase build; audio inputs are opened with `-guess_layout_max 0` so a WAV without a channel mask does not produce one.
+- **A reused version is credited to the clip it was made for**: clip 3 using `text-word-reveal@2` counts as reuse from clip 2.
 - Additions beyond the brief: `validate_asset` dry-run filmstrips, clip contact sheets without encoding, `bake_asset` (frame → image asset with lineage), `remix_clip`, `repin_clip`, SRT export from `cues` params, `value` asset previews, per-render sampled frame hashes.
 
 ## Blocked
@@ -78,9 +82,14 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - A killed child's `exitCode` stays null on Windows; track `'close'` instead (bit `renderVideo` once).
 - WAVs are written as WAVE_FORMAT_EXTENSIBLE so FFmpeg does not warn "Guessed Channel Layout".
 - Errors thrown inside a vm context are from another realm: no `instanceof Error`.
+- Don't write `\n` or `\t` inside `node - <<'EOF'` patch scripts: they land in the file as real newlines/tabs. Use the Edit tool for lines with escapes.
+- Text animations settle into the same pixels in v1 and v2 of `text-word-reveal`; the versions differ only while words arrive, so `verify.mjs` compares frames from the first second of the item.
+- FFmpeg `fps=1` contact sheets sample just before each beat, so `beat-bars` look flat there; they do jump (see the clip sheets rendered with `render_clip_frame`).
 - `node --test` needs the glob `"test/*.test.js"` on Windows (a bare `test/` is taken as a module path).
 
 ## Log
 
 - 2026-10-02: baseline: empty repo (only the goal-loop skill and the brief). Spikes: Skia canvas + woff2 fonts + emoji fallback OK, raw RGBA → FFmpeg pipe OK (60 frames 1080×1920 in 1.26 s), `node:sqlite` FTS5 OK.
 - 2026-10-02: M1–M3 done. Gates: typecheck PASS, lint PASS, test PASS (40 tests: core 15, library 12, pipeline 8, mcp 5). Verified by tests: broken assets rejected with asset name + line; endless loop killed by watchdog; version pinning by frame hash; MP4 probes as h264/yuv420p/aac with faststart; two renders give equal sampled hashes; MCP client over stdio creates, edits, renders.
+- 2026-10-02: M4 server side (HTTP API, Range media, preview worker running `src/core` in a Web Worker: checked headless, clip + asset frames draw). UI screens delegated to a subagent (`src/ui`), still running.
+- 2026-10-02: M5–M7: 38 showcase assets and 3 compositions authored; `showcase/build.mjs` replays 49 MCP calls on an empty data dir in ~23 s including the three renders (clip 1: 6.3 s, clip 2: 7.9 s, clip 3: 4.6 s for 32 s each, 8 workers). Looked at every frame of all six FFmpeg contact sheets (16 tiles each): no blank, clipped or overflowing frames; fixed along the way: lost code indentation (text layout now keeps leading whitespace), a visible box from the kinetic flash, low-contrast stat labels, tiny lower-thirds and badge digits, a pink accent on a pink background. `scripts/verify.mjs`: clip 1 unchanged after the v2 edit (18 hashes), re-pinned copy differs while the words arrive, second renders of all three clips match the first (18 hashes each). Gates: typecheck PASS, lint PASS, test PASS (42).

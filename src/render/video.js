@@ -38,7 +38,7 @@ export async function mixToWav(inputs, duration, outPath) {
   const args = ['-y', '-hide_banner', '-loglevel', 'error'];
   if (!inputs.length) args.push('-f', 'lavfi', '-t', String(duration), '-i', 'anullsrc=r=48000:cl=stereo', '-c:a', 'pcm_s16le', outPath);
   else {
-    for (const a of inputs) args.push('-i', a.path);
+    for (const a of inputs) args.push('-guess_layout_max', '0', '-i', a.path);
     args.push('-filter_complex', audioGraph(inputs, duration, 0), '-map', '[aout]', '-c:a', 'pcm_s16le', '-ar', '48000', '-ac', '2', outPath);
   }
   const r = await run(ffmpegPath(), args);
@@ -59,7 +59,8 @@ export async function renderVideo({ bundle, audio = [], outPath, workers = defau
   const wantHash = new Set(hashFrames);
   const args = ['-y', '-hide_banner', '-loglevel', 'warning', '-nostats',
     '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${comp.width}x${comp.height}`, '-framerate', String(comp.fps), '-i', 'pipe:0'];
-  if (audio.length) for (const a of audio) args.push('-i', a.path);
+  // a WAV without a channel mask would make FFmpeg warn that it guessed the layout; aformat sets it
+  if (audio.length) for (const a of audio) args.push('-guess_layout_max', '0', '-i', a.path);
   else args.push('-f', 'lavfi', '-t', String(comp.duration), '-i', 'anullsrc=r=48000:cl=stereo');
   const graph = audioGraph(audio, comp.duration);
   const video = '[0:v]scale=in_range=full:out_range=tv:out_color_matrix=bt709:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p[vout]';
