@@ -1,0 +1,35 @@
+{
+  "name": "fablecut",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A studio for making videos with code, where every clip leaves reusable assets behind.",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@napi-rs/canvas": "^1.0.10",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@types/node": "^26.6.4",
+    "eslint": "^10.11.0",
+    "globals": "^17.13.0",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "node --test --test-reporter=spec --test-timeout=120000 \"test/*.test.js\"",
+    "studio": "node src/server/index.js",
+    "mcp": "node src/mcp/server.js",
+    "fonts": "node scripts/vendor-fonts.mjs"
+  }
+}

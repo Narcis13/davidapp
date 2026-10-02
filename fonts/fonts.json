@@ -1,0 +1,126 @@
+[
+  {
+    "family": "Inter",
+    "slug": "font-inter",
+    "tags": [
+      "sans",
+      "ui",
+      "body"
+    ],
+    "license": "OFL-1.1",
+    "licenseFile": "licenses/inter-LICENSE.txt",
+    "source": "@fontsource/inter@5.3.0",
+    "files": [
+      {
+        "file": "inter-latin-400-normal.woff2",
+        "weight": 400,
+        "style": "normal"
+      },
+      {
+        "file": "inter-latin-600-normal.woff2",
+        "weight": 600,
+        "style": "normal"
+      },
+      {
+        "file": "inter-latin-800-normal.woff2",
+        "weight": 800,
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "family": "Space Grotesk",
+    "slug": "font-space-grotesk",
+    "tags": [
+      "sans",
+      "display",
+      "geometric"
+    ],
+    "license": "OFL-1.1",
+    "licenseFile": "licenses/space-grotesk-LICENSE.txt",
+    "source": "@fontsource/space-grotesk@5.3.0",
+    "files": [
+      {
+        "file": "space-grotesk-latin-400-normal.woff2",
+        "weight": 400,
+        "style": "normal"
+      },
+      {
+        "file": "space-grotesk-latin-700-normal.woff2",
+        "weight": 700,
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "family": "JetBrains Mono",
+    "slug": "font-jetbrains-mono",
+    "tags": [
+      "mono",
+      "code"
+    ],
+    "license": "OFL-1.1",
+    "licenseFile": "licenses/jetbrains-mono-LICENSE.txt",
+    "source": "@fontsource/jetbrains-mono@5.3.0",
+    "files": [
+      {
+        "file": "jetbrains-mono-latin-400-normal.woff2",
+        "weight": 400,
+        "style": "normal"
+      },
+      {
+        "file": "jetbrains-mono-latin-700-normal.woff2",
+        "weight": 700,
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "family": "Anton",
+    "slug": "font-anton",
+    "tags": [
+      "display",
+      "condensed",
+      "impact"
+    ],
+    "license": "OFL-1.1",
+    "licenseFile": "licenses/anton-LICENSE.txt",
+    "source": "@fontsource/anton@5.3.0",
+    "files": [
+      {
+        "file": "anton-latin-400-normal.woff2",
+        "weight": 400,
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "family": "Playfair Display",
+    "slug": "font-playfair-display",
+    "tags": [
+      "serif",
+      "display",
+      "editorial"
+    ],
+    "license": "OFL-1.1",
+    "licenseFile": "licenses/playfair-display-LICENSE.txt",
+    "source": "@fontsource/playfair-display@5.3.0",
+    "files": [
+      {
+        "file": "playfair-display-latin-700-normal.woff2",
+        "weight": 700,
+        "style": "normal"
+      },
+      {
+        "file": "playfair-display-latin-900-normal.woff2",
+        "weight": 900,
+        "style": "normal"
+      },
+      {
+        "file": "playfair-display-latin-700-italic.woff2",
+        "weight": 700,
+        "style": "italic"
+      }
+    ]
+  }
+]

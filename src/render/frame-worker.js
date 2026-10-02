@@ -1,0 +1,211 @@
+// A render worker thread. It owns one asset runtime (compiled from the bundle it was last given)
+// and answers requests for frames, contact sheets, audio and asset validation. Asset code only
+// ever runs here, inside vm contexts; the pool kills the thread if a request overruns its timeout.
+
+import { parentPort } from 'node:worker_threads';
+import { createHash } from 'node:crypto';
+import { createRuntime, describeError } from '../core/runtime.js';
+import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
+import { hashSeed } from '../core/rng.js';
+import { nodeHost, registerFonts, createCanvas, loadImage, takeLogs } from './host.js';
+
+registerFonts();
+
+let state = { key: null, rt: null, comp: null, beats: [] };
+let canvas = null;
+
+async function makeRuntime(bundle) {
+  const rt = createRuntime(nodeHost);
+  for (const [ref, img] of Object.entries(bundle.images ?? {})) rt.setImage(ref, await loadImage(img.path));
+  rt.load(bundle.assets ?? {});
+  return rt;
+}
+
+function surface(width, height) {
+  if (!canvas || canvas.width !== width || canvas.height !== height) canvas = createCanvas(width, height);
+  return canvas;
+}
+
+const sha = (buf) => createHash('sha256').update(buf).digest('hex');
+
+function raw(c) {
+  const data = c.data();
+  const ab = new ArrayBuffer(data.length);
+  new Uint8Array(ab).set(data);
+  return ab;
+}
+
+/** PNG of the canvas, scaled down so its longer side is at most maxSize. */
+function png(c, maxSize) {
+  const long = Math.max(c.width, c.height);
+  if (!maxSize || long <= maxSize) return c.toBuffer('image/png');
+  const k = maxSize / long;
+  const small = createCanvas(Math.round(c.width * k), Math.round(c.height * k));
+  const sctx = small.getContext('2d');
+  sctx.imageSmoothingQuality = 'high';
+  sctx.drawImage(c, 0, 0, small.width, small.height);
+  return small.toBuffer('image/png');
+}
+
+function output(c, msg) {
+  if (msg.output === 'none') return { result: { hash: msg.hash ? sha(c.data()) : undefined, width: c.width, height: c.height } };
+  if (msg.output === 'raw') {
+    const buffer = raw(c);
+    return { result: { buffer, hash: msg.hash ? sha(new Uint8Array(buffer)) : undefined, width: c.width, height: c.height }, transfer: [buffer] };
+  }
+  const out = { png: png(c, msg.maxSize), width: c.width, height: c.height };
+  if (msg.hash) out.hash = sha(c.data());
+  return { result: out };
+}
+
+function isBlank(c) {
+  const d = c.data();
+  for (let i = 3; i < d.length; i += 4 * 37) if (d[i] !== 0) return false;
+  return true;
+}
+
+function drawAsset(rt, ref, o) {
+  const c = surface(o.width, o.height);
+  rt.renderAsset(c.getContext('2d'), ref, o.params ?? {}, o);
+  return c;
+}
+
+/** A grid of scaled-down frames with a time label on each. cells: [{ label, draw() → canvas }]. */
+function sheet(cells, { cols, cellWidth, width, height }) {
+  const cw = cellWidth, ch = Math.round((cellWidth * height) / width);
+  const rows = Math.ceil(cells.length / cols);
+  const gap = 6, pad = 8;
+  const out = createCanvas(pad * 2 + cols * cw + (cols - 1) * gap, pad * 2 + rows * ch + (rows - 1) * gap);
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#16161d';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.imageSmoothingQuality = 'high';
+  cells.forEach((cell, i) => {
+    const x = pad + (i % cols) * (cw + gap), y = pad + Math.floor(i / cols) * (ch + gap);
+    ctx.drawImage(cell.draw(), x, y, cw, ch);
+    ctx.font = '600 13px "JetBrains Mono"';
+    const tw = ctx.measureText(cell.label).width;
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(x, y, tw + 10, 20);
+    ctx.fillStyle = '#ffffff';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(cell.label, x + 5, y + 15);
+  });
+  return out;
+}
+
+const metaOf = (def) => JSON.parse(JSON.stringify({ kind: def.kind, title: def.title, description: def.description, tags: def.tags, duration: def.duration, formats: def.formats, schema: def.schema, uses: def.uses }));
+
+/** Compile unsaved source, check it and render test frames. Throws with a useful message when it fails. */
+async function validate(msg) {
+  const rt = await makeRuntime({ assets: msg.assets, images: msg.images });
+  rt.load({ [msg.ref]: { source: msg.source, deps: msg.deps ?? {} } });
+  const def = rt.definition(msg.ref);
+  const meta = metaOf(def);
+  if (msg.inspectOnly) return { result: { meta } };
+  const warnings = [];
+  const frames = [];
+  const params = msg.params ?? {};
+  const seed = 1;
+  let thumb;
+  if (def.kind === 'visual') {
+    const duration = msg.duration ?? def.duration ?? 3;
+    const fps = 30;
+    const order = ['horizontal', 'vertical', 'square'].filter((f) => def.formats.includes(f)).slice(0, 2);
+    for (const format of order) {
+      const { width, height } = FORMATS[format];
+      const o = { params, duration, width, height, fps, seed };
+      const mid = Math.round(duration * 0.5 * fps) / fps;
+      let midHash = null, blank = true;
+      for (const t of [0, mid, Math.max(0, duration - 1 / fps)]) {
+        const t0 = performance.now();
+        const c = drawAsset(rt, msg.ref, { ...o, t });
+        const ms = performance.now() - t0;
+        const hash = sha(c.data());
+        if (t === mid) midHash = hash;
+        if (!isBlank(c)) blank = false;
+        frames.push({ format, t, ms: Math.round(ms * 10) / 10 });
+        if (ms > 250) warnings.push(`${format} frame at t=${t}s took ${Math.round(ms)}ms to draw; long clips will render slowly`);
+      }
+      // the same (t, params) must give the same pixels, whatever was drawn in between
+      const again = sha(drawAsset(rt, msg.ref, { ...o, t: mid }).data());
+      if (again !== midHash) throw new Error(`Not deterministic: drawing t=${mid}s twice (${format}) gave different pixels. A frame must depend only on f.t, the params and f.rng; do not keep state between calls.`);
+      if (blank) warnings.push(`all ${format} test frames are blank with the default parameters`);
+      if (!thumb) {
+        const c = createCanvas(width, height);
+        rt.renderAsset(c.getContext('2d'), msg.ref, params, { ...o, t: Math.round(duration * (msg.thumbAt ?? 0.6) * fps) / fps, background: '#101018' });
+        thumb = png(c, 640);
+      }
+    }
+  } else if (def.kind === 'value') {
+    const value = rt.callValue(msg.ref, params);
+    if (value === undefined) warnings.push('render() returned undefined with the default parameters');
+    thumb = png(drawAsset(rt, msg.ref, { params, t: 0, duration: 3, width: 1280, height: 720, seed }), 640);
+  } else {
+    const duration = Math.min(msg.duration ?? def.duration ?? 2, 8);
+    const a = rt.renderAudio(msg.ref, params, { duration, seed });
+    const b = rt.renderAudio(msg.ref, params, { duration, seed });
+    const h = (x) => sha(new Uint8Array(x.left.buffer, x.left.byteOffset, x.left.byteLength));
+    if (h(a) !== h(b)) throw new Error('Not deterministic: synthesizing twice gave different samples. Use f.rng() for noise.');
+    let peak = 0;
+    for (let i = 0; i < a.left.length; i++) peak = Math.max(peak, Math.abs(a.left[i]));
+    if (peak < 0.001) warnings.push('the audio is silent with the default parameters');
+    if (peak > 1) warnings.push(`the audio peaks at ${peak.toFixed(2)} (above 1.0) and will clip`);
+    frames.push({ format: 'audio', t: 0, peak: Math.round(peak * 1000) / 1000 });
+    thumb = png(drawAsset(rt, msg.ref, { params, t: 0, duration, width: 1280, height: 720, seed }), 640);
+  }
+  return { result: { meta, warnings, frames, thumb, logs: takeLogs() } };
+}
+
+const handlers = {
+  async load(msg) {
+    takeLogs();
+    const rt = await makeRuntime(msg.bundle);
+    state = { key: msg.bundle.key, rt, comp: msg.bundle.composition ?? null, beats: msg.bundle.beats ?? [] };
+    return { result: {} };
+  },
+  clipFrame(msg) {
+    const comp = state.comp;
+    const c = surface(comp.width, comp.height);
+    state.rt.renderClipFrame(c.getContext('2d'), comp, msg.frame, { beats: state.beats });
+    return output(c, msg);
+  },
+  assetFrame(msg) {
+    return output(drawAsset(state.rt, msg.ref, msg), msg);
+  },
+  /** Contact sheet of clip frames: msg.frames = [frame numbers]. */
+  clipSheet(msg) {
+    const comp = state.comp;
+    const cells = msg.frames.map((frame) => ({
+      label: `${(frame / comp.fps).toFixed(2)}s`,
+      draw: () => { const c = surface(comp.width, comp.height); state.rt.renderClipFrame(c.getContext('2d'), comp, frame, { beats: state.beats }); return c; },
+    }));
+    const out = sheet(cells, { cols: msg.cols, cellWidth: msg.cellWidth, width: comp.width, height: comp.height });
+    return { result: { png: out.toBuffer('image/png'), width: out.width, height: out.height } };
+  },
+  /** Filmstrip of one asset: msg.times = [seconds]. */
+  assetSheet(msg) {
+    const cells = msg.times.map((t) => ({ label: `${t.toFixed(2)}s`, draw: () => drawAsset(state.rt, msg.ref, { ...msg, t, background: msg.background ?? '#101018' }) }));
+    const out = sheet(cells, { cols: msg.cols, cellWidth: msg.cellWidth, width: msg.width, height: msg.height });
+    return { result: { png: out.toBuffer('image/png'), width: out.width, height: out.height } };
+  },
+  audio(msg) {
+    const { left, right } = state.rt.renderAudio(msg.ref, msg.params ?? {}, { duration: msg.duration, seed: msg.seed ?? hashSeed(1, msg.ref) });
+    const l = left.buffer, r = right === left ? left.slice().buffer : right.buffer;
+    return { result: { left: l, right: r, sampleRate: SAMPLE_RATE }, transfer: [l, r] };
+  },
+  value(msg) {
+    const v = state.rt.callValue(msg.ref, msg.params ?? {});
+    return { result: { value: JSON.parse(JSON.stringify(v, (k, x) => (typeof x === 'function' ? '[function]' : x)) ?? 'null') } };
+  },
+  validate,
+};
+
+parentPort.on('message', async (msg) => {
+  try {
+    const { result, transfer } = await handlers[msg.op](msg);
+    parentPort.postMessage({ id: msg.id, ok: true, result: { ...result, logs: result.logs ?? takeLogs() } }, transfer ?? []);
+  } catch (err) {
+    parentPort.postMessage({ id: msg.id, ok: false, error: { message: describeError(err), stack: String(err?.stack ?? ''), logs: takeLogs() } });
+  }
+});

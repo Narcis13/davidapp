@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "studio": {
+      "command": "node",
+      "args": ["src/mcp/server.js"],
+      "env": {
+        "STUDIO_AUTHOR": "claude-code"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+# Gates for gates.sh: one per line, a name then a shell command run from the repository root.
+typecheck  npm run --silent typecheck
+lint       npm run --silent lint
+test       npm test --silent
+
+@summary test (tests|pass|fail|cancelled).[0-9]+$
