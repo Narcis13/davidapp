@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { connect, callTool } from './mcp.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const out = process.argv[2] ?? join(root, 'docs', 'showcase', 'reports');
+const out = process.argv[2] ?? join(root, 'output', 'showcase', 'reports');
 mkdirSync(out, { recursive: true });
 
 const CLIP = 'clip-1-every-frame', COPY = 'clip-1-repinned', ASSET = 'text-word-reveal';

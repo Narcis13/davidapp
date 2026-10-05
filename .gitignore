@@ -1,5 +1,9 @@
 node_modules/
 data/
+output/
+*.mp4
+*.mov
+*.webm
 *.db
 *.db-wal
 *.db-shm

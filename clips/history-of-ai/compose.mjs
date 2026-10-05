@@ -1,12 +1,16 @@
 // "A Sketchbook History of AI": the composition of the 40-second vertical clip, pushed to the
 // studio through its MCP server.
 //
-//   node clips/history-of-ai/compose.mjs          save the composition (update_clip)
+//   node clips/history-of-ai/compose.mjs            create the clip if missing, sync its assets from
+//                                                   assets/, save the composition (update_clip)
+//   node clips/history-of-ai/compose.mjs --render   ...and render it into STUDIO_DATA/renders
 //
 // Chapters are sketch-chapter pages that erase themselves; a timeline runs along the bottom, the
 // pencil sound sits under every page that draws itself and an eraser sound under every rub-out.
 
+import { fileURLToPath } from 'node:url';
 import { connect, callTool } from '../../scripts/mcp.mjs';
+import { syncAssets } from '../../scripts/sync-assets.mjs';
 
 const ERASE = 0.6;
 const chapters = [
@@ -48,10 +52,23 @@ export const composition = {
   ],
 };
 
-if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
+const SLUG = 'history-of-ai';
+const ASSETS = ['theme-sketchbook', 'bg-paper', 'sfx-pencil', 'sketch-chapter', 'sketch-snowfall', 'sketch-timeline', 'music-loop'];
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const client = await connect({});
+  const must = (r, what) => { if (r.isError) throw new Error(`${what}: ${r.text}`); return r; };
   try {
-    const r = await callTool(client, 'update_clip', { clip: 'history-of-ai', composition });
+    if ((await callTool(client, 'get_clip', { clip: SLUG })).isError) {
+      must(await callTool(client, 'create_clip', { name: SLUG, title: 'A Sketchbook History of AI', format: composition.format, fps: composition.fps, duration: composition.duration }), 'create_clip');
+      console.log(`✓ created clip ${SLUG}`);
+    }
+    await syncAssets(client, ASSETS, { forClip: SLUG });
+    const r = must(await callTool(client, 'update_clip', { clip: SLUG, composition }), 'update_clip');
     console.log(r.text.slice(0, 3000));
+    if (process.argv.includes('--render')) {
+      const job = must(await callTool(client, 'start_render', { clip: SLUG, wait_seconds: 900 }), 'start_render').json;
+      console.log(`render #${job.id} ${job.status} → ${job.output}`);
+    }
   } finally { await client.close(); }
 }

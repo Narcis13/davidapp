@@ -3,7 +3,7 @@
 //
 //   node scripts/mcp.mjs tools
 //   node scripts/mcp.mjs call search_assets '{"query":"typewriter"}'
-//   node scripts/mcp.mjs call create_asset '{"name":"x","source":"@file:showcase/assets/x.js"}'
+//   node scripts/mcp.mjs call create_asset '{"name":"x","source":"@file:assets/x.js"}'
 //   node scripts/mcp.mjs call render_clip_frame '{"clip":"demo","t":2}' --out frame.png
 //
 // A string value "@file:<path>" is replaced by that file's text. Images in the result are written

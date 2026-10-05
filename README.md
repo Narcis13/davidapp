@@ -17,11 +17,12 @@ the next one reused it.
 
 | | clip | format | what it adds | what it reuses |
 |---|---|---|---|---|
-| [![clip 1](docs/showcase/clips/clip-1-every-frame.poster.png)](docs/showcase/clips/clip-1-every-frame.mp4) | [**Every frame is a function**](docs/showcase/clips/clip-1-every-frame.mp4) | vertical 1080×1920 | 28 assets: easing, spring, a theme, eight text animations, backgrounds, a code window, counters, a logo, a synthesized soundtrack | nothing: it is the first |
-| [![clip 2](docs/showcase/clips/clip-2-compounding.poster.png)](docs/showcase/clips/clip-2-compounding.mp4) | [**The library compounds**](docs/showcase/clips/clip-2-compounding.mp4) | horizontal 1920×1080 | 7 assets: a second theme, a grid, a scramble title, a lower third, a bar chart, a lineage diagram, a versioning diagram | 24 from clip 1, one of them (`text-word-reveal`) edited into version 2 |
-| [![clip 3](docs/showcase/clips/clip-3-release-notes.poster.png)](docs/showcase/clips/clip-3-release-notes.mp4) | [**What's new in Fablecut**](docs/showcase/clips/clip-3-release-notes.mp4) | square 1080×1080 | 5 assets: a bullet-list template, a badge, a formats diagram, and two forks of clip 1 assets (a confetti burst, a baked whoosh) | 24 from clip 1 and 5 from clip 2, as they are |
+| [![clip 1](docs/showcase/posters/clip-1-every-frame.poster.png)](https://github.com/Narcis13/davidapp/releases/download/showcase-v1/clip-1-every-frame.mp4) | [**Every frame is a function**](https://github.com/Narcis13/davidapp/releases/download/showcase-v1/clip-1-every-frame.mp4) | vertical 1080×1920 | 28 assets: easing, spring, a theme, eight text animations, backgrounds, a code window, counters, a logo, a synthesized soundtrack | nothing: it is the first |
+| [![clip 2](docs/showcase/posters/clip-2-compounding.poster.png)](https://github.com/Narcis13/davidapp/releases/download/showcase-v1/clip-2-compounding.mp4) | [**The library compounds**](https://github.com/Narcis13/davidapp/releases/download/showcase-v1/clip-2-compounding.mp4) | horizontal 1920×1080 | 7 assets: a second theme, a grid, a scramble title, a lower third, a bar chart, a lineage diagram, a versioning diagram | 24 from clip 1, one of them (`text-word-reveal`) edited into version 2 |
+| [![clip 3](docs/showcase/posters/clip-3-release-notes.poster.png)](https://github.com/Narcis13/davidapp/releases/download/showcase-v1/clip-3-release-notes.mp4) | [**What's new in Fablecut**](https://github.com/Narcis13/davidapp/releases/download/showcase-v1/clip-3-release-notes.mp4) | square 1080×1080 | 5 assets: a bullet-list template, a badge, a formats diagram, and two forks of clip 1 assets (a confetti burst, a baked whoosh) | 24 from clip 1 and 5 from clip 2, as they are |
 
-Contact sheets, ffprobe reports, the reuse report and the verification results are in
+The MP4s are attached to the [`showcase-v1` release](https://github.com/Narcis13/davidapp/releases/tag/showcase-v1)
+(videos are never committed). Contact sheets, ffprobe reports, the reuse report and the verification results are in
 [docs/showcase](docs/showcase/INDEX.md).
 
 ## Run it
@@ -32,12 +33,24 @@ is found automatically).
 ```bash
 npm install
 npm run showcase      # builds the library and the three clips through the MCP server, and renders them
+npm run sync-assets   # pushes every asset in assets/ into the library (new or changed ones only)
 npm run studio        # the studio: http://127.0.0.1:8787
 ```
 
 Everything is stored under `./data` (git-ignored): `studio.db`, asset thumbnails, cached audio and
 `renders/`. Set `STUDIO_DATA` to use another directory, `PORT` for another port. `npm run seed`
-builds the library and clips without rendering.
+builds the library and clips without rendering. Exports and evidence (`npm run evidence`,
+`npm run verify`) go to `./output` (also git-ignored). No video is ever committed.
+
+Where things live:
+
+```
+assets/          every function asset's source, one flat folder (name.v2.js is version 2 of name)
+clips/<name>/    one folder per clip: compose.mjs holds its composition
+showcase/        build.mjs + plan.mjs: the MCP calls that rebuild the three showcase clips
+data/            the studio's runtime store: studio.db, thumbnails, caches, renders/  (git-ignored)
+output/          exported renders, contact sheets and reports                         (git-ignored)
+```
 
 ```bash
 npm test              # 56 tests: asset contract, text layout, database, render pipeline, HTTP API, MCP
@@ -103,8 +116,8 @@ asset({
   and stores it as an immutable version. Editing makes version 2; whatever pinned version 1 keeps it.
 
 The full contract (the `f` object, the standard library, parameter types, audio and value assets)
-is in [docs/ASSET_CONTRACT.md](docs/ASSET_CONTRACT.md). The 39 showcase asset sources in
-[showcase/assets](showcase/assets) are worked examples.
+is in [docs/ASSET_CONTRACT.md](docs/ASSET_CONTRACT.md). Every asset source lives in
+[assets/](assets); they are worked examples.
 
 ## Use it from Claude Code (MCP)
 
@@ -181,7 +194,9 @@ src/studio    library (versioned assets), clips (pinned compositions), render qu
 src/mcp       the MCP tools and the stdio server
 src/server    HTTP API, media, static files
 src/ui        the studio; preview-worker.js runs src/core in a Web Worker
-showcase      the three clips: asset sources, compositions, and the plan of MCP calls that builds them
+assets        every function asset's source (synced into the library by scripts/sync-assets.mjs)
+clips         one folder per clip with its composition
+showcase      the plan of MCP calls that builds the three showcase clips
 ```
 
 - **Rendering.** Worker threads draw frames in parallel with Skia (every frame is a pure function

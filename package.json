@@ -33,6 +33,7 @@
     "fonts": "node scripts/vendor-fonts.mjs",
     "showcase": "node showcase/build.mjs",
     "seed": "node showcase/build.mjs --no-render",
+    "sync-assets": "node scripts/sync-assets.mjs",
     "report:reuse": "node scripts/mcp.mjs call reuse_report",
     "verify": "node scripts/verify.mjs",
     "evidence": "node scripts/evidence.mjs"

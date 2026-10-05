@@ -1,8 +1,8 @@
-// Collect the showcase evidence from a data directory into docs/showcase/: the latest finished
+// Collect the showcase evidence from a data directory into output/showcase/ (gitignored): the latest finished
 // MP4 of each clip, its ffprobe report, audio levels, FFmpeg contact sheets, SRT, and the
 // library reports (reuse, text animations, composition depth, render speed).
 //
-//   STUDIO_DATA=<dir> node scripts/evidence.mjs [out-dir]        (default out-dir: docs/showcase)
+//   STUDIO_DATA=<dir> node scripts/evidence.mjs [out-dir]        (default out-dir: output/showcase)
 
 import { copyFileSync, mkdirSync, writeFileSync, statSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,7 +11,7 @@ import { createStudio } from '../src/studio/studio.js';
 import { ffmpegPath, ffprobePath, run } from '../src/render/ffmpeg.js';
 import { ROOT } from '../src/render/host.js';
 
-const out = process.argv[2] ?? join(ROOT, 'docs', 'showcase');
+const out = process.argv[2] ?? join(ROOT, 'output', 'showcase');
 for (const d of ['clips', 'reports', 'sheets']) mkdirSync(join(out, d), { recursive: true });
 for (const f of readdirSync(join(out, 'sheets'))) rmSync(join(out, 'sheets', f));
 

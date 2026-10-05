@@ -63,7 +63,9 @@ src/studio/   services: library (assets), clips, renders (queue), lineage; studi
 src/mcp/      MCP tools and stdio server
 src/server/   HTTP API + static files
 src/ui/       the studio web app (vanilla ES modules); preview.js + preview-worker.js run src/core in a Web Worker
-showcase/     asset sources and clip compositions of the three showcase clips, and build.mjs that replays them through MCP
+assets/       every function asset's source, flat (name.v2.js = version 2); scripts/sync-assets.mjs pushes them
+clips/        one folder per clip, compose.mjs = its composition
+showcase/     plan.mjs + build.mjs: replays the three showcase clips through MCP
 fonts/        bundled OFL fonts and their licenses
 ```
 
@@ -74,8 +76,9 @@ fonts/        bundled OFL fonts and their licenses
 
 - `npm run showcase` (= `node showcase/build.mjs`) rebuilds the library and renders the three clips through the
   MCP server into `STUDIO_DATA`. `--no-render` builds the library and clips only.
-- Committed evidence goes in `docs/showcase/` (`clips/`, `sheets/`, `reports/`, `studio/`) with an `INDEX.md`
-  mapping each contract item to its files. Loop screenshots stay in the scratchpad.
+- `npm run evidence` / `verify` write to `output/showcase/` (git-ignored). A snapshot without videos is committed in
+  `docs/showcase/` (`posters/`, `sheets/`, `reports/`, `studio/`) with an `INDEX.md`
+  mapping each contract item to its files. MP4s go on a GitHub release, never in git. Loop screenshots stay in the scratchpad.
 - Finished PROGRESS.md files move to `docs/progress/<YYYY-MM-DD>-<slug>.md`.
 
 ## Conventions
