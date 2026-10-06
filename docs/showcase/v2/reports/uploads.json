@@ -1,0 +1,161 @@
+{
+ "checks": {
+  "a PNG, a JPG and an SVG were uploaded": true,
+  "every upload was described by the agent through MCP": true,
+  "search finds every upload by its tags": true,
+  "a hostile SVG comes out with nothing active": true
+ },
+ "uploads": [
+  {
+   "ref": "studio-logo@1",
+   "file": "studio-logo.svg",
+   "format": "svg",
+   "bytes": 315926,
+   "size": "2048×2048",
+   "palette": [
+    "#14102a",
+    "#ffd166",
+    "#1b1b31",
+    "#cadf89",
+    "#f49b72"
+   ],
+   "sanitised": {
+    "removed": [],
+    "vectorPaths": 4,
+    "drawnFrom": "a raster made once in Node (image/png)"
+   },
+   "title": "Studio logo",
+   "description": "A square logo: a yellow play triangle on a dark rounded tile with a yellow border, a pink dot and a mint swoosh underneath. Vector, so it can be drawn on.",
+   "tags": [
+    "logo",
+    "brand",
+    "play",
+    "icon",
+    "vector",
+    "svg",
+    "upload"
+   ],
+   "suggestedUses": [
+    "drawn on with svg-draw-on in a corner",
+    "end card mark",
+    "recoloured in one colour as a watermark"
+   ],
+   "describedBy": "claude-opus-5-5",
+   "describedThroughMcp": true,
+   "waitingForDescription": false,
+   "foundByTag": {
+    "logo": true,
+    "brand": true,
+    "play": true,
+    "icon": true
+   },
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "harbour-at-dusk@1",
+   "file": "harbour-at-dusk.png",
+   "format": "png",
+   "bytes": 38342,
+   "size": "1920×1080",
+   "palette": [
+    "#16152a",
+    "#2e2544",
+    "#59345b",
+    "#743d6a",
+    "#ae6e68"
+   ],
+   "title": "Harbour skyline at dusk",
+   "description": "A flat, graphic city skyline at dusk: violet sky fading to orange, dark towers with lit windows, a calm sea with an orange reflection. Wide 16:9.",
+   "tags": [
+    "city",
+    "skyline",
+    "dusk",
+    "night",
+    "background",
+    "photo",
+    "purple",
+    "upload"
+   ],
+   "suggestedUses": [
+    "full-frame background under titles",
+    "slow push-in (Ken Burns) behind an intro",
+    "duotone it to the clip theme"
+   ],
+   "describedBy": "claude-opus-5-5",
+   "describedThroughMcp": true,
+   "waitingForDescription": false,
+   "foundByTag": {
+    "city": true,
+    "skyline": true,
+    "dusk": true,
+    "night": true
+   },
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "mountain-lake-dawn@1",
+   "file": "mountain-lake-dawn.jpg",
+   "format": "jpeg",
+   "bytes": 67005,
+   "size": "1600×1200",
+   "palette": [
+    "#1f353f",
+    "#324e5d",
+    "#575b58",
+    "#88796b",
+    "#bb967d"
+   ],
+   "title": "Mountain lake at dawn",
+   "description": "Layered blue mountain ridges under a teal-to-peach dawn sky, above a still lake that reflects the warm light with faint ripples. 4:3, calm and quiet.",
+   "tags": [
+    "mountains",
+    "lake",
+    "dawn",
+    "landscape",
+    "calm",
+    "background",
+    "photo",
+    "upload"
+   ],
+   "suggestedUses": [
+    "calm full-frame background (cover) for a vertical piece",
+    "duotone it to the clip theme",
+    "behind a 3D terrain or a quote"
+   ],
+   "describedBy": "claude-opus-5-5",
+   "describedThroughMcp": true,
+   "waitingForDescription": false,
+   "foundByTag": {
+    "mountains": true,
+    "lake": true,
+    "dawn": true,
+    "landscape": true
+   },
+   "usedIn": [
+    "clip-5-a-library-in-3d"
+   ]
+  }
+ ],
+ "hostileSvg": {
+  "input": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\" onload=\"alert(1)\"><script>alert(2)</script><foreignObject><body xmlns=\"http://www.w3.org/1999/xhtml\">x</body></foreignObject><image href=\"https://example.com/x.png\"/><a href=\"javascript:alert(3)\"><rect width=\"5\" height=\"5\" fill=\"url(https://example.com/p.svg#g)\" onclick=\"alert(4)\"/></a><use xlink:href=\"https://example.com/y.svg#z\"/><circle cx=\"5\" cy=\"5\" r=\"2\" fill=\"#f00\"/></svg>",
+  "removed": [
+   "event handler onload on <svg>",
+   "<script>",
+   "<foreignObject>",
+   "<image>",
+   "<a> (its contents kept)",
+   "external url() in fill on <rect>",
+   "event handler onclick on <rect>",
+   "external xlink:href on <use>"
+  ],
+  "output": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\"><rect width=\"5\" height=\"5\"/><use/><circle cx=\"5\" cy=\"5\" r=\"2\" fill=\"#f00\"/></svg>"
+ },
+ "tests": "test/uploads.test.js; the files are drawn by showcase/uploads/make.mjs"
+}

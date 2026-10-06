@@ -16,7 +16,7 @@
   },
   "frames": 900,
   "meanVolume": -16.9,
-  "mb": 330.2
+  "mb": 330
  },
  {
   "name": "clip-4-direct-the-studio-square",
@@ -54,7 +54,7 @@
   },
   "frames": 900,
   "meanVolume": -16.9,
-  "mb": 321
+  "mb": 321.1
  },
  {
   "name": "clip-5-a-library-in-3d",
@@ -92,6 +92,6 @@
   },
   "frames": 2700,
   "meanVolume": -17.3,
-  "mb": 481.5
+  "mb": 481.6
  }
 ]

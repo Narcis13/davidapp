@@ -27,8 +27,8 @@
   "sample_rate": "48000",
   "channels": 2
  },
- "bytes": 180135575,
- "renderSeconds": 149.88,
+ "bytes": 180058296,
+ "renderSeconds": 46.38,
  "meanVolume": -16.9,
- "maxVolume": -3.5
+ "maxVolume": -3.6
 }

@@ -1,0 +1,6 @@
+Frame hashes of clips 1 to 3 after iteration 2, compared with the baseline taken on this machine from the code before it
+(scripts/hashes.mjs --compare reports/baseline-hashes.json; win32 x64, Node v24.19.0, 2026-10-06):
+
+✓ clip-1-every-frame: 120 dense frames, 18 render samples identical
+✓ clip-2-compounding: 120 dense frames, 18 render samples identical
+✓ clip-3-release-notes: 120 dense frames, 18 render samples identical

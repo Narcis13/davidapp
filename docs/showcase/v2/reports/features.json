@@ -1,0 +1,143 @@
+{
+ "what": "Where clips 4 and 5 use each feature of iteration 2 (item ids from their compositions; layer moves, precomps and requests from their journals and the database).",
+ "everyFeatureUsed": true,
+ "covered": {
+  "transforms": true,
+  "keyframes": true,
+  "perFormatLayouts": true,
+  "draggedLayerOrder": true,
+  "motions": true,
+  "transitions": true,
+  "effects": true,
+  "masks": true,
+  "precomp": true,
+  "preset": true,
+  "threeD": true,
+  "uploadedImage": true,
+  "uploadedSvg": true,
+  "requestFlow": true
+ },
+ "clip-4-direct-the-studio": {
+  "transforms": [
+   "behind-title",
+   "orb",
+   "numbers",
+   "title",
+   "logo"
+  ],
+  "keyframes": [
+   "photo (scale)",
+   "title (rotation)"
+  ],
+  "perFormatLayouts": [
+   "behind-title (vertical)",
+   "orb (vertical)",
+   "title (vertical, square)",
+   "logo (vertical, square)"
+  ],
+  "draggedLayerOrder": [
+   "move_track behind → index 2",
+   "move_track behind → index 1"
+  ],
+  "motions": [
+   "orb: motion-pop@1 (out)",
+   "title: motion-slide@1 (in)",
+   "logo: motion-drift@1 (emphasis)",
+   "logo: motion-pop@1 (out)"
+  ],
+  "transitions": [
+   "drift: trans-wipe@1",
+   "orb: trans-iris@1",
+   "numbers: trans-push@1"
+  ],
+  "effects": [
+   "clip: fx-grain@1",
+   "track bg: fx-vignette@1",
+   "photo: fx-duotone@1",
+   "numbers: fx-glow@1"
+  ],
+  "masks": [
+   "end: mask-iris@1 (alpha)"
+  ],
+  "precomp": [
+   "saved from its layers: studio-title-card"
+  ],
+  "preset": [
+   "front-caption: lower-third-studio@1 (of lower-third@1)"
+  ],
+  "threeD": [
+   "orb: orb-3d@1"
+  ],
+  "uploadedImage": [
+   "photo: harbour-at-dusk@1 (png)"
+  ],
+  "uploadedSvg": [
+   "logo: studio-logo"
+  ],
+  "requestFlow": [
+   "request #1 \"Make the logo float gently while it is on screen, once it has been drawn.\" → clip-edit by claude-opus-5-5, accepted"
+  ]
+ },
+ "clip-5-a-library-in-3d": {
+  "transforms": [
+   "grows",
+   "orb",
+   "numbers",
+   "terrain-line",
+   "reuse-line"
+  ],
+  "keyframes": [
+   "lake (scale)"
+  ],
+  "perFormatLayouts": [],
+  "draggedLayerOrder": [],
+  "motions": [
+   "grows: motion-drift@1 (loop)",
+   "grows: motion-pop@1 (out)",
+   "orb: motion-orbit@1 (loop)",
+   "numbers: motion-bounce@1 (in)"
+  ],
+  "transitions": [
+   "terrain: trans-glitch@1",
+   "drift: trans-wipe@1",
+   "orb: trans-iris@1",
+   "numbers: trans-push@1",
+   "letters-photo: trans-glitch@1",
+   "end: trans-iris@1"
+  ],
+  "effects": [
+   "clip: fx-grain@1",
+   "track bg: fx-vignette@1",
+   "lake: fx-duotone@1",
+   "orb: fx-chromatic@1",
+   "numbers: fx-glow@1"
+  ],
+  "masks": [
+   "letters-photo: block-text-3d@2 (alpha)"
+  ],
+  "precomp": [
+   "opener: studio-title-card@1"
+  ],
+  "preset": [
+   "baked: lower-third-studio@1 (of lower-third@1)",
+   "intro-third: lower-third-studio@1 (of lower-third@1)"
+  ],
+  "threeD": [
+   "terrain: terrain-3d@1",
+   "grows: block-text-3d@2",
+   "orb: orb-spin@1"
+  ],
+  "uploadedImage": [
+   "lake: mountain-lake-dawn@1 (jpeg)",
+   "letters-photo: mountain-lake-dawn@1 (jpeg)"
+  ],
+  "uploadedSvg": [
+   "opener: studio-logo",
+   "opener: studio-logo",
+   "opener: studio-logo"
+  ],
+  "requestFlow": [
+   "request #2 \"add a lower third at 0:03\" → clip-edit by claude-opus-5-5, accepted"
+  ]
+ }
+}

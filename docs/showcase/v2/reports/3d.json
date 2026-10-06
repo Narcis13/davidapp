@@ -1,0 +1,121 @@
+{
+ "checks": {
+  "at least 3 procedural 3D assets": true,
+  "two renders of a clip with 3D give identical frame hashes": true,
+  "2D text behind and in front of a 3D piece in one clip": true,
+  "a baked sequence is used by a second clip": true,
+  "preview matches render (parity cases 3d and sequence)": true
+ },
+ "assets": [
+  {
+   "ref": "block-text-3d@2",
+   "title": "3D block text",
+   "madeFor": "clip-5-a-library-in-3d",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "terrain-3d@1",
+   "title": "3D terrain flyover",
+   "madeFor": "clip-5-a-library-in-3d",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "orb-3d@1",
+   "title": "3D orb",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio"
+   ]
+  }
+ ],
+ "determinism": [
+  {
+   "clip": "clip-4-direct-the-studio",
+   "format": "vertical",
+   "renders": [
+    5,
+    7
+   ],
+   "sampledFrames": 18,
+   "identical": true
+  }
+ ],
+ "between": {
+  "clip": "clip-4-direct-the-studio",
+  "shape": "orb-3d@1 (track 3d, 7–15 s)",
+  "textBehind": [
+   "behind-title (track behind, 7.6–14.8 s)"
+  ],
+  "textInFront": [
+   "front-caption (track titles, 8.4–14.600000000000001 s)"
+  ],
+  "frames": [
+   "studio/zorder-title-behind.png",
+   "studio/zorder-title-in-front.png"
+  ]
+ },
+ "baked": [
+  {
+   "ref": "orb-spin@1",
+   "bakedFrom": "orb-3d@1",
+   "madeFor": "clip-5-a-library-in-3d",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  }
+ ],
+ "parity": {
+  "3d": [
+   {
+    "frame": 5,
+    "meanDiff": 0.657,
+    "maxDiff": 220,
+    "over16": 0.649,
+    "over64": 0.383,
+    "distinct": 389,
+    "ok": true,
+    "image": "parity-3d-f5.png"
+   },
+   {
+    "frame": 15,
+    "meanDiff": 0.681,
+    "maxDiff": 220,
+    "over16": 0.703,
+    "over64": 0.398,
+    "distinct": 391,
+    "ok": true,
+    "image": "parity-3d-f15.png"
+   }
+  ],
+  "sequence": [
+   {
+    "frame": 3,
+    "meanDiff": 0.219,
+    "maxDiff": 12,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 501,
+    "ok": true,
+    "image": "parity-sequence-f3.png"
+   },
+   {
+    "frame": 12,
+    "meanDiff": 0.218,
+    "maxDiff": 10,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 508,
+    "ok": true,
+    "image": "parity-sequence-f12.png"
+   }
+  ]
+ },
+ "tests": "test/solid.test.js, test/parity.test.js (cases 3d, sequence)"
+}

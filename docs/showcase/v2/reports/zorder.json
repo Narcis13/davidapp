@@ -1,0 +1,51 @@
+{
+ "what": "Clip 4 at 0:11 drawn by the Node renderer: the title track under the 3D track (as built), after move_track puts it above (what dragging the track does), and after moving it back (what undo restores). Counted over the pixels that differ between the two orders, which is where the title and the orb overlap.",
+ "clip": "clip-4-direct-the-studio",
+ "t": 11,
+ "tracksAsBuilt": [
+  "bg",
+  "behind",
+  "3d",
+  "scenes",
+  "titles",
+  "overlay",
+  "music"
+ ],
+ "tracksTitleInFront": [
+  "bg",
+  "3d",
+  "behind",
+  "scenes",
+  "titles",
+  "overlay",
+  "music"
+ ],
+ "tracksAfterMovingBack": [
+  "bg",
+  "behind",
+  "3d",
+  "scenes",
+  "titles",
+  "overlay",
+  "music"
+ ],
+ "pixelsThatDiffer": 31968,
+ "titleInkAmongThem": {
+  "titleBehind": 37,
+  "titleInFront": 14251
+ },
+ "hashes": {
+  "titleBehind": "95d66bb9d6436b561887352b5a34dc1afaae017d39566899d56c52f06c33d478",
+  "titleInFront": "4a098ca78219434142353131953d35bdf1cc5124ab50bcaba4bb2bb7476331aa",
+  "movedBack": "95d66bb9d6436b561887352b5a34dc1afaae017d39566899d56c52f06c33d478"
+ },
+ "checks": {
+  "the order changes the frame": true,
+  "in front, the overlap shows the title; behind, it shows the orb": true,
+  "moving the track back restores the frame exactly": true
+ },
+ "frames": [
+  "studio/zorder-title-behind.png",
+  "studio/zorder-title-in-front.png"
+ ]
+}

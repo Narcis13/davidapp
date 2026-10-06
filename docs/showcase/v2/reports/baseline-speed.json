@@ -1,0 +1,52 @@
+{
+ "code": "the commit before iteration 2 (6c9f8cf: iteration-1 src)",
+ "machine": "Intel(R) Core(TM) i9-14900KF × 32",
+ "platform": "win32 x64",
+ "node": "v24.19.0",
+ "runs": 5,
+ "method": "MCP start_render with wait; renderSeconds from the render stats (frames drawn by the worker pool + FFmpeg encode, audio mix excluded once cached); median of the runs; baseline and current code rendered in turns (scripts/speed-compare.mjs)",
+ "clips": {
+  "clip-1-every-frame": {
+   "size": "1080×1920",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    6.33,
+    6.3,
+    6.34,
+    6.37,
+    6.28
+   ],
+   "median": 6.33,
+   "framesPerSecond": 151.7
+  },
+  "clip-2-compounding": {
+   "size": "1920×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    7.88,
+    7.8,
+    7.82,
+    7.87,
+    7.91
+   ],
+   "median": 7.87,
+   "framesPerSecond": 122
+  },
+  "clip-3-release-notes": {
+   "size": "1080×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    4.7,
+    4.67,
+    4.64,
+    4.66,
+    4.65
+   ],
+   "median": 4.66,
+   "framesPerSecond": 206
+  }
+ }
+}

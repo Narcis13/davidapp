@@ -1,0 +1,239 @@
+{
+ "checks": {
+  "at least 4 motion assets": true,
+  "at least 3 transition assets": true,
+  "at least 4 effect assets": true,
+  "a precomp made from layers": true,
+  "a mask in a clip": true,
+  "every kind appears in the showcase": true
+ },
+ "counts": {
+  "motion": 6,
+  "transition": 4,
+  "effect": 5,
+  "precomp": 1,
+  "preset": 1,
+  "sequence": 1
+ },
+ "motion": [
+  {
+   "ref": "motion-pop@1",
+   "title": "Pop",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "motion-slide@1",
+   "title": "Slide",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio"
+   ]
+  },
+  {
+   "ref": "motion-drift@1",
+   "title": "Drift",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "motion-wiggle@1",
+   "title": "Wiggle",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": []
+  },
+  {
+   "ref": "motion-bounce@1",
+   "title": "Bounce",
+   "madeFor": "clip-5-a-library-in-3d",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "motion-orbit@1",
+   "title": "Orbit",
+   "madeFor": "clip-5-a-library-in-3d",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  }
+ ],
+ "transition": [
+  {
+   "ref": "trans-wipe@1",
+   "title": "Soft wipe",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "trans-push@1",
+   "title": "Push",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "trans-iris@1",
+   "title": "Iris",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "trans-glitch@1",
+   "title": "Glitch cut",
+   "madeFor": "clip-5-a-library-in-3d",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  }
+ ],
+ "effect": [
+  {
+   "ref": "fx-glow@1",
+   "title": "Glow",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "fx-grain@1",
+   "title": "Film grain",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "fx-vignette@1",
+   "title": "Vignette",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "fx-duotone@1",
+   "title": "Duotone",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  },
+  {
+   "ref": "fx-chromatic@1",
+   "title": "Chromatic aberration",
+   "madeFor": "clip-5-a-library-in-3d",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  }
+ ],
+ "precomp": [
+  {
+   "ref": "studio-title-card@1",
+   "title": "Studio title card",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  }
+ ],
+ "preset": [
+  {
+   "ref": "lower-third-studio@1",
+   "title": "Lower third · studio",
+   "madeFor": "clip-4-direct-the-studio",
+   "usedIn": [
+    "clip-4-direct-the-studio",
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  }
+ ],
+ "sequence": [
+  {
+   "ref": "orb-spin@1",
+   "title": "Orb spin (baked)",
+   "madeFor": "clip-5-a-library-in-3d",
+   "usedIn": [
+    "clip-5-a-library-in-3d",
+    "clip-6-what-the-library-holds"
+   ]
+  }
+ ],
+ "masks": [
+  {
+   "clip": "clip-4-direct-the-studio",
+   "item": "end",
+   "mask": "mask-iris@1",
+   "mode": "alpha"
+  },
+  {
+   "clip": "clip-5-a-library-in-3d",
+   "item": "letters-photo",
+   "mask": "block-text-3d@2",
+   "mode": "alpha"
+  },
+  {
+   "clip": "clip-6-what-the-library-holds",
+   "item": "end",
+   "mask": "mask-iris@1",
+   "mode": "alpha"
+  }
+ ],
+ "contractTests": {
+  "test/kinds.test.js": [
+   "every new kind validates, with a demo thumbnail and its kind recorded",
+   "a broken asset of each new kind is rejected with a useful error, and nothing crashes",
+   "motions: in, out, emphasis and loop move the item; at rest it is exactly where it was",
+   "transitions hand over from the item before (held on its last frame) to the next",
+   "effects on an item, on a track and on the whole clip; deterministic frame to frame",
+   "every context that is read back (effects, luma masks) is made with willReadFrequently, the frame\\'s own included",
+   "masks: alpha, inverted and luma; the mask moves with the layer unless it has its own transform",
+   "presets: a named asset that is a base plus params; it pins the base and draws the same",
+   "a preset pins the assets named in its params: a theme preset resolves, and keeps that version",
+   "precomps: layers saved as one asset with exposed params; replacing them keeps the picture",
+   "split_item is a continuation: the seed, the transition, the motions, the effects and the mask carry on over the cut",
+   "a transition without a duration runs for its asset\\'s own, else 0.5 s, and never for longer than its item",
+   "precomps: a transition between saved layers still plays, within its track; a layer without a duration lasts as long as the precomp",
+   "metadata is edited without a new code version; search follows; null goes back to the source",
+   "params saved as the new defaults: the source is rewritten in place, the old version is untouched",
+   "a v1 database (three kinds only) is migrated on open, keeping every row and the triggers"
+  ],
+  "test/parity.test.js": []
+ }
+}
