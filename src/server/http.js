@@ -140,6 +140,21 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       const r = await library.forkAsset({ ref: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, source: data.source, note: data.note, forClip: data.forClip, author: data.author ?? author });
       return { asset: r.asset, warnings: r.warnings };
     }],
+    // tweak and keep: new defaults, presets, metadata, diffs
+    ['POST', /^\/api\/assets\/([a-z0-9-]+)\/defaults$/, async ({ params, data }) => {
+      const r = await library.saveDefaults({ slug: params[0], params: data.params, note: data.note, author: data.author ?? author });
+      return { asset: r.asset, warnings: r.warnings };
+    }],
+    ['POST', /^\/api\/assets\/([a-z0-9-]+)\/preset$/, async ({ params, data }) => {
+      const r = await library.createPreset({ base: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, params: data.params, title: data.title, description: data.description, tags: data.tags, author: data.author ?? author });
+      return { asset: r.asset, warnings: r.warnings };
+    }],
+    ['PUT', /^\/api\/assets\/([a-z0-9-]+)\/metadata$/, ({ params, data }) => library.setMetadata({ slug: params[0], title: data.title, description: data.description, tags: data.tags, author: data.author ?? author })],
+    ['GET', /^\/api\/assets\/([a-z0-9-]+)\/diff$/, ({ params, query }) => library.diffVersions(params[0], int(query.get('a'), 1, 1, 1e6), int(query.get('b'), 1, 1, 1e6))],
+    ['POST', /^\/api\/clips\/([a-z0-9-]+)\/precomp$/, async ({ params, data }) => {
+      const r = await clips.savePrecomp({ clip: params[0], items: data.items, slug: data.name, title: data.title, description: data.description, tags: data.tags, expose: data.expose ?? [], replace: !!data.replace, author: data.author ?? author });
+      return { asset: r.asset, clip: r.clip };
+    }],
     // the exact frame, drawn by the renderer (PNG)
     ['POST', /^\/api\/frame\/asset$/, async ({ data, res }) => png(res, (await studio.assetFrame({ ref: data.ref, source: data.source, slug: data.name, params: data.params, t: data.t, duration: data.duration, format: data.format, width: data.width, height: data.height, background: data.background, maxSize: data.maxSize })).png)],
     ['POST', /^\/api\/frame\/clip$/, async ({ data, res }) => png(res, (await studio.clipFrame({ clip: data.clip, composition: data.composition, t: data.t, maxSize: data.maxSize })).png)],

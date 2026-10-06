@@ -6,7 +6,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, SAMPLE_RATE, makeRef, parseRef } from '../core/engine.js';
 import { normalizeComposition, itemsOf, reformat } from '../core/composition.js';
-import { needsEasing } from '../core/transform.js';
+import { needsEasing, boxToTransform } from '../core/transform.js';
+import { precompSource } from './generate.js';
 import { mapParams, resolveParams, walkParams } from '../core/schema.js';
 import { hashSeed } from '../core/rng.js';
 import { encodeWav, detectBeats } from '../render/wav.js';
@@ -65,6 +66,38 @@ export function createClips(ctx, library) {
       if (!row) { problems.push(`${where}: no asset "${wanted}" in the library`); return null; }
       return row;
     };
+    /** Check params against a schema (strictly) and pin the asset/image references in them. */
+    const pinWith = (schema, params, at) => {
+      for (const e of resolveParams(schema, params, { strict: true }).errors) problems.push(`${at}: params.${e.path}: ${e.message}`);
+      const out = mapParams(schema, params, ['asset', 'image'], (value, def) => {
+        const dep = pin(value, `${at}: params`);
+        if (!dep) return value;
+        if (def.type === 'image' && dep.type !== 'image') problems.push(`${at}: params: "${value}" is a ${dep.type} asset where an image is expected`);
+        if (def.type === 'asset' && (dep.type !== 'function' || (def.kind && dep.kind !== def.kind))) problems.push(`${at}: params: "${value}" is a ${dep.kind ?? dep.type} asset where a ${def.kind ?? 'function'} asset is expected`);
+        const pinned = makeRef(dep.slug, dep.version);
+        refs.add(pinned);
+        return pinned;
+      });
+      walkParams(schema, out, ['font'], (family) => {
+        const ref = library.fontRef(family);
+        if (ref) fonts.add(ref);
+        else problems.push(`${at}: params: unknown font family "${family}" (available: ${library.fontFamilies().join(', ')})`);
+      });
+      return out;
+    };
+    /** A motion, effect, mask or transition: the right kind of asset, pinned, with valid params. */
+    const pinAttachment = (att, where, kinds) => {
+      const row = pin(att.asset, where);
+      if (!row) return;
+      const kind = row.type === 'function' ? row.kind : row.type;
+      if (!kinds.includes(kind)) problems.push(`${where}: ${makeRef(row.slug, row.version)} is a ${kind} asset; this takes ${kinds.join(' or ')} assets`);
+      att.asset = makeRef(row.slug, row.version);
+      refs.add(att.asset);
+      const schema = row.type === 'function' ? json(row.schema, {}) : row.type === 'image' ? IMAGE_ITEM_SCHEMA : {};
+      att.params = pinWith(schema, att.params ?? {}, where);
+    };
+    for (const [i, fx] of (composition.effects ?? []).entries()) pinAttachment(fx, `effects[${i}]`, ['effect']);
+    for (const tr of composition.tracks) for (const [i, fx] of (tr.effects ?? []).entries()) pinAttachment(fx, `track "${tr.id}": effects[${i}]`, ['effect']);
     for (const { track, item } of itemsOf(composition)) {
       const where = `item "${item.id}"`;
       const row = pin(item.asset, where);
@@ -79,26 +112,13 @@ export function createClips(ctx, library) {
       const schema = row.type === 'function' ? json(row.schema, {}) : row.type === 'image' && track.type !== 'audio' ? IMAGE_ITEM_SCHEMA : null;
       if (!schema) { if (Object.keys(item.params).length) problems.push(`${where}: ${row.type} assets take no params`); continue; }
       // the item's params, and each format's overrides of them, are checked and pinned the same way
-      const pinParams = (params, at) => {
-        for (const e of resolveParams(schema, params, { strict: true }).errors) problems.push(`${at}: params.${e.path}: ${e.message}`);
-        const out = mapParams(schema, params, ['asset', 'image'], (value, def) => {
-          const dep = pin(value, `${at}: params`);
-          if (!dep) return value;
-          if (def.type === 'image' && dep.type !== 'image') problems.push(`${at}: params: "${value}" is a ${dep.type} asset where an image is expected`);
-          if (def.type === 'asset' && (dep.type !== 'function' || (def.kind && dep.kind !== def.kind))) problems.push(`${at}: params: "${value}" is a ${dep.kind ?? dep.type} asset where a ${def.kind ?? 'function'} asset is expected`);
-          const pinned = makeRef(dep.slug, dep.version);
-          refs.add(pinned);
-          return pinned;
-        });
-        walkParams(schema, out, ['font'], (family) => {
-          const ref = library.fontRef(family);
-          if (ref) fonts.add(ref);
-          else problems.push(`${at}: params: unknown font family "${family}" (available: ${library.fontFamilies().join(', ')})`);
-        });
-        return out;
-      };
+      const pinParams = (params, at) => pinWith(schema, params, at);
       item.params = pinParams(item.params, where);
       for (const [fname, o] of Object.entries(item.formats ?? {})) if (o.params) o.params = pinParams(o.params, `${where} (${fname})`);
+      for (const [i, m] of (item.motions ?? []).entries()) pinAttachment(m, `${where}: motions[${i}]`, ['motion']);
+      for (const [i, fx] of (item.effects ?? []).entries()) pinAttachment(fx, `${where}: effects[${i}]`, ['effect']);
+      if (item.mask) pinAttachment(item.mask, `${where}: mask`, ['visual', 'image']);
+      if (item.transition) pinAttachment(item.transition, `${where}: transition`, ['transition']);
       // keyframed params must be numbers or colours the schema accepts
       const keyed = [item.keyframes, ...Object.values(item.formats ?? {}).map((o) => o.keyframes)];
       for (const kf of keyed) for (const [prop, keys] of Object.entries(kf ?? {})) {
@@ -195,6 +215,14 @@ export function createClips(ctx, library) {
       }
     }
     if (composition.easing) refs.add(composition.easing);
+    // motions, effects, masks and transitions, with the assets named in their params
+    const attachments = [...(composition.effects ?? []), ...composition.tracks.flatMap((t) => t.effects ?? [])];
+    for (const { track, item } of itemsOf(composition)) if (track.type !== 'audio') attachments.push(...(item.motions ?? []), ...(item.effects ?? []), ...(item.mask ? [item.mask] : []), ...(item.transition ? [item.transition] : []));
+    for (const a of attachments) {
+      refs.add(a.asset);
+      const row = library.requireVersion(a.asset);
+      if (row.type === 'function') walkParams(json(row.schema, {}), a.params ?? {}, ['asset', 'image'], (value) => { if (parseRef(value).version !== null) refs.add(value); });
+    }
     const audio = await prepareAudio(composition);
     const bundle = library.bundle([...refs], { composition, beats: audio.beats });
     const out = { bundle, audio };
@@ -470,6 +498,87 @@ export function createClips(ctx, library) {
     return createClip({ slug: newSlug, title: title ?? `${row.title} (latest assets)`, description: `"${row.title}" with its assets moved to their latest versions.`, author, composition: p.composition, remixedFrom: slug });
   }
 
+  /**
+   * Save layers of a clip as one asset (a precomp): the selected items, their timing relative to the
+   * first of them, their layout and attachments, drawn by f.layers. `expose` turns item params into
+   * the precomp's own params (their current values become the defaults). With replace, the items are
+   * swapped for one item that uses the new asset.
+   * @param {{ clip: string, items: string[], slug: string, title?: string, description?: string, tags?: string[], expose?: { item: string, param: string, name?: string }[], author: string, replace?: boolean }} o
+   */
+  async function savePrecomp({ clip: slug, items: ids, slug: name, title, description, tags, expose = [], author, replace = false }) {
+    const row = clipRow(slug);
+    const comp = json(row.composition);
+    if (!Array.isArray(ids) || !ids.length) throw new StudioError('items: the ids of the layers to save');
+    const picked = [];
+    comp.tracks.forEach((tr, ti) => tr.items.forEach((it, ii) => { if (ids.includes(it.id)) picked.push({ tr, it, ti, ii }); }));
+    const missing = ids.filter((id) => !picked.some((p) => p.it.id === id));
+    if (missing.length) throw new StudioError(`No item ${missing.map((x) => `"${x}"`).join(', ')} in clip "${slug}"`, 'not_found');
+    const audio = picked.filter((p) => p.tr.type === 'audio');
+    if (audio.length) throw new StudioError(`A precomp holds visual layers; leave the audio items (${audio.map((p) => p.it.id).join(', ')}) on the clip`);
+    const t0 = Math.min(...picked.map((p) => p.it.start));
+    const duration = round3(Math.max(...picked.map((p) => p.it.start + p.it.duration)) - t0);
+    const uses = {}, aliasOf = new Map();
+    const alias = (ref) => {
+      if (aliasOf.has(ref)) return aliasOf.get(ref);
+      const base = parseRef(ref).slug;
+      let a = base, n = 2;
+      while (Object.hasOwn(uses, a)) a = `${base}-${n++}`;
+      uses[a] = ref;
+      aliasOf.set(ref, a);
+      return a;
+    };
+    // assets named in params (themes, images) must be pinned by the precomp too, so they are bundled
+    const pinRefs = (ref, params) => {
+      const r = library.requireVersion(ref);
+      if (r.type === 'function') walkParams(json(r.schema, {}), params ?? {}, ['asset', 'image'], (value) => { if (parseRef(value).version !== null) alias(value); });
+    };
+    const params = {};
+    const byItem = new Map();
+    for (const x of expose) {
+      const p = picked.find((q2) => q2.it.id === x.item);
+      if (!p) throw new StudioError(`expose: "${x.item}" is not one of the saved items`);
+      const r = library.requireVersion(p.it.asset);
+      const def = json(r.schema, {})[x.param];
+      if (!def) throw new StudioError(`expose: ${p.it.asset} has no parameter "${x.param}"`);
+      let pname = x.name ?? x.param;
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(pname)) throw new StudioError(`expose: "${pname}" is not a valid parameter name`);
+      if (Object.hasOwn(params, pname)) pname = `${x.item.replace(/[^A-Za-z0-9_]/g, '_')}_${x.param}`;
+      params[pname] = { ...def, default: p.it.params[x.param] ?? def.default };
+      byItem.set(`${x.item}|${x.param}`, pname);
+    }
+    const att = (a) => { pinRefs(a.asset, a.params); return { ...a, asset: alias(a.asset) }; };
+    const layers = picked.map(({ it }) => {
+      pinRefs(it.asset, it.params);
+      const L = { id: it.id, asset: alias(it.asset), start: round3(it.start - t0), duration: it.duration };
+      L.params = Object.fromEntries(Object.entries(it.params).map(([k, v]) => [k, byItem.has(`${it.id}|${k}`) ? { $param: byItem.get(`${it.id}|${k}`) } : v]));
+      const transform = it.transform ?? (it.box ? boxToTransform(it.box) : undefined);
+      if (transform) L.transform = transform;
+      for (const k of ['label', 'fadeIn', 'fadeOut', 'opacity', 'blend', 'offset', 'assetDuration', 'keyframes', 'formats']) if (it[k] !== undefined) L[k] = it[k];
+      if (it.motions) L.motions = it.motions.map(att);
+      if (it.effects) L.effects = it.effects.map(att);
+      if (it.mask) L.mask = att(it.mask);
+      if (it.transition) L.transition = att(it.transition);
+      return L;
+    });
+    if (comp.easing && picked.some((p) => needsEasing(p.it))) { if (uses.easing && uses.easing !== comp.easing) throw new StudioError('The layers use two different easing assets'); uses.easing = comp.easing; }
+    const titles = picked.map((p) => library.requireVersion(p.it.asset)).map((r) => r.title ?? r.slug);
+    const source = precompSource({
+      title: title ?? `${row.title}: ${picked.length} layers`,
+      description: description ?? `A precomp of ${picked.length} layers (${[...new Set(titles)].slice(0, 4).join(', ')}) saved from the clip "${row.title}".`,
+      tags: [...new Set([...(tags ?? []), 'precomp'])], duration, uses, params, layers, from: `clip "${slug}" (items ${ids.join(', ')})`,
+    });
+    const saved = await library.saveFunction({ slug: name, source, author, forClip: slug, note: `Precomp of ${picked.length} layers from ${slug}`, mode: 'create', derivation: 'precomp' });
+    if (!replace) return { asset: saved.asset, source, clip: null };
+    // the new item sits where the top-most saved layer was
+    const top = picked.reduce((a, b) => (b.ti > a.ti || (b.ti === a.ti && b.ii > a.ii) ? b : a));
+    /** @type {any[]} */
+    const ops = ids.map((id) => ({ op: 'remove_item', id }));
+    const index = top.tr.items.slice(0, top.ii).filter((it) => !ids.includes(it.id)).length;
+    ops.push({ op: 'add_item', track: top.tr.id, item: { id: name, asset: saved.asset.ref, start: t0, duration, params: {}, transform: {} } }, { op: 'move_item', id: name, track: top.tr.id, index });
+    const edited = await editClip(slug, ops, { by: `precomp ${saved.asset.ref}` });
+    return { asset: saved.asset, source, clip: edited.clip };
+  }
+
   function getClip(slug) {
     const row = clipRow(slug);
     return { ...shape(row), assets: clipAssets(slug) };
@@ -498,5 +607,5 @@ export function createClips(ctx, library) {
     }));
   }
 
-  return { prepare, prepareAudio, bundleFor, check, createClip, updateClip, editClip, applyOps, remixClip, repinClip, getClip, listClips, clipAssets, clipRow };
+  return { prepare, prepareAudio, bundleFor, check, createClip, updateClip, editClip, applyOps, remixClip, repinClip, savePrecomp, getClip, listClips, clipAssets, clipRow };
 }

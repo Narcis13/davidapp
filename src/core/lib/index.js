@@ -7,6 +7,7 @@ import * as beat from './beat.js';
 import { noise, fbm } from './noise.js';
 import { createText } from './text.js';
 import { createAudio } from './audio.js';
+import * as fx from './fx.js';
 
 /** @param {{ sampleRate?: number }} [o] */
 export function createLib({ sampleRate } = {}) {
@@ -19,5 +20,6 @@ export function createLib({ sampleRate } = {}) {
     fbm,
     text: createText(),
     audio: createAudio(sampleRate),
+    fx,
   });
 }

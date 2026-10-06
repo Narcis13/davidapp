@@ -18,9 +18,16 @@ import { createLib } from './lib/index.js';
 import { createRng, hashSeed } from './rng.js';
 import { normalizeSchema, resolveParams, SchemaError } from './schema.js';
 import { safeZone, formatOf, REF_RE, FORMATS, SAMPLE_RATE } from './engine.js';
-import { forFormat, isV2Item, layerGeometry, sampleItem } from './transform.js';
+import { forFormat, isV2Item, layerGeometry, sampleItem, spaceRect, TRANSFORM_DEFAULTS } from './transform.js';
+import { drawDemo } from './demo.js';
 
-export const KINDS = ['visual', 'value', 'audio'];
+/**
+ * visual draws; value returns a value; audio returns samples; motion returns a transform delta for
+ * an item; transition draws one layer turning into another; effect draws a processed copy of a layer.
+ */
+export const KINDS = ['visual', 'value', 'audio', 'motion', 'transition', 'effect'];
+/** What a motion may return: offsets in px add, scales and opacity multiply, rotation (degrees) adds. */
+export const MOTION_KEYS = ['x', 'y', 'scale', 'scaleX', 'scaleY', 'rotation', 'opacity'];
 const MAX_DEPTH = 24;
 
 export class AssetError extends Error {
@@ -233,6 +240,12 @@ export function createRuntime(host) {
       lib,
       params: p,
       ref: e.ref,
+      /** motion: in | out | emphasis | loop. */
+      phase: env.phase ?? null,
+      /** effect: the layer to process; transition: the outgoing and incoming layers ({ canvas, ctx, width, height } or null). */
+      source: env.source ?? null,
+      from: env.from ?? null,
+      to: env.to ?? null,
       /** Compose another asset: draw a visual, or get the value of a value asset. */
       use(name, params = {}, o = {}) {
         const ref = resolve(e, name);
@@ -241,7 +254,12 @@ export function createRuntime(host) {
         const key = o.key ?? (counts[ref] = (counts[ref] ?? 0) + 1);
         const seed = hashSeed(env.seed, ref, key);
         const kind = child.def.kind;
-        if (kind === 'value') return invoke(child, params, { ...env, seed, depth: env.depth + 1 });
+        if (kind === 'value' || kind === 'motion') return invoke(child, params, { ...env, seed, depth: env.depth + 1 });
+        // an effect or transition used from another one (a preset) works on the same layers
+        if (kind === 'effect' || kind === 'transition') {
+          if (e.def.kind !== kind) throw new AssetError(`"${name}" is ${kind === 'effect' ? 'an effect' : 'a transition'}; only ${kind === 'effect' ? 'an effect' : 'a transition'} can use it (attach it to an item instead)`, [e.ref]);
+          return invoke(child, params, { ...env, seed, depth: env.depth + 1 });
+        }
         if (kind === 'audio') {
           if (e.def.kind !== 'audio') throw new AssetError(`"${name}" is an audio asset; only audio assets can use it`, [e.ref]);
           return toStereo(invoke(child, params, { ...env, seed, depth: env.depth + 1, t: 0, duration: o.duration ?? duration }), ref).left;
@@ -281,6 +299,23 @@ export function createRuntime(host) {
       },
       /** A cleared scratch canvas: { canvas, ctx, width, height }. Draw it back with ctx.drawImage(layer.canvas, x, y). */
       offscreen: (w = width, h = height) => offscreen(w, h),
+      /**
+       * Draw layers inside this asset's box, the way a clip draws its items: a precomp. Each layer is
+       * { asset (an alias from uses), start, duration, params, transform, keyframes, motions, effects,
+       * mask, opacity, blend, fadeIn, fadeOut }, bottom first. A param value { $param: "name" } takes
+       * values[name], so a precomp exposes the params it chooses.
+       */
+      layers(list, values = {}) {
+        if (!Array.isArray(list)) throw new AssetError('f.layers() takes a list of layers', [e.ref]);
+        if (e.def.kind !== 'visual') throw new AssetError('f.layers() draws, so only a visual asset can call it', [e.ref]);
+        const sub = { width, height, fps: env.fps, seed: env.seed, format: env.format, easing: e.deps.easing ?? null };
+        const frame = Math.round(t * env.fps);
+        list.forEach((layer, i) => {
+          const item = bindLayer(e, layer, values, i);
+          if (frame < Math.round(item.start * env.fps) || frame >= Math.round((item.start + item.duration) * env.fps)) return;
+          drawLayer(ctx, sub, forFormat(item, env.format), t, env.clip);
+        });
+      },
     };
     try {
       return fn(f, p);
@@ -324,6 +359,7 @@ export function createRuntime(host) {
       const env = baseEnv(ctx, o);
       if (e.def.kind === 'visual') return invoke(e, params, env);
       if (e.def.preview) return invoke(e, params, env, e.def.preview);
+      if (e.def.kind === 'motion' || e.def.kind === 'transition' || e.def.kind === 'effect') return drawKindDemo(ctx, e, params, env, o.background);
       if (e.def.kind === 'audio') return drawWaveform(ctx, e, params, env);
       return drawValueCard(ctx, e, params, env);
     } finally {
@@ -408,7 +444,13 @@ export function createRuntime(host) {
       const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
       for (const tr of comp.tracks) {
         if (tr.type === 'audio' || tr.hidden || (solo && !tr.solo)) continue;
+        // v2: a track with effects is drawn on its own layer first, then processed (an adjustment layer)
+        if (tr.effects?.length) { drawTrackWithEffects(ctx, comp, tr, frame, t, clip, format); continue; }
+        const handoff = transitionsAt(tr, frame, fps);
         for (const item of tr.items) {
+          if (handoff.outgoing.has(item)) continue;
+          const tx = handoff.incoming.get(item);
+          if (tx) { drawTransition(ctx, comp, tx, t, clip, format); continue; }
           if (!activeAt(item, frame, fps)) continue;
           // composition v2 (transforms, keyframes, formats…) and image layers take the new path;
           // everything else is drawn exactly as in v1, so old clips keep their pixels
@@ -451,6 +493,15 @@ export function createRuntime(host) {
           }
         }
       }
+      // v2: effects on the whole clip, after every track
+      if (comp.effects?.length) {
+        const out = applyEffects({ canvas: ctx.canvas, ctx, width, height }, comp.effects, comp, { t, duration: comp.duration }, clip, 'clip');
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(out.canvas, 0, 0);
+        ctx.restore();
+      }
     } finally {
       while (ctx.__saveDepth() > 0) ctx.restore();
     }
@@ -480,13 +531,9 @@ export function createRuntime(host) {
     ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
 
-  /**
-   * Draw one composition-v2 item (already merged for the frame's format): its keyframed transform,
-   * opacity and params at this frame, placed with a canvas transform so vectors stay sharp.
-   */
-  function drawLayer(ctx, comp, item, t, clip) {
-    if (item.hidden) return;
-    const { width, height, fps } = comp;
+  /** Where an item is at time t (clip seconds): its sampled state with motions applied, and its geometry. Null when invisible. */
+  function layerState(comp, item, t, clip) {
+    const { width, height } = comp;
     const lt = Math.max(0, t - item.start);
     const offset = item.offset ?? 0;
     const at = lt + offset;
@@ -494,46 +541,286 @@ export function createRuntime(host) {
     let opacity = s.opacity;
     if (item.fadeIn > 0) opacity *= Math.min(1, lt / item.fadeIn);
     if (item.fadeOut > 0) opacity *= Math.min(1, (item.duration - lt) / item.fadeOut);
-    if (opacity <= 0) return;
-    const geo = layerGeometry(s.transform, width, height);
+    let transform = s.transform;
+    if (item.motions?.length) {
+      const box = layerGeometry(transform, width, height);
+      const m = motionDelta(comp, item, lt, box, clip);
+      const R = spaceRect(transform.space, width, height);
+      transform = { ...transform, x: transform.x + m.x / R.width, y: transform.y + m.y / R.height, scale: transform.scale * m.scale, scaleX: transform.scaleX * m.scaleX, scaleY: transform.scaleY * m.scaleY, rotation: transform.rotation + m.rotation };
+      opacity *= m.opacity;
+    }
+    if (opacity <= 0) return null;
+    return { lt, at, params: s.params, transform, opacity, geo: layerGeometry(transform, width, height) };
+  }
+
+  /** The combined transform delta of an item's motions at on-screen time lt. */
+  function motionDelta(comp, item, lt, box, clip) {
+    const out = { x: 0, y: 0, scale: 1, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1 };
+    item.motions.forEach((m, i) => {
+      const e = entry(m.asset);
+      if (e.def.kind !== 'motion') throw new AssetError(`item "${item.id}": ${m.asset} is a ${e.def.kind} asset, not a motion`);
+      const phase = m.phase ?? 'in';
+      const d = phase === 'loop' ? item.duration : Math.min(item.duration, m.duration ?? e.def.duration ?? 0.6);
+      const start = phase === 'out' ? item.duration - d : phase === 'emphasis' ? m.at ?? 0 : 0;
+      if (lt < start || lt > start + d) return;
+      const r = invoke(e, m.params, {
+        ctx: measureContext(), width: box.width, height: box.height, fps: comp.fps, t: lt - start, duration: d, depth: 0,
+        seed: hashSeed(comp.seed ?? 1, item.id, 'motion', i), clip, phase,
+        format: formatOf(box.width, box.height), safe: { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: box.width, height: box.height },
+      });
+      const delta = checkMotion(r, m.asset);
+      out.x += delta.x ?? 0; out.y += delta.y ?? 0;
+      out.scale *= delta.scale ?? 1; out.scaleX *= delta.scaleX ?? 1; out.scaleY *= delta.scaleY ?? 1;
+      out.rotation += delta.rotation ?? 0; out.opacity *= delta.opacity ?? 1;
+    });
+    out.opacity = Math.min(1, Math.max(0, out.opacity));
+    return out;
+  }
+
+  function checkMotion(r, ref) {
+    if (r === undefined || r === null) return {};
+    if (typeof r !== 'object' || Array.isArray(r)) throw new AssetError(`a motion returns an object such as { x, y, scale, rotation, opacity }; got ${Array.isArray(r) ? 'an array' : typeof r}`, [ref]);
+    for (const [k, v] of Object.entries(r)) {
+      if (!MOTION_KEYS.includes(k)) throw new AssetError(`a motion returned "${k}"; it can return ${MOTION_KEYS.join(', ')}`, [ref]);
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new AssetError(`a motion returned ${k}: ${String(v)}; every value must be a finite number`, [ref]);
+    }
+    return r;
+  }
+
+  /** Draw the item's content (an image or a visual asset) into target, with the canvas transform of its geometry. */
+  function drawContent(target, comp, item, st, clip) {
+    const { width, height, fps } = comp;
     const img = images.get(item.asset);
     const e = img ? null : entry(item.asset);
-    if (e && e.def.kind !== 'visual') throw new AssetError(`item "${item.id}": ${item.asset} is a ${e.def.kind} asset and cannot sit on a visual track`);
-    const layered = opacity < 1 || (item.blend && item.blend !== 'source-over');
-    const target = layered ? offscreen(width, height).ctx : ctx;
+    if (e && e.def.kind !== 'visual') throw new AssetError(`item "${item.id}": ${item.asset} is a ${e.def.kind} asset and cannot sit on a visual track${e.def.kind === 'effect' || e.def.kind === 'motion' || e.def.kind === 'transition' ? ` (attach it to an item: ${e.def.kind === 'effect' ? 'effects' : e.def.kind === 'motion' ? 'motions' : 'transition'})` : ''}`);
+    const geo = st.geo;
     const depth = target.__saveDepth();
     target.save();
     const floor = target.__floor(depth + 1);
     try {
       target.beginPath();
       target.transform(...geo.matrix);
-      if (img) drawImageFit(target, img, geo.width, geo.height, s.params.fit);
+      if (img) drawImageFit(target, img, geo.width, geo.height, st.params.fit);
       else {
-        invoke(e, s.params, {
-          ctx: target, width: geo.width, height: geo.height, fps, t: at, duration: item.assetDuration ?? offset + item.duration, depth: 0,
+        invoke(e, st.params, {
+          ctx: target, width: geo.width, height: geo.height, fps, t: st.at, duration: item.assetDuration ?? (item.offset ?? 0) + item.duration, depth: 0,
           seed: hashSeed(comp.seed ?? 1, item.id), clip,
           format: geo.full ? formatOf(width, height) : formatOf(geo.width, geo.height),
           safe: geo.full ? safeZone(width, height) : { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: geo.width, height: geo.height },
         });
       }
-    } catch (err) {
-      if (err instanceof AssetError) err.message = `item "${item.id}" at ${t.toFixed(3)}s: ${err.message}`;
-      throw err;
     } finally {
       target.__floor(floor);
       while (target.__saveDepth() > depth) target.restore();
     }
-    if (layered) {
+  }
+
+  /**
+   * Draw one composition-v2 item (already merged for the frame's format): its keyframed transform,
+   * motions, opacity and params at this frame, placed with a canvas transform so vectors stay sharp;
+   * then its effects and mask on a layer of its own.
+   */
+  function drawLayer(ctx, comp, item, t, clip) {
+    if (item.hidden) return;
+    try {
+      const st = layerState(comp, item, t, clip);
+      if (!st) return;
+      const own = item.effects?.length || item.mask;
+      const layered = own || st.opacity < 1 || (item.blend && item.blend !== 'source-over');
+      if (!layered) return drawContent(ctx, comp, item, st, clip);
+      let layer = offscreen(comp.width, comp.height);
+      drawContent(layer.ctx, comp, item, st, clip);
+      if (item.effects?.length) layer = applyEffects(layer, item.effects, comp, { t: st.lt, duration: item.duration }, clip, item.id);
+      if (item.mask) applyMask(layer, comp, item, st, t, clip);
+      composite(ctx, layer.canvas, st.opacity, item.blend);
+    } catch (err) {
+      if (err instanceof AssetError && !err.message.startsWith('item "')) err.message = `item "${item.id}" at ${t.toFixed(3)}s: ${err.message}`;
+      throw err;
+    }
+  }
+
+  function composite(ctx, canvas, opacity = 1, blend = 'source-over') {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.globalCompositeOperation = blend ?? 'source-over';
+    ctx.drawImage(canvas, 0, 0);
+    ctx.restore();
+  }
+
+  /** Run effects one after another on a layer; each draws a processed copy of the previous result. */
+  function applyEffects(layer, list, comp, span, clip, owner) {
+    let src = layer;
+    list.forEach((fx, i) => {
+      const e = entry(fx.asset);
+      if (e.def.kind !== 'effect') throw new AssetError(`${fx.asset} is a ${e.def.kind} asset, not an effect`);
+      const out = offscreen(comp.width, comp.height);
+      invoke(e, fx.params, {
+        ctx: out.ctx, width: comp.width, height: comp.height, fps: comp.fps, t: span.t, duration: span.duration, depth: 0,
+        seed: hashSeed(comp.seed ?? 1, owner, 'effect', i), clip, source: src,
+        format: formatOf(comp.width, comp.height), safe: safeZone(comp.width, comp.height),
+      });
+      src = out;
+    });
+    return src;
+  }
+
+  /** Keep the layer's pixels where the mask is opaque (or bright, or the inverse). */
+  function applyMask(layer, comp, item, st, t, clip) {
+    const m = item.mask;
+    const mask = offscreen(comp.width, comp.height);
+    const mItem = { id: `${item.id}:mask`, asset: m.asset, start: item.start, duration: item.duration, params: m.params, offset: item.offset, assetDuration: item.assetDuration, transform: m.transform ?? st.transform };
+    const mst = layerState(comp, mItem, t, clip);
+    if (mst) drawContent(mask.ctx, comp, mItem, { ...mst, geo: m.transform ? mst.geo : st.geo }, clip);
+    const mode = m.mode ?? 'alpha';
+    if (mode.startsWith('luma')) {
+      // brightness becomes coverage: the same arithmetic on every platform
+      const img = mask.ctx.getImageData(0, 0, mask.width, mask.height);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i + 3] = Math.round(((0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) * d[i + 3]) / 255);
+        d[i] = d[i + 1] = d[i + 2] = 255;
+      }
+      mask.ctx.putImageData(img, 0, 0);
+    }
+    layer.ctx.save();
+    layer.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    layer.ctx.globalCompositeOperation = mode.endsWith('inverted') ? 'destination-out' : 'destination-in';
+    layer.ctx.drawImage(mask.canvas, 0, 0);
+    layer.ctx.restore();
+  }
+
+  /** A track with effects: its items on one layer, the effects over it, then onto the frame. */
+  function drawTrackWithEffects(ctx, comp, tr, frame, t, clip, format) {
+    const layer = offscreen(comp.width, comp.height);
+    const handoff = transitionsAt(tr, frame, comp.fps);
+    for (const item of tr.items) {
+      if (handoff.outgoing.has(item)) continue;
+      const tx = handoff.incoming.get(item);
+      if (tx) { drawTransition(layer.ctx, comp, tx, t, clip, format); continue; }
+      if (!activeAt(item, frame, comp.fps)) continue;
+      drawLayer(layer.ctx, comp, forFormat(item, format), t, clip);
+    }
+    composite(ctx, applyEffects(layer, tr.effects, comp, { t, duration: comp.duration }, clip, `track:${tr.id}`).canvas);
+  }
+
+  /**
+   * Transitions running on a track at this frame. An item with a transition hands over from the item
+   * before it on the same track (the latest one that starts earlier); for the transition's duration
+   * that item keeps playing, or holds its last frame if it has already ended.
+   */
+  function transitionsAt(tr, frame, fps) {
+    const incoming = new Map(), outgoing = new Set();
+    for (const item of tr.items) {
+      if (!item.transition) continue;
+      const a = Math.round(item.start * fps), d = Math.round(item.transition.duration * fps);
+      if (frame < a || frame >= a + d || !activeAt(item, frame, fps)) continue;
+      let from = null;
+      for (const other of tr.items) if (other !== item && other.start < item.start && (!from || other.start > from.start)) from = other;
+      if (from && Math.round((from.start + from.duration) * fps) < a - 1) from = null;
+      if (from) outgoing.add(from);
+      incoming.set(item, { item, from, start: item.start, duration: item.transition.duration });
+    }
+    return { incoming, outgoing };
+  }
+
+  function drawTransition(ctx, comp, tx, t, clip, format) {
+    const { item, from } = tx;
+    const e = entry(item.transition.asset);
+    if (e.def.kind !== 'transition') throw new AssetError(`item "${item.id}": ${item.transition.asset} is a ${e.def.kind} asset, not a transition`);
+    const to = offscreen(comp.width, comp.height);
+    drawLayer(to.ctx, comp, forFormat(item, format), t, clip);
+    let fromLayer = null;
+    if (from) {
+      fromLayer = offscreen(comp.width, comp.height);
+      // the outgoing item holds its last frame once it has ended
+      const last = from.start + from.duration - 1 / comp.fps;
+      drawLayer(fromLayer.ctx, comp, forFormat(from, format), Math.min(t, last), clip);
+    }
+    const out = offscreen(comp.width, comp.height);
+    const lt = t - tx.start;
+    try {
+      invoke(e, item.transition.params, {
+        ctx: out.ctx, width: comp.width, height: comp.height, fps: comp.fps, t: lt, duration: tx.duration, depth: 0,
+        seed: hashSeed(comp.seed ?? 1, item.id, 'transition'), clip, from: fromLayer, to,
+        format: formatOf(comp.width, comp.height), safe: safeZone(comp.width, comp.height),
+      });
+    } catch (err) {
+      if (err instanceof AssetError) err.message = `item "${item.id}" at ${t.toFixed(3)}s (transition): ${err.message}`;
+      throw err;
+    }
+    composite(ctx, out.canvas);
+  }
+
+  /** A precomp layer with its aliases resolved through the owner's pins and its $param bindings filled. */
+  function bindLayer(owner, layer, values, i) {
+    if (!layer || typeof layer !== 'object') throw new AssetError(`f.layers(): layer ${i} is not an object`, [owner.ref]);
+    const bind = (v) => {
+      if (Array.isArray(v)) return v.map(bind);
+      if (v && typeof v === 'object') {
+        if (typeof v.$param === 'string') return values[v.$param];
+        return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, bind(x)]));
+      }
+      return v;
+    };
+    const pin = (alias) => resolve(owner, alias);
+    const att = (a) => ({ ...a, asset: pin(a.asset), params: bind(a.params ?? {}) });
+    const item = { ...layer, id: layer.id ?? `layer-${i + 1}`, asset: pin(layer.asset), start: layer.start ?? 0, duration: layer.duration ?? 1e9, params: bind(layer.params ?? {}) };
+    if (layer.motions) item.motions = layer.motions.map(att);
+    if (layer.effects) item.effects = layer.effects.map(att);
+    if (layer.mask) item.mask = att(layer.mask);
+    if (layer.transition) item.transition = att(layer.transition);
+    if (!item.transform) item.transform = {};
+    return item;
+  }
+
+  /** The playground preview of a motion, transition or effect: applied to a built-in demo scene. */
+  function drawKindDemo(ctx, e, params, env, background) {
+    const { width: w, height: h } = env;
+    const kind = e.def.kind;
+    const scene = (which) => { const l = offscreen(w, h); drawDemo(l.ctx, w, h, which, lib); return l; };
+    if (kind === 'effect') {
+      const src = scene('scene');
+      const out = offscreen(w, h);
+      invoke(e, params, { ...env, ctx: out.ctx, source: src });
+      ctx.drawImage(out.canvas, 0, 0);
+    } else if (kind === 'transition') {
+      const out = offscreen(w, h);
+      invoke(e, params, { ...env, ctx: out.ctx, from: scene('a'), to: scene('b') });
+      ctx.drawImage(out.canvas, 0, 0);
+    } else {
+      // a card that enters with the motion as 'in', rests, and leaves with it as 'out' (or loops)
+      if (!background) drawDemo(ctx, w, h, 'floor', lib);
+      const card = { width: 0.36, height: 0.36 * Math.min(w, h) / h };
+      const d = Math.min(env.duration / 2, e.def.duration ?? 0.6);
+      const loop = (params?.phase ?? null) === 'loop' || (e.def.tags ?? []).includes('loop');
+      const phase = loop ? 'loop' : env.t < env.duration / 2 ? 'in' : 'out';
+      const start = phase === 'out' ? env.duration - d : 0;
+      const span = phase === 'loop' ? env.duration : d;
+      let delta = {};
+      if (env.t >= start && env.t <= start + span) {
+        delta = checkMotion(invoke(e, params, { ...env, ctx: measureContext(), t: env.t - start, duration: span, phase, width: card.width * w, height: card.height * h }), e.ref);
+      }
+      const tf = { ...TRANSFORM_DEFAULTS, ...card };
+      const R = { width: w, height: h };
+      const geo = layerGeometry({ ...tf, x: tf.x + (delta.x ?? 0) / R.width, y: tf.y + (delta.y ?? 0) / R.height, scale: delta.scale ?? 1, scaleX: delta.scaleX ?? 1, scaleY: delta.scaleY ?? 1, rotation: delta.rotation ?? 0 }, w, h);
       ctx.save();
-      ctx.globalAlpha = opacity;
-      ctx.globalCompositeOperation = item.blend ?? 'source-over';
-      ctx.drawImage(target.canvas, 0, 0);
+      ctx.globalAlpha = Math.min(1, Math.max(0, delta.opacity ?? 1));
+      ctx.transform(...geo.matrix);
+      drawDemo(ctx, geo.width, geo.height, 'card', lib);
       ctx.restore();
     }
   }
 
+  /** Run a motion once (validation, tests): its delta at time t of the given phase. */
+  function callMotion(ref, params, { phase = 'in', t = 0, duration = 0.6, width = 400, height = 300, fps = 30, seed = 1 } = {}) {
+    const e = entry(ref);
+    if (e.def.kind !== 'motion') throw new AssetError(`${ref} is a ${e.def.kind} asset, not a motion`);
+    const env = { ...baseEnv(measureContext(), { width, height, fps, t, duration, seed }), phase };
+    return checkMotion(invoke(e, params, env), ref);
+  }
+
   return {
-    lib, load, compile, setImage, renderAsset, renderClipFrame, renderAudio, callValue,
+    lib, load, compile, setImage, renderAsset, renderClipFrame, renderAudio, callValue, callMotion,
     has: (ref) => entries.has(ref) || images.has(ref),
     definition: (ref) => entry(ref).def,
     clearTextCache: () => lib.text.clearCache(),

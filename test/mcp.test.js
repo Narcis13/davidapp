@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { connect, callTool, inlineFiles } from '../scripts/mcp.mjs';
 import { EASING, DOT, LABEL, TONE } from './helpers.js';
 import { createStudio } from '../src/studio/studio.js';
+import { MOTION_POP, EFFECT_GRAIN, TRANSITION_WIPE, BROKEN } from './fixtures/kinds.js';
 
 let client, dataDir;
 const call = (name, args) => callTool(client, name, args);
@@ -27,7 +28,8 @@ test('the server lists its tools with schemas', async () => {
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name);
   for (const n of ['studio_guide', 'search_assets', 'get_asset', 'validate_asset', 'create_asset', 'update_asset', 'fork_asset', 'create_clip', 'update_clip', 'edit_clip', 'render_asset_frame', 'render_clip_frame', 'start_render', 'get_render', 'cancel_render', 'list_clip_assets', 'frame_hashes', 'reuse_report',
-    'list_requests', 'claim_request', 'get_request', 'reply_request', 'propose_asset_version', 'propose_new_asset', 'propose_clip_edit', 'complete_request']) assert.ok(names.includes(n), `missing tool ${n}`);
+    'list_requests', 'claim_request', 'get_request', 'reply_request', 'propose_asset_version', 'propose_new_asset', 'propose_clip_edit', 'complete_request',
+    'save_defaults', 'create_preset', 'save_precomp', 'set_asset_metadata', 'diff_versions']) assert.ok(names.includes(n), `missing tool ${n}`);
   const create = tools.find((t) => t.name === 'create_asset');
   assert.deepEqual(create.inputSchema.required, ['name', 'source']);
   assert.match((await call('studio_guide')).text, /The frame object `f`[\s\S]*Library now/);
@@ -217,6 +219,43 @@ test('requests: list, claim with frames, reply, propose a version and a clip edi
   } finally {
     await studio.close();
   }
+});
+
+test('tweak and keep, and the new kinds, over MCP: defaults, presets, metadata, diff, precomps; broken kinds rejected', async () => {
+  const defaults = await call('save_defaults', { name: 'label', params: { text: 'Kept', color: '#ffcc00' } });
+  assert.ok(!defaults.isError, defaults.text);
+  assert.equal(defaults.json.updated, 'label@2');
+  const diff = await call('diff_versions', { name: 'label', a: 1, b: 2, t: 1 });
+  assert.match(diff.text, /- {4}text: \{ type: 'string', default: 'Hello' \},[\s\S]*\+ {4}text: \{ type: 'string', default: 'Kept' \},/);
+  assert.equal(diff.images.length, 1, 'the same frame of both versions, side by side');
+  const preset = await call('create_preset', { base: 'dot@2', name: 'dot-big-teal', params: { radius: 90, color: '#14b8a6' }, title: 'Big teal dot' });
+  assert.ok(!preset.isError, preset.text);
+  assert.deepEqual(preset.json.deps, { base: 'dot@2' });
+  const meta = await call('set_asset_metadata', { name: 'dot-big-teal', tags: ['dot', 'teal', 'preset'] });
+  assert.deepEqual(meta.json.tags, ['dot', 'teal', 'preset']);
+  assert.equal((await call('get_asset', { ref: 'dot-big-teal' })).json.version, 1, 'no new version');
+  assert.ok((await call('search_assets', { tags: ['teal'] })).json.assets.some((a) => a.ref === 'dot-big-teal@1'));
+  for (const [name, source] of [['pop', MOTION_POP], ['grain', EFFECT_GRAIN], ['wipe', TRANSITION_WIPE]]) {
+    const r = await call('create_asset', { name, source });
+    assert.ok(!r.isError, r.text);
+    assert.equal(r.images.length, 1, `${name} has a demo thumbnail`);
+  }
+  for (const [what, [source, expected]] of Object.entries(BROKEN)) {
+    const r = await call('create_asset', { name: 'broken', source });
+    assert.ok(r.isError, what);
+    assert.match(r.text, expected, what);
+  }
+  const edit = await call('edit_clip', { clip: 'mcp-demo', operations: [
+    { op: 'update_item', id: 'label', patch: { motions: [{ asset: 'pop', phase: 'in' }], effects: [{ asset: 'grain', params: { amount: 0.1 } }] } },
+    { op: 'update_item', id: 'dot2', patch: { transition: { asset: 'wipe', duration: 0.5 } } },
+  ] });
+  assert.ok(!edit.isError, edit.text);
+  const pre = await call('save_precomp', { clip: 'mcp-demo', items: ['label', 'dot2'], name: 'demo-card', expose: [{ item: 'label', param: 'text', name: 'headline' }], replace: true });
+  assert.ok(!pre.isError, pre.text);
+  assert.equal(pre.json.created, 'demo-card@1');
+  assert.deepEqual(pre.json.params, ['headline']);
+  const used = (await call('list_clip_assets', { clip: 'mcp-demo' })).json.assets;
+  assert.ok(used.some((a) => a.ref === 'demo-card@1' && a.direct) && used.some((a) => a.ref === 'pop@1' && !a.direct));
 });
 
 test('the CLI helper inlines @file: arguments', () => {

@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS asset_versions (
   id              INTEGER PRIMARY KEY,
   asset_id        INTEGER NOT NULL REFERENCES assets(id),
   version         INTEGER NOT NULL,
-  kind            TEXT CHECK (kind IN ('visual', 'value', 'audio')),  -- function assets only
+  kind            TEXT CHECK (kind IN ('visual', 'value', 'audio', 'motion', 'transition', 'effect')),  -- function assets only
   title           TEXT,
   description     TEXT NOT NULL,
   tags            TEXT NOT NULL DEFAULT '[]',   -- JSON array
@@ -209,6 +209,15 @@ CREATE INDEX IF NOT EXISTS proposals_request ON proposals(request_id);
 /** Columns added since schema v1: [table, column, declaration]. */
 const COLUMNS = [
   ['renders', 'format', 'TEXT'],   // v2: rendered in another format than the clip's (its overrides apply)
+  // v2: metadata edited in the studio, over what the source declares (no new code version)
+  ['assets', 'meta_title', 'TEXT'],
+  ['assets', 'meta_description', 'TEXT'],
+  ['assets', 'meta_tags', 'TEXT'],
+  ['assets', 'meta_by', 'TEXT'],
+  ['assets', 'meta_at', 'TEXT'],
+  ['assets', 'derivation', 'TEXT'],                        // how it came from forked_from: fork | bake | preset | precomp
+  ['assets', 'needs_description', 'INTEGER NOT NULL DEFAULT 0'],  // an upload waiting for the agent to describe it
+  ['assets', 'featured', 'INTEGER NOT NULL DEFAULT 0'],
 ];
 
 /** Open (and create or migrate) the database at `file`. */
@@ -219,12 +228,43 @@ export function openDb(file) {
   db.exec(SCHEMA);
   const row = db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get();
   if (row && Number(row.value) > SCHEMA_VERSION) throw new Error(`The database at ${file} is schema v${row.value}; this build understands v${SCHEMA_VERSION}`);
+  widenKinds(db);
   // columns added after v1: ALTER TABLE on a database made by an older build (idempotent)
   for (const [table, column, decl] of COLUMNS) {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
   }
   db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(SCHEMA_VERSION));
   return db;
+}
+
+/**
+ * v1 databases only allow the kinds visual, value and audio. SQLite cannot change a CHECK
+ * constraint in place, so the table is rebuilt with the current definition (the documented
+ * "twelve steps": foreign keys off, copy, drop, rename, then the triggers and indexes again).
+ */
+function widenKinds(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'asset_versions'").get();
+  if (!row || row.sql.includes("'motion'")) return;
+  const create = /CREATE TABLE IF NOT EXISTS asset_versions \([\s\S]*?\n\);/.exec(SCHEMA)[0].replace('CREATE TABLE IF NOT EXISTS asset_versions', 'CREATE TABLE asset_versions_v2');
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(create);
+      db.exec('INSERT INTO asset_versions_v2 SELECT * FROM asset_versions');
+      db.exec('DROP TABLE asset_versions');
+      db.exec('ALTER TABLE asset_versions_v2 RENAME TO asset_versions');
+      db.exec(SCHEMA);
+      const broken = db.prepare('PRAGMA foreign_key_check').all();
+      if (broken.length) throw new Error(`rebuilding asset_versions broke ${broken.length} foreign keys`);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
 }
 
 /** Run fn inside a transaction; rolls back if it throws. */

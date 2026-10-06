@@ -93,7 +93,8 @@ export function needsEasing(item) {
  * @param {(name: string) => (x: number) => number} ease
  */
 export function sampleItem(item, lt, ease) {
-  const transform = { ...TRANSFORM_DEFAULTS, ...(item.transform ?? {}) };
+  // a v1 item drawn through this path (a transition's outgoing layer) keeps its box
+  const transform = { ...TRANSFORM_DEFAULTS, ...(item.transform ?? (item.box ? boxToTransform(item.box) : {})) };
   let opacity = item.opacity ?? 1;
   let params = item.params ?? {};
   const kf = item.keyframes;

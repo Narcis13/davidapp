@@ -10,6 +10,9 @@ import { walkParams } from '../core/schema.js';
 import { createCanvas, fontManifest, loadImage, registerFonts, FONTS_DIR } from '../render/host.js';
 import { probeSummary } from '../render/ffmpeg.js';
 import { json, now, transaction } from '../db/db.js';
+import { presetSource, rewriteDefaults } from './generate.js';
+import { diffLines, unified } from '../core/diff.js';
+import { resolveParams } from '../core/schema.js';
 
 export class StudioError extends Error {
   /** code: invalid | not_found | conflict | rejected */
@@ -33,7 +36,8 @@ const raceOf = (e, slug) => (/UNIQUE constraint/i.test(String(e?.message)) ? new
 
 const VERSION_COLS = `v.id AS version_id, v.version, v.kind, v.title, v.description, v.tags, v.duration, v.formats, v.schema, v.uses, v.deps,
   v.source, v.source_hash, v.file, v.mime, v.meta, v.thumb, v.author, v.note, v.parent_version, v.clip_id, v.engine, v.created_at AS version_created_at,
-  a.id AS asset_id, a.slug, a.type, a.latest_version, a.forked_from, a.origin_clip, a.created_at`;
+  a.id AS asset_id, a.slug, a.type, a.latest_version, a.forked_from, a.origin_clip, a.created_at,
+  a.meta_title, a.meta_description, a.meta_tags, a.meta_by, a.meta_at, a.derivation, a.needs_description, a.featured`;
 
 export function createLibrary(ctx) {
   const { db, dataDir, pool } = ctx;
@@ -84,9 +88,14 @@ export function createLibrary(ctx) {
       kind: row.kind,
       version: row.version,
       latestVersion: row.latest_version,
-      title: row.title ?? row.slug,
-      description: row.description,
-      tags: json(row.tags, []),
+      // metadata edited in the studio wins over what the source declares
+      title: row.meta_title ?? row.title ?? row.slug,
+      description: row.meta_description ?? row.description,
+      tags: row.meta_tags ? json(row.meta_tags, []) : json(row.tags, []),
+      edited: !!(row.meta_title || row.meta_description || row.meta_tags),
+      derivation: row.derivation ?? (row.forked_from ? (row.type === 'function' ? 'fork' : 'bake') : null),
+      needsDescription: !!row.needs_description,
+      featured: !!row.featured,
       formats: json(row.formats, []),
       duration: row.duration,
       author: row.author,
@@ -112,6 +121,8 @@ export function createLibrary(ctx) {
     const forks = q('SELECT a.slug FROM assets a JOIN asset_versions fv ON fv.id = a.forked_from WHERE fv.asset_id = ? ORDER BY a.id').all(row.asset_id);
     return {
       ...summary(row),
+      declared: { title: row.title, description: row.description, tags: json(row.tags, []) },
+      metadataEdit: row.meta_by ? { by: row.meta_by, at: row.meta_at } : null,
       schema: json(row.schema, {}),
       uses: json(row.uses, {}),
       deps: json(row.deps, {}),
@@ -251,7 +262,8 @@ export function createLibrary(ctx) {
     return { ...result, deps, thumb: Buffer.from(result.thumb) };
   }
 
-  async function saveFunction({ slug, source, author, forClip, note, params, mode, forkOf }) {
+  /** @param {{ slug: string, source: string, author: string, forClip?: string, note?: string, params?: any, mode: string, forkOf?: any, derivation?: string }} o */
+  async function saveFunction({ slug, source, author, forClip, note, params, mode, forkOf, derivation }) {
     if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name: use lowercase letters, digits and dashes (2–64 characters), e.g. "text-word-reveal"`);
     if (!author) throw new StudioError('author is required: which model or person wrote this asset');
     const existing = q('SELECT * FROM assets WHERE slug = ?').get(slug);
@@ -275,8 +287,8 @@ export function createLibrary(ctx) {
       transaction(db, () => {
       let assetId = existing?.id;
       if (!assetId) {
-        assetId = q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at) VALUES (?, ?, 0, ?, ?, ?)')
-          .run(slug, 'function', forkOf?.version_id ?? null, clip?.id ?? null, at).lastInsertRowid;
+        assetId = q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at, derivation) VALUES (?, ?, 0, ?, ?, ?, ?)')
+          .run(slug, 'function', forkOf?.version_id ?? null, clip?.id ?? null, at, derivation ?? (forkOf ? 'fork' : null)).lastInsertRowid;
       }
       // someone else may have saved a version while we were validating
       const current = q('SELECT latest_version FROM assets WHERE id = ?').get(assetId).latest_version;
@@ -300,10 +312,111 @@ export function createLibrary(ctx) {
   }
 
   function reindex(assetId, { slug, title, description, tags, source }) {
+    const o = q('SELECT meta_title, meta_description, meta_tags FROM assets WHERE id = ?').get(assetId);
+    if (o?.meta_title) title = o.meta_title;
+    if (o?.meta_description) description = o.meta_description;
+    if (o?.meta_tags) tags = json(o.meta_tags, tags);
     q('DELETE FROM asset_tags WHERE asset_id = ?').run(assetId);
     for (const tag of tags) q('INSERT OR IGNORE INTO asset_tags (asset_id, tag) VALUES (?, ?)').run(assetId, tag);
     q('DELETE FROM assets_fts WHERE rowid = ?').run(assetId);
     q('INSERT INTO assets_fts (rowid, slug, title, description, tags, source) VALUES (?, ?, ?, ?, ?, ?)').run(assetId, slug, title ?? slug, description, tags.join(' '), source ?? '');
+  }
+
+  /** Search index and tags for an asset, from its latest version (and any metadata edits). */
+  function reindexLatest(assetId) {
+    const r = q('SELECT a.slug, v.title, v.description, v.tags, v.source FROM assets a JOIN asset_versions v ON v.asset_id = a.id AND v.version = a.latest_version WHERE a.id = ?').get(assetId);
+    if (r) reindex(assetId, { slug: r.slug, title: r.title, description: r.description, tags: json(r.tags, []), source: r.source ?? '' });
+  }
+
+  /**
+   * Edit an asset's title, description or tags without a new code version. The edit applies to
+   * every version and to search; null for a field goes back to what the source declares.
+   * @param {{ slug: string, title?: string | null, description?: string | null, tags?: string[] | null, author: string, keepFlag?: boolean }} o
+   */
+  function setMetadata({ slug, title, description, tags, author, keepFlag = false }) {
+    if (!author) throw new StudioError('author is required');
+    const a = q('SELECT * FROM assets WHERE slug = ?').get(slug);
+    if (!a) throw new StudioError(`No asset named "${slug}" in the library.`, 'not_found');
+    const sets = [], args = [];
+    if (title !== undefined) {
+      if (title !== null && (typeof title !== 'string' || !title.trim() || title.length > 120)) throw new StudioError('title is a short name (1–120 characters)');
+      sets.push('meta_title = ?'); args.push(title === null ? null : title.trim());
+    }
+    if (description !== undefined) {
+      if (description !== null && (typeof description !== 'string' || description.trim().length < 12 || description.length > 2000)) throw new StudioError('description is one or two sentences (12–2000 characters) saying what it is and when to use it');
+      sets.push('meta_description = ?'); args.push(description === null ? null : description.trim());
+    }
+    if (tags !== undefined) {
+      if (tags !== null && (!Array.isArray(tags) || !tags.length || tags.length > 24 || !tags.every((t) => typeof t === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(t)))) throw new StudioError('tags is a list of 1–24 lowercase-kebab strings such as ["logo", "brand"]');
+      sets.push('meta_tags = ?'); args.push(tags === null ? null : JSON.stringify([...new Set(tags)]));
+    }
+    if (!sets.length) throw new StudioError('Give a title, description or tags to change');
+    // describing an upload is what takes it off the "needs description" list
+    if (!keepFlag && description) sets.push('needs_description = 0');
+    transaction(db, () => {
+      q(`UPDATE assets SET ${sets.join(', ')}, meta_by = ?, meta_at = ? WHERE id = ?`).run(...args, author, now(), a.id);
+      reindexLatest(a.id);
+    });
+    ctx.events?.emit('asset', slug, 'metadata', { author });
+    return getAsset(slug, { includeSource: false });
+  }
+
+  /**
+   * A preset: a named asset that is another asset plus a chosen parameter set (its new defaults).
+   * It pins the base version, has its own thumbnail, and is searchable and usable like any asset.
+   * @param {{ base: string, slug: string, params: any, title?: string, description?: string, tags?: string[], author: string, forClip?: string }} o
+   */
+  async function createPreset({ base, slug, params, title, description, tags, author, forClip }) {
+    const row = requireVersion(base);
+    if (row.type !== 'function') throw new StudioError(`${base} is a ${row.type} asset; presets are made from function assets`);
+    const schema = json(row.schema, {});
+    if (!params || typeof params !== 'object' || !Object.keys(params).length) throw new StudioError('params is the parameter set the preset keeps (at least one)');
+    const { values, errors } = resolveParams(schema, params, { strict: true });
+    if (errors.length) throw new StudioError(`The preset's params do not fit ${makeRef(row.slug, row.version)}:\n- ${errors.map((e) => `${e.path}: ${e.message}`).join('\n- ')}`);
+    const chosen = Object.fromEntries(Object.keys(params).map((k) => [k, values[k]]));
+    const baseRef = makeRef(row.slug, row.version);
+    const baseTitle = summary(row).title;
+    const name = title ?? `${baseTitle} · ${slug}`;
+    const shown = Object.entries(chosen).filter(([, v]) => typeof v !== 'object').slice(0, 4).map(([k, v]) => `${k} ${typeof v === 'string' ? `"${v.length > 24 ? `${v.slice(0, 24)}…` : v}"` : v}`).join(', ');
+    const source = presetSource({
+      base: baseRef, kind: row.kind, title: name,
+      description: description ?? `A preset of ${baseTitle} (${baseRef})${shown ? ` with ${shown}` : ''}. Same parameters, these values as defaults.`,
+      tags: [...new Set([...(tags ?? summary(row).tags), 'preset'])].slice(0, 24),
+      duration: row.duration, formats: json(row.formats, []), schema, params: chosen,
+    });
+    return saveFunction({ slug, source, author, forClip, note: `Preset of ${baseRef}`, mode: 'create', forkOf: row, derivation: 'preset' });
+  }
+
+  /**
+   * Save parameter values as an asset's new defaults: the next version is the same source with
+   * those `default:` values rewritten in place.
+   * @param {{ slug: string, params: any, author: string, note?: string, forClip?: string }} o
+   */
+  async function saveDefaults({ slug, params, author, note, forClip }) {
+    const row = requireVersion(slug);
+    if (row.type !== 'function') throw new StudioError(`"${slug}" is a ${row.type} asset; only function assets have parameters`);
+    const schema = json(row.schema, {});
+    const { values, errors } = resolveParams(schema, params ?? {}, { strict: true });
+    if (errors.length) throw new StudioError(`These params do not fit ${makeRef(row.slug, row.version)}:\n- ${errors.map((e) => `${e.path}: ${e.message}`).join('\n- ')}`);
+    const changed = Object.fromEntries(Object.keys(params).filter((k) => JSON.stringify(values[k]) !== JSON.stringify(schema[k].default)).map((k) => [k, values[k]]));
+    if (!Object.keys(changed).length) throw new StudioError('These are already the defaults; nothing to save', 'conflict');
+    let source;
+    try { source = rewriteDefaults(row.source, changed); } catch (e) { throw new StudioError(`Could not rewrite the defaults in the source (${e.message}); edit the source instead`); }
+    const list = Object.entries(changed).map(([k, v]) => `${k} ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ');
+    return saveFunction({ slug: row.slug, source, author, forClip, note: note ?? `New defaults: ${list.length > 160 ? `${list.slice(0, 160)}…` : list}`, mode: 'update' });
+  }
+
+  /** Two versions of an asset, line by line. */
+  function diffVersions(slug, a, b) {
+    const A = requireVersion(makeRef(parseRef(slug).slug, a)), B = requireVersion(makeRef(parseRef(slug).slug, b));
+    if (A.type !== 'function') throw new StudioError(`"${A.slug}" is a ${A.type} asset; its versions are files, not source`);
+    const lines = diffLines(A.source, B.source);
+    const ra = makeRef(A.slug, A.version), rb = makeRef(B.slug, B.version);
+    return {
+      a: { ref: ra, note: A.note, author: A.author, schema: json(A.schema, {}) }, b: { ref: rb, note: B.note, author: B.author, schema: json(B.schema, {}) },
+      added: lines.filter((l) => l.op === 'add').length, removed: lines.filter((l) => l.op === 'del').length,
+      lines, unified: unified(lines, { from: ra, to: rb }),
+    };
   }
 
   const createAsset = (o) => saveFunction({ ...o, mode: 'create' });
@@ -366,7 +479,7 @@ export function createLibrary(ctx) {
     const at = now();
     const prev = existing ? versionRow(slug) : null;
     transaction(db, () => {
-      const assetId = existing?.id ?? q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at) VALUES (?, ?, 0, ?, ?, ?)').run(slug, type, from?.version_id ?? null, clip?.id ?? null, at).lastInsertRowid;
+      const assetId = existing?.id ?? q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at, derivation) VALUES (?, ?, 0, ?, ?, ?, ?)').run(slug, type, from?.version_id ?? null, clip?.id ?? null, at, from ? 'bake' : null).lastInsertRowid;
       q(`INSERT INTO asset_versions (asset_id, version, title, description, tags, duration, file, mime, meta, thumb, author, note, parent_version, clip_id, engine, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(assetId, version, title ?? null, description.trim(), JSON.stringify(tags), duration, file, mime, JSON.stringify(info), thumb, author, note ?? null, prev?.version_id ?? from?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at);
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
@@ -419,6 +532,6 @@ export function createLibrary(ctx) {
     return fam ? makeRef(fam.slug, 1) : null;
   };
 
-  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, FORMATS };
+  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
 }
 

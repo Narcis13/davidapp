@@ -137,6 +137,38 @@ async function validate(msg) {
         thumb = png(c, 640);
       }
     }
+  } else if (def.kind === 'motion') {
+    // a motion is called at the start, middle and end of each phase; it must return a delta, the same every time
+    const duration = def.duration ?? 0.6;
+    for (const phase of ['in', 'out', 'emphasis', 'loop']) {
+      for (const t of [0, duration / 2, duration]) {
+        const a = rt.callMotion(msg.ref, params, { phase, t, duration, seed });
+        const b = rt.callMotion(msg.ref, params, { phase, t, duration, seed });
+        if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`Not deterministic: the ${phase} motion at t=${t}s returned different deltas on two calls. Use f.t, the params and f.rng only.`);
+        frames.push({ format: phase, t, delta: a });
+      }
+    }
+    const rest = rt.callMotion(msg.ref, params, { phase: 'in', t: duration, duration, seed });
+    if (Object.entries(rest).some(([k, v]) => (['x', 'y', 'rotation'].includes(k) ? Math.abs(v) > 0.5 : Math.abs(v - 1) > 0.01))) warnings.push(`at the end of its "in" phase the motion returns ${JSON.stringify(rest)}, not rest (x, y, rotation 0; scale, opacity 1): the item will jump when the motion ends`);
+    thumb = demoThumb(rt, msg.ref, params, Math.round(duration * 0.5 * 30) / 30, 3);
+  } else if (def.kind === 'transition' || def.kind === 'effect') {
+    const duration = def.duration ?? 1;
+    const { width, height } = FORMATS.horizontal;
+    const o = { params, duration, width, height, fps: 30, seed, background: '#101018' };
+    let midHash = null, blank = true;
+    const mid = Math.round(duration * 0.5 * 30) / 30;
+    for (const t of [0, mid, Math.max(0, duration - 1 / 30)]) {
+      const t0 = performance.now();
+      const c = drawAsset(rt, msg.ref, { ...o, t });
+      const ms = performance.now() - t0;
+      frames.push({ format: 'horizontal', t, ms: Math.round(ms * 10) / 10 });
+      if (t === mid) midHash = sha(c.data());
+      if (!isBlank(c)) blank = false;
+      if (ms > 400) warnings.push(`a 1920×1080 frame at t=${t}s took ${Math.round(ms)}ms; long clips will render slowly`);
+    }
+    if (sha(drawAsset(rt, msg.ref, { ...o, t: mid }).data()) !== midHash) throw new Error(`Not deterministic: drawing t=${mid}s twice gave different pixels. A frame must depend only on f.t, the params, f.rng and the layers it is given.`);
+    if (blank) warnings.push(`the ${def.kind} draws nothing with the default parameters`);
+    thumb = demoThumb(rt, msg.ref, params, mid, duration);
   } else if (def.kind === 'value') {
     const value = rt.callValue(msg.ref, params);
     if (value === undefined) warnings.push('render() returned undefined with the default parameters');
@@ -155,6 +187,14 @@ async function validate(msg) {
     thumb = png(drawAsset(rt, msg.ref, { params, t: 0, duration, width: 1280, height: 720, seed }), 640);
   }
   return { result: { meta, warnings, frames, thumb, logs: takeLogs() } };
+}
+
+/** The playground's demo of a motion, transition or effect as a 640px thumbnail. */
+function demoThumb(rt, ref, params, t, duration) {
+  const { width, height } = FORMATS.horizontal;
+  const c = createCanvas(width, height);
+  rt.renderAsset(c.getContext('2d'), ref, params, { params, t, duration, width, height, fps: 30, seed: 1, background: '#101018' });
+  return png(c, 640);
 }
 
 const handlers = {

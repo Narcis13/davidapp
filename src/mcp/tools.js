@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { ENGINE_VERSION, FORMATS } from '../core/engine.js';
 import { ROOT } from '../render/host.js';
 import { StudioError } from '../studio/studio.js';
+import { sideBySide } from '../render/host.js';
 
 const FORMAT = z.enum(['vertical', 'horizontal', 'square']);
 const REF = z.string().describe('Asset reference: "name" (latest version) or "name@3" (pinned)');
@@ -364,6 +365,56 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       input: { id: z.number().int() },
       run: (a) => ({ json: compactRender(renders.cancel(a.id)) }),
     },
+    // ── tweak and keep ───────────────────────────────────────────────────────────────────
+    {
+      name: 'save_defaults',
+      title: 'Save params as an asset\'s new defaults',
+      description: 'Make a parameter set the defaults of a new version of an asset: the source is rewritten in place (each `default:` in the params declaration), validated and saved as the next version. Clips that pin older versions are unchanged.',
+      input: { name: z.string(), params: PARAMS, note: z.string().optional(), for_clip: z.string().optional(), author: AUTHOR },
+      run: async (a) => saved(await library.saveDefaults({ slug: a.name, params: a.params, note: a.note, forClip: a.for_clip, author: who(a.author) }), 'updated'),
+    },
+    {
+      name: 'create_preset',
+      title: 'Save params as a preset',
+      description: 'A preset is a new named asset: another asset plus a chosen parameter set as its defaults. It pins the base version, gets its own thumbnail, shows in search and lineage, and is used in clips like any asset (its params can still be changed per item).',
+      input: { base: REF.describe('The asset (version) the preset is made from'), name: z.string().describe('Name of the preset asset'), params: PARAMS.describe('The parameter values it keeps'), title: z.string().optional(), description: z.string().optional(), tags: z.array(z.string()).optional(), for_clip: z.string().optional(), author: AUTHOR },
+      run: async (a) => saved(await library.createPreset({ base: a.base, slug: a.name, params: a.params, title: a.title, description: a.description, tags: a.tags, forClip: a.for_clip, author: who(a.author) }), 'created'),
+    },
+    {
+      name: 'save_precomp',
+      title: 'Save clip layers as one asset (precomp)',
+      description: 'Group layers of a clip into a new visual asset that draws them with their timing, layout, motions and effects (f.layers). expose turns item params into the precomp\'s own params (current values become defaults), so an intro or a stat scene becomes one reusable piece. With replace: true the items are swapped for one item using it.',
+      input: { clip: z.string(), items: z.array(z.string()).min(1), name: z.string(), title: z.string().optional(), description: z.string().optional(), tags: z.array(z.string()).optional(), expose: z.array(z.object({ item: z.string(), param: z.string(), name: z.string().optional() })).optional(), replace: z.boolean().optional(), author: AUTHOR },
+      run: async (a) => {
+        const r = await clips.savePrecomp({ clip: a.clip, items: a.items, slug: a.name, title: a.title, description: a.description, tags: a.tags, expose: a.expose ?? [], replace: !!a.replace, author: who(a.author) });
+        return { json: { created: r.asset.ref, params: r.asset.params, uses: r.asset.deps, clip: r.clip ? { revision: r.clip.revision } : undefined } };
+      },
+    },
+    {
+      name: 'set_asset_metadata',
+      title: 'Edit an asset\'s title, description or tags',
+      description: 'Change how an asset is named, described and tagged in the library, without a new code version (it applies to every version and to search). null resets a field to what the source declares. Describing an upload takes it off the needs-description list.',
+      input: { name: z.string(), title: z.string().nullable().optional(), description: z.string().nullable().optional(), tags: z.array(z.string()).nullable().optional(), author: AUTHOR },
+      run: (a) => { const r = library.setMetadata({ slug: a.name, title: a.title, description: a.description, tags: a.tags, author: who(a.author) }); return { json: { updated: r.ref, title: r.title, description: r.description, tags: r.tags, declared: r.declared } }; },
+    },
+    {
+      name: 'diff_versions',
+      title: 'Compare two versions of an asset',
+      description: 'A unified diff of two versions\' source, plus the same frame of each side by side (same t and params).',
+      input: { name: z.string(), a: z.number().int().describe('Older version'), b: z.number().int().describe('Newer version'), t: z.number().min(0).optional(), params: PARAMS.optional() },
+      readOnly: true,
+      run: async (a) => {
+        const d = library.diffVersions(a.name, a.a, a.b);
+        const images = [];
+        const row = library.requireVersion(d.b.ref);
+        if (row.type === 'function' && row.kind === 'visual') {
+          const [fa, fb] = await Promise.all([d.a.ref, d.b.ref].map((ref) => studio.assetFrame({ ref, params: a.params ?? {}, t: a.t, maxSize: 640 })));
+          images.push(image(`${a.name}-v${a.a}-vs-v${a.b}`, await sideBySide(fa.png, fb.png)));
+        }
+        return { text: d.unified, json: { a: d.a.ref, b: d.b.ref, added: d.added, removed: d.removed }, images };
+      },
+    },
+
     // ── requests from the studio ─────────────────────────────────────────────────────────
     {
       name: 'list_requests',

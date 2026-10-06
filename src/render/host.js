@@ -63,3 +63,15 @@ export function evaluate(source, filename = 'asset.js') {
 
 export const nodeHost = { evaluate, createCanvas };
 export { createCanvas, loadImage };
+
+/** Two PNGs next to each other on one dark canvas (version diffs, before/after). */
+export async function sideBySide(a, b, gap = 12) {
+  const [A, B] = await Promise.all([loadImage(a), loadImage(b)]);
+  const c = createCanvas(A.width + B.width + gap, Math.max(A.height, B.height));
+  const g = c.getContext('2d');
+  g.fillStyle = '#16161d';
+  g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(A, 0, 0);
+  g.drawImage(B, A.width + gap, 0);
+  return c.toBuffer('image/png');
+}

@@ -23,6 +23,33 @@ export const BLEND_MODES = ['source-over', 'screen', 'multiply', 'overlay', 'lig
 
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
+
+export const MOTION_PHASES = ['in', 'out', 'emphasis', 'loop'];
+export const MASK_MODES = ['alpha', 'alpha-inverted', 'luma', 'luma-inverted'];
+
+/**
+ * An asset attached to an item, a track or the clip (a motion, an effect, a transition, a mask):
+ * { asset, params, …extra }. Returns the normalized attachment, or null after reporting problems.
+ */
+function attachment(a, path, err, extra = {}) {
+  if (!isPlain(a)) { err(path, 'an attachment is an object such as { asset: "fx-glow", params: {} }'); return null; }
+  if (typeof a.asset !== 'string' || !REF_RE.test(a.asset)) { err(`${path}.asset`, 'asset must be a reference such as "fx-glow" or "fx-glow@2"'); return null; }
+  if (a.params !== undefined && !isPlain(a.params)) { err(`${path}.params`, 'params must be an object'); return null; }
+  const out = { asset: a.asset, params: isPlain(a.params) ? a.params : {} };
+  for (const [k, check] of Object.entries(extra)) {
+    if (a[k] === undefined) continue;
+    const problem = check(a[k]);
+    if (problem) err(`${path}.${k}`, problem); else out[k] = a[k];
+  }
+  for (const k of Object.keys(a)) if (!['asset', 'params', ...Object.keys(extra)].includes(k)) err(`${path}.${k}`, `unknown field (use asset, params${Object.keys(extra).map((x) => `, ${x}`).join('')})`);
+  return out;
+}
+const positive = (v) => (num(v) && v > 0 ? null : 'must be a number of seconds > 0');
+const effectList = (list, path, err) => {
+  if (!Array.isArray(list)) { err(path, 'effects is a list of { asset, params }'); return undefined; }
+  const out = list.map((a, i) => attachment(a, `${path}[${i}]`, err)).filter(Boolean);
+  return out.length ? out : undefined;
+};
 const round = (v) => Math.round(v * 1000) / 1000;
 
 /**
@@ -63,6 +90,8 @@ export function normalizeComposition(input) {
     const track = { id: typeof tr.id === 'string' && tr.id ? tr.id : `track-${ti + 1}`, name: typeof tr.name === 'string' ? tr.name : undefined, type, hidden: tr.hidden ? true : undefined, items: [] };
     // editor flags (v2): only written when set, so a v1 track normalizes to exactly what it was
     for (const k of ['locked', 'solo', 'muted']) if (tr[k]) track[k] = true;
+    // an effect on a track processes everything on it, like an adjustment layer
+    if (tr.effects !== undefined) { if (type === 'audio') err(`${tp}.effects`, 'an audio track takes no effects'); else { const fx = effectList(tr.effects, `${tp}.effects`, err); if (fx) track.effects = fx; } }
     if (!Array.isArray(tr.items)) { err(`${tp}.items`, 'items must be an array'); tracks.push(track); return; }
     tr.items.forEach((it, ii) => {
       const ip = `${tp}.items[${ii}]`;
@@ -132,6 +161,29 @@ export function normalizeComposition(input) {
             if (Object.keys(out).length) (item.formats ??= {})[fname] = out;
           }
         }
+        if (it.motions !== undefined) {
+          if (!Array.isArray(it.motions)) err(`${ip}.motions`, 'motions is a list of { asset, phase, duration, at, params }');
+          else {
+            const list = it.motions.map((m, mi) => attachment(m, `${ip}.motions[${mi}]`, err, {
+              phase: (v) => (MOTION_PHASES.includes(v) ? null : `phase must be one of ${MOTION_PHASES.join(', ')}`),
+              duration: positive,
+              at: (v) => (num(v) && v >= 0 ? null : 'at is the item time (seconds) an emphasis starts'),
+            })).filter(Boolean);
+            if (list.length) item.motions = list;
+          }
+        }
+        if (it.effects !== undefined) { const fx = effectList(it.effects, `${ip}.effects`, err); if (fx) item.effects = fx; }
+        if (it.mask !== undefined) {
+          const m = attachment(it.mask, `${ip}.mask`, err, {
+            mode: (v) => (MASK_MODES.includes(v) ? null : `mode must be one of ${MASK_MODES.join(', ')}`),
+            transform: (v) => checkTransform(v, `${ip}.mask.transform`).map((x) => x[1]).join('; ') || null,
+          });
+          if (m) item.mask = m;
+        }
+        if (it.transition !== undefined) {
+          const tr2 = attachment(it.transition, `${ip}.transition`, err, { duration: positive });
+          if (tr2) item.transition = tr2;
+        }
       }
       track.items.push(item);
     });
@@ -144,6 +196,8 @@ export function normalizeComposition(input) {
     else markers = input.markers.map((m) => ({ t: m.t, label: typeof m.label === 'string' ? m.label : '' }));
   }
 
+  let effects;
+  if (input.effects !== undefined) effects = effectList(input.effects, 'effects', err);
   let easing;
   if (input.easing !== undefined) {
     if (typeof input.easing !== 'string' || !REF_RE.test(input.easing)) err('easing', 'easing is the reference of the easing asset keyframes take their curves from, e.g. "easing@1"');
@@ -154,6 +208,7 @@ export function normalizeComposition(input) {
   const composition = { format: formatOf(width, height), width, height, fps, duration, seed, background, tracks };
   if (markers) composition.markers = markers;
   if (easing) composition.easing = easing;
+  if (effects) composition.effects = effects;
   return { composition, errors };
 }
 
