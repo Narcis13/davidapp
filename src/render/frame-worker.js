@@ -126,7 +126,7 @@ async function validate(msg) {
   const frames = [];
   const params = msg.params ?? {};
   const seed = 1;
-  let thumb;
+  let thumb, strip = null;
   if (def.kind === 'visual') {
     const duration = msg.duration ?? def.duration ?? 3;
     const fps = 30;
@@ -154,6 +154,7 @@ async function validate(msg) {
         const c = createCanvas(width, height);
         rt.renderAsset(c.getContext('2d'), msg.ref, params, { ...o, t: Math.round(duration * (msg.thumbAt ?? 0.6) * fps) / fps, background: '#101018' });
         thumb = png(c, 640);
+        strip = filmstrip(rt, msg.ref, params, { width, height, duration });
       }
     }
   } else if (def.kind === 'motion') {
@@ -170,6 +171,7 @@ async function validate(msg) {
     const rest = rt.callMotion(msg.ref, params, { phase: 'in', t: duration, duration, seed });
     if (Object.entries(rest).some(([k, v]) => (['x', 'y', 'rotation'].includes(k) ? Math.abs(v) > 0.5 : Math.abs(v - 1) > 0.01))) warnings.push(`at the end of its "in" phase the motion returns ${JSON.stringify(rest)}, not rest (x, y, rotation 0; scale, opacity 1): the item will jump when the motion ends`);
     thumb = demoThumb(rt, msg.ref, params, Math.round(duration * 0.5 * 30) / 30, 3);
+    strip = filmstrip(rt, msg.ref, params, { ...FORMATS.horizontal, duration: 3 });
   } else if (def.kind === 'transition' || def.kind === 'effect') {
     const duration = def.duration ?? 1;
     const { width, height } = FORMATS.horizontal;
@@ -188,6 +190,7 @@ async function validate(msg) {
     if (sha(drawAsset(rt, msg.ref, { ...o, t: mid }).data()) !== midHash) throw new Error(`Not deterministic: drawing t=${mid}s twice gave different pixels. A frame must depend only on f.t, the params, f.rng and the layers it is given.`);
     if (blank) warnings.push(`the ${def.kind} draws nothing with the default parameters`);
     thumb = demoThumb(rt, msg.ref, params, mid, duration);
+    strip = filmstrip(rt, msg.ref, params, { ...FORMATS.horizontal, duration });
   } else if (def.kind === 'value') {
     const value = rt.callValue(msg.ref, params);
     if (value === undefined) warnings.push('render() returned undefined with the default parameters');
@@ -205,7 +208,22 @@ async function validate(msg) {
     frames.push({ format: 'audio', t: 0, peak: Math.round(peak * 1000) / 1000 });
     thumb = png(drawAsset(rt, msg.ref, { params, t: 0, duration, width: 1280, height: 720, seed }), 640);
   }
-  return { result: { meta, warnings, frames, thumb, logs: takeLogs() } };
+  return { result: { meta, warnings, frames, thumb, strip, logs: takeLogs() } };
+}
+
+/** Eight frames across the asset's duration in one row (240 px cells): the library's hover preview. */
+function filmstrip(rt, ref, params, { width, height, duration }) {
+  const n = 8, cw = 240, ch = Math.round((cw * height) / width);
+  const out = createCanvas(cw * n, ch);
+  const g = out.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  const c = createCanvas(width, height);
+  for (let i = 0; i < n; i++) {
+    const t = Math.round(((i + 0.5) / n) * duration * 30) / 30;
+    rt.renderAsset(c.getContext('2d'), ref, params, { params, t, duration, width, height, fps: 30, seed: 1, background: '#101018' });
+    g.drawImage(c, i * cw, 0, cw, ch);
+  }
+  return out.toBuffer('image/png');
 }
 
 /** The playground's demo of a motion, transition or effect as a 640px thumbnail. */

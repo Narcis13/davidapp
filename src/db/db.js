@@ -163,6 +163,32 @@ CREATE TABLE IF NOT EXISTS events (
   at      TEXT NOT NULL
 );
 
+-- The library at scale: favourites, collections, recently used. (Featured is a flag on assets.)
+CREATE TABLE IF NOT EXISTS favorites (
+  asset_id    INTEGER PRIMARY KEY REFERENCES assets(id),
+  created_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collections (
+  id          INTEGER PRIMARY KEY,
+  slug        TEXT NOT NULL UNIQUE,
+  name        TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collection_assets (
+  collection_id  INTEGER NOT NULL REFERENCES collections(id),
+  asset_id       INTEGER NOT NULL REFERENCES assets(id),
+  added_at       TEXT NOT NULL,
+  PRIMARY KEY (collection_id, asset_id)
+);
+CREATE INDEX IF NOT EXISTS collection_assets_asset ON collection_assets(asset_id);
+CREATE TABLE IF NOT EXISTS asset_recent (
+  asset_id  INTEGER PRIMARY KEY REFERENCES assets(id),
+  at        TEXT NOT NULL,
+  how       TEXT NOT NULL            -- opened | used | created
+);
+CREATE INDEX IF NOT EXISTS asset_recent_at ON asset_recent(at);
+CREATE INDEX IF NOT EXISTS assets_origin ON assets(origin_clip);
+
 -- Requests to the agent, made from the studio. Worked by Claude Code over MCP.
 CREATE TABLE IF NOT EXISTS requests (
   id             INTEGER PRIMARY KEY,

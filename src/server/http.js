@@ -118,9 +118,18 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       query: query.get('query') ?? undefined, type: query.get('type') || undefined, kind: query.get('kind') || undefined,
       tags: query.get('tag') ? query.get('tag').split(',').filter(Boolean) : undefined, format: query.get('format') || undefined,
       originClip: query.get('origin') || undefined, usedByClip: query.get('usedBy') || undefined, derivedFrom: query.get('derivedFrom') || undefined,
+      author: query.get('author') || undefined, derivation: query.get('derivation') || undefined,
       needsDescription: query.get('needsDescription') ? query.get('needsDescription') === '1' : undefined,
+      favorite: query.get('favorite') === '1' || undefined, featured: query.get('featured') === '1' || undefined, recent: query.get('recent') === '1' || undefined,
+      collection: query.get('collection') || undefined, sort: query.get('sort') || undefined, facets: query.get('facets') === '1',
       limit: int(query.get('limit') ?? 100, 100, 1, 200), offset: int(query.get('offset') ?? 0, 0, 0, 1e9),
     })],
+    ['POST', /^\/api\/assets\/bulk$/, ({ data }) => library.bulk({ slugs: data.slugs, addTags: data.addTags, removeTags: data.removeTags, favorite: data.favorite, featured: data.featured, collection: data.collection, author: data.author ?? author })],
+    ['PUT', /^\/api\/assets\/([a-z0-9-]+)\/favorite$/, ({ params, data }) => { library.setFavorite(params[0], data.on !== false); return { ok: true }; }],
+    ['PUT', /^\/api\/assets\/([a-z0-9-]+)\/featured$/, ({ params, data }) => { library.setFeatured(params[0], data.on !== false); return { ok: true }; }],
+    ['POST', /^\/api\/assets\/([a-z0-9-]+)\/opened$/, ({ params }) => { library.touch(params[0], 'opened'); return { ok: true }; }],
+    ['GET', /^\/api\/collections$/, () => ({ collections: library.listCollections() })],
+    ['POST', /^\/api\/collections\/([a-z0-9-]+)\/remove$/, ({ params, data }) => { library.removeFromCollection(params[0], data.slugs ?? []); return { collections: library.listCollections() }; }],
     ['POST', /^\/api\/assets\/validate$/, async ({ data }) => {
       const d = await studio.draftBundle({ slug: data.name ?? 'draft', source: data.source });
       const m = d.validation.meta;
@@ -199,6 +208,10 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       return file(req, res, studio.dataDir, wav.slice(studio.dataDir.length + 1));
     }],
     ['GET', /^\/api\/clips\/([a-z0-9-]+)\/frame\.png$/, async ({ params, query, res }) => png(res, (await studio.clipFrame({ clip: params[0], t: Number(query.get('t') ?? 0), maxSize: Number(query.get('maxSize') ?? 640) })).png)],
+    ['POST', /^\/api\/clips\/([a-z0-9-]+)\/add-assets$/, async ({ params, data }) => {
+      const r = await clips.addAssets({ slug: params[0], assets: data.slugs ?? [], at: data.at, author: data.author ?? author });
+      return { clip: r.clip.slug, revision: r.clip.revision, added: r.added };
+    }],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/render$/, ({ params }) => renders.enqueue({ clip: params[0], requestedBy: author })],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/remix$/, async ({ params, data }) => (await clips.remixClip({ slug: params[0], newSlug: data.name, format: data.format, title: data.title, author: data.author ?? author })).clip],
 

@@ -104,6 +104,7 @@ export function createLibrary(ctx) {
       originClip: clipSlug(row.origin_clip),
       forkedFrom: refOfVersionId(row.forked_from),
       thumb: row.thumb,
+      strip: json(row.meta, {}).strip?.file ?? null,
       createdAt: row.created_at,
       versionCreatedAt: row.version_created_at,
       usedByClips: q('SELECT COUNT(DISTINCT ca.clip_id) AS n FROM clip_assets ca JOIN asset_versions v ON v.id = ca.version_id WHERE v.asset_id = ?').get(row.asset_id).n,
@@ -143,35 +144,168 @@ export function createLibrary(ctx) {
     };
   }
 
+  const SORTS = ['relevance', 'newest', 'used', 'name'];
+
   /**
-   * Search the library. Every filter is optional:
-   * query (full text), type, kind, tags (all must match), format, originClip, usedByClip, derivedFrom, author.
+   * The WHERE clause for a set of filters, leaving out the facet named in `except` (so each facet
+   * counts what the other filters allow).
+   */
+  function filterSql(f, except = null) {
+    const where = [], args = [];
+    const on = (name) => except !== name;
+    if (f.match) { where.push('a.id IN (SELECT rowid FROM assets_fts WHERE assets_fts MATCH ?)'); args.push(f.match); }
+    if (f.type && on('type')) { where.push('a.type = ?'); args.push(f.type); }
+    if (f.kind && on('kind')) { where.push('v.kind = ?'); args.push(f.kind); }
+    // set filters are IN (subquery): computed once, not once per row
+    if (on('tag')) for (const tag of f.tags ?? []) { where.push('a.id IN (SELECT asset_id FROM asset_tags WHERE tag = ?)'); args.push(tag); }
+    if (f.format && on('format')) { where.push("(v.formats = '[]' OR EXISTS (SELECT 1 FROM json_each(v.formats) WHERE value = ?))"); args.push(f.format); }
+    if (f.originClip && on('origin')) { where.push('a.origin_clip = (SELECT id FROM clips WHERE slug = ?)'); args.push(f.originClip); }
+    if (f.usedByClip && on('usedBy')) { where.push('a.id IN (SELECT cv.asset_id FROM clip_assets ca JOIN asset_versions cv ON cv.id = ca.version_id WHERE ca.clip_id = (SELECT id FROM clips WHERE slug = ?))'); args.push(f.usedByClip); }
+    if (f.derivedFrom) { where.push('a.forked_from IN (SELECT fv.id FROM asset_versions fv JOIN assets fa ON fa.id = fv.asset_id WHERE fa.slug = ?)'); args.push(f.derivedFrom); }
+    if (f.author && on('author')) { where.push('v.author = ?'); args.push(f.author); }
+    if (f.needsDescription !== undefined && on('needsDescription')) { where.push('a.needs_description = ?'); args.push(f.needsDescription ? 1 : 0); }
+    if (f.favorite && on('favorite')) where.push('a.id IN (SELECT asset_id FROM favorites)');
+    if (f.featured && on('featured')) where.push('a.featured = 1');
+    if (f.collection && on('collection')) { where.push('a.id IN (SELECT cl.asset_id FROM collection_assets cl JOIN collections co ON co.id = cl.collection_id WHERE co.slug = ?)'); args.push(f.collection); }
+    if (f.recent) where.push('a.id IN (SELECT asset_id FROM asset_recent)');
+    if (f.derivation) { where.push('a.derivation = ?'); args.push(f.derivation); }
+    return { sql: where.length ? `WHERE ${where.join(' AND ')}` : '', args };
+  }
+
+  const BASE = 'FROM assets a JOIN asset_versions v ON v.asset_id = a.id AND v.version = a.latest_version';
+
+  /** Counts per facet value, each under every filter except its own. */
+  function facetsFor(f) {
+    const count = (sql, args) => db.prepare(sql).all(...args).map((r) => ({ value: r.k, count: r.n }));
+    const by = (facet, expr, extra = '') => { const w = filterSql(f, facet); return count(`SELECT ${expr} AS k, COUNT(DISTINCT a.id) AS n ${BASE} ${extra} ${w.sql}${w.sql ? ' AND' : ' WHERE'} ${expr} IS NOT NULL GROUP BY k ORDER BY n DESC, k LIMIT 60`, w.args); };
+    const flag = (facet, cond) => { const w = filterSql(f, facet); return db.prepare(`SELECT COUNT(*) AS n ${BASE} ${w.sql}${w.sql ? ' AND' : ' WHERE'} ${cond}`).get(...w.args).n; };
+    const all = filterSql(f);
+    return {
+      type: by('type', 'a.type'),
+      kind: by('kind', 'v.kind'),
+      // tags narrow each other, so their counts are under the full filter
+      tag: count(`SELECT t.tag AS k, COUNT(*) AS n ${BASE} JOIN asset_tags t ON t.asset_id = a.id ${all.sql} GROUP BY t.tag ORDER BY n DESC, t.tag LIMIT 40`, all.args),
+      format: (() => { const w = filterSql(f, 'format'); return count(`SELECT fm.value AS k, COUNT(DISTINCT a.id) AS n ${BASE}, json_each(CASE WHEN v.formats = '[]' THEN '["vertical","horizontal","square"]' ELSE v.formats END) fm ${w.sql} GROUP BY fm.value ORDER BY n DESC, k`, w.args); })(),
+      author: by('author', 'v.author'),
+      origin: by('origin', '(SELECT slug FROM clips WHERE id = a.origin_clip)'),
+      usedBy: (() => { const w = filterSql(f, 'usedBy'); return count(`SELECT c.slug AS k, COUNT(DISTINCT a.id) AS n ${BASE} JOIN asset_versions uv ON uv.asset_id = a.id JOIN clip_assets ca ON ca.version_id = uv.id JOIN clips c ON c.id = ca.clip_id ${w.sql} GROUP BY c.slug ORDER BY n DESC, k LIMIT 60`, w.args); })(),
+      collection: (() => { const w = filterSql(f, 'collection'); return count(`SELECT co.slug AS k, COUNT(DISTINCT a.id) AS n ${BASE} JOIN collection_assets cl ON cl.asset_id = a.id JOIN collections co ON co.id = cl.collection_id ${w.sql} GROUP BY co.slug ORDER BY n DESC, k`, w.args); })(),
+      needsDescription: flag('needsDescription', 'a.needs_description = 1'),
+      favorite: flag('favorite', 'a.id IN (SELECT asset_id FROM favorites)'),
+      featured: flag('featured', 'a.featured = 1'),
+    };
+  }
+
+  /**
+   * Search the library. Every filter is optional: query (full text, ranked), type, kind, tags (all
+   * must match), format, originClip, usedByClip, derivedFrom, author, needsDescription, favorite,
+   * featured, collection, recent, derivation. sort: relevance (default; text rank boosted by
+   * featured, favourites and use; without a query: featured, favourites, use, newest), newest, used,
+   * name. facets: also return counts per facet value. Returns { total, assets, facets? }.
    * @param {any} [o]
    */
-  function search({ query, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, needsDescription, limit = 50, offset = 0 } = {}) {
-    const where = [], args = [];
-    let from = 'assets a JOIN asset_versions v ON v.asset_id = a.id AND v.version = a.latest_version';
-    let order = 'a.id DESC';
+  function search({ query, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, needsDescription, favorite, featured, collection, recent, derivation, sort = 'relevance', facets = false, limit = 50, offset = 0 } = {}) {
     const tokens = typeof query === 'string' ? query.toLowerCase().match(/[\p{L}\p{N}]+/gu) : null;
-    if (tokens?.length) {
-      from += ' JOIN assets_fts ON assets_fts.rowid = a.id';
-      where.push('assets_fts MATCH ?');
-      args.push(tokens.map((t) => `"${t}"*`).join(' '));
-      order = 'bm25(assets_fts, 10.0, 6.0, 3.0, 6.0, 0.5), a.id DESC';
+    const match = tokens?.length ? tokens.slice(0, 12).map((t) => `"${t}"*`).join(' ') : null;
+    const f = { match, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, needsDescription, favorite, featured, collection, recent, derivation };
+    const w = filterSql(f);
+    const total = db.prepare(`SELECT COUNT(*) AS n ${BASE} ${w.sql}`).get(...w.args).n;
+    if (!SORTS.includes(sort)) sort = 'relevance';
+    // usage and favourites joined once as aggregates, not looked up per row
+    let from = `${BASE} LEFT JOIN (SELECT uv.asset_id AS id, COUNT(DISTINCT ca.clip_id) AS n FROM clip_assets ca JOIN asset_versions uv ON uv.id = ca.version_id GROUP BY uv.asset_id) u ON u.id = a.id LEFT JOIN favorites fa ON fa.asset_id = a.id`;
+    let order, args = w.args;
+    const used = 'COALESCE(u.n, 0)', fav = '(fa.asset_id IS NOT NULL)';
+    if (sort === 'newest') order = 'v.created_at DESC, a.id DESC';
+    else if (sort === 'used') order = `${used} DESC, a.id DESC`;
+    else if (sort === 'name') order = 'LOWER(COALESCE(a.meta_title, v.title, a.slug)), a.id';
+    else if (recent) { from += ' JOIN asset_recent rr ON rr.asset_id = a.id'; order = 'rr.at DESC, a.id DESC'; }
+    else if (match) {
+      // text rank first (bm25: lower is better), nudged by what the studio knows is good
+      from += ' JOIN (SELECT rowid AS id, bm25(assets_fts, 10.0, 6.0, 3.0, 6.0, 0.5) AS rank FROM assets_fts WHERE assets_fts MATCH ?) m ON m.id = a.id';
+      args = [match, ...w.args];
+      // bm25 is negative (more negative is better), so the boosts multiply it
+      order = `m.rank * (1 + 0.6 * a.featured + 0.4 * ${fav} + 0.15 * MIN(${used}, 5)), a.id DESC`;
+    } else order = `a.featured DESC, ${fav} DESC, ${used} DESC, a.id DESC`;
+    // the page's ids first (narrow rows sort fast), then their details
+    const ids = db.prepare(`SELECT a.id ${from} ${w.sql} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, Math.min(Math.max(1, limit), 200), Math.max(0, offset)).map((r) => r.id);
+    const byId = new Map(ids.length ? db.prepare(`SELECT ${VERSION_COLS} ${BASE} WHERE a.id IN (${ids.map(() => '?').join(',')})`).all(...ids).map((r) => [r.asset_id, r]) : []);
+    const rows = ids.map((id) => byId.get(id));
+    const favs = new Set(rows.length ? db.prepare(`SELECT asset_id FROM favorites WHERE asset_id IN (${rows.map(() => '?').join(',')})`).all(...rows.map((r) => r.asset_id)).map((r) => r.asset_id) : []);
+    const out = { total, assets: rows.map((r) => ({ ...summary(r), favorite: favs.has(r.asset_id) })) };
+    if (facets) out.facets = facetsFor(f);
+    return out;
+  }
+
+  // ── favourites, collections, featured, recently used ──────────────────────────────────────
+
+  const assetIdOf = (slug) => {
+    const r = q('SELECT id FROM assets WHERE slug = ?').get(parseRef(slug).slug);
+    if (!r) throw new StudioError(`No asset named "${slug}" in the library.`, 'not_found');
+    return r.id;
+  };
+
+  function setFavorite(slug, on = true) {
+    const id = assetIdOf(slug);
+    if (on) q('INSERT OR IGNORE INTO favorites (asset_id, created_at) VALUES (?, ?)').run(id, now());
+    else q('DELETE FROM favorites WHERE asset_id = ?').run(id);
+    ctx.events?.emit('asset', parseRef(slug).slug, 'favorite', { on: !!on });
+  }
+
+  function setFeatured(slug, on = true) {
+    q('UPDATE assets SET featured = ? WHERE id = ?').run(on ? 1 : 0, assetIdOf(slug));
+    ctx.events?.emit('asset', parseRef(slug).slug, 'featured', { on: !!on });
+  }
+
+  /** Remember that an asset was opened, used in a clip or created (for "recently used"). */
+  function touch(slug, how = 'opened') {
+    const r = q('SELECT id FROM assets WHERE slug = ?').get(parseRef(slug).slug);
+    if (r) q('INSERT INTO asset_recent (asset_id, at, how) VALUES (?, ?, ?) ON CONFLICT(asset_id) DO UPDATE SET at = excluded.at, how = excluded.how').run(r.id, now(), how);
+  }
+
+  const listCollections = () => q('SELECT c.slug, c.name, c.created_at, (SELECT COUNT(*) FROM collection_assets ca WHERE ca.collection_id = c.id) AS n FROM collections c ORDER BY c.name').all().map((c) => ({ slug: c.slug, name: c.name, count: c.n, createdAt: c.created_at }));
+
+  /** Put assets in a collection (made when it does not exist yet). */
+  function addToCollection(name, slugs) {
+    const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
+    if (!SLUG_RE.test(slug)) throw new StudioError(`"${name}" is not a usable collection name`);
+    const ids = slugs.map(assetIdOf);
+    transaction(db, () => {
+      q('INSERT OR IGNORE INTO collections (slug, name, created_at) VALUES (?, ?, ?)').run(slug, String(name).trim(), now());
+      const cid = q('SELECT id FROM collections WHERE slug = ?').get(slug).id;
+      for (const id of ids) q('INSERT OR IGNORE INTO collection_assets (collection_id, asset_id, added_at) VALUES (?, ?, ?)').run(cid, id, now());
+    });
+    ctx.events?.emit('library', slug, 'collection', { added: slugs.length });
+    return listCollections().find((c) => c.slug === slug);
+  }
+
+  function removeFromCollection(collection, slugs) {
+    const c = q('SELECT id FROM collections WHERE slug = ?').get(collection);
+    if (!c) throw new StudioError(`No collection "${collection}"`, 'not_found');
+    for (const id of slugs.map(assetIdOf)) q('DELETE FROM collection_assets WHERE collection_id = ? AND asset_id = ?').run(c.id, id);
+    ctx.events?.emit('library', collection, 'collection', { removed: slugs.length });
+  }
+
+  /**
+   * Change many assets at once: tags added or removed (a metadata edit, no new versions),
+   * favourite, featured, a collection.
+   * @param {{ slugs: string[], addTags?: string[], removeTags?: string[], favorite?: boolean, featured?: boolean, collection?: string, author: string }} o
+   */
+  function bulk({ slugs, addTags = [], removeTags = [], favorite, featured, collection, author }) {
+    if (!Array.isArray(slugs) || !slugs.length || slugs.length > 500) throw new StudioError('slugs: 1–500 asset names');
+    for (const t of [...addTags, ...removeTags]) if (!/^[a-z0-9][a-z0-9-]*$/.test(t)) throw new StudioError(`"${t}" is not a lowercase-kebab tag`);
+    const changed = [];
+    for (const slug of slugs) {
+      if (addTags.length || removeTags.length) {
+        const a = getAsset(slug, { includeSource: false });
+        const next = [...new Set([...a.tags.filter((t) => !removeTags.includes(t)), ...addTags])];
+        if (next.join() !== a.tags.join()) setMetadata({ slug: a.slug, tags: next.length ? next : [a.type], author, keepFlag: true });
+      }
+      if (favorite !== undefined) setFavorite(slug, favorite);
+      if (featured !== undefined) setFeatured(slug, featured);
+      changed.push(parseRef(slug).slug);
     }
-    if (type) { where.push('a.type = ?'); args.push(type); }
-    if (kind) { where.push('v.kind = ?'); args.push(kind); }
-    for (const tag of tags ?? []) { where.push('EXISTS (SELECT 1 FROM asset_tags t WHERE t.asset_id = a.id AND t.tag = ?)'); args.push(tag); }
-    if (format) { where.push("(v.formats = '[]' OR EXISTS (SELECT 1 FROM json_each(v.formats) WHERE value = ?))"); args.push(format); }
-    if (originClip) { where.push('a.origin_clip = (SELECT id FROM clips WHERE slug = ?)'); args.push(originClip); }
-    if (usedByClip) { where.push('EXISTS (SELECT 1 FROM clip_assets ca JOIN asset_versions cv ON cv.id = ca.version_id WHERE cv.asset_id = a.id AND ca.clip_id = (SELECT id FROM clips WHERE slug = ?))'); args.push(usedByClip); }
-    if (derivedFrom) { where.push('a.forked_from IN (SELECT fv.id FROM asset_versions fv JOIN assets fa ON fa.id = fv.asset_id WHERE fa.slug = ?)'); args.push(derivedFrom); }
-    if (author) { where.push('v.author = ?'); args.push(author); }
-    if (needsDescription !== undefined) { where.push('a.needs_description = ?'); args.push(needsDescription ? 1 : 0); }
-    const sqlWhere = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const total = db.prepare(`SELECT COUNT(*) AS n FROM ${from} ${sqlWhere}`).get(...args).n;
-    const rows = db.prepare(`SELECT ${VERSION_COLS} FROM ${from} ${sqlWhere} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, Math.min(Math.max(1, limit), 200), Math.max(0, offset));
-    return { total, assets: rows.map(summary) };
+    if (collection) addToCollection(collection, slugs);
+    return { changed };
   }
 
   const allTags = () => q('SELECT tag, COUNT(*) AS n FROM asset_tags GROUP BY tag ORDER BY n DESC, tag').all();
@@ -262,7 +396,7 @@ export function createLibrary(ctx) {
     } catch (e) {
       throw new StudioError(`The asset was rejected: ${e.message}${e.logs?.length ? `\nconsole output:\n${e.logs.join('\n')}` : ''}`, 'rejected', { logs: e.logs });
     }
-    return { ...result, deps, thumb: Buffer.from(result.thumb) };
+    return { ...result, deps, thumb: Buffer.from(result.thumb), strip: result.strip ? Buffer.from(result.strip) : null };
   }
 
   /** @param {{ slug: string, source: string, author: string, forClip?: string, note?: string, params?: any, mode: string, forkOf?: any, derivation?: string }} o */
@@ -285,6 +419,9 @@ export function createLibrary(ctx) {
     const thumb = `thumbs/${slug}@${version}.png`;
     const thumbTmp = join(dataDir, tempOf(thumb));
     writeFileSync(thumbTmp, v.thumb);
+    // the hover filmstrip: written now, it is only ever read for a version that exists
+    const strip = v.strip ? `thumbs/${slug}@${version}.strip.png` : null;
+    if (strip) writeFileSync(join(dataDir, strip), v.strip);
     const at = now();
     try {
       transaction(db, () => {
@@ -300,7 +437,7 @@ export function createLibrary(ctx) {
       const versionId = q(`INSERT INTO asset_versions (asset_id, version, kind, title, description, tags, duration, formats, schema, uses, deps, source, source_hash, meta, thumb, author, note, parent_version, clip_id, engine, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         assetId, version, m.kind, m.title, m.description, JSON.stringify(m.tags), m.duration, JSON.stringify(m.formats), JSON.stringify(m.schema), JSON.stringify(m.uses), JSON.stringify(v.deps),
-        source, hash, JSON.stringify({ test: v.frames, warnings: v.warnings }), thumb, author, note ?? null, prev?.version_id ?? forkOf?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at).lastInsertRowid;
+        source, hash, JSON.stringify({ test: v.frames, warnings: v.warnings, strip: strip ? { file: strip, frames: 8 } : undefined }), thumb, author, note ?? null, prev?.version_id ?? forkOf?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at).lastInsertRowid;
       for (const [alias, dep] of Object.entries(v.deps)) q('INSERT INTO asset_deps (version_id, dep_version_id, alias) VALUES (?, ?, ?)').run(versionId, versionRow(dep).version_id, alias);
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
       reindex(assetId, { slug, title: m.title, description: m.description, tags: m.tags, source });
@@ -310,6 +447,7 @@ export function createLibrary(ctx) {
       rmSync(thumbTmp, { force: true });
       throw raceOf(e, slug);
     }
+    touch(slug, 'created');
     ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, clip: forClip ?? null, fork: forkOf ? makeRef(forkOf.slug, forkOf.version) : null });
     return { asset: getAsset(makeRef(slug, version), { includeSource: false }), warnings: v.warnings, logs: v.logs, frames: v.frames, thumbPath: join(dataDir, thumb), thumb: v.thumb };
   }
@@ -590,6 +728,6 @@ export function createLibrary(ctx) {
     return fam ? makeRef(fam.slug, 1) : null;
   };
 
-  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, sequenceByKey, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
+  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, sequenceByKey, setFavorite, setFeatured, touch, listCollections, addToCollection, removeFromCollection, bulk, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
 }
 

@@ -266,6 +266,7 @@ export function createClips(ctx, library) {
     const ins = q('INSERT OR REPLACE INTO clip_assets (clip_id, version_id, direct, depth) VALUES (?, ?, ?, ?)');
     for (const { row, depth, direct } of c.versions.values()) {
       ins.run(clipId, row.version_id, direct ? 1 : 0, depth);
+      if (direct) library.touch(row.slug, 'used');
       // an asset nobody claimed is first produced by the first clip that uses it
       if (row.origin_clip === null) q('UPDATE assets SET origin_clip = ? WHERE id = ? AND origin_clip IS NULL').run(clipId, row.asset_id);
     }
@@ -581,6 +582,35 @@ export function createClips(ctx, library) {
     return { asset: saved.asset, source, clip: edited.clip };
   }
 
+  /**
+   * Add library assets to a clip at a time (the library's "add to the open clip"): visual ones on a
+   * track of their own at the top, audio ones on an audio track, each for its natural duration.
+   * @param {{ slug: string, assets: string[], at?: number, author?: string }} o
+   */
+  async function addAssets({ slug, assets, at = 0, author }) {
+    const comp = json(clipRow(slug).composition);
+    if (!Array.isArray(assets) || !assets.length || assets.length > 50) throw new StudioError('assets: 1–50 asset names');
+    const start = Math.max(0, Math.min(Number(at) || 0, comp.duration - 0.1));
+    const ids = new Set(comp.tracks.flatMap((t) => t.items.map((i) => i.id)));
+    const ops = [], added = [];
+    const ensure = (id, type, name) => { if (!comp.tracks.some((t) => t.id === id) && !ops.some((o) => o.op === 'add_track' && o.track.id === id)) ops.push({ op: 'add_track', track: { id, type, name } }); };
+    for (const ref of assets) {
+      const row = library.requireVersion(ref);
+      const audio = row.type === 'sound' || row.kind === 'audio';
+      if (!audio && !(row.type === 'image' || row.type === 'sequence' || row.kind === 'visual')) throw new StudioError(`${ref} is a ${row.kind ?? row.type} asset: attach it to an item instead (motions, effects, transition)`);
+      const track = audio ? 'added-audio' : 'added';
+      ensure(track, audio ? 'audio' : 'visual', audio ? 'Added audio' : 'Added');
+      let id = row.slug, n = 2;
+      while (ids.has(id)) id = `${row.slug}-${n++}`;
+      ids.add(id);
+      const duration = round3(Math.min(row.duration ?? (row.type === 'sequence' ? json(row.meta, {}).duration : null) ?? 3, comp.duration - start));
+      ops.push({ op: 'add_item', track, item: { id, asset: makeRef(row.slug, row.version), start: round3(start), duration, params: {} } });
+      added.push(id);
+    }
+    const r = await editClip(slug, ops, { by: author ?? null });
+    return { clip: r.clip, added };
+  }
+
   function getClip(slug) {
     const row = clipRow(slug);
     return { ...shape(row), assets: clipAssets(slug) };
@@ -609,5 +639,5 @@ export function createClips(ctx, library) {
     }));
   }
 
-  return { prepare, prepareAudio, bundleFor, check, createClip, updateClip, editClip, applyOps, remixClip, repinClip, savePrecomp, getClip, listClips, clipAssets, clipRow };
+  return { prepare, prepareAudio, bundleFor, check, createClip, updateClip, editClip, applyOps, remixClip, repinClip, savePrecomp, addAssets, getClip, listClips, clipAssets, clipRow };
 }

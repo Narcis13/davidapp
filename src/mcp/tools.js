@@ -70,12 +70,17 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         origin_clip: z.string().optional().describe('Assets first produced by this clip'),
         used_by_clip: z.string().optional().describe('Assets this clip uses (any version)'),
         derived_from: z.string().optional().describe('Forks of this asset'),
-        limit: z.number().int().min(1).max(200).optional(),
+        derivation: z.enum(['fork', 'bake', 'preset', 'precomp']).optional().describe('Only presets, precomps, bakes or forks'),
+        favorite: z.boolean().optional(), featured: z.boolean().optional(), collection: z.string().optional(),
+        needs_description: z.boolean().optional().describe('Uploads still waiting for a description'),
+        sort: z.enum(['relevance', 'newest', 'used', 'name']).optional().describe('relevance (default): text rank boosted by featured, favourites and use'),
+        facets: z.boolean().optional().describe('Also return counts per type, kind, tag, format, author, origin clip, used by, collection'),
+        limit: z.number().int().min(1).max(200).optional(), offset: z.number().int().min(0).optional(),
       },
       readOnly: true,
       run: (a) => {
-        const r = library.search({ query: a.query, type: a.type, kind: a.kind, tags: a.tags, format: a.format, originClip: a.origin_clip, usedByClip: a.used_by_clip, derivedFrom: a.derived_from, limit: a.limit ?? 40 });
-        return { json: { total: r.total, assets: r.assets.map(compactAsset) } };
+        const r = library.search({ query: a.query, type: a.type, kind: a.kind, tags: a.tags, format: a.format, originClip: a.origin_clip, usedByClip: a.used_by_clip, derivedFrom: a.derived_from, derivation: a.derivation, favorite: a.favorite, featured: a.featured, collection: a.collection, needsDescription: a.needs_description, sort: a.sort, facets: !!a.facets, limit: a.limit ?? 40, offset: a.offset ?? 0 });
+        return { json: { total: r.total, assets: r.assets.map(compactAsset), facets: r.facets } };
       },
     },
     {
@@ -380,6 +385,14 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       input: { id: z.number().int() },
       run: (a) => ({ json: compactRender(renders.cancel(a.id)) }),
     },
+    {
+      name: 'organize_assets',
+      title: 'Tag, favourite, feature or collect assets',
+      description: 'Change many assets at once: add or remove tags (a metadata edit, no new versions), mark them favourite or featured (both raise them in search), or put them in a collection (made if it does not exist). Featured is for the pieces you want the next clip to start from.',
+      input: { names: z.array(z.string()).min(1).max(500), add_tags: z.array(z.string()).optional(), remove_tags: z.array(z.string()).optional(), favorite: z.boolean().optional(), featured: z.boolean().optional(), collection: z.string().optional(), author: AUTHOR },
+      run: (a) => ({ json: { ...library.bulk({ slugs: a.names, addTags: a.add_tags ?? [], removeTags: a.remove_tags ?? [], favorite: a.favorite, featured: a.featured, collection: a.collection, author: who(a.author) }), collections: library.listCollections() } }),
+    },
+
     // ── tweak and keep ───────────────────────────────────────────────────────────────────
     {
       name: 'save_defaults',
