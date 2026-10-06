@@ -63,8 +63,8 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       description: 'Find assets in the library by full text (name, description, tags, source), type, kind, tags, format and lineage. Returns the latest version of each match.',
       input: {
         query: z.string().optional().describe('Full-text query, e.g. "typewriter cursor"'),
-        type: z.enum(['function', 'image', 'sound', 'font']).optional(),
-        kind: z.enum(['visual', 'value', 'audio']).optional().describe('Function assets only'),
+        type: z.enum(['function', 'image', 'sound', 'font', 'sequence']).optional(),
+        kind: z.enum(['visual', 'value', 'audio', 'motion', 'transition', 'effect']).optional().describe('Function assets only'),
         tags: z.array(z.string()).optional().describe('All of these tags'),
         format: FORMAT.optional().describe('Designed for this format'),
         origin_clip: z.string().optional().describe('Assets first produced by this clip'),
@@ -190,6 +190,21 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         const frame = await studio.assetFrame({ ref: a.ref, params: a.params, t: a.t, duration: a.duration, width: a.width ?? 1080, height: a.height ?? 1080, background: a.transparent === false ? '#101018' : 'rgba(0,0,0,0)' });
         const r = await library.addFileAsset({ slug: a.name, type: 'image', data: frame.png, ext: '.png', description: a.description, tags: a.tags ?? ['baked'], forClip: a.for_clip, author: who(a.author), derivedFrom: frame.ref, meta: { bakedFrom: frame.ref, params: a.params ?? {} } });
         return { json: { added: compactAsset(r.asset) }, images: [image(`baked-${a.name}`, frame.png)] };
+      },
+    },
+    {
+      name: 'bake_sequence',
+      title: 'Bake an asset into a frame sequence',
+      description: 'Render a visual asset (a 3D scene, a heavy effect, anything expensive) once into a frame-sequence asset: PNG frames with a transparent background. Use the sequence as a layer in any clip (params.fit, params.loop); it is fast to preview and render, and it keeps its lineage back to the source. Cached: the same asset version, params, size, fps and duration return the sequence already baked (cached: true).',
+      input: {
+        ref: REF, name: z.string().describe('Name of the sequence asset'), params: PARAMS.optional(),
+        format: FORMAT.optional(), width: z.number().int().min(16).max(3840).optional(), height: z.number().int().min(16).max(3840).optional(),
+        fps: z.number().int().min(1).max(60).optional(), duration: z.number().positive().max(60).optional(),
+        title: z.string().optional(), description: z.string().optional(), tags: z.array(z.string()).optional(), for_clip: z.string().optional(), author: AUTHOR,
+      },
+      run: async (a) => {
+        const r = await studio.bakeSequence({ ref: a.ref, slug: a.name, params: a.params, format: a.format, width: a.width, height: a.height, fps: a.fps, duration: a.duration, title: a.title, description: a.description, tags: a.tags, forClip: a.for_clip, author: who(a.author) });
+        return { json: { sequence: r.asset.ref, cached: r.cached, frames: r.frames, seconds: r.seconds, bakedFrom: r.asset.forkedFrom, meta: r.asset.meta }, images: r.asset.thumb ? [{ png: readFileSync(join(studio.dataDir, r.asset.thumb)), path: join(studio.dataDir, r.asset.thumb) }] : [] };
       },
     },
     {

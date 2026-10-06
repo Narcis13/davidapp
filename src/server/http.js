@@ -82,7 +82,10 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
   function browserBundle(b) {
     const images = {};
     for (const ref of Object.keys(b.images ?? {})) images[ref] = { url: `/media/${library.requireVersion(ref).file}` };
-    return { key: b.key, assets: b.assets, images, beats: b.beats ?? [] };
+    // a sequence's frames are fetched as the preview needs them: /media/files/<slug>@<v>/000123.png
+    const sequences = {};
+    for (const [ref, s] of Object.entries(b.sequences ?? {})) sequences[ref] = { url: `/media/${s.file}/`, frames: s.frames, fps: s.fps, width: s.width, height: s.height };
+    return { key: b.key, assets: b.assets, images, sequences, beats: b.beats ?? [] };
   }
 
   /** What the editor needs to know about each asset version a composition names. */
@@ -151,6 +154,10 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     }],
     ['PUT', /^\/api\/assets\/([a-z0-9-]+)\/metadata$/, ({ params, data }) => library.setMetadata({ slug: params[0], title: data.title, description: data.description, tags: data.tags, author: data.author ?? author })],
     ['GET', /^\/api\/assets\/([a-z0-9-]+)\/diff$/, ({ params, query }) => library.diffVersions(params[0], int(query.get('a'), 1, 1, 1e6), int(query.get('b'), 1, 1, 1e6))],
+    ['POST', /^\/api\/assets\/([a-z0-9-]+)\/bake$/, async ({ params, data }) => {
+      const r = await studio.bakeSequence({ ref: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, params: data.params, format: data.format, width: data.width, height: data.height, fps: data.fps, duration: data.duration, title: data.title, description: data.description, tags: data.tags, author: data.author ?? author });
+      return { asset: r.asset, cached: r.cached, frames: r.frames };
+    }],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/precomp$/, async ({ params, data }) => {
       const r = await clips.savePrecomp({ clip: params[0], items: data.items, slug: data.name, title: data.title, description: data.description, tags: data.tags, expose: data.expose ?? [], replace: !!data.replace, author: data.author ?? author });
       return { asset: r.asset, clip: r.clip };

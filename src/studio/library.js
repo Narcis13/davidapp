@@ -182,7 +182,7 @@ export function createLibrary(ctx) {
    */
   function closure(refs) {
     const versions = new Map();
-    const assets = {}, images = {}, sounds = {};
+    const assets = {}, images = {}, sounds = {}, sequences = {};
     const queue = refs.map((ref) => ({ ref, depth: 0 }));
     while (queue.length) {
       const { ref, depth } = queue.shift();
@@ -197,15 +197,16 @@ export function createLibrary(ctx) {
         for (const dep of new Set(Object.values(deps))) queue.push({ ref: dep, depth: depth + 1 });
       } else if (row.type === 'image') images[pinned] = { path: absFile(row) };
       else if (row.type === 'sound') sounds[pinned] = { path: absFile(row) };
+      else if (row.type === 'sequence') { const m = json(row.meta, {}); sequences[pinned] = { dir: absFile(row), file: row.file, frames: m.frames, fps: m.fps, width: m.width, height: m.height }; }
     }
-    return { versions, assets, images, sounds };
+    return { versions, assets, images, sounds, sequences };
   }
 
   /** A worker bundle for rendering the given refs (and optionally a composition). */
   function bundle(refs, extra = {}) {
     const c = closure(refs);
-    const key = sha1(JSON.stringify([Object.keys(c.assets).sort(), Object.keys(c.images).sort(), extra.composition ?? null, extra.beats ?? null]));
-    return { key, assets: c.assets, images: c.images, sounds: c.sounds, ...extra };
+    const key = sha1(JSON.stringify([Object.keys(c.assets).sort(), Object.keys(c.images).sort(), Object.keys(c.sequences).sort(), extra.composition ?? null, extra.beats ?? null]));
+    return { key, assets: c.assets, images: c.images, sounds: c.sounds, sequences: c.sequences, ...extra };
   }
 
   // ── writing function assets ──────────────────────────────────────────────────────────────
@@ -496,6 +497,50 @@ export function createLibrary(ctx) {
     return { asset: getAsset(makeRef(slug, version)) };
   }
 
+  /**
+   * Add a frame sequence (PNG frames with alpha, 000000.png …) from a directory, moved into the data
+   * dir. meta: { frames, fps, width, height, duration, key, bakedFrom, params }.
+   * @param {{ slug: string, dir: string, meta: any, description: string, tags?: string[], title?: string, author: string, forClip?: string, derivedFrom?: string, thumb: Buffer }} o
+   */
+  function addSequence({ slug, dir, meta, description, tags = [], title, author, forClip, derivedFrom, thumb: thumbPng }) {
+    if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name`);
+    if (!author) throw new StudioError('author is required');
+    if (typeof description !== 'string' || description.trim().length < 12) throw new StudioError('description is required: what the sequence shows and what it was baked from');
+    if (!Array.isArray(tags) || !tags.every((t) => /^[a-z0-9][a-z0-9-]*$/.test(t))) throw new StudioError('tags must be lowercase-kebab strings');
+    const existing = q('SELECT * FROM assets WHERE slug = ?').get(slug);
+    if (existing && existing.type !== 'sequence') throw new StudioError(`"${slug}" already exists as a ${existing.type} asset`, 'conflict');
+    const clip = forClip ? clipBySlug(forClip) : null;
+    if (forClip && !clip) throw new StudioError(`for_clip: no clip named "${forClip}"`, 'not_found');
+    const from = derivedFrom ? requireVersion(derivedFrom) : null;
+    const version = (existing?.latest_version ?? 0) + 1;
+    const file = `files/${slug}@${version}`;
+    const thumb = `thumbs/${slug}@${version}.png`;
+    const at = now();
+    const prev = existing ? versionRow(slug) : null;
+    try {
+      transaction(db, () => {
+        const assetId = existing?.id ?? q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at, derivation) VALUES (?, ?, 0, ?, ?, ?, ?)').run(slug, 'sequence', from?.version_id ?? null, clip?.id ?? null, at, from ? 'bake' : null).lastInsertRowid;
+        q(`INSERT INTO asset_versions (asset_id, version, title, description, tags, duration, file, mime, meta, thumb, author, note, parent_version, clip_id, engine, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(assetId, version, title ?? null, description.trim(), JSON.stringify(tags), meta.duration, file, 'image/png', JSON.stringify(meta), thumb, author, derivedFrom ? `Baked from ${derivedFrom}` : null, prev?.version_id ?? from?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at);
+        q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
+        reindex(assetId, { slug, title, description: description.trim(), tags, source: '' });
+        writeFileSync(join(dataDir, thumb), thumbPng);
+        renameSync(dir, join(dataDir, file));
+      });
+    } catch (e) {
+      rmSync(join(dataDir, thumb), { force: true });
+      throw raceOf(e, slug);
+    }
+    ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, type: 'sequence', clip: forClip ?? null });
+    return { asset: getAsset(makeRef(slug, version), { includeSource: false }) };
+  }
+
+  /** A sequence already baked with this key (same asset version, params, size, fps and duration). */
+  const sequenceByKey = (key) => {
+    const r = q("SELECT a.slug, v.version FROM assets a JOIN asset_versions v ON v.asset_id = a.id WHERE a.type = 'sequence' AND json_extract(v.meta, '$.key') = ? ORDER BY v.id LIMIT 1").get(key);
+    return r ? getAsset(makeRef(r.slug, r.version), { includeSource: false }) : null;
+  };
+
   /** Register the bundled fonts as library assets (idempotent). */
   function seedFonts() {
     registerFonts();
@@ -532,6 +577,6 @@ export function createLibrary(ctx) {
     return fam ? makeRef(fam.slug, 1) : null;
   };
 
-  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
+  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, sequenceByKey, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
 }
 

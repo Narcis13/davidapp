@@ -33,11 +33,20 @@ CREATE TABLE IF NOT EXISTS clips (
 CREATE TABLE IF NOT EXISTS assets (
   id              INTEGER PRIMARY KEY,
   slug            TEXT NOT NULL UNIQUE,
-  type            TEXT NOT NULL CHECK (type IN ('function', 'image', 'sound', 'font')),
+  type            TEXT NOT NULL CHECK (type IN ('function', 'image', 'sound', 'font', 'sequence')),
   latest_version  INTEGER NOT NULL DEFAULT 0,
   forked_from     INTEGER REFERENCES asset_versions(id),  -- the version this asset was forked from
   origin_clip     INTEGER REFERENCES clips(id),           -- the clip that first produced it
-  created_at      TEXT NOT NULL
+  created_at      TEXT NOT NULL,
+  -- v2: metadata edited in the studio, over what the source declares (no new code version)
+  meta_title        TEXT,
+  meta_description  TEXT,
+  meta_tags         TEXT,
+  meta_by           TEXT,
+  meta_at           TEXT,
+  derivation        TEXT,                          -- how it came from forked_from: fork | bake | preset | precomp
+  needs_description INTEGER NOT NULL DEFAULT 0,    -- an upload waiting for the agent to describe it
+  featured          INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS asset_versions (
@@ -128,7 +137,8 @@ CREATE TABLE IF NOT EXISTS renders (
   requested_by      TEXT NOT NULL,
   created_at        TEXT NOT NULL,
   started_at        TEXT,
-  finished_at       TEXT
+  finished_at       TEXT,
+  format            TEXT          -- v2: rendered in another format than the clip's (its overrides apply)
 );
 CREATE INDEX IF NOT EXISTS renders_status ON renders(status);
 
@@ -206,7 +216,7 @@ CREATE TABLE IF NOT EXISTS proposals (
 CREATE INDEX IF NOT EXISTS proposals_request ON proposals(request_id);
 `;
 
-/** Columns added since schema v1: [table, column, declaration]. */
+/** Columns added since schema v1, for databases made by an older build: [table, column, declaration]. */
 const COLUMNS = [
   ['renders', 'format', 'TEXT'],   // v2: rendered in another format than the clip's (its overrides apply)
   // v2: metadata edited in the studio, over what the source declares (no new code version)
@@ -228,44 +238,50 @@ export function openDb(file) {
   db.exec(SCHEMA);
   const row = db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get();
   if (row && Number(row.value) > SCHEMA_VERSION) throw new Error(`The database at ${file} is schema v${row.value}; this build understands v${SCHEMA_VERSION}`);
-  widenKinds(db);
   // columns added after v1: ALTER TABLE on a database made by an older build (idempotent)
   for (const [table, column, decl] of COLUMNS) {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
   }
+  widenChecks(db);
   db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(SCHEMA_VERSION));
   return db;
 }
 
 /**
- * v1 databases only allow the kinds visual, value and audio. SQLite cannot change a CHECK
- * constraint in place, so the table is rebuilt with the current definition (the documented
- * "twelve steps": foreign keys off, copy, drop, rename, then the triggers and indexes again).
+ * v1 databases only allow the kinds visual, value and audio, and the types function, image, sound
+ * and font. SQLite cannot change a CHECK constraint in place, so such a table is rebuilt with the
+ * current definition (the documented "twelve steps": foreign keys off, copy, drop, rename, then the
+ * triggers and indexes again, and a foreign key check before committing).
  */
-function widenKinds(db) {
-  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'asset_versions'").get();
-  if (!row || row.sql.includes("'motion'")) return;
-  const create = /CREATE TABLE IF NOT EXISTS asset_versions \([\s\S]*?\n\);/.exec(SCHEMA)[0].replace('CREATE TABLE IF NOT EXISTS asset_versions', 'CREATE TABLE asset_versions_v2');
-  db.exec('PRAGMA foreign_keys = OFF');
-  try {
-    db.exec('BEGIN IMMEDIATE');
+function widenChecks(db) {
+  for (const [table, marker] of [['assets', "'sequence'"], ['asset_versions', "'motion'"]]) {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+    if (!row || String(row.sql).includes(marker)) continue;
+    const re = new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n\\);`);
+    const create = re.exec(SCHEMA)[0].replace(`CREATE TABLE IF NOT EXISTS ${table}`, `CREATE TABLE ${table}_v2`);
+    db.exec('PRAGMA foreign_keys = OFF');
     try {
-      db.exec(create);
-      db.exec('INSERT INTO asset_versions_v2 SELECT * FROM asset_versions');
-      db.exec('DROP TABLE asset_versions');
-      db.exec('ALTER TABLE asset_versions_v2 RENAME TO asset_versions');
-      db.exec(SCHEMA);
-      const broken = db.prepare('PRAGMA foreign_key_check').all();
-      if (broken.length) throw new Error(`rebuilding asset_versions broke ${broken.length} foreign keys`);
-      db.exec('COMMIT');
-    } catch (e) {
-      db.exec('ROLLBACK');
-      throw e;
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec(create);
+        db.exec(`INSERT INTO ${table}_v2 (${columnsOf(db, `${table}_v2`).filter((c) => columnsOf(db, table).includes(c)).join(', ')}) SELECT ${columnsOf(db, `${table}_v2`).filter((c) => columnsOf(db, table).includes(c)).join(', ')} FROM ${table}`);
+        db.exec(`DROP TABLE ${table}`);
+        db.exec(`ALTER TABLE ${table}_v2 RENAME TO ${table}`);
+        db.exec(SCHEMA);
+        const broken = db.prepare('PRAGMA foreign_key_check').all();
+        if (broken.length) throw new Error(`rebuilding ${table} broke ${broken.length} foreign keys`);
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    } finally {
+      db.exec('PRAGMA foreign_keys = ON');
     }
-  } finally {
-    db.exec('PRAGMA foreign_keys = ON');
   }
 }
+
+const columnsOf = (db, table) => db.prepare(`PRAGMA table_info(${table})`).all().map((c) => String(c.name));
 
 /** Run fn inside a transaction; rolls back if it throws. */
 export function transaction(db, fn) {

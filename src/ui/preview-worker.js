@@ -30,8 +30,22 @@ const host = {
   createCanvas: (w, h) => new OffscreenCanvas(w, h),
 };
 
-let rt = null, composition = null, beats = [];
+let rt = null, composition = null, beats = [], sequenceUrls = {};
 let canvas = null;
+// sequence frames are fetched as a frame needs them, and a few seconds of them are kept
+const seqCache = new Map();
+const SEQ_CACHE = 180;
+
+async function loadSequenceFrames(comp, frame) {
+  for (const { ref, index } of rt.sequenceFramesAt(comp, frame)) {
+    const key = `${ref}#${index}`;
+    if (seqCache.has(key)) { const v = seqCache.get(key); seqCache.delete(key); seqCache.set(key, v); continue; }
+    const res = await fetch(`${sequenceUrls[ref]}${String(index).padStart(6, '0')}.png`);
+    if (!res.ok) throw new Error(`Frame ${index} of ${ref} could not be loaded (${res.status})`);
+    seqCache.set(key, await createImageBitmap(await res.blob()));
+    while (seqCache.size > SEQ_CACHE) { const k = seqCache.keys().next().value; seqCache.get(k).close?.(); seqCache.delete(k); }
+  }
+}
 
 function surface(w, h) {
   if (!canvas || canvas.width !== w || canvas.height !== h) canvas = new OffscreenCanvas(w, h);
@@ -51,7 +65,11 @@ const handlers = {
       const blob = await (await fetch(img.url)).blob();
       next.setImage(ref, await createImageBitmap(blob));
     }
+    for (const [ref, seq] of Object.entries(bundle.sequences ?? {})) {
+      next.setSequence(ref, { frames: seq.frames, fps: seq.fps, width: seq.width, height: seq.height, get: (i) => seqCache.get(`${ref}#${i}`) ?? null });
+    }
     next.load(bundle.assets ?? {});
+    sequenceUrls = Object.fromEntries(Object.entries(bundle.sequences ?? {}).map(([ref, seq]) => [ref, seq.url]));
     rt = next;
     composition = comp ?? null;
     beats = bundle.beats ?? [];
@@ -63,8 +81,9 @@ const handlers = {
     const bitmap = c.transferToImageBitmap();
     return { result: { bitmap }, transfer: [bitmap] };
   },
-  clipFrame(m) {
+  async clipFrame(m) {
     const comp = m.composition ?? composition;
+    await loadSequenceFrames(comp, m.frame);
     const c = surface(comp.width, comp.height);
     rt.renderClipFrame(c.getContext('2d'), comp, m.frame, { beats });
     const bitmap = c.transferToImageBitmap();

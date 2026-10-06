@@ -4,6 +4,7 @@
 import { createCanvas } from '../../src/render/host.js';
 import { EASING, LABEL } from '../../test/helpers.js';
 import * as K from '../../test/fixtures/kinds.js';
+import { BALL, LETTERS } from '../../test/fixtures/solid.js';
 
 export const BLOCK = `asset({
   description: 'A rounded block with a darker border, for parity tests.',
@@ -49,9 +50,11 @@ asset({
 /** The assets the cases use, created in a studio. */
 export async function seedParity(studio, author = 'parity') {
   for (const [slug, source] of [['easing', EASING], ['label', LABEL], ['block', BLOCK], ['backdrop', BACKDROP], ['pop', K.MOTION_POP], ['slide', K.MOTION_SLIDE], ['wiggle', K.MOTION_WIGGLE],
-    ['wipe', K.TRANSITION_WIPE], ['push', K.TRANSITION_PUSH], ['iris', K.TRANSITION_IRIS], ['glow', K.EFFECT_GLOW], ['grain', K.EFFECT_GRAIN], ['duotone', K.EFFECT_DUOTONE], ['blur', K.EFFECT_BLUR], ['circle', K.MASK_CIRCLE], ['card', CARD]]) {
+    ['wipe', K.TRANSITION_WIPE], ['push', K.TRANSITION_PUSH], ['iris', K.TRANSITION_IRIS], ['glow', K.EFFECT_GLOW], ['grain', K.EFFECT_GRAIN], ['duotone', K.EFFECT_DUOTONE], ['blur', K.EFFECT_BLUR], ['circle', K.MASK_CIRCLE], ['card', CARD],
+    ['ball', BALL], ['letters', LETTERS]]) {
     await studio.library.createAsset({ slug, source, author });
   }
+  await studio.bakeSequence({ ref: 'ball', slug: 'ball-seq', params: { color: '#2dd4bf' }, width: 200, height: 200, fps: 10, duration: 2, author });
   const c = createCanvas(64, 32);
   const g = c.getContext('2d');
   g.fillStyle = '#00c2a8'; g.fillRect(0, 0, 32, 32); g.fillStyle = '#ffd166'; g.fillRect(32, 0, 32, 32);
@@ -77,6 +80,10 @@ export const CASES = {
   effect: [comp([{ id: 'v', items: [item('b', 'block', { transform: { width: 0.4, height: 0.5 }, effects: [{ asset: 'blur', params: { radius: 5 } }, { asset: 'glow', params: { radius: 16 } }] }), item('l', 'label', { params: { text: 'Duo' }, transform: { y: 0.8, height: 0.3 }, effects: [{ asset: 'duotone', params: { dark: '#1b1f3b', light: '#ffd166' } }] })], effects: [] }], { effects: [{ asset: 'grain', params: { amount: 0.1 } }] }), [5, 15]],
   mask: [comp([{ id: 'v', items: [item('b', 'block', { transform: { width: 0.8, height: 0.8 }, mask: { asset: 'circle', mode: 'alpha', params: { radius: 0.8 } } }), item('l', 'label', { params: { text: 'Masked' }, mask: { asset: 'circle', mode: 'luma-inverted', transform: { x: 0.5, y: 0.5, width: 0.3, height: 0.5 } } })] }]), [10]],
   precomp: [comp([{ id: 'v', items: [item('c', 'card', { params: { title: 'Precomp' }, transform: { x: 0.5, y: 0.5, width: 0.8, height: 0.8 } })] }]), [3, 15]],
+  '3d': [comp([{ id: 'behind', items: [item('t', 'label', { params: { text: 'BEHIND THE BALL', color: '#7cf5c0' }, transform: { height: 0.5 } })] },
+    { id: '3d', items: [item('b', 'ball', { transform: { x: 0.35, width: 0.6, height: 0.9 } }), item('w', 'letters', { params: { text: '3D' }, transform: { x: 0.75, width: 0.4, height: 0.6 } })] },
+    { id: 'front', items: [item('f', 'label', { params: { text: 'In front', color: '#ffffff' }, transform: { y: 0.85, height: 0.25 } })] }]), [5, 15]],
+  sequence: [comp([{ id: 'v', items: [item('s', 'ball-seq', { transform: { x: 0.3, width: 0.45, height: 0.8 } }), item('l', 'ball-seq', { params: { loop: true }, offset: 0.5, transform: { x: 0.75, width: 0.3, height: 0.5, rotation: 20 } })] }]), [3, 12]],
   image: [comp([{ id: 'v', items: [item('i', 'tiles', { transform: { width: 0.5, height: 0.5, rotation: 15 } }), item('j', 'tiles', { params: { fit: 'cover' }, transform: { x: 0.2, y: 0.25, width: 0.2, height: 0.3 } })] }]), [10]],
 };
 

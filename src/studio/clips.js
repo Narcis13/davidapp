@@ -21,6 +21,8 @@ const round3 = (v) => Math.round(v * 1000) / 1000;
 
 /** What an image layer takes: how the image fits its box. */
 const IMAGE_ITEM_SCHEMA = { fit: { type: 'enum', options: ['contain', 'cover', 'fill'], default: 'contain' } };
+/** A baked frame sequence plays like a layer: it fits its box, and holds its last frame or loops. */
+const SEQUENCE_ITEM_SCHEMA = { ...IMAGE_ITEM_SCHEMA, loop: { type: 'boolean', default: false } };
 
 /** Write a cache file so that nobody can read it half-written. */
 function writeAtomic(path, data) {
@@ -93,7 +95,7 @@ export function createClips(ctx, library) {
       if (!kinds.includes(kind)) problems.push(`${where}: ${makeRef(row.slug, row.version)} is a ${kind} asset; this takes ${kinds.join(' or ')} assets`);
       att.asset = makeRef(row.slug, row.version);
       refs.add(att.asset);
-      const schema = row.type === 'function' ? json(row.schema, {}) : row.type === 'image' ? IMAGE_ITEM_SCHEMA : {};
+      const schema = row.type === 'function' ? json(row.schema, {}) : row.type === 'image' ? IMAGE_ITEM_SCHEMA : row.type === 'sequence' ? SEQUENCE_ITEM_SCHEMA : {};
       att.params = pinWith(schema, att.params ?? {}, where);
     };
     for (const [i, fx] of (composition.effects ?? []).entries()) pinAttachment(fx, `effects[${i}]`, ['effect']);
@@ -106,10 +108,10 @@ export function createClips(ctx, library) {
       refs.add(item.asset);
       if (track.type === 'audio') {
         if (!(row.type === 'sound' || (row.type === 'function' && row.kind === 'audio'))) problems.push(`${where}: ${item.asset} is a ${row.kind ?? row.type} asset; an audio track takes audio or sound assets`);
-      } else if (!((row.type === 'function' && row.kind === 'visual') || row.type === 'image')) {
+      } else if (!((row.type === 'function' && row.kind === 'visual') || row.type === 'image' || row.type === 'sequence')) {
         problems.push(`${where}: ${item.asset} is a ${row.kind ?? row.type} asset; a ${track.type} track takes visual or image assets`);
       }
-      const schema = row.type === 'function' ? json(row.schema, {}) : row.type === 'image' && track.type !== 'audio' ? IMAGE_ITEM_SCHEMA : null;
+      const schema = row.type === 'function' ? json(row.schema, {}) : track.type === 'audio' ? null : row.type === 'image' ? IMAGE_ITEM_SCHEMA : row.type === 'sequence' ? SEQUENCE_ITEM_SCHEMA : null;
       if (!schema) { if (Object.keys(item.params).length) problems.push(`${where}: ${row.type} assets take no params`); continue; }
       // the item's params, and each format's overrides of them, are checked and pinned the same way
       const pinParams = (params, at) => pinWith(schema, params, at);
@@ -117,7 +119,7 @@ export function createClips(ctx, library) {
       for (const [fname, o] of Object.entries(item.formats ?? {})) if (o.params) o.params = pinParams(o.params, `${where} (${fname})`);
       for (const [i, m] of (item.motions ?? []).entries()) pinAttachment(m, `${where}: motions[${i}]`, ['motion']);
       for (const [i, fx] of (item.effects ?? []).entries()) pinAttachment(fx, `${where}: effects[${i}]`, ['effect']);
-      if (item.mask) pinAttachment(item.mask, `${where}: mask`, ['visual', 'image']);
+      if (item.mask) pinAttachment(item.mask, `${where}: mask`, ['visual', 'image', 'sequence']);
       if (item.transition) pinAttachment(item.transition, `${where}: transition`, ['transition']);
       // keyframed params must be numbers or colours the schema accepts
       const keyed = [item.keyframes, ...Object.values(item.formats ?? {}).map((o) => o.keyframes)];

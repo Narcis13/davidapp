@@ -4,6 +4,7 @@
 
 import { parentPort } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import { createRuntime, describeError } from '../core/runtime.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
@@ -11,14 +12,32 @@ import { nodeHost, registerFonts, createCanvas, loadImage, takeLogs } from './ho
 
 registerFonts();
 
-let state = { key: null, rt: null, comp: null, beats: [] };
+let state = { key: null, rt: null, comp: null, beats: [], sequences: {} };
 let canvas = null;
+
+// Sequence frames are PNG files, loaded as a frame needs them and kept in a small cache.
+const seqCache = new Map();
+const SEQ_CACHE = 96;
 
 async function makeRuntime(bundle) {
   const rt = createRuntime(nodeHost);
   for (const [ref, img] of Object.entries(bundle.images ?? {})) rt.setImage(ref, await loadImage(img.path));
+  for (const [ref, s] of Object.entries(bundle.sequences ?? {})) {
+    rt.setSequence(ref, { frames: s.frames, fps: s.fps, width: s.width, height: s.height, dir: s.dir, get: (i) => seqCache.get(`${ref}#${i}`) ?? null });
+  }
   rt.load(bundle.assets ?? {});
   return rt;
+}
+
+/** Load the sequence frames a clip frame needs before it is drawn. */
+async function loadSequenceFrames(rt, comp, frame) {
+  for (const { ref, index } of rt.sequenceFramesAt(comp, frame)) {
+    const key = `${ref}#${index}`;
+    if (seqCache.has(key)) { const v = seqCache.get(key); seqCache.delete(key); seqCache.set(key, v); continue; }
+    const s = state.sequences[ref];
+    seqCache.set(key, await loadImage(join(s.dir, `${String(index).padStart(6, '0')}.png`)));
+    while (seqCache.size > SEQ_CACHE) seqCache.delete(seqCache.keys().next().value);
+  }
 }
 
 function surface(width, height) {
@@ -201,11 +220,12 @@ const handlers = {
   async load(msg) {
     takeLogs();
     const rt = await makeRuntime(msg.bundle);
-    state = { key: msg.bundle.key, rt, comp: msg.bundle.composition ?? null, beats: msg.bundle.beats ?? [] };
+    state = { key: msg.bundle.key, rt, comp: msg.bundle.composition ?? null, beats: msg.bundle.beats ?? [], sequences: msg.bundle.sequences ?? {} };
     return { result: {} };
   },
-  clipFrame(msg) {
+  async clipFrame(msg) {
     const comp = state.comp;
+    await loadSequenceFrames(state.rt, comp, msg.frame);
     const c = surface(comp.width, comp.height);
     state.rt.renderClipFrame(c.getContext('2d'), comp, msg.frame, { beats: state.beats });
     return output(c, msg);
@@ -214,12 +234,21 @@ const handlers = {
     return output(drawAsset(state.rt, msg.ref, msg), msg);
   },
   /** Contact sheet of clip frames: msg.frames = [frame numbers]. */
-  clipSheet(msg) {
+  async clipSheet(msg) {
     const comp = state.comp;
-    const cells = msg.frames.map((frame) => ({
-      label: `${(frame / comp.fps).toFixed(2)}s`,
-      draw: () => { const c = surface(comp.width, comp.height); state.rt.renderClipFrame(c.getContext('2d'), comp, frame, { beats: state.beats }); return c; },
-    }));
+    const cells = [];
+    for (const frame of msg.frames) {
+      // each cell is drawn as soon as its sequence frames are in (the cache is smaller than a whole sheet)
+      await loadSequenceFrames(state.rt, comp, frame);
+      const c = surface(comp.width, comp.height);
+      state.rt.renderClipFrame(c.getContext('2d'), comp, frame, { beats: state.beats });
+      // kept at cell size: a full-size copy per cell would be hundreds of MB for a vertical clip
+      const copy = createCanvas(msg.cellWidth, Math.round((msg.cellWidth * comp.height) / comp.width));
+      const g = copy.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(c, 0, 0, copy.width, copy.height);
+      cells.push({ label: `${(frame / comp.fps).toFixed(2)}s`, draw: () => copy });
+    }
     const out = sheet(cells, { cols: msg.cols, cellWidth: msg.cellWidth, width: comp.width, height: comp.height });
     return { result: { png: out.toBuffer('image/png'), width: out.width, height: out.height } };
   },

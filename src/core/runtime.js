@@ -158,6 +158,8 @@ export function createRuntime(host) {
   const entries = new Map();
   /** @type {Map<string, any>} */
   const images = new Map();
+  /** sequence ref → { frames, fps, width, height, get(index) → image | null } */
+  const sequences = new Map();
   const layers = [];
   let layerIndex = 0;
   let scratch = null;
@@ -179,6 +181,38 @@ export function createRuntime(host) {
   }
 
   function setImage(ref, image) { images.set(ref, image); }
+  function setSequence(ref, seq) { sequences.set(ref, seq); }
+
+  /** The frame of a sequence an item shows at asset time `at` (held on its last frame, or looped). */
+  const sequenceIndex = (seq, at, loop) => {
+    const i = Math.max(0, Math.round(at * seq.fps));
+    return loop ? i % seq.frames : Math.min(seq.frames - 1, i);
+  };
+
+  /**
+   * The sequence frames a clip frame will draw: [{ ref, index }]. The host loads them (they are files)
+   * before calling renderClipFrame, which is synchronous.
+   */
+  function sequenceFramesAt(comp, frame) {
+    const out = [];
+    if (!sequences.size) return out;
+    const { fps } = comp;
+    const t = frame / fps;
+    const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
+    const want = (item, time) => {
+      for (const ref of [item.asset, item.mask?.asset]) {
+        const seq = ref && sequences.get(ref);
+        if (seq) out.push({ ref, index: sequenceIndex(seq, Math.max(0, time - item.start) + (item.offset ?? 0), item.params?.loop) });
+      }
+    };
+    for (const tr of comp.tracks) {
+      if (tr.type === 'audio' || tr.hidden || (solo && !tr.solo)) continue;
+      const handoff = transitionsAt(tr, frame, fps);
+      for (const from of handoff.outgoing) want(from, Math.min(t, from.start + from.duration - 1 / fps));
+      for (const item of tr.items) if (activeAt(item, frame, fps)) want(item, t);
+    }
+    return out;
+  }
 
   function entry(ref) {
     const e = entries.get(ref);
@@ -454,7 +488,7 @@ export function createRuntime(host) {
           if (!activeAt(item, frame, fps)) continue;
           // composition v2 (transforms, keyframes, formats…) and image layers take the new path;
           // everything else is drawn exactly as in v1, so old clips keep their pixels
-          if (isV2Item(item) || images.has(item.asset)) { drawLayer(ctx, comp, forFormat(item, format), t, clip); continue; }
+          if (isV2Item(item) || images.has(item.asset) || sequences.has(item.asset)) { drawLayer(ctx, comp, forFormat(item, format), t, clip); continue; }
           const lt = Math.max(0, t - item.start);
           let opacity = item.opacity ?? 1;
           if (item.fadeIn > 0) opacity *= Math.min(1, lt / item.fadeIn);
@@ -590,7 +624,13 @@ export function createRuntime(host) {
   /** Draw the item's content (an image or a visual asset) into target, with the canvas transform of its geometry. */
   function drawContent(target, comp, item, st, clip) {
     const { width, height, fps } = comp;
-    const img = images.get(item.asset);
+    const seq = sequences.get(item.asset);
+    let img = images.get(item.asset);
+    if (seq) {
+      const index = sequenceIndex(seq, st.at, st.params.loop);
+      img = seq.get(index);
+      if (!img) throw new AssetError(`item "${item.id}": frame ${index} of ${item.asset} is not loaded`);
+    }
     const e = img ? null : entry(item.asset);
     if (e && e.def.kind !== 'visual') throw new AssetError(`item "${item.id}": ${item.asset} is a ${e.def.kind} asset and cannot sit on a visual track${e.def.kind === 'effect' || e.def.kind === 'motion' || e.def.kind === 'transition' ? ` (attach it to an item: ${e.def.kind === 'effect' ? 'effects' : e.def.kind === 'motion' ? 'motions' : 'transition'})` : ''}`);
     const geo = st.geo;
@@ -820,8 +860,8 @@ export function createRuntime(host) {
   }
 
   return {
-    lib, load, compile, setImage, renderAsset, renderClipFrame, renderAudio, callValue, callMotion,
-    has: (ref) => entries.has(ref) || images.has(ref),
+    lib, load, compile, setImage, setSequence, sequenceFramesAt, renderAsset, renderClipFrame, renderAudio, callValue, callMotion,
+    has: (ref) => entries.has(ref) || images.has(ref) || sequences.has(ref),
     definition: (ref) => entry(ref).def,
     clearTextCache: () => lib.text.clearCache(),
   };

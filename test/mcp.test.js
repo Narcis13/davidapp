@@ -10,6 +10,7 @@ import { connect, callTool, inlineFiles } from '../scripts/mcp.mjs';
 import { EASING, DOT, LABEL, TONE } from './helpers.js';
 import { createStudio } from '../src/studio/studio.js';
 import { MOTION_POP, EFFECT_GRAIN, TRANSITION_WIPE, BROKEN } from './fixtures/kinds.js';
+import { BALL } from './fixtures/solid.js';
 
 let client, dataDir;
 const call = (name, args) => callTool(client, name, args);
@@ -29,7 +30,7 @@ test('the server lists its tools with schemas', async () => {
   const names = tools.map((t) => t.name);
   for (const n of ['studio_guide', 'search_assets', 'get_asset', 'validate_asset', 'create_asset', 'update_asset', 'fork_asset', 'create_clip', 'update_clip', 'edit_clip', 'render_asset_frame', 'render_clip_frame', 'start_render', 'get_render', 'cancel_render', 'list_clip_assets', 'frame_hashes', 'reuse_report',
     'list_requests', 'claim_request', 'get_request', 'reply_request', 'propose_asset_version', 'propose_new_asset', 'propose_clip_edit', 'complete_request',
-    'save_defaults', 'create_preset', 'save_precomp', 'set_asset_metadata', 'diff_versions']) assert.ok(names.includes(n), `missing tool ${n}`);
+    'save_defaults', 'create_preset', 'save_precomp', 'set_asset_metadata', 'diff_versions', 'bake_sequence']) assert.ok(names.includes(n), `missing tool ${n}`);
   const create = tools.find((t) => t.name === 'create_asset');
   assert.deepEqual(create.inputSchema.required, ['name', 'source']);
   assert.match((await call('studio_guide')).text, /The frame object `f`[\s\S]*Library now/);
@@ -256,6 +257,20 @@ test('tweak and keep, and the new kinds, over MCP: defaults, presets, metadata, 
   assert.deepEqual(pre.json.params, ['headline']);
   const used = (await call('list_clip_assets', { clip: 'mcp-demo' })).json.assets;
   assert.ok(used.some((a) => a.ref === 'demo-card@1' && a.direct) && used.some((a) => a.ref === 'pop@1' && !a.direct));
+  // 3D, baked once into a sequence and reused
+  assert.ok(!(await call('create_asset', { name: 'ball', source: BALL })).isError);
+  const bake = await call('bake_sequence', { ref: 'ball', name: 'ball-spin', width: 120, height: 120, fps: 10, duration: 1 });
+  assert.ok(!bake.isError, bake.text);
+  assert.equal(bake.json.cached, false);
+  assert.equal(bake.json.bakedFrom, 'ball@1');
+  assert.equal(bake.images.length, 1);
+  const again = await call('bake_sequence', { ref: 'ball', name: 'ball-spin-again', width: 120, height: 120, fps: 10, duration: 1 });
+  assert.equal(again.json.cached, true);
+  assert.equal(again.json.sequence, 'ball-spin@1');
+  assert.deepEqual((await call('search_assets', { type: 'sequence' })).json.assets.map((a) => a.ref), ['ball-spin@1']);
+  const placed = await call('edit_clip', { clip: 'mcp-demo', operations: [{ op: 'add_item', track: 'main', item: { id: 'spin', asset: 'ball-spin', start: 0, duration: 2, params: { loop: true }, transform: { x: 0.8, width: 0.3, height: 0.5 } } }] });
+  assert.ok(!placed.isError, placed.text);
+  assert.equal((await call('render_clip_frame', { clip: 'mcp-demo', t: 1.5 })).images.length, 1);
 });
 
 test('the CLI helper inlines @file: arguments', () => {

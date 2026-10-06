@@ -81,7 +81,7 @@ function normalizeDef(raw, path) {
   if (def.type === 'enum') {
     if (!Array.isArray(def.options) || !def.options.length || !def.options.every((o) => typeof o === 'string')) throw new SchemaError('enum needs options: a non-empty array of strings', path);
   }
-  if (def.type === 'asset' && def.kind !== undefined && !['visual', 'value', 'audio'].includes(def.kind)) throw new SchemaError('kind must be visual, value or audio', path);
+  if (def.type === 'asset' && def.kind !== undefined && !['visual', 'value', 'audio', 'motion', 'transition', 'effect'].includes(def.kind)) throw new SchemaError('kind must be visual, value, audio, motion, transition or effect', path);
   if (def.type === 'array') {
     if (def.of === undefined) throw new SchemaError('array needs "of": the item declaration', path);
     def.of = normalizeDef(def.of, `${path}[]`);

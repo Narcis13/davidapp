@@ -2,14 +2,15 @@
 // them. The HTTP server, the MCP server, the CLI and the tests all go through this.
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync, existsSync, renameSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, renameSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { FORMATS, makeRef } from '../core/engine.js';
+import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { openDb, json } from '../db/db.js';
 import { mapParams } from '../core/schema.js';
 import { WorkerPool } from '../render/pool.js';
 import { ROOT } from '../render/host.js';
-import { mixToWav } from '../render/video.js';
+import { mixToWav, defaultWorkers } from '../render/video.js';
+import { createCanvas, loadImage } from '../render/host.js';
 import { createLibrary, StudioError, SLUG_RE } from './library.js';
 import { createClips } from './clips.js';
 import { createRenders } from './renders.js';
@@ -69,6 +70,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
    * What a worker needs to draw one asset: a saved version (ref) or a draft (source). Assets and
    * images named in the parameters are pinned and bundled too.
    */
+  /** @param {{ ref?: string, source?: string, slug?: string, params?: any }} o */
   async function loadAsset({ ref, source, slug, params = {} }) {
     const extra = [];
     const pin = (schema) => mapParams(schema, params, ['asset', 'image'], (value) => {
@@ -173,6 +175,56 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     return job;
   }
 
+  /**
+   * Bake a visual asset (a 3D scene, anything expensive) into a frame-sequence asset: PNG frames with
+   * a transparent background, rendered in parallel. The bake is cached by asset version, params, size,
+   * fps and duration: asking again returns the sequence already made (cached: true).
+   * @param {{ ref: string, slug: string, params?: any, format?: string, width?: number, height?: number, fps?: number, duration?: number, description?: string, tags?: string[], title?: string, author: string, forClip?: string }} o
+   */
+  async function bakeSequence({ ref, slug, params = {}, format, width, height, fps = 30, duration, description, tags, title, author, forClip }) {
+    const a = await loadAsset({ ref, params });
+    const row = library.requireVersion(a.target);
+    if (row.kind !== 'visual') throw new StudioError(`${a.target} is a ${row.kind} asset; only visual assets bake to frame sequences`);
+    const size = sizeOf({ format, width, height }, a.formats);
+    const d = duration ?? a.natural ?? 3;
+    if (!(fps >= 1 && fps <= 60) || !(d > 0 && d <= 60)) throw new StudioError('fps must be 1–60 and duration 0–60 seconds');
+    const frames = Math.max(1, Math.round(d * fps));
+    const key = sha1(JSON.stringify([ENGINE_VERSION, a.target, a.params, size, fps, d]));
+    const hit = library.sequenceByKey(key);
+    if (hit) return { asset: hit, cached: true, frames };
+    const dir = mkdtempSync(join(dataDir, 'files', '.bake-'));
+    const bakePool = new WorkerPool({ size: defaultWorkers() });
+    const t0 = performance.now();
+    try {
+      let mid = null;
+      await Promise.all(Array.from({ length: frames }, (_, i) => bakePool.run('assetFrame', { ref: a.target, params: a.params, t: i / fps, duration: d, ...size, fps, seed: 1, background: 'rgba(0,0,0,0)', output: 'png' }, { bundle: a.bundle, timeout: 60000 }).then((r) => {
+        const png = Buffer.from(r.png);
+        writeFileSync(join(dir, `${String(i).padStart(6, '0')}.png`), png);
+        if (i === Math.floor(frames / 2)) mid = png;
+      }))).catch(fail);
+      const img = await loadImage(mid);
+      const k = Math.min(1, 640 / Math.max(img.width, img.height));
+      const thumb = createCanvas(Math.round(img.width * k), Math.round(img.height * k));
+      const g = thumb.getContext('2d');
+      g.fillStyle = '#101018';
+      g.fillRect(0, 0, thumb.width, thumb.height);
+      g.drawImage(img, 0, 0, thumb.width, thumb.height);
+      const seconds = Math.round((performance.now() - t0) / 10) / 100;
+      const r = library.addSequence({
+        slug, dir, author, forClip, derivedFrom: a.target, title, thumb: thumb.toBuffer('image/png'),
+        description: description ?? `${frames} frames of ${a.target} at ${size.width}×${size.height}, ${fps} fps, with a transparent background: a baked sequence to use as a layer.`,
+        tags: tags ?? ['sequence', 'baked'],
+        meta: { frames, fps, width: size.width, height: size.height, duration: d, key, bakedFrom: a.target, params: a.params, bakeSeconds: seconds },
+      });
+      return { asset: r.asset, cached: false, frames, seconds };
+    } catch (e) {
+      rmSync(dir, { recursive: true, force: true });
+      throw e;
+    } finally {
+      await bakePool.destroy();
+    }
+  }
+
   /** Write a PNG under the data dir's frames/ folder and return its path. */
   function saveFrame(name, png) {
     const file = join(framesDir, `${name.replace(/[^a-z0-9@._-]+/gi, '_')}.png`);
@@ -186,5 +238,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }
