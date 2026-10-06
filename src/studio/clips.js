@@ -323,8 +323,10 @@ export function createClips(ctx, library) {
   }
 
   /** Replace a clip's composition and/or its title and description. Bumps the revision. @param {string} slug @param {any} [o] */
-  async function updateClip(slug, { title, description, composition, check: doCheck = true, repin, by } = {}) {
+  async function updateClip(slug, { title, description, composition, check: doCheck = true, repin, by, revision: base } = {}) {
     const row = clipRow(slug);
+    // a save made from an older revision (the editor sends the one it loaded) must not overwrite a newer one
+    if (base !== undefined && base !== null && base !== row.revision) throw new StudioError(`Clip "${slug}" is at revision ${row.revision}, not ${base}: it was changed elsewhere. Load it again.`, 'conflict');
     let c = json(row.composition), p = null, checked = null;
     if (composition !== undefined || repin) {
       p = prepare(composition ?? c, { repin });

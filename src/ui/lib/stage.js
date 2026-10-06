@@ -10,7 +10,7 @@ import { fill, fmtTime, h, icon, s } from '/ui/lib/util.js';
 const isTyping = (el) => el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A', 'SUMMARY', 'VIDEO', 'AUDIO'].includes(el.tagName));
 
 /**
- * @param {{ guides?: boolean, onTime?: (t: number) => void, onState?: (playing: boolean) => void }} [o]
+ * @param {{ guides?: boolean, compact?: boolean, onTime?: (t: number) => void, onState?: (playing: boolean) => void }} [o]
  */
 export function createStage({ guides = false, compact = false, onTime = () => {}, onState = () => {} } = {}) {
   let width = 1920, height = 1080, duration = 0, fps = 30, scrubbing = false;
@@ -130,6 +130,8 @@ export function createStage({ guides = false, compact = false, onTime = () => {}
 
   return {
     el, pv, canvas, safeBtn, guidesBtn,
+    /** The element that holds the canvas and its overlays (for layers drawn on top, such as handles). */
+    frame, transport,
     /** The frame size the preview draws at: sets the aspect ratio of the pane and the overlays. */
     setSize(w, hgt) {
       width = w; height = hgt;

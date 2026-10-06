@@ -123,6 +123,7 @@ export function createLibrary(ctx) {
     const forks = q('SELECT a.slug FROM assets a JOIN asset_versions fv ON fv.id = a.forked_from WHERE fv.asset_id = ? ORDER BY a.id').all(row.asset_id);
     return {
       ...summary(row),
+      favorite: !!q('SELECT 1 FROM favorites WHERE asset_id = ?').get(row.asset_id),
       declared: { title: row.title, description: row.description, tags: json(row.tags, []) },
       metadataEdit: row.meta_by ? { by: row.meta_by, at: row.meta_at } : null,
       schema: json(row.schema, {}),

@@ -242,7 +242,8 @@ export function createRuntime(host) {
     let layer = layers[layerIndex];
     if (!layer) {
       const canvas = host.createCanvas(w, h);
-      layer = layers[layerIndex] = { canvas, ctx: track(canvas.getContext('2d')), width: w, height: h };
+      // effects read layers back (getImageData): tell the browser, so it keeps them in CPU memory
+      layer = layers[layerIndex] = { canvas, ctx: track(canvas.getContext('2d', { willReadFrequently: true })), width: w, height: h };
     } else if (layer.width !== w || layer.height !== h) {
       layer.canvas.width = w; layer.canvas.height = h;
       layer.width = w; layer.height = h;

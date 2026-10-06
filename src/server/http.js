@@ -196,7 +196,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       return { ...clip, ...(await clipBundle(clip.composition)) };
     }],
     ['PUT', /^\/api\/clips\/([a-z0-9-]+)$/, async ({ params, data }) => {
-      const r = await clips.updateClip(params[0], { title: data.title, description: data.description, composition: data.composition });
+      const r = await clips.updateClip(params[0], { title: data.title, description: data.description, composition: data.composition, revision: data.revision });
       return { ...r.clip, ...(await clipBundle(r.clip.composition)), checked: r.checked };
     }],
     // every pinned version the saved clip uses (direct and nested), with where each came from

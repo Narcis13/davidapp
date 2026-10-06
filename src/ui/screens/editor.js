@@ -1,21 +1,74 @@
-// Clip editor: preview with scrubbing and overlays, a timeline with draggable items, an inspector
-// with the same generated controls as the playground, and save / render / remix.
+// Clip editor: the preview with on-canvas handles and a format switcher, a timeline with track
+// controls, keyframe markers and waveforms, a layers view, an inspector (timing, layout with
+// keyframes and per-format overrides, parameters, attachments), undo and redo, clipboard, split,
+// the agent panel, and save / render / remix.
 // Edits go to a local draft composition that the preview draws live; changes to the set of assets
 // are pinned and bundled by the server first.
 
+import { FORMAT_NAMES, forFormat } from '/core/transform.js';
+import { mountAgentPanel } from '/ui/lib/agent-panel.js';
 import { api, getStatus, renderQueue } from '/ui/lib/api.js';
-import { openDialog } from '/ui/lib/dialog.js';
-import { createParamControls } from '/ui/lib/params.js';
+import { confirmDialog, openDialog } from '/ui/lib/dialog.js';
+import { createCanvasHandles } from '/ui/lib/canvas-handles.js';
+import { createHistory } from '/ui/lib/history.js';
+import { attachmentsSection, itemTime, keyMarks, keyframesSection, paramsSection, prune, sampled, setProp, transformSection } from '/ui/lib/inspector.js';
+import { live as liveEvents } from '/ui/lib/live.js';
 import { pickAsset } from '/ui/lib/picker.js';
 import { createStage } from '/ui/lib/stage.js';
 import { createTimeline } from '/ui/lib/timeline.js';
-import { assetHref, clamp, clone, errorBlock, fill, fmtDuration, h, icon, nextId, notice, plural, splitRef } from '/ui/lib/util.js';
+import { loadPeaks } from '/ui/lib/waveform.js';
+import { assetHref, clamp, clone, errorBlock, fill, fmtDuration, fmtTime, h, icon, nextId, notice, plural, splitRef } from '/ui/lib/util.js';
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,63}$/;
 const RELATION = { created: 'created here', reused: 'reused', 'new-version': 'new version', library: 'library' };
+const FORMAT_LABEL = { vertical: 'Vertical', horizontal: 'Horizontal', square: 'Square' };
 const round = (v) => Math.round(v * 1000) / 1000;
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const MOD = isMac ? '⌘' : 'Ctrl+';
+const OPEN_CLIP_KEY = 'fablecut.openClip';
+
+const SHORTCUTS = [
+  ['Space', 'Play or pause'],
+  ['← / →', 'One frame back or forward'],
+  ['S', 'Split the selected items at the playhead'],
+  [`${MOD}Z`, 'Undo'],
+  [isMac ? '⇧⌘Z' : 'Ctrl+Shift+Z or Ctrl+Y', 'Redo'],
+  [`${MOD}C`, 'Copy the selected items'],
+  [`${MOD}V`, 'Paste at the playhead'],
+  [`${MOD}D`, 'Duplicate the selected items'],
+  ['Delete or Backspace', 'Delete the selected items'],
+  ['Shift or ⌘ click', 'Add an item to the selection'],
+  ['Escape', 'Clear the selection'],
+  ['Arrow keys on the preview', 'Nudge the selected layer one pixel (Shift: ten)'],
+  ['Shift while dragging a corner', 'Keep the proportions'],
+  ['Shift while rotating', 'Rotate in 15° steps'],
+  ['Shift while moving on the preview', 'Move along one axis'],
+  ['Alt while dragging', 'Do not snap'],
+  ['↑ / ↓ on a track handle', 'Move the track forward or back'],
+  ['Alt+↑ / Alt+↓ on a layer', 'Move the layer forward or back'],
+  ['?', 'This list'],
+];
 
 const hasRefParams = (schema) => Object.values(schema ?? {}).some((d) => d.type === 'asset' || d.type === 'image' || ((d.type === 'array' || d.type === 'object') && /"type":"(asset|image)"/.test(JSON.stringify(d))));
+const isTyping = (el) => el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+
+/** Every asset reference a composition draws with (items, attachments, easing, refs in params). */
+function refsOf(comp) {
+  const refs = new Set();
+  const att = (a) => { if (a?.asset) refs.add(a.asset); for (const m of JSON.stringify(a?.params ?? {}).matchAll(/"([a-z0-9][a-z0-9-]*@\d+)"/g)) refs.add(m[1]); };
+  for (const a of comp.effects ?? []) att(a);
+  if (comp.easing) refs.add(comp.easing);
+  for (const tr of comp.tracks) {
+    for (const a of tr.effects ?? []) att(a);
+    for (const it of tr.items) {
+      att(it);
+      for (const a of [...(it.motions ?? []), ...(it.effects ?? []), it.mask, it.transition]) if (a) att(a);
+      for (const o of Object.values(it.formats ?? {})) att({ params: o.params });
+    }
+  }
+  return refs;
+}
+const needsEasing = (comp) => !comp.easing && /"ease":"(?!linear"|hold")/.test(JSON.stringify(comp.tracks));
 
 export async function mount(view, ctx) {
   const slug = ctx.params[0];
@@ -32,7 +85,12 @@ export async function mount(view, ctx) {
 
   let draft = clone(clip.composition);
   let bundle = clip.bundle, beats = clip.beats, info = clip.assets;
-  let selected = null, selectedTrack = null, dirty = false, busy = false;
+  let bundled = refsOf(draft);
+  let fmt = draft.format;
+  let sel = { ids: [], primary: null, track: null };
+  let dirty = false, busy = false, saving = false, pendingRevision = 0, keptRevision = 0;
+  let proposal = null, showProposal = false;
+  let clipboard = [];
 
   const msg = notice('editor-error');
   const unsaved = h('span.badge.warn', { hidden: true, 'data-testid': 'unsaved' }, 'Unsaved changes');
@@ -45,15 +103,95 @@ export async function mount(view, ctx) {
   const addBtn = h('button.btn.small', { type: 'button', 'data-testid': 'add-item' }, icon('plus', 14), 'Add item');
   const inspector = h('section.panel.inspector', { 'data-testid': 'inspector' });
   const assetsPanel = h('section.panel', { 'data-testid': 'clip-assets' }, h('h2', 'Assets in this clip'));
+  const layersList = h('ol.layers', { 'data-testid': 'layers-list' });
+  const layersPanel = h('section.panel.layers-panel', { 'data-testid': 'layers-panel' }, h('div.panel-head', h('h2', 'Layers at the playhead'), h('span.count', { 'data-testid': 'layers-count' })), layersList);
+  const agentBox = h('div.ed-agent');
+  const changedBanner = h('div.notice.info.clip-changed', { hidden: true, 'data-testid': 'clip-changed', role: 'status' });
+
+  // edit toolbar
+  const tool = (testid, label, iconText, title) => h('button.btn.small.ed-tool', { type: 'button', 'data-testid': testid, title, 'aria-label': label }, iconText ? h('span.ed-glyph', { 'aria-hidden': 'true' }, iconText) : null, h('span.ed-tool-label', label));
+  const undoBtn = tool('undo', 'Undo', '↶', `Undo (${MOD}Z)`);
+  const redoBtn = tool('redo', 'Redo', '↷', `Redo (${isMac ? '⇧⌘Z' : 'Ctrl+Y'})`);
+  const splitBtn = tool('split', 'Split', '✂', 'Split at the playhead (S)');
+  const copyBtn = tool('copy', 'Copy', null, `Copy (${MOD}C)`);
+  const pasteBtn = tool('paste', 'Paste', null, `Paste at the playhead (${MOD}V)`);
+  const dupBtn = tool('duplicate', 'Duplicate', null, `Duplicate (${MOD}D)`);
+  const keysBtn = h('button.btn.small.ed-tool', { type: 'button', 'data-testid': 'shortcuts', title: 'Keyboard shortcuts (?)', 'aria-label': 'Keyboard shortcuts' }, '?');
+  undoBtn.disabled = true; redoBtn.disabled = true;
+  const history = createHistory({ onChange(s) { undoBtn.disabled = !s.canUndo; redoBtn.disabled = !s.canRedo; } });
+
+  // format switcher
+  const fmtLabel = h('span.fmt-label', { 'data-testid': 'layout-format' });
+  const fmtBtns = FORMAT_NAMES.map((name) => {
+    const b = h('button.btn.small.toggle', { type: 'button', 'data-testid': `format-${name}`, 'data-format': name }, FORMAT_LABEL[name]);
+    b.addEventListener('click', () => setFormat(name));
+    return b;
+  });
+  const proposalBar = h('div.proposal-bar', { hidden: true, 'data-testid': 'proposal-bar' });
+  const frameLabel = h('div.frame-label', { hidden: true, 'data-testid': 'proposal-label' }, 'Proposal');
 
   const position = h('span.timecode', { 'data-testid': 'tl-position' });
   const showPosition = (t) => { position.textContent = `frame ${Math.round(t * draft.fps)} of ${Math.round(draft.duration * draft.fps)} · ${draft.fps} fps`; };
-  const stage = createStage({ guides: true, compact: true, onTime(t) { timeline.setTime(t, stage.pv.playing); showPosition(t); } });
-  ctx.onCleanup(() => stage.destroy());
+
+  let rafSync = 0, lastStored = 0;
+  const stage = createStage({
+    guides: true, compact: true,
+    onTime(t) {
+      timeline.setTime(t, stage.pv.playing);
+      showPosition(t);
+      cancelAnimationFrame(rafSync);
+      rafSync = requestAnimationFrame(() => { handles.redraw(); syncInspector(); drawLayers(); });
+      if (performance.now() - lastStored > 1000) remember();
+    },
+  });
+  ctx.onCleanup(() => { cancelAnimationFrame(rafSync); stage.destroy(); });
+  stage.frame.append(frameLabel);
+  const time = () => stage.pv.time;
+
   const timeline = createTimeline({
     onSeek(t) { stage.pv.pause(); stage.pv.seek(t); },
-    onSelect(itemId, trackId) { selected = itemId; selectedTrack = trackId; drawInspector(); },
-    onChange(itemId) { if (itemId === selected) syncTiming(); live(); },
+    onSelect(ids, primary, trackId) { select(ids, primary, trackId, 'timeline'); },
+    onBegin(key) { history.checkpoint(draft, key); },
+    onChange(itemId, patch, done) {
+      if (sel.primary === itemId) syncTiming();
+      live({ timeline: false });
+      if (done) { history.seal(); drawLayers(); }
+    },
+    onMoveItem(itemId, trackId) {
+      const f = findItem(itemId), to = draft.tracks.find((t) => t.id === trackId);
+      if (!f || !to) return;
+      f.track.items.splice(f.track.items.indexOf(f.item), 1);
+      to.items.push(f.item);
+      history.seal();
+      sel.track = trackId;
+      live();
+      drawInspector();
+    },
+    onTrack(trackId, patch) {
+      edit(`track:${trackId}:${Object.keys(patch).join()}`, (c) => {
+        const t = c.tracks.find((x) => x.id === trackId);
+        if (!t) return;
+        for (const [k, v] of Object.entries(patch)) { if (k === 'name') t.name = v; else if (v) t[k] = true; else delete t[k]; }
+      }, { inspector: 'redraw' });
+      if ('muted' in patch || ('solo' in patch && draft.tracks.find((t) => t.id === trackId)?.type === 'audio')) msg.show('Mute and solo on audio tracks are heard in the preview after saving.', 'info');
+    },
+    onReorderTracks(ids) {
+      edit('tracks-order', (c) => { c.tracks = ids.map((id) => c.tracks.find((t) => t.id === id)).filter(Boolean); });
+    },
+    onAddTrack(type) {
+      let id = type, n = 1;
+      while (draft.tracks.some((t) => t.id === id)) id = `${type}-${++n}`;
+      edit('track-add', (c) => { c.tracks.push({ id, name: `${type[0].toUpperCase()}${type.slice(1)} ${n}`, type, items: [] }); });
+      select([], null, id);
+    },
+    async onDeleteTrack(trackId) {
+      const t = draft.tracks.find((x) => x.id === trackId);
+      if (!t || t.locked) return;
+      if (t.items.length && !(await confirmDialog(`Delete the track "${t.name ?? t.id}" and its ${plural(t.items.length, 'item')}?`, { ok: 'Delete', title: 'Delete track' }))) return;
+      edit('track-del', (c) => { c.tracks = c.tracks.filter((x) => x.id !== trackId); });
+      select(sel.ids.filter((id) => findItem(id)), null, null);
+    },
+    keyframesOf: (item) => keyMarks(item, fmt),
   });
   ctx.onCleanup(() => timeline.destroy());
   ctx.setGuard(() => (dirty ? 'This clip has unsaved changes. Leave without saving?' : null));
@@ -62,49 +200,182 @@ export async function mount(view, ctx) {
     for (const track of comp.tracks) { const item = track.items.find((i) => i.id === id); if (item) return { track, item }; }
     return null;
   };
+  const allIds = () => new Set(draft.tracks.flatMap((t) => t.items.map((i) => i.id)));
+  const freeId = (base, taken = allIds()) => { let id = base, n = 2; while (taken.has(id)) id = `${base}-${n++}`; taken.add(id); return id; };
+  const formatSize = (name) => status.formats[name] ?? { width: draft.width, height: draft.height };
+  /** The composition as the preview draws it: the draft in the format being laid out. */
+  const viewOf = (comp) => (fmt === comp.format || !status.formats[fmt] ? comp : { ...comp, format: fmt, width: formatSize(fmt).width, height: formatSize(fmt).height });
+  const viewSize = () => { const v = viewOf(draft); return { width: v.width, height: v.height }; };
 
+  // ── on-canvas handles ────────────────────────────────────────────────────────────────────
+  /** Visual items drawn at the playhead, front to back. */
+  function activeLayers() {
+    const t = time();
+    const solo = draft.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
+    const out = [];
+    for (const track of draft.tracks) {
+      if (track.type === 'audio' || track.hidden || (solo && !track.solo)) continue;
+      for (const item of track.items) {
+        if (!(t >= item.start - 1e-6 && t < item.start + item.duration - 1e-6) || forFormat(item, fmt).hidden) continue;
+        out.push({ id: item.id, item, track, transform: sampled(item, fmt, itemTime(item, t)).transform, editable: !track.locked });
+      }
+    }
+    return out.reverse();
+  }
+  const handles = createCanvasHandles({
+    host: stage.frame,
+    size: viewSize,
+    layers: activeLayers,
+    selection: () => ({ ids: new Set(sel.ids), primary: sel.primary }),
+    onSelect(id, additive) {
+      if (!id) { select([], null, sel.track, 'canvas'); return; }
+      if (additive) {
+        const ids = sel.ids.includes(id) ? sel.ids.filter((x) => x !== id) : [...sel.ids, id];
+        select(ids, ids.includes(id) ? id : ids[ids.length - 1] ?? null, undefined, 'canvas');
+      } else select([id], id, undefined, 'canvas');
+    },
+    onTransform(id, patch, { begin, done }) {
+      const f = findItem(id);
+      if (!f || f.track.locked) return;
+      if (begin) history.checkpoint(draft, `canvas:${id}:${performance.now()}`);
+      const lt = itemTime(f.item, time());
+      for (const [k, v] of Object.entries(patch)) setProp(f.item, fmt, draft.format, k, v, lt);
+      live({ timeline: done, handles: false });
+      if (done) history.seal();
+    },
+  });
+  ctx.onCleanup(() => handles.destroy());
+
+  // ── state changes ────────────────────────────────────────────────────────────────────────
   function setDirty(on) { dirty = on; unsaved.hidden = !on; if (on) saved.hidden = true; saveBtn.disabled = !on || busy; }
   function setBusy(on) { busy = on; saveBtn.disabled = !dirty || on; renderBtn.disabled = on; remixBtn.disabled = on; addBtn.disabled = on; }
-  /** A change the loaded bundle can draw as it is: timing, fades, plain parameters. */
-  function live() { setDirty(true); stage.pv.setComposition(draft); }
+
+  /** The draft changed and the loaded bundle can draw it: show it everywhere. */
+  function live({ timeline: tl = true, handles: hd = true, inspector: insp = 'sync' } = {}) {
+    setDirty(true);
+    if (!showProposal) stage.pv.setComposition(viewOf(draft));
+    if (tl) timeline.refresh();
+    if (hd) handles.redraw();
+    if (insp === 'redraw') drawInspector(); else if (insp === 'sync') syncInspector();
+    drawLayers();
+  }
+
+  /**
+   * One edit of the draft: a checkpoint for undo, the change, then either a live redraw or (when
+   * the edit needs assets the bundle does not have) a round trip to the server for a new bundle.
+   */
+  function edit(key, mutate, { structural = false, inspector: insp = 'sync' } = {}) {
+    if (showProposal) return;
+    const before = JSON.stringify(draft);
+    const took = history.checkpoint(draft, key);
+    mutate(draft);
+    if (JSON.stringify(draft) === before) { if (took) history.discard(); return; }
+    if (structural || needsBundle(draft)) {
+      const next = draft;
+      draft = JSON.parse(before);
+      rebundle(next).then((ok) => { if (!ok && took) history.discard(); });
+      return;
+    }
+    live({ inspector: insp });
+  }
+  /** An inspector edit of the item it shows. */
+  const commitItem = (id) => (key, fn, o = {}) => edit(key, (c) => { const f = findItem(id, c); if (f && !f.track.locked) fn(f.item); }, o);
+
+  function needsBundle(comp) {
+    for (const r of refsOf(comp)) if (!bundled.has(r) || !/@\d+$/.test(r)) return true;
+    return needsEasing(comp);
+  }
+
+  /** Replace the whole draft (undo, redo): bundle again only if its assets changed. */
+  async function replaceDraft(next) {
+    if (needsBundle(next)) { await rebundle(next); return; }
+    draft = next;
+    selectionStillThere();
+    timeline.setData({ composition: draft, beats });
+    live({ inspector: 'redraw' });
+  }
+
+  function selectionStillThere() {
+    const ids = sel.ids.filter((id) => findItem(id));
+    sel = { ids, primary: ids.includes(sel.primary) ? sel.primary : ids[ids.length - 1] ?? null, track: draft.tracks.some((t) => t.id === sel.track) ? sel.track : null };
+    timeline.setSelected(sel.ids, sel.primary, sel.track);
+  }
+
+  function select(ids, primary, trackId, from) {
+    sel = { ids: [...ids], primary, track: trackId === undefined ? (primary ? findItem(primary)?.track.id ?? sel.track : sel.track) : trackId };
+    if (from !== 'timeline') timeline.setSelected(sel.ids, sel.primary, sel.track);
+    handles.redraw();
+    drawLayers();
+    drawInspector();
+    updateTools();
+  }
+
+  function updateTools() {
+    const any = sel.ids.length > 0;
+    for (const b of [copyBtn, dupBtn, splitBtn]) b.disabled = !any || showProposal;
+    pasteBtn.disabled = !clipboard.length || showProposal;
+  }
 
   function drawMeta() {
-    fill(meta, 
+    fill(meta,
       h('span.ref', clip.slug), ' · ', status.formats[draft.format]?.label ?? 'Custom size', ` · ${draft.width}×${draft.height} · ${fmtDuration(draft.duration)} · ${draft.fps} fps · `,
       h('span', { 'data-testid': 'revision' }, `revision ${clip.revision}`),
       clip.remixedFrom ? [' · remix of ', h('a', { href: `/clips/${clip.remixedFrom}` }, clip.remixedFrom)] : null);
   }
 
+  function drawFormat() {
+    const override = fmt !== draft.format;
+    fill(fmtLabel, `Laying out: ${FORMAT_LABEL[fmt] ?? 'Custom'}`, override ? h('span.fmt-ovr', ' (override)') : null);
+    for (const b of fmtBtns) { const on = b.dataset.format === fmt; b.dataset.active = String(on); b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); }
+  }
+
+  async function setFormat(name) {
+    if (name === fmt) return;
+    fmt = name;
+    drawFormat();
+    const v = viewSize();
+    stage.setSize(v.width, v.height);
+    if (showProposal && proposal) await showProposalView();
+    else stage.pv.setComposition(viewOf(draft));
+    timeline.refresh();
+    handles.redraw();
+    drawInspector();
+  }
+
   async function showClip() {
-    stage.setSize(draft.width, draft.height);
+    const v = viewSize();
+    stage.setSize(v.width, v.height);
     stage.setDuration(draft.duration, draft.fps);
     const hasAudio = clip.composition.tracks.some((t) => t.type === 'audio' && t.items.length);
-    await stage.show((pv) => pv.showClip({ composition: draft, bundle, audioUrl: hasAudio ? `/api/clips/${slug}/audio.wav?r=${clip.revision}` : null }));
+    const audioUrl = hasAudio ? `/api/clips/${slug}/audio.wav?r=${clip.revision}` : null;
+    await stage.show((pv) => pv.showClip({ composition: viewOf(draft), bundle, audioUrl }));
     timeline.setTime(stage.pv.time);
+    handles.redraw();
+    if (audioUrl) loadPeaks(audioUrl).then((p) => { if (ctx.alive() && p) timeline.setPeaks(p); });
   }
 
   /** Take a pinned composition, its bundle and asset facts from the server. */
   function adopt(r) {
     draft = clone(r.composition);
     bundle = r.bundle; beats = r.beats; info = r.assets;
-    if (selected && !findItem(selected)) selected = null;
-    if (selectedTrack && !draft.tracks.some((t) => t.id === selectedTrack)) selectedTrack = null;
+    bundled = refsOf(draft);
+    if (!FORMAT_NAMES.includes(fmt)) fmt = draft.format;
+    selectionStillThere();
     timeline.setData({ composition: draft, beats });
-    timeline.setSelected(selected, selected ? undefined : selectedTrack);
   }
 
   /** The set of assets changed: have the server pin and bundle `next`, then show it. */
-  async function rebundle(next, select) {
+  async function rebundle(next, select2) {
     msg.hide();
     setBusy(true);
     try {
       const r = await api.post(`/api/clips/${slug}/bundle`, { composition: next });
       if (!ctx.alive()) return false;
-      if (select !== undefined) selected = select;
+      if (select2 !== undefined) sel = { ids: [select2], primary: select2, track: sel.track };
       adopt(r);
       setDirty(true);
       await showClip();
-      drawInspector();
+      drawInspector(); drawLayers();
       return true;
     } catch (e) {
       msg.show(e.message);
@@ -118,24 +389,184 @@ export async function mount(view, ctx) {
   async function save() {
     msg.hide();
     setBusy(true);
+    saving = true;
     try {
-      const r = await api.put(`/api/clips/${slug}`, { composition: draft });
+      const r = await api.put(`/api/clips/${slug}`, { composition: draft, revision: clip.revision });
       if (!ctx.alive()) return false;
       clip = r;
       adopt(r);
       setDirty(false);
-      drawMeta(); drawAssets(); drawInspector();
+      drawMeta(); drawAssets(); drawInspector(); drawLayers();
       await showClip();
       saved.textContent = `Saved as revision ${clip.revision}`;
       saved.hidden = false;
+      hideChanged();
       return true;
     } catch (e) {
-      msg.show(e.message);
+      if (e.status === 409) showChanged(pendingRevision || clip.revision + 1, e.message);
+      else msg.show(e.message);
       return false;
     } finally {
+      saving = false;
       setBusy(false);
+      if (pendingRevision > clip.revision) onRevision(pendingRevision);
     }
   }
+
+  /** Load the saved clip again (after a change elsewhere, or an accepted proposal). */
+  async function reload() {
+    let r;
+    try { r = await api.get(`/api/clips/${slug}`); } catch (e) { msg.show(e.message); return; }
+    if (!ctx.alive()) return;
+    clip = r;
+    adopt(r);
+    history.clear();
+    setDirty(false);
+    hideChanged();
+    drawMeta(); drawAssets(); drawInspector(); drawLayers(); drawFormat();
+    await showClip();
+  }
+
+  // ── changes made elsewhere (live) ────────────────────────────────────────────────────────
+  function showChanged(revision, detail) {
+    const reloadBtn = h('button.btn.small', { type: 'button', 'data-testid': 'clip-reload' }, 'Reload');
+    const keepBtn = h('button.btn.small', { type: 'button', 'data-testid': 'clip-keep' }, 'Keep mine');
+    reloadBtn.addEventListener('click', () => reload());
+    keepBtn.addEventListener('click', () => { keptRevision = revision; clip.revision = Math.max(clip.revision, revision); drawMeta(); hideChanged(); });
+    fill(changedBanner, h('span', `This clip was changed elsewhere (revision ${revision}).`, detail ? h('span.muted', ` ${detail}`) : null), h('span.row', reloadBtn, keepBtn));
+    changedBanner.hidden = false;
+  }
+  function hideChanged() { changedBanner.hidden = true; changedBanner.replaceChildren(); }
+  function onRevision(revision) {
+    if (revision <= clip.revision || revision <= keptRevision) return;
+    if (saving) { pendingRevision = Math.max(pendingRevision, revision); return; }
+    pendingRevision = 0;
+    if (!dirty) reload(); else showChanged(revision);
+  }
+  ctx.onCleanup(liveEvents.on('clip', (e) => {
+    if (e.key === slug && Number(e.data?.revision) > 0) onRevision(Number(e.data.revision));
+  }));
+
+  // ── the open clip, for the library's "add to the open clip" ──────────────────────────────
+  function remember() {
+    lastStored = performance.now();
+    try { localStorage.setItem(OPEN_CLIP_KEY, JSON.stringify({ slug, at: round(time()) })); } catch { /* storage may be unavailable */ }
+  }
+
+  // ── toolbar actions ──────────────────────────────────────────────────────────────────────
+  async function undo() { const prev = history.undo(draft); if (prev) await replaceDraft(prev); }
+  async function redo() { const next = history.redo(draft); if (next) await replaceDraft(next); }
+  const editable = (id) => { const f = findItem(id); return f && !f.track.locked ? f : null; };
+
+  function copy() {
+    clipboard = sel.ids.map((id) => findItem(id)).filter(Boolean).map((f) => ({ track: f.track.id, type: f.track.type, item: clone(f.item) }));
+    updateTools();
+    if (clipboard.length) msg.show(`Copied ${plural(clipboard.length, 'item')}.`, 'ok');
+  }
+
+  function paste() {
+    if (!clipboard.length) return;
+    const t0 = Math.min(...clipboard.map((c) => c.item.start));
+    const at = time();
+    const taken = allIds();
+    const added = [];
+    edit('paste', (c) => {
+      for (const entry of clipboard) {
+        const ok = (t) => t && !t.locked && (t.type === 'audio') === (entry.type === 'audio');
+        let track = c.tracks.find((t) => t.id === entry.track);
+        if (!ok(track)) track = c.tracks.find((t) => t.id === sel.track && ok(t)) ?? c.tracks.find(ok);
+        if (!track) { track = { id: freeId(entry.type === 'audio' ? 'audio' : 'visual', new Set(c.tracks.map((t) => t.id))), type: entry.type, items: [] }; c.tracks.push(track); }
+        const item = clone(entry.item);
+        item.id = freeId(`${entry.item.id}-copy`, taken);
+        item.duration = round(Math.min(item.duration, c.duration));
+        item.start = round(clamp(at + item.start - t0, 0, c.duration - item.duration));
+        track.items.push(item);
+        added.push(item.id);
+      }
+    }, { inspector: 'none' });
+    select(added, added[added.length - 1] ?? null);
+  }
+
+  function duplicate() {
+    const taken = allIds();
+    const added = [];
+    edit('duplicate', (c) => {
+      for (const id of sel.ids) {
+        const f = findItem(id, c);
+        if (!f || f.track.locked) continue;
+        const copyItem = { ...clone(f.item), id: freeId(`${id}-copy`, taken) };
+        const after = round(f.item.start + f.item.duration);
+        if (after + f.item.duration <= c.duration + 1e-6) copyItem.start = after;
+        f.track.items.splice(f.track.items.indexOf(f.item) + 1, 0, copyItem);
+        added.push(copyItem.id);
+      }
+    }, { inspector: 'none' });
+    if (added.length) select(added, added[added.length - 1]);
+  }
+
+  function removeSelected() {
+    const ids = sel.ids.filter((id) => editable(id));
+    if (!ids.length) return;
+    edit('delete', (c) => { for (const id of ids) { const f = findItem(id, c); if (f) f.track.items.splice(f.track.items.indexOf(f.item), 1); } }, { inspector: 'none' });
+    select([], null, sel.track);
+  }
+
+  /** Split at the playhead exactly like the server's split_item: the second part continues the asset. */
+  function split() {
+    const at = round(time());
+    const targets = sel.ids.map((id) => editable(id)).filter((f) => f && at > f.item.start + 1e-6 && at < f.item.start + f.item.duration - 1e-6);
+    if (!targets.length) { msg.show(sel.ids.length ? 'The playhead is not inside the selected items.' : 'Select an item under the playhead to split it.', 'info'); return; }
+    msg.hide();
+    const taken = allIds();
+    const seconds = [];
+    edit('split', (c) => {
+      for (const { item: orig } of targets) {
+        const f = findItem(orig.id, c);
+        const it = f.item;
+        const offset = it.offset ?? 0;
+        const whole = it.assetDuration ?? offset + it.duration;
+        const cut = round(at - it.start);
+        const second = { ...clone(it), id: freeId(`${it.id}-b`, taken), start: at, duration: round(it.duration - cut), offset: round(offset + cut), assetDuration: whole };
+        delete second.fadeIn;
+        Object.assign(it, { duration: cut, assetDuration: whole });
+        delete it.fadeOut;
+        f.track.items.splice(f.track.items.indexOf(it) + 1, 0, second);
+        seconds.push(second.id);
+      }
+    }, { inspector: 'none' });
+    select(seconds, seconds[seconds.length - 1]);
+  }
+
+  function shortcutsSheet() {
+    if (document.querySelector('dialog[open]')) return;
+    openDialog({ title: 'Keyboard shortcuts', testid: 'shortcuts-sheet', body: h('dl.shortcut-list', SHORTCUTS.map(([k, what]) => [h('dt', h('kbd', k)), h('dd', what)])) });
+  }
+
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+  splitBtn.addEventListener('click', split);
+  copyBtn.addEventListener('click', copy);
+  pasteBtn.addEventListener('click', paste);
+  dupBtn.addEventListener('click', duplicate);
+  keysBtn.addEventListener('click', shortcutsSheet);
+
+  const onKey = (e) => {
+    if (e.defaultPrevented || document.querySelector('dialog[open]') || isTyping(e.target)) return;
+    const mod = e.metaKey || e.ctrlKey;
+    const k = e.key.toLowerCase();
+    if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+    else if (mod && k === 'y') { e.preventDefault(); redo(); }
+    else if (mod && k === 'c') { if (sel.ids.length && !getSelection()?.toString()) { e.preventDefault(); copy(); } }
+    else if (mod && k === 'v') { if (clipboard.length) { e.preventDefault(); paste(); } }
+    else if (mod && k === 'd') { e.preventDefault(); duplicate(); }
+    else if (mod || e.altKey) return;
+    else if (e.key === 'Delete' || e.key === 'Backspace') { if (sel.ids.length) { e.preventDefault(); removeSelected(); } }
+    else if (k === 's') { e.preventDefault(); split(); }
+    else if (e.key === '?') { e.preventDefault(); shortcutsSheet(); }
+    else if (e.key === 'Escape' && sel.ids.length) { select([], null, sel.track); }
+  };
+  document.addEventListener('keydown', onKey);
+  ctx.onCleanup(() => document.removeEventListener('keydown', onKey));
 
   saveBtn.addEventListener('click', save);
   renderBtn.addEventListener('click', async () => {
@@ -188,8 +619,8 @@ export async function mount(view, ctx) {
     if (!picked || !ctx.alive()) return;
     const next = clone(draft);
     const audio = picked.kind === 'audio';
-    const fits = (t) => (t.type === 'audio') === audio;
-    let track = next.tracks.find((t) => t.id === selectedTrack && fits(t)) ?? (audio ? next.tracks.find(fits) : [...next.tracks].reverse().find(fits));
+    const fits = (t) => (t.type === 'audio') === audio && !t.locked;
+    let track = next.tracks.find((t) => t.id === sel.track && fits(t)) ?? (audio ? next.tracks.find(fits) : [...next.tracks].reverse().find(fits));
     if (!track) {
       const base = audio ? 'audio' : 'visual';
       let id = base, n = 1;
@@ -201,20 +632,102 @@ export async function mount(view, ctx) {
     let id = picked.slug, n = 1;
     while (ids.has(id)) id = `${picked.slug}-${++n}`;
     const duration = round(Math.min(picked.duration ?? 3, next.duration));
-    const start = round(clamp(Math.round(stage.pv.time / 0.05) * 0.05, 0, next.duration - duration));
+    const start = round(clamp(Math.round(time() / 0.05) * 0.05, 0, next.duration - duration));
     track.items.push({ id, asset: picked.ref, start, duration, params: {} });
-    selectedTrack = track.id;
-    await rebundle(next, id);
+    sel.track = track.id;
+    history.checkpoint(draft, 'add-item');
+    if (!(await rebundle(next, id))) history.discard();
+    else timeline.setSelected([id], id, track.id);
   });
+
+  // ── layers view ──────────────────────────────────────────────────────────────────────────
+  let layersKey = '';
+  function drawLayers(force = false) {
+    const list = activeLayers();
+    const key = JSON.stringify([list.map((l) => [l.id, l.editable, l.track.name]), sel.ids, sel.primary, info && Object.keys(info).length]);
+    if (!force && key === layersKey) return;
+    layersKey = key;
+    layersPanel.querySelector('[data-testid=layers-count]').textContent = plural(list.length, 'layer');
+    fill(layersList, list.length ? list.map((L, i) => {
+      const a = info[L.item.asset];
+      const row = h(`li.layer-row${sel.ids.includes(L.id) ? '.selected' : ''}${L.editable ? '' : '.locked'}`, { 'data-testid': 'layer-row', 'data-id': L.id, tabIndex: 0, role: 'button', 'aria-pressed': String(sel.ids.includes(L.id)), 'aria-label': `${L.item.label ?? a?.title ?? L.item.asset}, layer ${i + 1} from the front` },
+        h('span.layer-grip', { 'aria-hidden': 'true' }, '⋮⋮'),
+        h('span.layer-thumb', a?.thumb ? h('img', { src: `/media/${a.thumb}`, alt: '', loading: 'lazy' }) : null),
+        h('span.layer-text', h('b', L.item.label ?? a?.title ?? splitRef(L.item.asset).slug), h('span.ref', `${L.id} · ${L.track.name ?? L.track.id}`)));
+      row.addEventListener('pointerdown', (e) => layerDrag(e, L, row, list));
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select([L.id], L.id); }
+        else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+          e.preventDefault();
+          const j = i + (e.key === 'ArrowUp' ? -1 : 1);
+          if (list[j]) moveLayer(L.id, list[j].id, e.key === 'ArrowUp');
+        }
+      });
+      return row;
+    }) : h('li.muted.layers-empty', 'Nothing is drawn at the playhead.'));
+  }
+
+  /** Put layer `id` just in front of (or behind) layer `target`: same track or the target's. */
+  function moveLayer(id, target, front) {
+    const a = findItem(id), b = findItem(target);
+    if (!a || !b || a.track.locked || b.track.locked) return;
+    edit('layers', (c) => {
+      const A = findItem(id, c), B = findItem(target, c);
+      A.track.items.splice(A.track.items.indexOf(A.item), 1);
+      const idx = B.track.items.indexOf(B.item);
+      B.track.items.splice(front ? idx + 1 : idx, 0, A.item);
+    });
+    drawLayers(true);
+    requestAnimationFrame(() => layersList.querySelector(`[data-id="${CSS.escape(id)}"]`)?.focus());
+  }
+
+  function layerDrag(e, L, row, list) {
+    if (e.button !== undefined && e.button > 0) return;
+    const y0 = e.clientY;
+    let moved = false, over = null;
+    const rowsEls = [...layersList.querySelectorAll('.layer-row')];
+    const move = (ev) => {
+      if (!moved && Math.abs(ev.clientY - y0) < 4) return;
+      if (!L.editable) return;
+      moved = true;
+      row.classList.add('dragging');
+      row.style.transform = `translateY(${ev.clientY - y0}px)`;
+      over = null;
+      for (const [i, r] of rowsEls.entries()) {
+        const b = r.getBoundingClientRect();
+        r.classList.remove('drop-above', 'drop-below');
+        if (r !== row && ev.clientY >= b.top && ev.clientY < b.bottom) { over = { i, above: ev.clientY < b.top + b.height / 2 }; r.classList.add(over.above ? 'drop-above' : 'drop-below'); }
+      }
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      row.classList.remove('dragging');
+      row.style.transform = '';
+      for (const r of rowsEls) r.classList.remove('drop-above', 'drop-below');
+      if (!moved) { select([L.id], L.id); return; }
+      // the list runs front to back: dropping above a row puts the layer in front of it
+      if (over) moveLayer(L.id, list[over.i].id, over.above);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }
 
   // ── inspector ────────────────────────────────────────────────────────────────────────────
   let timing = null;   // the inputs that mirror a drag on the timeline
+  let sections = [];   // { sync() } of the sections on screen
 
   function syncTiming() {
-    const found = selected ? findItem(selected) : null;
+    const found = sel.primary ? findItem(sel.primary) : null;
     if (!found || !timing) return;
     timing.start.value = String(found.item.start);
     timing.duration.value = String(found.item.duration);
+  }
+  function syncInspector() {
+    for (const s of sections) s.sync();
+    drawOverrideState();
   }
 
   function numField(label, testid, value, { min, max, step, slider = false }, apply) {
@@ -240,108 +753,143 @@ export async function mount(view, ctx) {
   }
 
   function drawClipSettings() {
-    timing = null;
+    timing = null; sections = [];
     const end = Math.max(0.1, ...draft.tracks.flatMap((t) => t.items.map((i) => i.start + i.duration)));
     const duration = numField('Clip duration in seconds', 'clip-duration', draft.duration, { min: Math.ceil(end * 100) / 100, max: 120, step: 0.5 }, (v) => {
       if (v === draft.duration) return;
-      draft.duration = v;
-      stage.setDuration(v, draft.fps);
+      edit('clip-duration', (c) => { c.duration = v; }, { inspector: 'none' });
+      stage.setDuration(draft.duration, draft.fps);
       timeline.setData({ composition: draft, beats });
       drawMeta();
-      live();
     });
     const bgId = nextId('f');
     const bg = h('input.mono', { type: 'text', id: bgId, value: draft.background ?? '#000000', 'data-testid': 'clip-background', spellcheck: false, autocomplete: 'off' });
     bg.addEventListener('input', () => {
       const ok = CSS.supports('color', bg.value.trim());
       bg.classList.toggle('invalid', !ok);
-      if (!ok) return;
-      draft.background = bg.value.trim();
-      live();
+      if (ok) edit('clip-background', (c) => { c.background = bg.value.trim(); }, { inspector: 'none' });
     });
-    fill(inspector, 
+    fill(inspector,
       h('h2', 'Inspector'),
-      h('p.muted', { 'data-testid': 'inspector-empty' }, draft.tracks.some((t) => t.items.length) ? 'Select an item on the timeline to edit its timing and parameters.' : 'This clip is empty. Use "Add item" to place an asset at the playhead.'),
+      h('p.muted', { 'data-testid': 'inspector-empty' }, draft.tracks.some((t) => t.items.length) ? 'Select an item on the timeline or on the preview to edit it.' : 'This clip is empty. Use "Add item" to place an asset at the playhead.'),
       h('h3', 'Clip'),
       duration.el,
       h('div.field', h('label', { for: bgId }, 'Background colour'), bg));
   }
 
+  function drawMulti() {
+    timing = null; sections = [];
+    const del = h('button.btn.small.danger', { type: 'button', 'data-testid': 'delete-item' }, icon('trash', 14), 'Delete');
+    del.addEventListener('click', removeSelected);
+    fill(inspector,
+      h('div.panel-head', h('h2', 'Inspector'), h('span.ref', { 'data-testid': 'selected-id' }, sel.primary)),
+      h('p', { 'data-testid': 'selection-count' }, `${plural(sel.ids.length, 'item')} selected.`),
+      h('ul.multi-list', sel.ids.map((id) => h('li.ref', id))),
+      h('div.row', del),
+      h('p.hint', 'Copy, paste, duplicate, split and delete work on all of them. Shift or ⌘ click to change the selection.'));
+  }
+
+  let overrideState = null;   // the reset-override button and its label, while an item is shown
+  function drawOverrideState() {
+    if (!overrideState) return;
+    const f = findItem(overrideState.id);
+    const has = !!(f && fmt !== draft.format && f.item.formats?.[fmt]);
+    overrideState.reset.hidden = !has;
+  }
+
+  const schemaCache = new Map();
+  function schemaOf(ref) {
+    if (info[ref]?.schema) return Promise.resolve(info[ref].schema);
+    if (!schemaCache.has(ref)) {
+      const { slug: s, version } = splitRef(ref);
+      const p = api.get(`/api/assets/${s}${version ? `?version=${version}` : ''}`).then((a) => a.schema ?? {});
+      p.catch(() => schemaCache.delete(ref));
+      schemaCache.set(ref, p);
+    }
+    return schemaCache.get(ref);
+  }
+  const optionCache = new Map();
+  function options(what) {
+    if (!optionCache.has(what)) {
+      const urls = what === 'mask' ? ['/api/assets?type=function&kind=visual&limit=100', '/api/assets?type=image&limit=100', '/api/assets?type=sequence&limit=100'] : [`/api/assets?type=function&kind=${what}&limit=100`];
+      const p = Promise.all(urls.map((u) => api.get(u).catch(() => ({ assets: [] }))))
+        .then((rs) => rs.flatMap((r) => r.assets.map((a) => ({ value: a.ref, label: `${a.title === a.slug ? a.slug : `${a.title} · ${a.slug}`} @${a.version}` }))));
+      optionCache.set(what, p);
+    }
+    return optionCache.get(what);
+  }
+
   function drawInspector() {
-    const found = selected ? findItem(selected) : null;
+    overrideState = null;
+    if (sel.ids.length > 1) { drawMulti(); return; }
+    const found = sel.primary ? findItem(sel.primary) : null;
     if (!found) { drawClipSettings(); return; }
     const { track, item } = found;
     const a = info[item.asset] ?? { slug: splitRef(item.asset).slug, version: splitRef(item.asset).version, latestVersion: splitRef(item.asset).version, schema: {}, title: item.asset, kind: track.type === 'audio' ? 'audio' : 'visual' };
     const audio = track.type === 'audio';
+    const locked = !!track.locked;
+    const commit = commitItem(item.id);
 
     const start = numField('Start', 'item-start', item.start, { min: 0, max: round(draft.duration - 0.1), step: 0.05 }, (v) => {
-      item.start = round(Math.min(v, draft.duration - item.duration));
-      timeline.refresh(); live();
-      return item.start;
+      const x = round(Math.min(v, draft.duration - item.duration));
+      commit(`start:${item.id}`, (it) => { it.start = x; }, { inspector: 'none' });
+      return x;
     });
     const duration = numField('Duration', 'item-duration', item.duration, { min: 0.1, max: draft.duration, step: 0.05 }, (v) => {
-      item.duration = round(Math.min(v, draft.duration - item.start));
-      timeline.refresh(); live();
-      return item.duration;
+      const x = round(Math.min(v, draft.duration - item.start));
+      commit(`duration:${item.id}`, (it) => { it.duration = x; if (it.assetDuration !== undefined && it.assetDuration < (it.offset ?? 0) + x) it.assetDuration = round((it.offset ?? 0) + x); }, { inspector: 'none' });
+      return x;
     });
     timing = { start: start.input, duration: duration.input };
-    const optional = (key, v, zero) => { if (v === zero) delete item[key]; else item[key] = v; live(); };
+    const optional = (key, v, zero) => commit(`${key}:${item.id}`, (it) => { if (v === zero) delete it[key]; else it[key] = v; }, { inspector: 'none' });
     const fadeIn = numField('Fade in', 'item-fadein', item.fadeIn ?? 0, { min: 0, max: 10, step: 0.05 }, (v) => optional('fadeIn', v, 0));
     const fadeOut = numField('Fade out', 'item-fadeout', item.fadeOut ?? 0, { min: 0, max: 10, step: 0.05 }, (v) => optional('fadeOut', v, 0));
-    const level = audio
-      ? numField('Gain', 'item-gain', item.gain ?? 1, { min: 0, max: 4, step: 0.05, slider: true }, (v) => { item.gain = v; live(); })
-      : numField('Opacity', 'item-opacity', item.opacity ?? 1, { min: 0, max: 1, step: 0.01, slider: true }, (v) => optional('opacity', v, 1));
+    const gain = audio ? numField('Gain', 'item-gain', item.gain ?? 1, { min: 0, max: 4, step: 0.05, slider: true }, (v) => commit(`gain:${item.id}`, (it) => { it.gain = v; }, { inspector: 'none' })) : null;
+
+    const env = { item, fmt, own: draft.format, size: viewSize(), lt: () => itemTime(item, time()), t: time, commit, seek: (t) => { stage.pv.pause(); stage.pv.seek(clamp(t, 0, draft.duration)); }, hasEasing: !!draft.easing };
+    sections = [];
+    const tf = audio ? null : transformSection(env);
+    const kfs = audio ? null : keyframesSection(env);
+    const params = paramsSection({ ...env, schema: a.schema, fonts, visual: !audio });
+    for (const s of [tf, kfs, params]) if (s) sections.push(s);
 
     const structural = hasRefParams(a.schema);
-    const controls = createParamControls({
-      schema: a.schema, values: item.params, fonts,
-      onChange(next, m) {
-        if (m.structural) {
-          const copy = clone(draft);
-          findItem(item.id, copy).item.params = clone(next);
-          rebundle(copy);
-        } else {
-          item.params = next;
-          live();
-        }
-      },
-    });
     const resetBtn = h('button.btn.small', { type: 'button', 'data-testid': 'reset-params' }, 'Reset');
     resetBtn.addEventListener('click', () => {
-      if (structural) { const copy = clone(draft); findItem(item.id, copy).item.params = {}; rebundle(copy); return; }
-      item.params = {};
-      controls.reset({});
-      live();
+      commit(`reset:${item.id}`, (it) => { it.params = {}; for (const o of Object.values(it.formats ?? {})) delete o.params; prune(it); }, { structural, inspector: 'redraw' });
     });
 
     const behind = a.latestVersion > a.version;
     const upgrade = behind ? h('button.btn.small', { type: 'button', 'data-testid': 'upgrade' }, 'Upgrade') : null;
-    upgrade?.addEventListener('click', () => {
-      const copy = clone(draft);
-      findItem(item.id, copy).item.asset = `${a.slug}@${a.latestVersion}`;
-      rebundle(copy);
-    });
+    upgrade?.addEventListener('click', () => commit('upgrade', (it) => { it.asset = `${a.slug}@${a.latestVersion}`; }, { structural: true }));
     const change = h('button.btn.small', { type: 'button', 'data-testid': 'change-asset' }, 'Change asset');
     change.addEventListener('click', async () => {
       const picked = await pickAsset({ title: 'Change the asset', kinds: [audio ? 'audio' : 'visual'] });
       if (!picked || !ctx.alive()) return;
-      const copy = clone(draft);
-      const target = findItem(item.id, copy).item;
-      target.asset = picked.ref;
-      target.params = {};
-      rebundle(copy);
+      commit('change-asset', (it) => { it.asset = picked.ref; it.params = {}; }, { structural: true });
     });
     const del = h('button.btn.small.danger', { type: 'button', 'data-testid': 'delete-item' }, icon('trash', 14), 'Delete item');
-    del.addEventListener('click', () => {
-      track.items.splice(track.items.indexOf(item), 1);
-      selected = null;
-      timeline.setData({ composition: draft, beats });
-      timeline.setSelected(null, track.id);
-      drawInspector();
-      live();
-    });
+    del.addEventListener('click', removeSelected);
 
-    fill(inspector, 
+    const reset = h('button.btn.small', { type: 'button', 'data-testid': 'reset-override', hidden: true, title: `Use the ${FORMAT_LABEL[draft.format]?.toLowerCase() ?? 'base'} layout in ${FORMAT_LABEL[fmt]?.toLowerCase()}` }, 'Reset override');
+    reset.addEventListener('click', () => commit(`reset-override:${fmt}`, (it) => { if (it.formats) delete it.formats[fmt]; prune(it); }, { inspector: 'redraw' }));
+    overrideState = { id: item.id, reset };
+
+    const body = h('fieldset.ed-fields', { disabled: locked },
+      h('h3', `Timing · ${track.name ?? track.id} track`),
+      h('div.field-grid', start.el, duration.el, fadeIn.el, fadeOut.el),
+      item.offset !== undefined ? h('p.hint', { 'data-testid': 'item-offset' }, `Starts ${fmtTime(item.offset)} into the asset${item.assetDuration ? ` (of ${fmtTime(item.assetDuration)})` : ''}.`) : null,
+      gain?.el,
+      tf ? [
+        h('div.panel-head', h('h3', 'Layout ', h('span.muted', `· ${FORMAT_LABEL[fmt] ?? 'Custom'}${fmt !== draft.format ? ' (override)' : ''}`)), reset),
+        tf.el,
+        h('h3', 'Keyframes'), kfs.el,
+      ] : null,
+      h('div.panel-head', h('h3', 'Parameters'), Object.keys(a.schema ?? {}).length ? resetBtn : null),
+      params.el,
+      audio ? null : attachmentsSection({ item, readOnly: locked, fonts, schemaOf, options, pick: pickAsset, commit }));
+
+    fill(inspector,
       h('div.panel-head', h('h2', 'Inspector'), h('span.ref', { 'data-testid': 'selected-id' }, item.id)),
       h('div.inspector-asset',
         h('a.asset-link', { href: assetHref(item.asset), 'data-testid': 'item-asset' },
@@ -349,11 +897,10 @@ export async function mount(view, ctx) {
           h('span', h('b', a.title), h('span.ref', item.asset))),
         h('p.version-state', { 'data-testid': 'version-state' }, behind ? `pinned v${a.version}, latest v${a.latestVersion} → ` : `pinned v${a.version}, the latest`, upgrade),
         h('div.row', change, del)),
-      h('h3', `Timing · ${track.name ?? track.id} track`),
-      h('div.field-grid', start.el, duration.el, fadeIn.el, fadeOut.el),
-      level.el,
-      h('div.panel-head', h('h3', 'Parameters'), Object.keys(a.schema ?? {}).length ? resetBtn : null),
-      controls.el);
+      locked ? h('p.notice.info', { 'data-testid': 'track-locked' }, 'This track is locked. Unlock it on the timeline to edit.') : null,
+      body);
+    if (locked) { change.disabled = true; del.disabled = true; if (upgrade) upgrade.disabled = true; }
+    drawOverrideState();
   }
 
   /** The saved clip's pinned assets, with how the clip came by each. */
@@ -368,7 +915,7 @@ export async function mount(view, ctx) {
     if (!ctx.alive()) return;
     const list = used.filter((a) => a.type !== 'font');
     const fontsUsed = used.filter((a) => a.type === 'font');
-    fill(assetsPanel, 
+    fill(assetsPanel,
       h('div.panel-head', h('h2', 'Assets in this clip'), h('span.count', plural(list.length, 'asset'))),
       list.length
         ? h('ul.used-assets', list.map((a) => h('li', { 'data-testid': 'clip-asset', 'data-relation': a.relation },
@@ -379,8 +926,46 @@ export async function mount(view, ctx) {
       fontsUsed.length ? h('p.muted', `Fonts: ${fontsUsed.map((f) => f.title).join(', ')}`) : null);
   }
 
+  // ── proposals from the agent ─────────────────────────────────────────────────────────────
+  async function showProposalView() {
+    const p = proposal;
+    const comp = viewOf(p.composition);
+    stage.setSize(comp.width, comp.height);
+    stage.setDuration(comp.duration, comp.fps);
+    await stage.show((pv) => pv.showClip({ composition: comp, bundle: p.bundle, audioUrl: null }));
+  }
+  async function setProposalShown(on) {
+    showProposal = on && !!proposal;
+    frameLabel.hidden = !showProposal;
+    handles.setEnabled(!showProposal);
+    drawProposalBar();
+    updateTools();
+    if (showProposal) await showProposalView(); else await showClip();
+  }
+  function drawProposalBar() {
+    if (!proposal) { proposalBar.hidden = true; proposalBar.replaceChildren(); return; }
+    const toggle = h('button.btn.small.toggle', { type: 'button', 'data-testid': 'proposal-toggle', 'data-showing': showProposal ? 'proposal' : 'current', 'aria-pressed': String(showProposal) }, showProposal ? 'Show current' : 'Show proposal');
+    toggle.addEventListener('click', () => setProposalShown(!showProposal));
+    const close = h('button.icon-btn.small', { type: 'button', 'data-testid': 'proposal-close', 'aria-label': 'Close the proposal preview' }, icon('close', 16));
+    close.addEventListener('click', () => { proposal = null; setProposalShown(false); });
+    const pr = proposal.proposal ?? {};
+    fill(proposalBar,
+      h('span.proposal-tag', showProposal ? 'Proposal' : 'Current'),
+      h('span.proposal-text', pr.summary ?? pr.note ?? `Proposal #${pr.id ?? ''}`, proposal.current && proposal.current !== clip.revision ? h('span.muted', ` · made against revision ${proposal.current}`) : null),
+      toggle, close);
+    proposalBar.hidden = false;
+  }
+
+  const agent = mountAgentPanel(agentBox, {
+    scope: 'clip', clip: slug,
+    getContext: () => ({ at: round(time()), items: [...sel.ids] }),
+    onPreview(p) { if (!p?.composition || !p.bundle) return; proposal = p; setProposalShown(true); },
+    onAccepted() { proposal = null; frameLabel.hidden = true; showProposal = false; handles.setEnabled(true); drawProposalBar(); if (dirty) showChanged(clip.revision + 1); else reload(); },
+  });
+  ctx.onCleanup(() => agent.destroy());
+
   // ── layout ───────────────────────────────────────────────────────────────────────────────
-  fill(view, 
+  fill(view,
     h('div.page-head',
       h('div',
         h('a.back', { href: '/clips' }, icon('back', 16), 'Clips'),
@@ -388,19 +973,29 @@ export async function mount(view, ctx) {
         meta),
       h('div.page-head-side', saveBtn, remixBtn, renderBtn)),
     msg.el,
+    changedBanner,
     h('div.editor',
       h('div.ed-main',
-        h('section.panel.stage-panel', stage.el),
+        h('section.panel.stage-panel',
+          h('div.fmt-bar', fmtLabel, h('div.fmt-switch', { role: 'group', 'aria-label': 'Format to lay out' }, fmtBtns)),
+          proposalBar,
+          stage.el),
         h('section.panel.timeline-panel',
           h('div.panel-head', h('div.row', h('h2', 'Timeline'), position), h('div.row', addBtn, timeline.toolbar)),
+          h('div.ed-toolbar', { role: 'toolbar', 'aria-label': 'Edit' }, undoBtn, redoBtn, splitBtn, copyBtn, pasteBtn, dupBtn, keysBtn),
           timeline.el,
-          h('p.hint', `Drag an item to move it, drag its edges to trim. ${plural(beats.length, 'beat')} detected in the audio.`))),
-      h('aside.ed-side', inspector, assetsPanel)));
+          h('p.hint', `Drag an item to move it (also to another track), drag its edges to trim. Moves snap to the playhead, beats and other items; hold Alt to move freely. ${plural(beats.length, 'beat')} detected in the audio.`)),
+        layersPanel),
+      h('aside.ed-side', agentBox, inspector, assetsPanel)));
 
   drawMeta();
+  drawFormat();
   drawAssets();
   drawInspector();
+  updateTools();
   timeline.setData({ composition: draft, beats });
   showPosition(0);
+  remember();
   await showClip();
+  drawLayers(true);
 }

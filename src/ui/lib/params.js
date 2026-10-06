@@ -12,11 +12,17 @@ import { api } from '/ui/lib/api.js';
 import { clone, fill, h, icon, nextId } from '/ui/lib/util.js';
 
 const optionCache = new Map();
-/** Function assets of a kind, or image assets, as select options. Cached per page load. */
+/**
+ * Function assets of a kind (visual, value, audio, motion, transition, effect; narrowed by `tag`),
+ * or image assets, as select options, by name. Cached per page load.
+ */
 function assetOptions(def) {
-  const url = def.type === 'image' ? '/api/assets?type=image&limit=200' : `/api/assets?type=function&limit=200${def.kind ? `&kind=${def.kind}` : ''}`;
+  const q = new URLSearchParams({ type: def.type === 'image' ? 'image' : 'function', limit: '200', sort: 'name' });
+  if (def.type === 'asset' && def.kind) q.set('kind', def.kind);
+  if (def.type === 'asset' && def.tag) q.set('tag', def.tag);
+  const url = `/api/assets?${q}`;
   if (!optionCache.has(url)) {
-    const p = api.get(url).then((r) => r.assets.map((a) => ({ value: a.ref, label: `${a.title === a.slug ? a.slug : `${a.title} · ${a.slug}`} @${a.version}` })));
+    const p = api.get(url).then((r) => r.assets.map((a) => ({ value: a.ref, label: `${a.title === a.slug ? a.slug : `${a.title} · ${a.slug}`} @${a.version}${def.type === 'asset' && !def.kind && a.kind && a.kind !== 'visual' ? ` (${a.kind})` : ''}` })));
     optionCache.set(url, p);
     p.catch(() => optionCache.delete(url));
   }
