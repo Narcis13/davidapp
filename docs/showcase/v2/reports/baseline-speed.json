@@ -1,0 +1,44 @@
+{
+ "machine": "Intel(R) Core(TM) i5-10600 CPU @ 3.30GHz × 12",
+ "node": "v24.21.0",
+ "runs": 3,
+ "method": "MCP start_render with wait; renderSeconds from the render stats (frames drawn by the worker pool + FFmpeg encode, audio mix excluded once cached); median of the runs",
+ "clips": {
+  "clip-1-every-frame": {
+   "size": "1080×1920",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    24.5,
+    28.77,
+    27.37
+   ],
+   "median": 27.37,
+   "framesPerSecond": 35.1
+  },
+  "clip-2-compounding": {
+   "size": "1920×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    30.12,
+    28.95,
+    33.63
+   ],
+   "median": 30.12,
+   "framesPerSecond": 31.9
+  },
+  "clip-3-release-notes": {
+   "size": "1080×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    18.06,
+    17.04,
+    16.47
+   ],
+   "median": 17.04,
+   "framesPerSecond": 56.3
+  }
+ }
+}
