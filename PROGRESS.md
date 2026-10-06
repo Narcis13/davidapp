@@ -112,6 +112,12 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - **The compounding levers built**: `suggest_assets(brief)` (OR-matched words ranked by bm25 × quality, a few per kind, with matched words, params, notes and a numbered contact sheet), notes agents leave on assets (`add_asset_note`, shown in `get_asset` and suggestions), real usage examples per asset from the clips that use it (`get_asset.examples`), presets and precomps (M3), featured/favourites raising proven pieces, and a clip theme: `composition.theme` pins a value asset and every asset reads it as `f.theme`, so new pieces look consistent by default.
 - *(more decisions are added as each milestone lands)*
 
+## Clip concepts (decided before each build starts; not part of the measured build)
+
+- **Clip 4 · `clip-4-direct-the-studio`** (30 s, horizontal, with vertical and square overrides; rendered in all three formats; theme `theme-tide`): 0–7 s an uploaded photo (made here, PNG) with a slow keyframed push-in, the title "Direct the studio" (reused `text-kinetic`) with a slide-in motion and keyframed rotation, the uploaded SVG logo drawn on by a new `svg-draw-on` asset; 7–15 s a new 3D asset `orb-3d` with a title track behind it and a caption in front, the title track dragged (move_track) from in front to behind; 15–23 s reused `stat-trio` with new `fx-glow`, `motion-pop`; 23–30 s reused `logo-sting` with a new mask `mask-iris` and a preset of clip 2's `lower-third` (`lower-third-studio`). New transitions between scenes (`trans-wipe`, `trans-push`, `trans-iris`), clip-wide `fx-grain`, a track `fx-vignette`, `fx-duotone` on the photo in one format. The opening title and logo are saved as the precomp `studio-title-card`. Music: clip 1's `music-loop`. One step through the request flow (the user asks for the drift on the logo; the agent proposes it; accepted).
+- **Clip 5 · `clip-5-a-library-in-3d`** (60 s, vertical): reuses clip 4's motions, transitions, effects, precomp, preset and orb; adds `terrain-3d`, `block-text-3d`, a baked sequence of `orb-3d` (`orb-spin`), `fx-chromatic`, `trans-glitch`, `motion-bounce`, `motion-orbit`, a luma mask; a clip-scoped request "add a lower third at 0:03" proposed as a clip edit and accepted; a described uploaded JPG.
+- **Clip 6** (90 s): decided only after clip 5 renders.
+
 ## Blocked
 
 - *(none)*
