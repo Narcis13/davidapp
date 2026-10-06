@@ -573,11 +573,11 @@ export function createClips(ctx, library) {
     if (comp.easing && picked.some((p) => needsEasing(p.it))) { if (uses.easing && uses.easing !== comp.easing) throw new StudioError('The layers use two different easing assets'); uses.easing = comp.easing; }
     const titles = picked.map((p) => library.requireVersion(p.it.asset)).map((r) => r.title ?? r.slug);
     const source = precompSource({
-      title: title ?? `${row.title}: ${picked.length} layers`,
-      description: description ?? `A precomp of ${picked.length} layers (${[...new Set(titles)].slice(0, 4).join(', ')}) saved from the clip "${row.title}".`,
+      title: title ?? `${row.title}: ${picked.length} layer${picked.length === 1 ? '' : 's'}`,
+      description: description ?? `A precomp of ${picked.length} layer${picked.length === 1 ? '' : 's'} (${[...new Set(titles)].slice(0, 4).join(', ')}) saved from the clip "${row.title}".`,
       tags: [...new Set([...(tags ?? []), 'precomp'])], duration, uses, params, layers, from: `clip "${slug}" (items ${ids.join(', ')})`,
     });
-    const saved = await library.saveFunction({ slug: name, source, author, forClip: slug, note: `Precomp of ${picked.length} layers from ${slug}`, mode: 'create', derivation: 'precomp' });
+    const saved = await library.saveFunction({ slug: name, source, author, forClip: slug, note: `Precomp of ${picked.length} layer${picked.length === 1 ? '' : 's'} from ${slug}`, mode: 'create', derivation: 'precomp' });
     if (!replace) return { asset: saved.asset, source, clip: null };
     // the new item sits where the top-most saved layer was
     const top = picked.reduce((a, b) => (b.ti > a.ti || (b.ti === a.ti && b.ii > a.ii) ? b : a));
