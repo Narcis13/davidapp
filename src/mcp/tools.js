@@ -78,7 +78,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       run: () => {
         const fn = library.search({ type: 'function', limit: 200 });
         const stats = { engine: ENGINE_VERSION, formats: FORMATS, assets: library.search({ limit: 1 }).total, functionAssets: fn.total, clips: clips.listClips().map((c) => c.slug), fonts: library.fontFamilies(), tags: library.allTags().slice(0, 40).map((t) => `${t.tag} (${t.n})`) };
-        return { text: `${readFileSync(join(ROOT, 'docs', 'ASSET_CONTRACT.md'), 'utf8')}\n\n## Workflow\n\n1. create_clip (empty) so new assets can record which clip they were made for.\n2. search_assets before writing anything: reuse, update_asset or fork_asset what exists.\n3. validate_asset to see a filmstrip of a draft; create_asset when it looks right.\n4. update_clip / edit_clip to place assets on the timeline; render_clip_frame (sheet: true) to look at the result.\n5. start_render, then get_render until it is done.\n\n## Library now\n\n${JSON.stringify(stats, null, 1)}` };
+        return { text: `${readFileSync(join(ROOT, 'docs', 'ASSET_CONTRACT.md'), 'utf8')}\n\n${readFileSync(join(ROOT, 'docs', 'COOKBOOK.md'), 'utf8')}\n\n## Workflow\n\n1. create_clip (empty) so new assets can record which clip they were made for.\n2. suggest_assets with the brief, then search_assets: reuse, preset, precomp, update_asset or fork_asset what exists before writing anything new.\n3. validate_asset to see a filmstrip of a draft; create_asset when it looks right.\n4. update_clip / edit_clip to place assets on the timeline; render_clip_frame (sheet: true) to look at the result.\n5. start_render, then get_render until it is done.\n\n## Library now\n\n${JSON.stringify(stats, null, 1)}` };
       },
     },
     {
