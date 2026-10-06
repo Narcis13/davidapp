@@ -26,7 +26,7 @@ try {
       seen.add(r.format);
       const name = `${clip}${r.format !== comp.format ? `-${r.format}` : ''}`;
       const mp4 = r.outputPath;
-      const probe = JSON.parse((await run(ffprobePath(), ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', mp4])).stdout);
+      const probe = JSON.parse((await run(ffprobePath(), ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', mp4])).stdout.toString('utf8'));
       const v = probe.streams.find((s) => s.codec_type === 'video'), a = probe.streams.find((s) => s.codec_type === 'audio');
       const head = readFileSync(mp4).subarray(0, 4096);
       const faststart = head.indexOf('moov') >= 0 && (head.indexOf('mdat') < 0 || head.indexOf('moov') < head.indexOf('mdat'));

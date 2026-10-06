@@ -3,12 +3,13 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempStudio, seedAssets, smallComposition, AUTHOR, DOT } from './helpers.js';
 import { createStudio } from '../src/studio/studio.js';
 import { createStudioServer } from '../src/server/http.js';
-import { findClaude } from '../src/studio/agent-run.js';
+import { findClaude, commandFor } from '../src/studio/agent-run.js';
 
 const STUB = fileURLToPath(new URL('./fixtures/claude-stub.mjs', import.meta.url));
 const AGENT = 'agent-under-test';
@@ -272,6 +273,24 @@ test('Run now: a session that overruns its timeout is stopped; one can be cancel
     const failed = await waitFor(async () => { const x = (await fail.call('GET', `/api/requests/${r.id}`)).body; return x.run?.status === 'failed' ? x : null; }, 10000);
     assert.match(failed.messages.at(-1).body, /failed \(exit 3\)\. stub: failing on purpose/);
   } finally { await fail.close(); }
+});
+
+test('how the CLI is started: a script with this Node, a binary directly, a .cmd shim through the shell with the prompt on stdin', { timeout: 30000 }, async () => {
+  assert.deepEqual(commandFor('/opt/claude.mjs', ['-p', '--tools', '']), { cmd: process.execPath, args: ['/opt/claude.mjs', '-p', '--tools', ''], shell: false });
+  assert.deepEqual(commandFor('/usr/local/bin/claude', ['-p']), { cmd: '/usr/local/bin/claude', args: ['-p'], shell: false });
+  if (process.platform !== 'win32') return;
+  assert.deepEqual(commandFor('C:/npm dir/claude.cmd', ['-p', '--tools', '', 'a,b']), { cmd: '"C:/npm dir/claude.cmd"', args: ['"-p"', '"--tools"', '""', '"a,b"'], shell: true });
+  // a real shim, in a folder with a space in its name, as npm writes them
+  const shim = join(t.dataDir, 'cache', 'claude shim.cmd');
+  writeFileSync(shim, `@"${process.execPath}" "${STUB}" %*\r\n`);
+  const s = await serve({ ...process.env, STUDIO_CLAUDE_BIN: shim, STUDIO_DATA: t.dataDir });
+  try {
+    const r = (await s.call('POST', '/api/requests', { scope: 'asset', asset: 'dot', message: 'cyan "please" & thanks | 100%' })).body;
+    assert.equal((await s.call('POST', `/api/requests/${r.id}/run`)).status, 200);
+    const done = await waitFor(async () => { const x = (await s.call('GET', `/api/requests/${r.id}`)).body; return ['done', 'failed'].includes(x.run?.status) ? x : null; });
+    assert.equal(done?.run.status, 'done', JSON.stringify(done?.messages.at(-1)));
+    assert.equal(done.proposals[0].summary, 'Stub: the default colour is now cyan.');
+  } finally { await s.close(); }
 });
 
 test('the studio passes the stub only the studio MCP server and its read/answer tools', async () => {

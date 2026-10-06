@@ -12,7 +12,7 @@
 
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { connect, callTool, inlineFiles } from './mcp.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,7 +27,7 @@ const journal = join(root, 'showcase', 'journal', `${clip}.jsonl`);
 mkdirSync(dirname(journal), { recursive: true });
 // "@module:path" is a JS module's default export (a composition in clips/<clip>/compose.mjs)
 async function modules(v) {
-  if (typeof v === 'string' && v.startsWith('@module:')) return JSON.parse(JSON.stringify((await import(`${join(root, v.slice(8))}?t=${Date.now()}`)).default));
+  if (typeof v === 'string' && v.startsWith('@module:')) return JSON.parse(JSON.stringify((await import(`${pathToFileURL(join(root, v.slice(8))).href}?t=${Date.now()}`)).default));
   if (Array.isArray(v)) return Promise.all(v.map(modules));
   if (v && typeof v === 'object') return Object.fromEntries(await Promise.all(Object.entries(v).map(async ([k, x]) => [k, await modules(x)])));
   return v;

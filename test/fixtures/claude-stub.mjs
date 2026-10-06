@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // A stand-in for the `claude` CLI in tests ("Run now" without a model). It takes the same flags the
-// studio passes, connects to the MCP server named in --mcp-config exactly as Claude Code would,
+// studio passes, reads the prompt from stdin, connects to the MCP server named in --mcp-config exactly as Claude Code would,
 // works the request named in the prompt, and prints stream-json lines like `claude -p --verbose`.
 //
 //   CLAUDE_STUB_MODE=work (default)  claim, propose a new version of the request's asset, finish
@@ -20,7 +20,9 @@ say({ type: 'system', subtype: 'init', tools: (flag('--allowedTools') ?? '').spl
 if (mode === 'fail') { process.stderr.write('stub: failing on purpose\n'); process.exit(3); }
 if (mode === 'hang') { say({ type: 'assistant', message: { content: [{ type: 'text', text: 'Thinking for a very long time…' }] } }); setInterval(() => {}, 1000); await new Promise(() => {}); }
 
-const id = Number(/request #(\d+)/.exec(flag('-p') ?? '')?.[1]);
+let prompt = '';
+for await (const chunk of process.stdin) prompt += chunk;
+const id = Number(/request #(\d+)/.exec(prompt)?.[1]);
 const server = JSON.parse(readFileSync(flag('--mcp-config'), 'utf8')).mcpServers.studio;
 const client = new Client({ name: 'claude-stub', version: '0.0.1' });
 await client.connect(new StdioClientTransport({ command: server.command, args: server.args, env: { ...process.env, ...server.env }, stderr: 'ignore' }));

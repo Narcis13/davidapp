@@ -10,7 +10,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { connect, callTool, inlineFiles } from '../scripts/mcp.mjs';
 import { readFileSync } from 'node:fs';
 import { steps, AUTHOR, JOURNALS, JOURNAL_AUTHOR } from './plan.mjs';
@@ -33,7 +33,7 @@ for (const clip of JOURNALS) {
 }
 
 async function modules(v) {
-  if (typeof v === 'string' && v.startsWith('@module:')) return JSON.parse(JSON.stringify((await import(join(here, '..', v.slice(8)))).default));
+  if (typeof v === 'string' && v.startsWith('@module:')) return JSON.parse(JSON.stringify((await import(pathToFileURL(join(here, '..', v.slice(8))).href)).default));
   if (Array.isArray(v)) return Promise.all(v.map(modules));
   if (v && typeof v === 'object') return Object.fromEntries(await Promise.all(Object.entries(v).map(async ([k, x]) => [k, await modules(x)])));
   return v;

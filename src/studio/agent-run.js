@@ -5,7 +5,7 @@
 // Without the CLI on PATH (or STUDIO_CLAUDE_BIN) the studio hides the button; the inbox flow, an
 // agent working the queue over MCP, works either way.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { ROOT } from '../render/host.js';
@@ -26,6 +26,27 @@ export function findClaude(env = process.env) {
     }
   }
   return null;
+}
+
+/**
+ * How to start the CLI. A script (STUDIO_CLAUDE_BIN=…/claude.mjs) runs with this Node. A .cmd shim
+ * (an npm install on Windows) only starts through the shell, so its arguments are quoted here; they
+ * are flags, tool names and a path under the data dir. The prompt, the only text a user wrote, never
+ * goes on the command line: it is written to the session's stdin.
+ */
+export function commandFor(bin, args) {
+  if (/\.[cm]?js$/i.test(bin)) return { cmd: process.execPath, args: [bin, ...args], shell: false };
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(bin)) return { cmd: `"${bin}"`, args: args.map((a) => `"${String(a).replaceAll('"', '')}"`), shell: true };
+  return { cmd: bin, args, shell: false };
+}
+
+/** Stop a session and what it started (its MCP server). On Windows a signal only ends the first process. */
+function killTree(child, signal) {
+  if (process.platform === 'win32' && child.pid) {
+    const r = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    if (r.status === 0) return;
+  }
+  child.kill(signal);
 }
 
 export function promptFor(r) {
@@ -89,10 +110,13 @@ export function createAgentRuns(studio, { env = process.env, timeoutSeconds = Nu
     const r = requests.get(id);
     if (['done', 'cancelled'].includes(r.status)) throw new StudioError(`Request #${r.id} is ${r.status}`, 'conflict');
     if (active.has(r.id)) throw new StudioError(`Request #${r.id} already has a session running`, 'conflict');
-    const args = ['-p', promptFor(r), '--output-format', 'stream-json', '--verbose',
+    const args = ['-p', '--output-format', 'stream-json', '--verbose',
       '--mcp-config', configFile(), '--strict-mcp-config', '--tools', '', '--allowedTools', RUN_TOOLS.map((t) => `mcp__studio__${t}`).join(','),
       '--permission-mode', 'dontAsk', '--restricted', '--no-session-persistence'];
-    const child = spawn(bin, args, { cwd: ROOT, env: { ...env }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const c = commandFor(bin, args);
+    const child = spawn(c.cmd, c.args, { cwd: ROOT, env: { ...env }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, shell: c.shell });
+    child.stdin.on('error', () => { /* the session ended before it read the prompt; 'close' reports it */ });
+    child.stdin.end(promptFor(r));
     const startedAt = new Date().toISOString();
     const run = { child, timer: null, ended: false, reason: null };
     active.set(r.id, run);
@@ -131,8 +155,8 @@ export function createAgentRuns(studio, { env = process.env, timeoutSeconds = Nu
     const run = active.get(Number(id));
     if (!run || run.ended) return false;
     run.reason = reason;
-    run.child.kill('SIGTERM');
-    setTimeout(() => { if (!run.ended) run.child.kill('SIGKILL'); }, 3000).unref?.();
+    killTree(run.child, 'SIGTERM');
+    setTimeout(() => { if (!run.ended) killTree(run.child, 'SIGKILL'); }, 3000).unref?.();
     return true;
   }
 

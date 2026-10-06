@@ -158,6 +158,30 @@ test('presets: a named asset that is a base plus params; it pins the base and dr
   await assert.rejects(studio.library.createPreset({ base: 'label', slug: 'label-bad', params: { size: 3 }, author: AUTHOR }), /size: unknown parameter/);
 });
 
+test('a preset pins the assets named in its params: a theme preset resolves, and keeps that version', async () => {
+  const ink = (c) => `asset({ kind: 'value', description: 'An ink colour as a value asset, for tests.', tags: ['test'], render() { return { ink: '${c}' }; } });`;
+  await studio.library.createAsset({ slug: 'ink-red', source: ink('#ff0000'), author: AUTHOR });
+  await studio.library.createAsset({ slug: 'ink-blue', source: ink('#0000ff'), author: AUTHOR });
+  await studio.library.createAsset({ slug: 'swatch', author: AUTHOR, source: `asset({
+  description: 'A block filled with the ink of the theme it is given, for tests.',
+  tags: ['shape', 'test'],
+  duration: 2,
+  params: { theme: { type: 'asset', kind: 'value', default: 'ink-red' } },
+  render(f, p) { f.ctx.fillStyle = f.use(p.theme).ink; f.ctx.fillRect(0, 0, f.width, f.height); },
+});` });
+  const p = (await studio.library.createPreset({ base: 'swatch', slug: 'swatch-blue', params: { theme: 'ink-blue' }, author: AUTHOR })).asset;
+  assert.equal(p.schema.theme.default, 'ink-blue@1', 'the bare name became a pinned ref');
+  const shot = (ref, params) => studio.assetFrame({ ref, params, t: 1, hash: true, format: 'square' });
+  const viaPreset = await shot('swatch-blue');
+  assert.equal(viaPreset.hash, (await shot('swatch', { theme: 'ink-blue' })).hash, 'the preset draws the base with the blue ink');
+  assert.notEqual(viaPreset.hash, (await shot('swatch')).hash);
+  // the theme moves on; the preset keeps the version it pinned
+  await studio.library.updateAsset({ slug: 'ink-blue', source: ink('#00ff00'), author: AUTHOR });
+  assert.equal((await shot('swatch-blue')).hash, viaPreset.hash);
+  assert.notEqual((await shot('swatch', { theme: 'ink-blue' })).hash, viaPreset.hash);
+  await assert.rejects(studio.library.createPreset({ base: 'swatch', slug: 'swatch-none', params: { theme: 'no-such-ink' }, author: AUTHOR }), /no-such-ink/);
+});
+
 test('precomps: layers saved as one asset with exposed params; replacing them keeps the picture', async () => {
   await studio.clips.updateClip('kinds', { composition: base([
     { id: 'bg', items: [block('back', { params: { color: '#202060' } })] },
