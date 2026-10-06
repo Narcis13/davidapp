@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { connect, callTool, inlineFiles } from '../scripts/mcp.mjs';
 import { EASING, DOT, LABEL, TONE } from './helpers.js';
 import { createStudio } from '../src/studio/studio.js';
+import { RUN_TOOLS } from '../src/studio/agent-run.js';
 import { MOTION_POP, EFFECT_GRAIN, TRANSITION_WIPE, BROKEN } from './fixtures/kinds.js';
 import { BALL } from './fixtures/solid.js';
 
@@ -251,7 +252,14 @@ test('tweak and keep, and the new kinds, over MCP: defaults, presets, metadata, 
     { op: 'update_item', id: 'dot2', patch: { transition: { asset: 'wipe', duration: 0.5 } } },
   ] });
   assert.ok(!edit.isError, edit.text);
-  const pre = await call('save_precomp', { clip: 'mcp-demo', items: ['label', 'dot2'], name: 'demo-card', expose: [{ item: 'label', param: 'text', name: 'headline' }], replace: true });
+  // the track was locked above: its layers are not replaced until it is unlocked, and the refusal saves no asset
+  const precomp = { clip: 'mcp-demo', items: ['label', 'dot2'], name: 'demo-card', expose: [{ item: 'label', param: 'text', name: 'headline' }], replace: true };
+  const refused = await call('save_precomp', precomp);
+  assert.ok(refused.isError);
+  assert.match(refused.text, /Track "main" is locked: unlock it to replace the layers \(dot2\)/);
+  assert.ok((await call('get_asset', { ref: 'demo-card' })).isError, 'nothing was saved under the name');
+  assert.ok(!(await call('edit_clip', { clip: 'mcp-demo', operations: [{ op: 'update_track', id: 'main', patch: { locked: false } }] })).isError);
+  const pre = await call('save_precomp', precomp);
   assert.ok(!pre.isError, pre.text);
   assert.equal(pre.json.created, 'demo-card@1');
   assert.deepEqual(pre.json.params, ['headline']);
@@ -293,6 +301,48 @@ test('uploads over MCP: upload an image and an SVG, see them in list_undescribed
   const bad = await call('upload_image', { name: 'x.svg', data_base64: Buffer.from('<!DOCTYPE svg [<!ENTITY a "b">]><svg>&a;</svg>').toString('base64') });
   assert.ok(bad.isError);
   assert.match(bad.text, /The SVG was rejected: a DOCTYPE or entity declaration/);
+});
+
+test('STUDIO_TOOLS limits the server to those tools (a Run now session), and STUDIO_RUNNER=0 leaves queued renders alone', async () => {
+  const dir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), 'studio-mcp-run-'));
+  // a render waiting in the queue, put there by another process
+  const seed = createStudio({ dataDir: dir, role: 'test' });
+  let queued;
+  try {
+    await seed.library.createAsset({ slug: 'easing', source: EASING, author: 'seed' });
+    await seed.library.createAsset({ slug: 'dot', source: DOT, author: 'seed' });
+    await seed.clips.createClip({ slug: 'waiting', author: 'seed', composition: { width: 320, height: 180, fps: 10, duration: 1, tracks: [{ id: 'a', type: 'visual', items: [{ id: 'dot', asset: 'dot', start: 0, duration: 1 }] }] } });
+    queued = seed.renders.enqueue({ clip: 'waiting' }).id;
+  } finally { await seed.close(); }
+  // connect() hands the child this process's environment
+  Object.assign(process.env, { STUDIO_TOOLS: RUN_TOOLS.join(','), STUDIO_RUNNER: '0' });
+  let limited;
+  try { limited = await connect({ dataDir: dir, author: 'claude-code-run' }); } finally { delete process.env.STUDIO_TOOLS; delete process.env.STUDIO_RUNNER; }
+  try {
+    const names = (await limited.listTools()).tools.map((t) => t.name);
+    assert.deepEqual([...names].sort(), [...RUN_TOOLS].sort());
+    assert.ok(names.length < (await client.listTools()).tools.length, 'fewer than the whole server offers');
+    // a tool outside the list is not there to call, whatever the client's own allowlist says
+    const outside = /** @type {[string, any][]} */ ([['create_asset', { name: 'sneaky', source: DOT.replace('A dot that slides', 'A dot that sneaks') }], ['edit_clip', { clip: 'waiting', operations: [{ op: 'set', background: '#ff0000' }] }], ['start_render', { clip: 'waiting' }]]);
+    for (const [name, args] of outside) {
+      const refused = await callTool(limited, name, args).then((r) => (r.isError ? r.text : null), (e) => String(e.message));
+      assert.match(refused ?? `${name} was run`, /not found|unknown tool/i, name);
+    }
+    assert.ok(!(await callTool(limited, 'get_clip', { clip: 'waiting' })).isError, 'the read tools work');
+    assert.equal((await callTool(limited, 'search_assets', { query: 'sneaks' })).json.assets.length, 0);
+    // the runner's first look at the queue is immediate and it looks again every 700 ms: still queued after two seconds
+    await new Promise((r) => setTimeout(r, 2000));
+  } finally {
+    await limited.close();
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  const check = createStudio({ dataDir: dir, role: 'test' });
+  try {
+    assert.equal(check.renders.get(queued).status, 'queued');
+    assert.equal(check.clips.getClip('waiting').revision, 1);
+    assert.equal(check.library.versionRow('sneaky'), undefined);
+  } finally { await check.close(); }
+  try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* Windows may still hold the db file */ }
 });
 
 test('the CLI helper inlines @file: arguments', () => {

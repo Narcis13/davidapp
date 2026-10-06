@@ -66,8 +66,10 @@ export function promptFor(r) {
  * @param {any} studio
  * @param {{ env?: Record<string, string | undefined>, timeoutSeconds?: number, author?: string }} [o]
  */
-export function createAgentRuns(studio, { env = process.env, timeoutSeconds = Number(env.STUDIO_AGENT_TIMEOUT ?? 600), author = 'claude-code-run' } = {}) {
+export function createAgentRuns(studio, { env = process.env, timeoutSeconds = Number(env.STUDIO_AGENT_TIMEOUT), author = 'claude-code-run' } = {}) {
   const { requests } = studio;
+  // unset, or not a number of seconds ("abc" would be NaN: a timer of 0 ms, every session stopped at once)
+  if (!(Number.isFinite(timeoutSeconds) && timeoutSeconds > 0)) timeoutSeconds = 600;
   /** request id → { child, timer, ended, reason } */
   const active = new Map();
 
@@ -83,7 +85,10 @@ export function createAgentRuns(studio, { env = process.env, timeoutSeconds = Nu
     const dir = join(studio.dataDir, 'cache');
     mkdirSync(dir, { recursive: true });
     const file = join(dir, 'agent-mcp.json');
-    writeFileSync(file, JSON.stringify({ mcpServers: { studio: { command: process.execPath, args: [join(ROOT, 'src', 'mcp', 'server.js')], env: { STUDIO_DATA: studio.dataDir, STUDIO_AUTHOR: author } } } }, null, 1));
+    // the server itself offers only the Run now tools (the CLI's allowlist is a second fence, not the only one),
+    // and it does not take render jobs: it lives as long as one session, and a render it claimed would die with it
+    const env = { STUDIO_DATA: studio.dataDir, STUDIO_AUTHOR: author, STUDIO_TOOLS: RUN_TOOLS.join(','), STUDIO_RUNNER: '0' };
+    writeFileSync(file, JSON.stringify({ mcpServers: { studio: { command: process.execPath, args: [join(ROOT, 'src', 'mcp', 'server.js')], env } } }, null, 1));
     return file;
   }
 
@@ -142,10 +147,16 @@ export function createAgentRuns(studio, { env = process.env, timeoutSeconds = Nu
       active.delete(r.id);
       run.ended = true;
       const status = run.reason ?? (code === 0 ? 'done' : 'failed');
-      requests.setRun(r.id, { status, startedAt, finishedAt: new Date().toISOString(), exitCode: code, by: user });
-      const says = { done: 'Run now: the session ended.', failed: `Run now: the session failed (exit ${code}).${stderr.trim() ? ` ${stderr.trim().slice(0, 600)}` : ''}`, timeout: `Run now: stopped after ${timeoutSeconds} s.`, cancelled: 'Run now: cancelled.' };
-      requests.note(r.id, 'studio', 'system', says[status] ?? `Run now: ${status}.`);
-      requests.release(r.id, author);
+      // on shutdown the sessions are stopped and the database closes before this runs: nothing to record it in,
+      // and an error thrown from an event handler would take the process down (the next start marks the run failed)
+      try {
+        requests.setRun(r.id, { status, startedAt, finishedAt: new Date().toISOString(), exitCode: code, by: user });
+        const says = { done: 'Run now: the session ended.', failed: `Run now: the session failed (exit ${code}).${stderr.trim() ? ` ${stderr.trim().slice(0, 600)}` : ''}`, timeout: `Run now: stopped after ${timeoutSeconds} s.`, cancelled: 'Run now: cancelled.' };
+        requests.note(r.id, 'studio', 'system', says[status] ?? `Run now: ${status}.`);
+        requests.release(r.id, author);
+      } catch (e) {
+        if (!/database is not open/i.test(String(e?.message))) console.error(`ERROR Run now: could not record the end of the session on request #${r.id}: ${e?.message ?? e}`);
+      }
     });
     return requests.get(r.id);
   }

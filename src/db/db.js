@@ -334,8 +334,12 @@ function widenChecks(db) {
 
 const columnsOf = (db, table) => db.prepare(`PRAGMA table_info(${table})`).all().map((c) => String(c.name));
 
-/** Run fn inside a transaction; rolls back if it throws. */
+/**
+ * Run fn inside a transaction; rolls back if it throws. Called inside another transaction on the
+ * same connection it joins that one (SQLite has no nested BEGIN): the outer one commits or rolls back.
+ */
 export function transaction(db, fn) {
+  if (db.isTransaction) return fn();
   db.exec('BEGIN IMMEDIATE');
   try {
     const out = fn();

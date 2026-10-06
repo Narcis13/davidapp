@@ -7,7 +7,7 @@
 // - Agents leave notes on assets for the next agent; each asset shows real usage examples.
 
 import { makeRef } from '../core/engine.js';
-import { json, now } from '../db/db.js';
+import { json, now, transaction } from '../db/db.js';
 import { StudioError } from './library.js';
 
 const STOP = new Set('a an and are as at be by for from has in into is it its of on or that the this to was with we you your our make made need want some any show shows use using clip scene video about over under like'.split(' '));
@@ -116,8 +116,10 @@ export function createCompounding(ctx, library, clips) {
     if (!a) throw new StudioError(`No asset named "${slug}" in the library.`, 'not_found');
     const text = String(body ?? '').trim();
     if (text.length < 4 || text.length > 1000) throw new StudioError('A note is 4–1000 characters');
-    q('INSERT INTO asset_notes (asset_id, author, body, created_at) VALUES (?, ?, ?, ?)').run(a.id, author, text, now());
-    ctx.events?.emit('asset', slug, 'note', { author });
+    transaction(db, () => {
+      q('INSERT INTO asset_notes (asset_id, author, body, created_at) VALUES (?, ?, ?, ?)').run(a.id, author, text, now());
+      ctx.events?.emit('asset', slug, 'note', { author });
+    });
     return notesOf(slug);
   }
 

@@ -11,8 +11,8 @@ import { createHash } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { createCanvas, loadImage } from '../render/host.js';
 import { json } from '../db/db.js';
-import { StudioError, SLUG_RE } from './library.js';
-import { sanitizeSvg, vectorModel, SvgError } from './svg.js';
+import { StudioError, SLUG_RE, checkImageSize } from './library.js';
+import { sanitizeSvg, vectorModel, useExpansion, USE_BUDGET, SvgError } from './svg.js';
 
 export const MAX_UPLOAD = 25_000_000;
 
@@ -22,9 +22,19 @@ export function sniff(buf) {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { kind: 'jpeg', ext: '.jpg' };
   if (buf.length >= 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') return { kind: 'webp', ext: '.webp' };
   const head = buf.subarray(0, 4096).toString('utf8').replace(/^\uFEFF/, '').trimStart();
-  // an XML prologue (declaration, comments, a DOCTYPE, even one with an internal subset) then <svg>;
-  // whether that prologue is acceptable is the sanitiser's call, with a clearer message
-  if (/^(<\?xml[^>]*\?>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE[\s\S]*?>\s*(\]\s*>\s*)?)?<svg[\s>]/i.test(head) || (/^(<\?xml|<!DOCTYPE\s+svg)/i.test(head) && /<svg[\s>]/i.test(head))) return { kind: 'svg', ext: '.svg' };
+  // an XML prologue (declaration, comments, a DOCTYPE, even one with an internal subset) then <svg>.
+  // The declaration and comments are stepped over one at a time: one regex with a repeated comment
+  // group backtracks without end. Whether the prologue is acceptable is the sanitiser's call, with a clearer message
+  if (!head.startsWith('<')) return null;
+  let i = 0;
+  for (;;) {
+    const end = head.startsWith('<!--', i) ? head.indexOf('-->', i + 4) + 3 : head.startsWith('<?', i) ? head.indexOf('?>', i + 2) + 2 : -1;
+    if (end < 4) break;
+    i = end;
+    while (i < head.length && head.charCodeAt(i) <= 32) i++;
+  }
+  const rest = head.slice(i);
+  if (/^<svg[\s>]/i.test(rest) || (/^<!DOCTYPE\s+(?!html)/i.test(rest) && /<svg[\s>]/i.test(rest))) return { kind: 'svg', ext: '.svg' };
   return null;
 }
 
@@ -97,6 +107,9 @@ export function createUploads(ctx, library) {
         throw e;
       }
       removed = clean.removed;
+      // the rasteriser expands every <use> as well, so a document that multiplies itself is refused before it gets there
+      const added = useExpansion(clean.tree);
+      if (added.nodes > USE_BUDGET.nodes || added.commands > USE_BUDGET.commands) throw new StudioError(`The SVG was rejected: its <use> references repeat too much of the drawing (more than ${USE_BUDGET.nodes} extra elements or ${USE_BUDGET.commands} path commands once expanded)`, 'rejected');
       vector = vectorModel(clean.tree);
       natural = { width: vector.width, height: vector.height };
       const img = await loadImage(Buffer.from(clean.svg)).catch(() => { throw new StudioError('The SVG could not be drawn after sanitising', 'rejected'); });
@@ -107,8 +120,8 @@ export function createUploads(ctx, library) {
       raster = c.toBuffer('image/png');
       ext = '.png';
       sidecar = { ext: '.svg', data: Buffer.from(clean.svg) };
-      if (vector.paths.length > 4000 || JSON.stringify(vector).length > 1_500_000) vector = null;
-    }
+      if (vector.over || vector.paths.length > 4000 || JSON.stringify(vector).length > 1_500_000) vector = null;
+    } else checkImageSize(data, `"${name}"`);
     const img = await loadImage(raster).catch(() => { throw new StudioError(`"${name}" could not be decoded as an image`, 'rejected'); });
     const slug = wanted ?? uniqueSlug(name);
     const colours = palette(img);

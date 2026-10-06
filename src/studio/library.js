@@ -2,7 +2,7 @@
 // render worker (compiled, test frames drawn, determinism checked) before a version is accepted.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef, parseRef } from '../core/engine.js';
 import { staticCheck } from '../core/static-check.js';
@@ -30,6 +30,59 @@ const sha1 = (s) => createHash('sha1').update(s).digest('hex');
 
 /** A sibling temp name for a data-relative path: files are written there and renamed once the row exists. */
 const tempOf = (rel) => { const i = rel.lastIndexOf('/'); return `${rel.slice(0, i + 1)}.tmp-${randomBytes(6).toString('hex')}-${rel.slice(i + 1)}`; };
+
+/**
+ * Rename a freshly written file or folder into place. On Windows an antivirus or the indexer often
+ * holds a handle on something just written, and the rename fails with EPERM, EBUSY or EACCES for a
+ * moment: try again a few times (about a second in all) before giving up on work that took minutes.
+ */
+export function renameRetry(from, to, tries = 8) {
+  // an empty folder in the way (left by an earlier failure) would refuse a folder; one with files in it stays
+  try { rmdirSync(to); } catch { /* not there, not a folder, or not empty: the rename says which */ }
+  for (let n = 1; ; n++) {
+    try { return renameSync(from, to); } catch (e) {
+      if (n >= tries || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * 2 ** (n - 1));
+    }
+  }
+}
+
+export const MAX_IMAGE_SIDE = 16384, MAX_IMAGE_PIXELS = 64_000_000;
+
+/** The pixel size an image file declares in its header (PNG, JPEG, GIF, WebP): { width, height }, or null when it cannot be read. */
+export function imageSize(buf) {
+  if (buf.length >= 24 && buf[0] === 0x89 && buf.toString('latin1', 1, 4) === 'PNG' && buf.toString('latin1', 12, 16) === 'IHDR') return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  if (buf.length >= 10 && /^GIF8[79]a$/.test(buf.toString('latin1', 0, 6))) return { width: buf.readUInt16LE(6), height: buf.readUInt16LE(8) };
+  if (buf.length >= 30 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') {
+    const chunk = buf.toString('latin1', 12, 16);
+    if (chunk === 'VP8X') return { width: buf.readUIntLE(24, 3) + 1, height: buf.readUIntLE(27, 3) + 1 };
+    if (chunk === 'VP8L' && buf[20] === 0x2f) { const b = buf.readUInt32LE(21); return { width: (b & 0x3fff) + 1, height: ((b >>> 14) & 0x3fff) + 1 }; }
+    if (chunk === 'VP8 ' && buf[23] === 0x9d && buf[24] === 0x01 && buf[25] === 0x2a) return { width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff };
+    return null;
+  }
+  if (buf.length >= 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    // segments until a start-of-frame (SOF0–SOF15, not DHT, JPG or DAC), which holds the size
+    for (let i = 2; i + 9 <= buf.length;) {
+      if (buf[i] !== 0xff) return null;
+      const m = buf[i + 1];
+      if (m === 0xff) { i++; continue; }
+      if (m === 0x01 || (m >= 0xd0 && m <= 0xd8)) { i += 2; continue; }
+      if (m === 0xd9 || m === 0xda) return null;
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { width: buf.readUInt16BE(i + 7), height: buf.readUInt16BE(i + 5) };
+      i += 2 + buf.readUInt16BE(i + 2);
+    }
+  }
+  return null;
+}
+
+/** Refuse an image whose header declares more pixels than the studio will decode (a small file can declare gigabytes). */
+export function checkImageSize(buf, name = 'The image') {
+  const s = imageSize(buf);
+  if (s && (s.width > MAX_IMAGE_SIDE || s.height > MAX_IMAGE_SIDE || s.width * s.height > MAX_IMAGE_PIXELS)) {
+    throw new StudioError(`${name} is ${s.width}×${s.height} pixels; images are at most ${MAX_IMAGE_SIDE} pixels a side and ${MAX_IMAGE_PIXELS / 1e6} megapixels`, 'rejected');
+  }
+  return s;
+}
 
 /** Two writers racing for the same name or version: say so, instead of a raw SQLite error. */
 const raceOf = (e, slug) => (/UNIQUE constraint/i.test(String(e?.message)) ? new StudioError(`"${slug}" was saved by someone else at the same moment; try again.`, 'conflict') : e);
@@ -252,14 +305,19 @@ export function createLibrary(ctx) {
 
   function setFavorite(slug, on = true) {
     const id = assetIdOf(slug);
-    if (on) q('INSERT OR IGNORE INTO favorites (asset_id, created_at) VALUES (?, ?)').run(id, now());
-    else q('DELETE FROM favorites WHERE asset_id = ?').run(id);
-    ctx.events?.emit('asset', parseRef(slug).slug, 'favorite', { on: !!on });
+    transaction(db, () => {
+      if (on) q('INSERT OR IGNORE INTO favorites (asset_id, created_at) VALUES (?, ?)').run(id, now());
+      else q('DELETE FROM favorites WHERE asset_id = ?').run(id);
+      ctx.events?.emit('asset', parseRef(slug).slug, 'favorite', { on: !!on });
+    });
   }
 
   function setFeatured(slug, on = true) {
-    q('UPDATE assets SET featured = ? WHERE id = ?').run(on ? 1 : 0, assetIdOf(slug));
-    ctx.events?.emit('asset', parseRef(slug).slug, 'featured', { on: !!on });
+    const id = assetIdOf(slug);
+    transaction(db, () => {
+      q('UPDATE assets SET featured = ? WHERE id = ?').run(on ? 1 : 0, id);
+      ctx.events?.emit('asset', parseRef(slug).slug, 'featured', { on: !!on });
+    });
   }
 
   /** Remember that an asset was opened, used in a clip or created (for "recently used"). */
@@ -279,16 +337,19 @@ export function createLibrary(ctx) {
       q('INSERT OR IGNORE INTO collections (slug, name, created_at) VALUES (?, ?, ?)').run(slug, String(name).trim(), now());
       const cid = q('SELECT id FROM collections WHERE slug = ?').get(slug).id;
       for (const id of ids) q('INSERT OR IGNORE INTO collection_assets (collection_id, asset_id, added_at) VALUES (?, ?, ?)').run(cid, id, now());
+      ctx.events?.emit('library', slug, 'collection', { added: slugs.length });
     });
-    ctx.events?.emit('library', slug, 'collection', { added: slugs.length });
     return listCollections().find((c) => c.slug === slug);
   }
 
   function removeFromCollection(collection, slugs) {
     const c = q('SELECT id FROM collections WHERE slug = ?').get(collection);
     if (!c) throw new StudioError(`No collection "${collection}"`, 'not_found');
-    for (const id of slugs.map(assetIdOf)) q('DELETE FROM collection_assets WHERE collection_id = ? AND asset_id = ?').run(c.id, id);
-    ctx.events?.emit('library', collection, 'collection', { removed: slugs.length });
+    const ids = slugs.map(assetIdOf);
+    transaction(db, () => {
+      for (const id of ids) q('DELETE FROM collection_assets WHERE collection_id = ? AND asset_id = ?').run(c.id, id);
+      ctx.events?.emit('library', collection, 'collection', { removed: slugs.length });
+    });
   }
 
   /**
@@ -425,9 +486,10 @@ export function createLibrary(ctx) {
     const thumb = `thumbs/${slug}@${version}.png`;
     const thumbTmp = join(dataDir, tempOf(thumb));
     writeFileSync(thumbTmp, v.thumb);
-    // the hover filmstrip: written now, it is only ever read for a version that exists
+    // the hover filmstrip, the same way
     const strip = v.strip ? `thumbs/${slug}@${version}.strip.png` : null;
-    if (strip) writeFileSync(join(dataDir, strip), v.strip);
+    const stripTmp = strip ? join(dataDir, tempOf(strip)) : null;
+    if (strip) writeFileSync(stripTmp, v.strip);
     const at = now();
     try {
       transaction(db, () => {
@@ -447,14 +509,16 @@ export function createLibrary(ctx) {
       for (const [alias, dep] of Object.entries(v.deps)) q('INSERT INTO asset_deps (version_id, dep_version_id, alias) VALUES (?, ?, ?)').run(versionId, versionRow(dep).version_id, alias);
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
       reindex(assetId, { slug, title: m.title, description: m.description, tags: m.tags, source });
+      touch(slug, 'created');
+      ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, clip: forClip ?? null, fork: forkOf ? makeRef(forkOf.slug, forkOf.version) : null });
       });
-      renameSync(thumbTmp, join(dataDir, thumb));
+      renameRetry(thumbTmp, join(dataDir, thumb));
+      if (strip) renameRetry(stripTmp, join(dataDir, strip));
     } catch (e) {
       rmSync(thumbTmp, { force: true });
+      if (strip) rmSync(stripTmp, { force: true });
       throw raceOf(e, slug);
     }
-    touch(slug, 'created');
-    ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, clip: forClip ?? null, fork: forkOf ? makeRef(forkOf.slug, forkOf.version) : null });
     return { asset: getAsset(makeRef(slug, version), { includeSource: false }), warnings: v.warnings, logs: v.logs, frames: v.frames, thumbPath: join(dataDir, thumb), thumb: v.thumb };
   }
 
@@ -508,8 +572,8 @@ export function createLibrary(ctx) {
     transaction(db, () => {
       q(`UPDATE assets SET ${sets.join(', ')}, meta_by = ?, meta_at = ? WHERE id = ?`).run(...args, author, now(), a.id);
       reindexLatest(a.id);
+      ctx.events?.emit('asset', slug, 'metadata', { author });
     });
-    ctx.events?.emit('asset', slug, 'metadata', { author });
     return getAsset(slug, { includeSource: false });
   }
 
@@ -611,12 +675,15 @@ export function createLibrary(ctx) {
     const from = derivedFrom ? requireVersion(derivedFrom) : null;
     const version = (existing?.latest_version ?? 0) + 1;
     const file = `files/${slug}@${version}${e}`;
+    // a header can declare far more pixels than the file has bytes: checked before anything decodes it
+    if (type === 'image') checkImageSize(bytes, `"${slug}"`);
     const fileTmp = join(dataDir, tempOf(file));
     let thumbTmp = null;
     writeFileSync(fileTmp, bytes);
-    // a file kept next to the asset's own (an uploaded SVG next to its raster)
+    // a file kept next to the asset's own (an uploaded SVG next to its raster), under a temp name like the others
     const side = sidecar ? `files/${slug}@${version}${sidecar.ext}` : null;
-    if (side) { meta = { ...meta, sidecar: side }; writeFileSync(join(dataDir, side), sidecar.data); }
+    const sideTmp = side ? join(dataDir, tempOf(side)) : null;
+    if (side) { meta = { ...meta, sidecar: side }; writeFileSync(sideTmp, sidecar.data); }
     try {
     const info = { ...meta, license: license ?? meta.license ?? 'original', bytes: bytes.length };
     let thumb = null, duration = null;
@@ -643,16 +710,17 @@ export function createLibrary(ctx) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(assetId, version, title ?? null, description.trim(), JSON.stringify(tags), duration, file, mime, JSON.stringify(info), thumb, author, note ?? null, prev?.version_id ?? from?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at);
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
       reindex(assetId, { slug, title, description: description.trim(), tags, source: '' });
+      ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, type, clip: forClip ?? null });
     });
-    renameSync(fileTmp, join(dataDir, file));
-    if (thumbTmp) renameSync(thumbTmp, join(dataDir, thumb));
+    renameRetry(fileTmp, join(dataDir, file));
+    if (thumbTmp) renameRetry(thumbTmp, join(dataDir, thumb));
+    if (side) renameRetry(sideTmp, join(dataDir, side));
     } catch (err) {
       rmSync(fileTmp, { force: true });
       if (thumbTmp) rmSync(thumbTmp, { force: true });
-      if (side) rmSync(join(dataDir, side), { force: true });
+      if (side) rmSync(sideTmp, { force: true });
       throw raceOf(err, slug);
     }
-    ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, type, clip: forClip ?? null });
     return { asset: getAsset(makeRef(slug, version)) };
   }
 
@@ -676,6 +744,9 @@ export function createLibrary(ctx) {
     const thumb = `thumbs/${slug}@${version}.png`;
     const at = now();
     const prev = existing ? versionRow(slug) : null;
+    // the thumbnail under a temp name, like every file of a version: a save that loses the race for the name must not touch the winner's
+    const thumbTmp = join(dataDir, tempOf(thumb));
+    writeFileSync(thumbTmp, thumbPng);
     try {
       transaction(db, () => {
         const assetId = existing?.id ?? q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at, derivation) VALUES (?, ?, 0, ?, ?, ?, ?)').run(slug, 'sequence', from?.version_id ?? null, clip?.id ?? null, at, from ? 'bake' : null).lastInsertRowid;
@@ -683,14 +754,15 @@ export function createLibrary(ctx) {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(assetId, version, title ?? null, description.trim(), JSON.stringify(tags), meta.duration, file, 'image/png', JSON.stringify(meta), thumb, author, derivedFrom ? `Baked from ${derivedFrom}` : null, prev?.version_id ?? from?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at);
         q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
         reindex(assetId, { slug, title, description: description.trim(), tags, source: '' });
-        writeFileSync(join(dataDir, thumb), thumbPng);
-        renameSync(dir, join(dataDir, file));
+        ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, type: 'sequence', clip: forClip ?? null });
+        // the files move in last, still under the lock (the version is this save's by now): it is only saved with its frames in place
+        renameRetry(thumbTmp, join(dataDir, thumb));
+        renameRetry(dir, join(dataDir, file));
       });
     } catch (e) {
-      rmSync(join(dataDir, thumb), { force: true });
+      rmSync(thumbTmp, { force: true });
       throw raceOf(e, slug);
     }
-    ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, type: 'sequence', clip: forClip ?? null });
     return { asset: getAsset(makeRef(slug, version), { includeSource: false }) };
   }
 

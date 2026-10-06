@@ -3,7 +3,7 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempStudio, AUTHOR } from './helpers.js';
 import { buildSynthetic } from '../scripts/lib/synth.mjs';
@@ -89,5 +89,7 @@ test('saved assets get a filmstrip for hover previews', () => {
   const a = L.getAsset('tpl-wave', { includeSource: false });
   assert.match(a.strip, /^thumbs\/tpl-wave@1\.strip\.png$/);
   assert.ok(existsSync(join(t.dataDir, a.strip)));
+  // strips and thumbnails are written under temp names and renamed once their version is saved: none is left over
+  assert.deepEqual(readdirSync(join(t.dataDir, 'thumbs')).filter((f) => f.startsWith('.tmp-')), []);
   assert.equal(L.search({ query: 'tpl wave', limit: 1 }).assets[0].strip, a.strip);
 });

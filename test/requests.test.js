@@ -3,13 +3,15 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempStudio, seedAssets, smallComposition, AUTHOR, DOT } from './helpers.js';
 import { createStudio } from '../src/studio/studio.js';
 import { createStudioServer } from '../src/server/http.js';
-import { findClaude, commandFor } from '../src/studio/agent-run.js';
+import { findClaude, commandFor, RUN_TOOLS } from '../src/studio/agent-run.js';
+import { transaction } from '../src/db/db.js';
 
 const STUB = fileURLToPath(new URL('./fixtures/claude-stub.mjs', import.meta.url));
 const AGENT = 'agent-under-test';
@@ -141,6 +143,113 @@ test('an expired claim goes back to the queue', () => {
   assert.ok(listed.some((x) => x.id === r.id));
   assert.match(R().get(r.id).messages.at(-1).body, /claim expired/);
   assert.equal(R().claim({ id: r.id, agent: 'another-agent' }).claimedBy, 'another-agent');
+});
+
+test('a proposal that arrives after the user cancelled does not bring the request back', async () => {
+  const r = R().create({ asset: 'kick', message: 'faster please', author: AUTHOR });
+  R().claim({ id: r.id, agent: AGENT });
+  const faster = studio.library.getAsset('kick').source.replace('default: 120', 'default: 140');
+  // the agent's proposal is still being validated (test frames are drawn) when the user cancels
+  const proposing = R().propose({ id: r.id, agent: AGENT, kind: 'asset-version', source: faster, summary: 'Faster' });
+  assert.equal(R().cancel({ id: r.id, author: AUTHOR }).status, 'cancelled');
+  await assert.rejects(proposing, (/** @type {any} */ e) => e.code === 'conflict' && /was cancelled while this proposal was being prepared/.test(e.message));
+  const after = R().get(r.id);
+  assert.equal(after.status, 'cancelled');
+  assert.deepEqual(after.proposals, [], 'no proposal was stored');
+  assert.equal(after.messages.at(-1).body, 'Cancelled.');
+  // the same for a request closed meanwhile (the agent completed it from another session)
+  const r2 = R().create({ asset: 'kick', message: 'slower please', author: AUTHOR });
+  const late = R().propose({ id: r2.id, agent: AGENT, kind: 'asset-version', source: faster.replace('140', '100'), summary: 'Slower' });
+  R().complete({ id: r2.id, agent: AGENT, body: 'Nothing to change.' });
+  await assert.rejects(late, /was closed while this proposal was being prepared/);
+  assert.equal(R().get(r2.id).status, 'done');
+});
+
+test('accepting twice at once (a double click, two tabs) applies the proposal once', async () => {
+  const r = R().create({ clip: 'demo', message: 'a darker background', author: AUTHOR });
+  // an edit that would apply cleanly a second time, so nothing but the guard stops it
+  const { proposal } = await R().propose({ id: r.id, agent: AGENT, kind: 'clip-edit', operations: [{ op: 'set', background: '#050505' }], summary: 'Darker' });
+  const before = studio.clips.getClip('demo').revision;
+  const from = studio.events.latest();
+  const results = await Promise.allSettled([R().accept({ proposal: proposal.id, author: AUTHOR }), R().accept({ proposal: proposal.id, author: AUTHOR })]);
+  assert.deepEqual(results.map((x) => x.status), ['fulfilled', 'rejected']);
+  const refused = /** @type {any} */ (results[1]).reason;
+  assert.equal(refused.code, 'conflict');
+  assert.match(refused.message, /is being accepted already/);
+  assert.equal(studio.clips.getClip('demo').revision, before + 1, 'one new revision');
+  assert.equal(R().get(r.id).messages.filter((m) => /^Accepted proposal/.test(m.body)).length, 1);
+  assert.deepEqual(studio.events.since(from).map((e) => `${e.topic}:${e.action}`), ['clip:updated', 'request:proposal']);
+  await assert.rejects(R().accept({ proposal: proposal.id, author: AUTHOR }), /is accepted; only a pending proposal/);
+  // decided from another process while this one was saving: the stored decision stands
+  const r2 = R().create({ clip: 'demo', message: 'lighter again', author: AUTHOR });
+  const p2 = (await R().propose({ id: r2.id, agent: AGENT, kind: 'clip-edit', operations: [{ op: 'set', background: '#101018' }], summary: 'Lighter' })).proposal;
+  const accepting = R().accept({ proposal: p2.id, author: AUTHOR });
+  studio.db.prepare("UPDATE proposals SET status = 'rejected' WHERE id = ?").run(p2.id);
+  await assert.rejects(accepting, (/** @type {any} */ e) => e.code === 'conflict' && /was rejected elsewhere while it was being accepted/.test(e.message));
+  assert.equal(R().proposal(p2.id).status, 'rejected');
+});
+
+test('two agents going for the same request: one gets it, the other is told who has it', async () => {
+  const r = R().create({ scope: 'library', message: 'who takes this?', author: AUTHOR });
+  // in this process: the second claim sees the first
+  assert.equal(R().claim({ id: r.id, agent: 'agent-a' }).claimedBy, 'agent-a');
+  assert.throws(() => R().claim({ id: r.id, agent: 'agent-b' }), (/** @type {any} */ e) => e.code === 'conflict' && /being worked by agent-a \(until /.test(e.message));
+  assert.equal(R().claim({ id: r.id, agent: 'agent-a' }).claimedBy, 'agent-a', 'the holder may claim again (a longer lease)');
+  assert.equal(R().get(r.id).messages.filter((m) => /is working on it/.test(m.body)).length, 1);
+  // from several processes at the same instant, as MCP servers do: exactly one holds each request
+  const open = [1, 2, 3].map((n) => R().create({ scope: 'library', message: `race ${n}`, author: AUTHOR }).id);
+  const script = `
+    import { createStudio } from ${JSON.stringify(new URL('../src/studio/studio.js', import.meta.url).href)};
+    const [dir, agent, at, ...ids] = process.argv.slice(1);
+    const studio = createStudio({ dataDir: dir, role: 'mcp' });
+    await new Promise((r) => setTimeout(r, Math.max(0, Number(at) - Date.now())));
+    const out = ids.map((id) => { try { return studio.requests.claim({ id: Number(id), agent }).claimedBy; } catch (e) { return 'refused: ' + e.message; } });
+    await studio.close();
+    console.log(JSON.stringify(out));`;
+  const at = Date.now() + 2500;
+  const outs = await Promise.all(['p1', 'p2', 'p3', 'p4'].map((agent) => new Promise((resolve, reject) => {
+    execFile(process.execPath, ['--input-type=module', '-e', script, t.dataDir, agent, String(at), ...open.map(String)], { env: { ...process.env } }, (err, stdout, stderr) => (err ? reject(new Error(`${err.message}\n${stderr}`)) : resolve(JSON.parse(stdout.trim().split('\n').at(-1)))));
+  })));
+  for (const [i, id] of open.entries()) {
+    const got = outs.map((o) => o[i]);
+    const holder = R().get(id).claimedBy;
+    assert.equal(got.filter((x) => !x.startsWith('refused')).length, 1, `request ${id}: ${got.join(' | ')}`);
+    assert.ok(got.includes(holder));
+    for (const x of got.filter((y) => y.startsWith('refused'))) assert.match(x, new RegExp(`being worked by ${holder}`));
+    assert.equal(R().get(id).messages.filter((m) => /is working on it/.test(m.body)).length, 1);
+  }
+});
+
+test('a change and its event are one transaction: if the event cannot be written, nothing changed', async () => {
+  const emit = studio.events.emit;
+  const counts = () => studio.db.prepare('SELECT (SELECT COUNT(*) FROM requests) AS requests, (SELECT COUNT(*) FROM request_messages) AS messages, (SELECT COUNT(*) FROM assets) AS assets, (SELECT COUNT(*) FROM events) AS events').get();
+  const r = R().create({ scope: 'library', message: 'events with the change', author: AUTHOR });
+  const before = counts(), revision = studio.clips.getClip('demo').revision;
+  studio.events.emit = () => { throw new Error('database is locked'); };
+  try {
+    assert.throws(() => R().create({ scope: 'library', message: 'never stored', author: AUTHOR }), /database is locked/);
+    assert.throws(() => R().reply({ id: r.id, author: AUTHOR, body: 'never stored either' }), /database is locked/);
+    assert.throws(() => R().claim({ id: r.id, agent: AGENT }), /database is locked/);
+    assert.throws(() => R().cancel({ id: r.id, author: AUTHOR }), /database is locked/);
+    assert.throws(() => studio.library.setFavorite('dot', true), /database is locked/);
+    assert.throws(() => studio.library.setMetadata({ slug: 'dot', title: 'Never', author: AUTHOR }), /database is locked/);
+    await assert.rejects(studio.clips.editClip('demo', [{ op: 'set', background: '#ff00ff' }]), /database is locked/);
+    await assert.rejects(studio.library.createAsset({ slug: 'never-saved', source: DOT.replace('A dot that slides', 'A dot that never slides'), author: AUTHOR }), /database is locked/);
+  } finally {
+    studio.events.emit = emit;
+  }
+  assert.deepEqual(counts(), before);
+  assert.equal(R().get(r.id).status, 'open');
+  assert.equal(studio.clips.getClip('demo').revision, revision);
+  assert.equal(studio.library.getAsset('dot').title === 'Never' || studio.library.getAsset('dot').favorite, false);
+  assert.equal(studio.library.versionRow('never-saved'), undefined);
+  assert.deepEqual(readdirSync(join(t.dataDir, 'thumbs')).filter((f) => f.startsWith('.tmp-') || f.startsWith('never-saved')), [], 'and its files are gone');
+  // a transaction inside a transaction joins it: one commit, or one rollback, for all of it
+  assert.throws(() => transaction(studio.db, () => { R().reply({ id: r.id, author: AUTHOR, body: 'inside' }); throw new Error('outer fails'); }), /outer fails/);
+  assert.deepEqual(counts(), before);
+  assert.equal(studio.db.isTransaction, false);
+  assert.equal(transaction(studio.db, () => transaction(studio.db, () => R().reply({ id: r.id, author: AUTHOR, body: 'inside' }).messages.length)), 2);
+  assert.equal(counts().events, before.events + 1);
 });
 
 test('every change is an event, whichever process makes it', async () => {
@@ -294,8 +403,35 @@ test('how the CLI is started: a script with this Node, a binary directly, a .cmd
 });
 
 test('the studio passes the stub only the studio MCP server and its read/answer tools', async () => {
-  const { RUN_TOOLS, promptFor } = await import('../src/studio/agent-run.js');
+  const { promptFor } = await import('../src/studio/agent-run.js');
   assert.ok(!RUN_TOOLS.includes('create_asset') && !RUN_TOOLS.includes('update_clip') && !RUN_TOOLS.includes('start_render'), 'no tool that changes the library or a clip directly');
   assert.match(promptFor({ id: 7, title: 'x' }), /claim_request with id 7/);
   assert.ok(join(STUB).endsWith('claude-stub.mjs'));
+  // the session's MCP server is told the same list, so the limit does not rest on the CLI's flags, and it renders nothing
+  const config = JSON.parse(readFileSync(join(t.dataDir, 'cache', 'agent-mcp.json'), 'utf8')).mcpServers;
+  assert.deepEqual(Object.keys(config), ['studio']);
+  assert.deepEqual(config.studio.env, { STUDIO_DATA: t.dataDir, STUDIO_AUTHOR: 'claude-code-run', STUDIO_TOOLS: RUN_TOOLS.join(','), STUDIO_RUNNER: '0' });
+});
+
+test('Run now: a timeout that is not a number means the default; a session ending after the studio closed its database is not a crash', async () => {
+  // its own studio: this one is shut down in the middle of a session
+  const own = tempStudio();
+  const server = /** @type {any} */ (createStudioServer(own.studio, { env: { ...process.env, STUDIO_CLAUDE_BIN: STUB, CLAUDE_STUB_MODE: 'hang', STUDIO_AGENT_TIMEOUT: 'abc' } }));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const post = async (path, body) => (await fetch(base + path, { method: 'POST', headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })).json();
+  const r = await post('/api/requests', { scope: 'library', message: 'still running at shutdown' });
+  const started = await post(`/api/requests/${r.id}/run`);
+  assert.equal(started.run.status, 'running');
+  assert.equal(started.run.timeoutSeconds, 600, 'not NaN, which would stop every session at once');
+  await new Promise((res) => setTimeout(res, 500));
+  assert.equal(own.studio.requests.get(r.id).run.status, 'running', 'still running after half a second');
+  // shutdown: the server stops its sessions, then the database closes, and only then does the child's "close" arrive
+  server.closeAllConnections();
+  await new Promise((resolve) => server.close(resolve));
+  own.studio.db.close();
+  await own.studio.pool.destroy();
+  // an exception thrown in that handler would be uncaught and fail this test
+  await new Promise((res) => setTimeout(res, 1500));
+  try { rmSync(own.dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* Windows may still hold the db file */ }
 });

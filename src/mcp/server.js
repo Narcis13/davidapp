@@ -5,6 +5,8 @@
 //
 //   STUDIO_DATA    data directory (default: <repo>/data)
 //   STUDIO_AUTHOR  recorded as the author of assets and clips (default: mcp-client)
+//   STUDIO_TOOLS   comma-separated tool names: only these are offered (a "Run now" session gets the read and answer tools)
+//   STUDIO_RUNNER  0: do not pick up queued renders (a short-lived server would take a render down with it)
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -14,8 +16,10 @@ import { createTools } from './tools.js';
 // stdout carries the protocol: anything else printed there would corrupt it
 console.log = (...args) => console.error(...args);
 
-const studio = createStudio({ role: 'mcp', runner: true });
+const studio = createStudio({ role: 'mcp', runner: process.env.STUDIO_RUNNER !== '0' });
 const { tools, call } = createTools(studio);
+// an allowlist is enforced here, where the tools are: a tool that is not registered cannot be called
+const only = process.env.STUDIO_TOOLS ? new Set(process.env.STUDIO_TOOLS.split(',').map((s) => s.trim()).filter(Boolean)) : null;
 
 const server = new McpServer(
   { name: 'fablecut-studio', version: '0.1.0' },
@@ -23,6 +27,7 @@ const server = new McpServer(
 );
 
 for (const tool of tools) {
+  if (only && !only.has(tool.name)) continue;
   server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: tool.input, annotations: { readOnlyHint: !!tool.readOnly } }, (args) => call(tool.name, args));
 }
 

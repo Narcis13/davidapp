@@ -18,7 +18,7 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
   '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2', '.ico': 'image/x-icon',
 };
-const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501 };
+const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501, too_large: 413 };
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 /** Packages the studio page may load from node_modules (CodeMirror 6 and what it imports). */
 const VENDOR = new Set(['codemirror', '@codemirror/state', '@codemirror/view', '@codemirror/commands', '@codemirror/language', '@codemirror/lang-javascript', '@codemirror/search', '@codemirror/autocomplete', '@codemirror/lint',
@@ -67,10 +67,26 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     return stream();
   }
 
-  async function body(req) {
+  /**
+   * The request body, at most `limit` bytes. A larger one is refused only after the rest of it has
+   * been read and dropped: throwing inside the loop destroys the socket, and so does an answer that
+   * closes the connection while the client is still sending (measured: 9 of 10 such answers were
+   * lost), and either way the browser shows a network error instead of the reason.
+   */
+  async function read(req, limit, message) {
     const chunks = [];
-    let size = 0;
-    for await (const c of req) { size += c.length; if (size > 8e6) throw new StudioError('Request body too large'); chunks.push(c); }
+    let size = 0, over = Number(req.headers['content-length']) > limit;
+    for await (const c of req) {
+      if (over) continue;
+      size += c.length;
+      if (size > limit) { over = true; chunks.length = 0; } else chunks.push(c);
+    }
+    if (over) throw new StudioError(message, 'too_large');
+    return chunks;
+  }
+
+  async function body(req) {
+    const chunks = await read(req, 8e6, 'The request body is larger than 8 MB');
     if (!chunks.length) return {};
     // JSON only: a form post from another site cannot carry this content type without a preflight
     if (!String(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) throw new StudioError('Send the request body as application/json', 'unsupported');
@@ -302,9 +318,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
   async function receiveUpload(req, url) {
     const type = String(req.headers['content-type'] ?? '').toLowerCase();
     if (!/^image\/(png|jpeg|webp|svg\+xml)\b/.test(type)) throw new StudioError('Upload one PNG, JPEG, WebP or SVG file as the request body, with its image/* Content-Type', 'unsupported');
-    const chunks = [];
-    let size = 0;
-    for await (const c of req) { size += c.length; if (size > MAX_UPLOAD) throw new StudioError(`The file is larger than ${MAX_UPLOAD / 1e6} MB`); chunks.push(c); }
+    const chunks = await read(req, MAX_UPLOAD, `The file is larger than ${MAX_UPLOAD / 1e6} MB`);
     const r = await uploads.upload({ name: url.searchParams.get('name') || 'upload', data: Buffer.concat(chunks), author: url.searchParams.get('author') || author, forClip: url.searchParams.get('clip') || undefined });
     return { asset: r.asset, duplicate: r.duplicate, removed: r.removed };
   }
@@ -347,7 +361,8 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     const t0 = performance.now();
     res.on('finish', () => { if (req.url.startsWith('/api/')) log(`${req.method} ${req.url} ${res.statusCode} ${Math.round(performance.now() - t0)}ms`); });
     handle(req, res).catch((e) => {
-      if (e instanceof StudioError) return res.headersSent ? res.end() : send(res, STATUS[e.code] ?? 400, { error: e.message, code: e.code, details: e.details });
+      // an over-limit body was read to its end first (see read), so the answer arrives; the connection is not kept
+      if (e instanceof StudioError) return res.headersSent ? res.end() : send(res, STATUS[e.code] ?? 400, { error: e.message, code: e.code, details: e.details }, e.code === 'too_large' ? { connection: 'close' } : {});
       console.error(`ERROR ${req.method} ${req.url}\n${e?.stack ?? e}`);
       return res.headersSent ? res.end() : send(res, 500, { error: 'Internal server error' });
     });

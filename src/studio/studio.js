@@ -125,7 +125,10 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     return clips.getClip(clip).composition;
   }
 
-  /** One frame of a clip (saved, or a draft composition) → { png, width, height, hash?, frame, t }. */
+  /**
+   * One frame of a clip (saved, or a draft composition) → { png, width, height, hash?, frame, t }.
+   * @param {{ clip?: string, composition?: any, t?: number, frame?: number, maxSize?: number, hash?: boolean }} o
+   */
   async function clipFrame({ clip, composition, t = 0, frame, maxSize, hash }) {
     const comp = await compositionOf({ clip, composition });
     const total = Math.round(comp.duration * comp.fps);

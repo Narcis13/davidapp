@@ -14,7 +14,10 @@ export function createEvents(ctx) {
   const last = db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM events');
   let writes = 0;
 
-  /** Record a change. topic: asset | clip | render | request | library; key: what changed. */
+  /**
+   * Record a change. topic: asset | clip | render | request | library; key: what changed.
+   * Synchronous: call it inside the transaction that makes the change, so the two commit together.
+   */
   function emit(topic, key, action, data = {}) {
     insert.run(topic, key === undefined || key === null ? null : String(key), action, JSON.stringify(data), ctx.role ?? 'studio', now());
     // keep the table small: the studio only ever needs the recent tail

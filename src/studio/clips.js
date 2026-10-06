@@ -179,7 +179,7 @@ export function createClips(ctx, library) {
           writeAtomic(beatFile, JSON.stringify(detectBeats(mono.subarray(0, Math.round(span * SAMPLE_RATE)), SAMPLE_RATE)));
         }
       } else {
-        const seed = hashSeed(composition.seed, item.id);
+        const seed = hashSeed(composition.seed, item.seedId ?? item.id);
         // assets named in the item's params are part of what the synth needs
         const extra = [];
         walkParams(json(row.schema, {}), item.params, ['asset', 'image'], (value) => { if (parseRef(value).version !== null) extra.push(value); });
@@ -314,11 +314,11 @@ export function createClips(ctx, library) {
       const id = q(`INSERT INTO clips (slug, title, description, format, width, height, fps, duration, composition, revision, remixed_from, author, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`).run(slug, title ?? slug, description, c.format, c.width, c.height, c.fps, c.duration, JSON.stringify(c), from?.id ?? null, author, at, at).lastInsertRowid;
       writeUsage(id, p.refs, p.fonts);
+      ctx.events?.emit('clip', slug, 'created', { revision: 1, author, remixedFrom: remixedFrom ?? null });
     }); } catch (e) {
       if (/UNIQUE constraint/i.test(String(e?.message))) throw new StudioError(`A clip named "${slug}" already exists. Use update_clip to change it.`, 'conflict');
       throw e;
     }
-    ctx.events?.emit('clip', slug, 'created', { revision: 1, author, remixedFrom: remixedFrom ?? null });
     return { clip: getClip(slug), checked };
   }
 
@@ -339,8 +339,8 @@ export function createClips(ctx, library) {
         .run(title ?? row.title, description ?? row.description, c.format, c.width, c.height, c.fps, c.duration, JSON.stringify(c), now(), row.id, row.revision);
       if (!done.changes) throw new StudioError(`Clip "${slug}" was changed by someone else while this edit was being checked (it was revision ${row.revision}). Load it again and re-apply the edit.`, 'conflict');
       if (p) writeUsage(row.id, p.refs, p.fonts);
+      ctx.events?.emit('clip', slug, 'updated', { revision: row.revision + 1, by: by ?? null });
     });
-    ctx.events?.emit('clip', slug, 'updated', { revision: row.revision + 1, by: by ?? null });
     return { clip: getClip(slug), checked };
   }
 
@@ -470,7 +470,9 @@ export function createClips(ctx, library) {
           const offset = it.offset ?? 0;
           const whole = it.assetDuration ?? offset + it.duration;
           const cut = round3(op.at - it.start);
-          const second = { ...structuredClone(it), id: freeId(`${it.id}-b`), start: round3(op.at), duration: round3(it.duration - cut), offset: round3(offset + cut), assetDuration: whole };
+          // the second part is a continuation: it keeps the first part's seed, and does not play the transition into the item again
+          const second = { ...structuredClone(it), id: freeId(`${it.id}-b`), start: round3(op.at), duration: round3(it.duration - cut), offset: round3(offset + cut), assetDuration: whole, seedId: it.seedId ?? it.id };
+          delete second.transition;
           delete second.fadeIn;
           Object.assign(it, { duration: cut, assetDuration: whole });
           delete it.fadeOut;
@@ -527,6 +529,18 @@ export function createClips(ctx, library) {
     if (missing.length) throw new StudioError(`No item ${missing.map((x) => `"${x}"`).join(', ')} in clip "${slug}"`, 'not_found');
     const audio = picked.filter((p) => p.tr.type === 'audio');
     if (audio.length) throw new StudioError(`A precomp holds visual layers; leave the audio items (${audio.map((p) => p.it.id).join(', ')}) on the clip`);
+    /** @type {any[]} */
+    const ops = ids.map((id) => ({ op: 'remove_item', id }));
+    if (replace) {
+      // whatever can refuse the replacement is checked now: a saved asset stays (versions are never deleted),
+      // so a replace refused after the save would leave the asset behind and its name taken
+      const locked = picked.filter((p) => p.tr.locked);
+      const tracks = [...new Set(locked.map((p) => `"${p.tr.id}"`))];
+      if (locked.length) throw new StudioError(`Track ${tracks.join(', ')} ${tracks.length === 1 ? 'is' : 'are'} locked: unlock ${tracks.length === 1 ? 'it' : 'them'} to replace the layers (${locked.map((p) => p.it.id).join(', ')}), or save them without replacing`, 'conflict');
+      if (comp.tracks.some((tr) => tr.items.some((it) => it.id === name && !ids.includes(it.id)))) throw new StudioError(`Clip "${slug}" already has an item with the id "${name}", the id the new item takes (the asset's name): pick another name`, 'conflict');
+      // the clip without the layers must still be a valid composition; the new item is one visual item on a track that is there
+      prepare(applyOps(comp, ops));
+    }
     const t0 = Math.min(...picked.map((p) => p.it.start));
     const duration = round3(Math.max(...picked.map((p) => p.it.start + p.it.duration)) - t0);
     const uses = {}, aliasOf = new Map();
@@ -559,13 +573,14 @@ export function createClips(ctx, library) {
       byItem.set(`${x.item}|${x.param}`, pname);
     }
     const att = (a) => { pinRefs(a.asset, a.params); return { ...a, asset: alias(a.asset) }; };
-    const layers = picked.map(({ it }) => {
+    const layers = picked.map(({ it, tr }) => {
       pinRefs(it.asset, it.params);
-      const L = { id: it.id, asset: alias(it.asset), start: round3(it.start - t0), duration: it.duration };
+      // the track is kept so that a transition hands over from the layer before it on its own track
+      const L = { id: it.id, track: tr.id, asset: alias(it.asset), start: round3(it.start - t0), duration: it.duration };
       L.params = Object.fromEntries(Object.entries(it.params).map(([k, v]) => [k, byItem.has(`${it.id}|${k}`) ? { $param: byItem.get(`${it.id}|${k}`) } : v]));
       const transform = it.transform ?? (it.box ? boxToTransform(it.box) : undefined);
       if (transform) L.transform = transform;
-      for (const k of ['label', 'fadeIn', 'fadeOut', 'opacity', 'blend', 'offset', 'assetDuration', 'keyframes', 'formats']) if (it[k] !== undefined) L[k] = it[k];
+      for (const k of ['label', 'fadeIn', 'fadeOut', 'opacity', 'blend', 'offset', 'assetDuration', 'seedId', 'keyframes', 'formats']) if (it[k] !== undefined) L[k] = it[k];
       if (it.motions) L.motions = it.motions.map(att);
       if (it.effects) L.effects = it.effects.map(att);
       if (it.mask) L.mask = att(it.mask);
@@ -583,11 +598,14 @@ export function createClips(ctx, library) {
     if (!replace) return { asset: saved.asset, source, clip: null };
     // the new item sits where the top-most saved layer was
     const top = picked.reduce((a, b) => (b.ti > a.ti || (b.ti === a.ti && b.ii > a.ii) ? b : a));
-    /** @type {any[]} */
-    const ops = ids.map((id) => ({ op: 'remove_item', id }));
     const index = top.tr.items.slice(0, top.ii).filter((it) => !ids.includes(it.id)).length;
     ops.push({ op: 'add_item', track: top.tr.id, item: { id: name, asset: saved.asset.ref, start: t0, duration, params: {}, transform: {} } }, { op: 'move_item', id: name, track: top.tr.id, index });
-    const edited = await editClip(slug, ops, { by: `precomp ${saved.asset.ref}` });
+    let edited;
+    try { edited = await editClip(slug, ops, { by: `precomp ${saved.asset.ref}` }); } catch (e) {
+      // what is left to go wrong (the clip was changed while the asset was being validated) cannot take the asset back: say it is there
+      if (e instanceof StudioError) throw new StudioError(`${saved.asset.ref} was saved, but the layers were not replaced: ${e.message}`, e.code, { ...e.details, asset: saved.asset.ref });
+      throw e;
+    }
     return { asset: saved.asset, source, clip: edited.clip };
   }
 

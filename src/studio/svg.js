@@ -89,7 +89,23 @@ const ATTRS = new Set(['id', 'class', 'd', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx
 const CSS_PROPS = new Set(['fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-miterlimit',
   'opacity', 'stop-color', 'stop-opacity', 'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline', 'letter-spacing', 'visibility', 'display', 'color', 'clip-path', 'mask', 'filter', 'mix-blend-mode', 'isolation']);
 
-const localUrlsOnly = (v) => !/url\s*\(/i.test(v) || [...v.matchAll(/url\s*\(\s*(['"]?)([^)'"]*)\1\s*\)/gi)].every((m) => m[2].startsWith('#'));
+const COLOR_FNS = ['rgb', 'rgba', 'hsl', 'hsla'], TRANSFORM_FNS = ['matrix', 'translate', 'scale', 'rotate', 'skewx', 'skewy'];
+const TRANSFORM_ATTRS = new Set(['transform', 'gradientTransform', 'patternTransform']);
+/**
+ * What a value may not carry, or null when it is fine. Checked positively, since a value that fails
+ * to parse here can still parse in a renderer: no CSS escapes (u\72l), and once every well-formed
+ * url(#id) is taken out, no function left but colours (and transform functions where a transform goes).
+ * So an unclosed url(http://…, a protocol-relative url(//…) and image-set('http://…') all go.
+ */
+function badValue(v, transforms = false) {
+  if (v.includes('\\')) return 'an escape';
+  const rest = v.replace(/url\(\s*(['"]?)#[^\s()'"]+\1\s*\)/gi, ' ');
+  for (const [, name] of rest.matchAll(/([\w-]*)\s*\(/g)) {
+    const fn = name.toLowerCase();
+    if (!COLOR_FNS.includes(fn) && !(transforms && TRANSFORM_FNS.includes(fn))) return fn === 'url' ? 'external url()' : `${name || 'a bare '}()`;
+  }
+  return null;
+}
 const dangerous = (v) => /javascript:|vbscript:|data:(?!image\/(png|jpeg|webp);)|expression\s*\(|@import|behaviou?r\s*:/i.test(v);
 
 /**
@@ -112,12 +128,13 @@ export function sanitizeSvg(text) {
       if (k === 'href' || k === 'xlink:href') { if (!v.startsWith('#')) { note(`external ${k} on <${el.name}>`); continue; } }
       // a style attribute is filtered declaration by declaration below; other values whole
       if (k !== 'style' && dangerous(v)) { note(`unsafe value in ${k} on <${el.name}>`); continue; }
-      if (k !== 'style' && !localUrlsOnly(v)) { note(`external url() in ${k} on <${el.name}>`); continue; }
+      const bad = k === 'style' ? null : badValue(v, TRANSFORM_ATTRS.has(k));
+      if (bad) { note(`${bad} in ${k} on <${el.name}>`); continue; }
       if (k === 'style') {
         const kept = v.split(';').map((d) => d.trim()).filter(Boolean).filter((d) => {
           const [prop, ...rest] = d.split(':');
           const val = rest.join(':').trim();
-          const ok = CSS_PROPS.has(prop.trim().toLowerCase()) && localUrlsOnly(val) && !dangerous(val);
+          const ok = CSS_PROPS.has(prop.trim().toLowerCase()) && !badValue(val) && !dangerous(val);
           if (!ok) note(`style property "${prop.trim()}" on <${el.name}>`);
           return ok;
         });
@@ -183,15 +200,89 @@ function styleOf(el, parent) {
   return s;
 }
 
-/** The SVG's drawable paths as data (see src/core/lib/svg.js); gradients become their first stop's colour, text is left to the raster. */
-export function vectorModel(tree) {
-  const attr = (el, k) => el.attrs.find(([a]) => a === k)?.[1];
-  const vb = (attr(tree, 'viewBox') ?? '').split(/[\s,]+/).filter(Boolean).map(Number);
-  const w = num(attr(tree, 'width'), vb[2] ?? 300), h = num(attr(tree, 'height'), vb[3] ?? 150);
-  const viewBox = vb.length === 4 && vb.every(Number.isFinite) ? vb : [0, 0, w, h];
+const attr = (el, k) => el.attrs.find(([a]) => a === k)?.[1];
+const useTarget = (el, ids) => ids.get((attr(el, 'href') ?? attr(el, 'xlink:href') ?? '').slice(1));
+function indexIds(tree) {
   const ids = new Map();
   const index = (el) => { if (!el.name) return; const id = attr(el, 'id'); if (id) ids.set(id, el); el.children.forEach(index); };
   index(tree);
+  return ids;
+}
+
+const shapes = new WeakMap();
+/**
+ * An element's own outline as path commands ({ cmds, length }, or null when it draws none). Worked
+ * out once per element: a <use> can draw the same path thousands of times.
+ */
+function shapeOf(el) {
+  if (shapes.has(el)) return shapes.get(el);
+  let d = null;
+  const a = (k) => num(attr(el, k));
+  if (el.name === 'path') d = attr(el, 'd');
+  else if (el.name === 'rect') {
+    const x = a('x'), y = a('y'), rw = a('width'), rh = a('height');
+    let rx = num(attr(el, 'rx') ?? attr(el, 'ry'), 0), ry = num(attr(el, 'ry') ?? attr(el, 'rx'), 0);
+    rx = Math.min(rx, rw / 2); ry = Math.min(ry, rh / 2);
+    d = rx || ry ? `M${x + rx},${y}H${x + rw - rx}A${rx},${ry} 0 0 1 ${x + rw},${y + ry}V${y + rh - ry}A${rx},${ry} 0 0 1 ${x + rw - rx},${y + rh}H${x + rx}A${rx},${ry} 0 0 1 ${x},${y + rh - ry}V${y + ry}A${rx},${ry} 0 0 1 ${x + rx},${y}Z` : `M${x},${y}H${x + rw}V${y + rh}H${x}Z`;
+  } else if (el.name === 'circle' || el.name === 'ellipse') {
+    const cx = a('cx'), cy = a('cy'), rx = el.name === 'circle' ? a('r') : a('rx'), ry = el.name === 'circle' ? a('r') : a('ry');
+    d = `M${cx - rx},${cy}A${rx},${ry} 0 1 0 ${cx + rx},${cy}A${rx},${ry} 0 1 0 ${cx - rx},${cy}Z`;
+  } else if (el.name === 'line') d = `M${a('x1')},${a('y1')}L${a('x2')},${a('y2')}`;
+  else if (el.name === 'polyline' || el.name === 'polygon') {
+    const pts = (attr(el, 'points') ?? '').split(/[\s,]+/).filter(Boolean).map(Number);
+    if (pts.length >= 4) d = `M${pts.slice(0, 2).join(',')}L${pts.slice(2).join(',')}${el.name === 'polygon' ? 'Z' : ''}`;
+  }
+  let shape = null;
+  if (d) {
+    try { const cmds = parsePath(d); if (cmds.length) shape = { cmds, length: Math.round(pathLength(cmds) * 1000) / 1000 }; } catch { /* malformed path data draws nothing */ }
+  }
+  shapes.set(el, shape);
+  return shape;
+}
+
+/** What walking a drawing may cost before the studio stops: elements visited and path commands drawn, with every <use> followed. */
+export const VECTOR_BUDGET = { nodes: 20_000, commands: 200_000 };
+/** What <use> may add to a document before it is refused: the rasteriser expands every reference too (about half a second at these numbers). */
+export const USE_BUDGET = { nodes: 200_000, commands: 5_000_000 };
+
+/**
+ * What the <use> elements of a document add to it once expanded: { nodes, commands } (elements and
+ * path commands drawn beyond the document's own). Counted, not expanded: each element's total is
+ * worked out once, so groups of <use> nested ten deep (10^12 shapes) cost one pass over the elements.
+ */
+export function useExpansion(tree) {
+  const ids = indexIds(tree);
+  const totals = new Map(), open = new Set();
+  let own = 0, ownCommands = 0;
+  const total = (el, depth) => {
+    if (!el.name) return [0, 0];
+    const known = totals.get(el);
+    if (known) return known;
+    // a reference that comes back to itself draws nothing; a chain of references this long is refused
+    if (open.has(el)) return [0, 0];
+    if (depth > 256) return [Infinity, Infinity];
+    open.add(el);
+    const sum = [1, shapeOf(el)?.cmds.length ?? 0];
+    for (const c of [...el.children, ...(el.name === 'use' ? [useTarget(el, ids)].filter(Boolean) : [])]) { const t = total(c, depth + 1); sum[0] += t[0]; sum[1] += t[1]; }
+    open.delete(el);
+    totals.set(el, sum);
+    return sum;
+  };
+  const count = (el) => { if (!el.name) return; own++; ownCommands += shapeOf(el)?.cmds.length ?? 0; el.children.forEach(count); };
+  count(tree);
+  const [nodes, commands] = total(tree, 0);
+  return { nodes: nodes - own, commands: commands - ownCommands };
+}
+
+/**
+ * The SVG's drawable paths as data (see src/core/lib/svg.js); gradients become their first stop's colour, text is left to the raster.
+ * A drawing over VECTOR_BUDGET comes back with no paths and `over: true`: it has a raster, but no f.svg().
+ */
+export function vectorModel(tree) {
+  const vb = (attr(tree, 'viewBox') ?? '').split(/[\s,]+/).filter(Boolean).map(Number);
+  const w = num(attr(tree, 'width'), vb[2] ?? 300), h = num(attr(tree, 'height'), vb[3] ?? 150);
+  const viewBox = vb.length === 4 && vb.every(Number.isFinite) ? vb : [0, 0, w, h];
+  const ids = indexIds(tree);
   const paint = (v, s) => {
     if (!v || v === 'none') return v === 'none' ? 'none' : null;
     if (v === 'currentColor') return s.color ?? '#000000';
@@ -200,8 +291,11 @@ export function vectorModel(tree) {
     return v;
   };
   const paths = [];
+  let nodes = 0, commands = 0, over = false;
   const walk = (el, m, parent, depth) => {
-    if (!el.name || depth > 32 || paths.length > 4000) return;
+    if (over || !el.name || depth > 32 || paths.length > 4000) return;
+    // nested <use> multiplies: ten levels of ten references are 10^10 visits with nothing to show for them
+    if (++nodes > VECTOR_BUDGET.nodes) { over = true; return; }
     if (['defs', 'clipPath', 'mask', 'pattern', 'symbol', 'linearGradient', 'radialGradient', 'marker', 'filter', 'title', 'desc', 'text'].includes(el.name) && depth > 0) return;
     const s = styleOf(el, parent);
     if (s.display === 'none' || s.visibility === 'hidden') return;
@@ -209,36 +303,19 @@ export function vectorModel(tree) {
     const group = { ...s, groupOpacity: s.opacity };
     if (el.name === 'svg' || el.name === 'g') { for (const c of el.children) walk(c, mm, group, depth + 1); return; }
     if (el.name === 'use') {
-      const target = ids.get((attr(el, 'href') ?? attr(el, 'xlink:href') ?? '').slice(1));
+      const target = useTarget(el, ids);
       if (target) walk(target.name === 'symbol' ? { ...target, name: 'g' } : target, mul(mm, [1, 0, 0, 1, num(attr(el, 'x')), num(attr(el, 'y'))]), group, depth + 1);
       return;
     }
-    let d = null;
-    const a = (k) => num(attr(el, k));
-    if (el.name === 'path') d = attr(el, 'd');
-    else if (el.name === 'rect') {
-      const x = a('x'), y = a('y'), rw = a('width'), rh = a('height');
-      let rx = num(attr(el, 'rx') ?? attr(el, 'ry'), 0), ry = num(attr(el, 'ry') ?? attr(el, 'rx'), 0);
-      rx = Math.min(rx, rw / 2); ry = Math.min(ry, rh / 2);
-      d = rx || ry ? `M${x + rx},${y}H${x + rw - rx}A${rx},${ry} 0 0 1 ${x + rw},${y + ry}V${y + rh - ry}A${rx},${ry} 0 0 1 ${x + rw - rx},${y + rh}H${x + rx}A${rx},${ry} 0 0 1 ${x},${y + rh - ry}V${y + ry}A${rx},${ry} 0 0 1 ${x + rx},${y}Z` : `M${x},${y}H${x + rw}V${y + rh}H${x}Z`;
-    } else if (el.name === 'circle' || el.name === 'ellipse') {
-      const cx = a('cx'), cy = a('cy'), rx = el.name === 'circle' ? a('r') : a('rx'), ry = el.name === 'circle' ? a('r') : a('ry');
-      d = `M${cx - rx},${cy}A${rx},${ry} 0 1 0 ${cx + rx},${cy}A${rx},${ry} 0 1 0 ${cx - rx},${cy}Z`;
-    } else if (el.name === 'line') d = `M${a('x1')},${a('y1')}L${a('x2')},${a('y2')}`;
-    else if (el.name === 'polyline' || el.name === 'polygon') {
-      const pts = (attr(el, 'points') ?? '').split(/[\s,]+/).filter(Boolean).map(Number);
-      if (pts.length >= 4) d = `M${pts.slice(0, 2).join(',')}L${pts.slice(2).join(',')}${el.name === 'polygon' ? 'Z' : ''}`;
-    }
-    if (!d) return;
-    let cmds;
-    try { cmds = parsePath(d); } catch { return; }
-    if (!cmds.length) return;
+    const shape = shapeOf(el);
+    if (!shape) return;
+    if ((commands += shape.cmds.length) > VECTOR_BUDGET.commands) { over = true; return; }
     paths.push({
-      d: cmds, fill: paint(s.fill ?? '#000000', s), stroke: paint(s.stroke ?? 'none', s), strokeWidth: num(s['stroke-width'], 1), opacity: s.opacity,
+      d: shape.cmds, fill: paint(s.fill ?? '#000000', s), stroke: paint(s.stroke ?? 'none', s), strokeWidth: num(s['stroke-width'], 1), opacity: s.opacity,
       fillOpacity: num(s['fill-opacity'], 1), strokeOpacity: num(s['stroke-opacity'], 1), fillRule: s['fill-rule'] === 'evenodd' ? 'evenodd' : 'nonzero',
-      lineCap: s['stroke-linecap'] ?? 'butt', lineJoin: s['stroke-linejoin'] ?? 'miter', m: mm.map((v) => Math.round(v * 1e6) / 1e6), length: Math.round(pathLength(cmds) * 1000) / 1000,
+      lineCap: s['stroke-linecap'] ?? 'butt', lineJoin: s['stroke-linejoin'] ?? 'miter', m: mm.map((v) => Math.round(v * 1e6) / 1e6), length: shape.length,
     });
   };
   walk(tree, [1, 0, 0, 1, 0, 0], { fill: '#000000' }, 0);
-  return { width: w, height: h, viewBox, paths };
+  return over ? { width: w, height: h, viewBox, paths: [], over: true } : { width: w, height: h, viewBox, paths };
 }

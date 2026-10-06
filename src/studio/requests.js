@@ -37,6 +37,8 @@ export function createRequests(ctx, library, clips, frames) {
   };
   const emit = (key, action, data = {}) => ctx.events?.emit('request', key, action, data);
   const leaseUntil = (seconds = LEASE_SECONDS) => new Date(Date.now() + seconds * 1000).toISOString();
+  /** Proposal ids this process is accepting right now. */
+  const accepting = new Set();
 
   // ── shapes ───────────────────────────────────────────────────────────────────────────────
 
@@ -108,8 +110,8 @@ export function createRequests(ctx, library, clips, frames) {
       transaction(db, () => {
         if (!q("UPDATE requests SET status = 'open', claimed_by = NULL, lease_until = NULL, updated_at = ? WHERE id = ? AND status = 'working' AND lease_until < ?").run(now(), r.id, now()).changes) return;
         message(r.id, 'studio', 'system', `${r.claimed_by}'s claim expired; the request is back in the queue.`);
+        emit(r.id, 'status', { status: 'open' });
       });
-      emit(r.id, 'status', { status: 'open' });
     }
   }
 
@@ -146,9 +148,9 @@ export function createRequests(ctx, library, clips, frames) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`).run(s, assetRow?.asset_id ?? null, assetRow?.version ?? null, clipRow?.id ?? null, clipRow?.revision ?? null,
         JSON.stringify(s === 'clip' ? items : []), at ?? null, params ? JSON.stringify(params) : null, title, author, now(), now()).lastInsertRowid;
       message(rid, author, 'user', text);
+      emit(rid, 'created', { scope: s, asset: assetRow?.slug ?? null, clip: clipRow?.slug ?? null });
       return rid;
     });
-    emit(id, 'created', { scope: s, asset: assetRow?.slug ?? null, clip: clipRow?.slug ?? null });
     return get(id);
   }
 
@@ -164,8 +166,8 @@ export function createRequests(ctx, library, clips, frames) {
       // a user who writes while the agent holds the claim is heard when it next reads the thread
       else if (r.status !== 'working') setStatus(r.id, 'open', ', claimed_by = NULL, lease_until = NULL');
       else q('UPDATE requests SET updated_at = ? WHERE id = ?').run(now(), r.id);
+      emit(r.id, 'message', { role });
     });
-    emit(r.id, 'message', { role });
     return get(r.id);
   }
 
@@ -176,8 +178,8 @@ export function createRequests(ctx, library, clips, frames) {
       setStatus(r.id, 'cancelled', ', claimed_by = NULL, lease_until = NULL');
       q("UPDATE proposals SET status = 'superseded' WHERE request_id = ? AND status = 'pending'").run(r.id);
       message(r.id, author, 'system', 'Cancelled.');
+      emit(r.id, 'status', { status: 'cancelled' });
     });
-    emit(r.id, 'status', { status: 'cancelled' });
     return get(r.id);
   }
 
@@ -189,6 +191,13 @@ export function createRequests(ctx, library, clips, frames) {
   async function accept({ proposal: pid, author, force = false }) {
     const p = proposalRow(pid);
     if (p.status !== 'pending') throw new StudioError(`Proposal #${p.id} is ${p.status}; only a pending proposal can be accepted`, 'conflict');
+    // a double click or a second tab: the first accept is still saving (it awaits validation and test frames)
+    if (accepting.has(p.id)) throw new StudioError(`Proposal #${p.id} is being accepted already`, 'conflict');
+    accepting.add(p.id);
+    try { return await applyProposal(p, author, force); } finally { accepting.delete(p.id); }
+  }
+
+  async function applyProposal(p, author, force) {
     const r = row(p.request_id);
     const payload = json(p.payload, {});
     const note = `${payload.note || p.summary || 'Proposed by the agent'} (accepted from request #${r.id})`;
@@ -213,11 +222,13 @@ export function createRequests(ctx, library, clips, frames) {
       result = `${p.target}#${out.clip.revision}`;
     } else throw new StudioError(`Unknown proposal kind ${p.kind}`);
     transaction(db, () => {
-      q("UPDATE proposals SET status = 'accepted', result = ?, decided_at = ?, decided_by = ? WHERE id = ?").run(result, now(), author, p.id);
+      // another process may have decided it (or cancelled the request) while this one was saving
+      const done = q("UPDATE proposals SET status = 'accepted', result = ?, decided_at = ?, decided_by = ? WHERE id = ? AND status = 'pending'").run(result, now(), author, p.id);
+      if (!done.changes) throw new StudioError(`Proposal #${p.id} was ${proposalRow(p.id).status} elsewhere while it was being accepted; what it made is ${result}`, 'conflict');
       setStatus(r.id, 'done', ', claimed_by = NULL, lease_until = NULL');
       message(r.id, author, 'system', `Accepted proposal #${p.id}: it is now ${result}.`, p.id);
+      emit(r.id, 'proposal', { proposal: p.id, status: 'accepted', result });
     });
-    emit(r.id, 'proposal', { proposal: p.id, status: 'accepted', result });
     return { request: get(r.id), result };
   }
 
@@ -231,8 +242,8 @@ export function createRequests(ctx, library, clips, frames) {
       message(p.request_id, author, 'system', `Rejected proposal #${p.id}.`, p.id);
       if (text) { message(p.request_id, author, 'user', text); setStatus(p.request_id, 'open', ', claimed_by = NULL, lease_until = NULL'); }
       else setStatus(p.request_id, 'done', ', claimed_by = NULL, lease_until = NULL');
+      emit(p.request_id, 'proposal', { proposal: p.id, status: 'rejected' });
     });
-    emit(p.request_id, 'proposal', { proposal: p.id, status: 'rejected' });
     return get(p.request_id);
   }
 
@@ -247,15 +258,16 @@ export function createRequests(ctx, library, clips, frames) {
     expireLeases();
     const target = id !== undefined && id !== null ? row(id) : q("SELECT * FROM requests WHERE status = 'open' ORDER BY id LIMIT 1").get();
     if (!target) return null;
-    if (target.status === 'working' && target.claimed_by !== agent) throw new StudioError(`Request #${target.id} is being worked by ${target.claimed_by} (until ${target.lease_until})`, 'conflict');
-    if (['done', 'cancelled'].includes(target.status)) throw new StudioError(`Request #${target.id} is ${target.status}`, 'conflict');
-    const claimed = transaction(db, () => {
-      const ok = q("UPDATE requests SET status = 'working', claimed_by = ?, lease_until = ?, updated_at = ? WHERE id = ? AND status IN ('open', 'review', 'working')").run(agent, leaseUntil(), now(), target.id).changes;
-      if (ok && target.claimed_by !== agent) message(target.id, agent, 'system', `${agent} is working on it.`);
-      return ok;
+    transaction(db, () => {
+      // read again under the write lock: another agent may have claimed it since the row above was read,
+      // and the UPDATE itself only takes a request that is free or already this agent's
+      const cur = row(target.id);
+      const ok = q("UPDATE requests SET status = 'working', claimed_by = ?, lease_until = ?, updated_at = ? WHERE id = ? AND (status IN ('open', 'review') OR (status = 'working' AND claimed_by = ?))").run(agent, leaseUntil(), now(), cur.id, agent).changes;
+      if (!ok && cur.status === 'working') throw new StudioError(`Request #${cur.id} is being worked by ${cur.claimed_by} (until ${cur.lease_until})`, 'conflict');
+      if (!ok) throw new StudioError(`Request #${cur.id} is ${cur.status}`, 'conflict');
+      if (cur.claimed_by !== agent) message(cur.id, agent, 'system', `${agent} is working on it.`);
+      emit(cur.id, 'status', { status: 'working', agent });
     });
-    if (!claimed) throw new StudioError(`Request #${target.id} was taken by someone else; try again`, 'conflict');
-    emit(target.id, 'status', { status: 'working', agent });
     return get(target.id);
   }
 
@@ -353,18 +365,21 @@ export function createRequests(ctx, library, clips, frames) {
     let pid;
     try {
       pid = transaction(db, () => {
+        // validating and drawing took a while: the user may have cancelled or closed the request meanwhile
+        const status = row(r.id).status;
+        if (['done', 'cancelled'].includes(status)) throw new StudioError(`Request #${r.id} was ${status === 'done' ? 'closed' : 'cancelled'} while this proposal was being prepared; nothing was proposed`, 'conflict');
         q("UPDATE proposals SET status = 'superseded' WHERE request_id = ? AND status = 'pending'").run(r.id);
         const newId = q(`INSERT INTO proposals (request_id, kind, target, base, payload, summary, status, thumb, meta, author, created_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`)
           .run(r.id, kind, target, base ?? null, JSON.stringify(payload), summary, thumb, JSON.stringify(meta), agent, now()).lastInsertRowid;
         message(r.id, agent, 'agent', summary || `Proposed ${kind === 'clip-edit' ? `an edit of ${target}` : kind === 'new-asset' ? `a new asset, ${target}` : `a new version of ${target}`}.`, newId);
         setStatus(r.id, 'review', ', lease_until = NULL');
+        emit(r.id, 'proposal', { proposal: newId, status: 'pending', kind, target });
         return newId;
       });
     } catch (e) {
       if (thumb) rmSync(join(dataDir, thumb), { force: true });
       throw e;
     }
-    emit(r.id, 'proposal', { proposal: pid, status: 'pending', kind, target });
     return { request: get(r.id), proposal: proposalShape(proposalRow(pid)) };
   }
 
@@ -374,28 +389,34 @@ export function createRequests(ctx, library, clips, frames) {
     transaction(db, () => {
       if (body?.trim()) message(r.id, agent, 'agent', body.trim());
       setStatus(r.id, 'done', ', claimed_by = NULL, lease_until = NULL');
+      emit(r.id, 'status', { status: 'done' });
     });
-    emit(r.id, 'status', { status: 'done' });
     return get(r.id);
   }
 
   /** Record the state of a "Run now" session on the request (JSON), and tell the studio. */
   function setRun(id, run) {
-    q('UPDATE requests SET run = ?, updated_at = ? WHERE id = ?').run(run ? JSON.stringify(run) : null, now(), Number(id));
-    emit(id, 'run', { status: run?.status ?? null });
+    transaction(db, () => {
+      q('UPDATE requests SET run = ?, updated_at = ? WHERE id = ?').run(run ? JSON.stringify(run) : null, now(), Number(id));
+      emit(id, 'run', { status: run?.status ?? null });
+    });
   }
 
   /** Give a claim back (a session that ended without answering): the request returns to the queue. */
   function release(id, agent) {
-    const done = q("UPDATE requests SET status = 'open', claimed_by = NULL, lease_until = NULL, updated_at = ? WHERE id = ? AND status = 'working' AND claimed_by = ?").run(now(), Number(id), agent).changes;
-    if (done) { message(Number(id), 'studio', 'system', `${agent} stopped without an answer; the request is back in the queue.`); emit(id, 'status', { status: 'open' }); }
-    return !!done;
+    return transaction(db, () => {
+      const done = q("UPDATE requests SET status = 'open', claimed_by = NULL, lease_until = NULL, updated_at = ? WHERE id = ? AND status = 'working' AND claimed_by = ?").run(now(), Number(id), agent).changes;
+      if (done) { message(Number(id), 'studio', 'system', `${agent} stopped without an answer; the request is back in the queue.`); emit(id, 'status', { status: 'open' }); }
+      return !!done;
+    });
   }
 
   /** A progress or system line in the thread (from a "Run now" session). */
   function note(id, author, role, body) {
-    message(Number(id), author, role, body);
-    emit(id, 'message', { role });
+    transaction(db, () => {
+      message(Number(id), author, role, body);
+      emit(id, 'message', { role });
+    });
   }
 
   return { create, list, get, reply, cancel, accept, reject, claim, context, propose, complete, setRun, note, release, proposal: (id) => proposalShape(proposalRow(id)), expireLeases };
