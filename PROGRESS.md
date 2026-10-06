@@ -12,7 +12,7 @@ proven by clips 4, 5 and 6. Brief: `ITERATION_2_PROMPT.md`. Iteration 1's record
 
 Started 2026-10-06 on branch `main` at `f24ab12`.
 
-**Next:** M7 UI is with four background agents (library, playground, editor, shell/agent panel); when they report: integrate (app.js badge call, requested shared changes), verify every screen headless at both sizes, commit. Meanwhile M8 backend (compounding): `mcp_calls` log + build metrics, `suggest_assets`, asset notes, usage examples, clip theme (`f.theme`), cookbook.
+**Next:** M7 UI is with four background agents (library → src/ui/screens/library.js, lib/grid.js, lib/upload.js, lib/picker.js, css/library.css; playground → screens/asset.js, lib/code-editor.js, lib/diff-view.js, lib/params.js, css/playground.css; editor → screens/editor.js, lib/timeline.js, lib/stage.js, lib/inspector.js, lib/canvas-handles.js, lib/history.js, lib/waveform.js, css/editor.css; shell → lib/agent-panel.js, screens/requests.js, lib/requests-badge.js, css/agent.css, live updates in renders/gallery/lineage/clips). When each reports: apply its requested shared changes (app.js: import + call startRequestsBadge()), then verify all screens myself (sweep at both sizes on showcase + dev-seed-v2 data; update .claude/goal-loop/screens with the new screens/testids), commit. Then `scripts/bench-library.mjs` (D13), M9 clips 4–5. M8 backend and the cookbook are done.
 
 ## Contract (Done means)
 
