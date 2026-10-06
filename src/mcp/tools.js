@@ -12,7 +12,7 @@ const FORMAT = z.enum(['vertical', 'horizontal', 'square']);
 const REF = z.string().describe('Asset reference: "name" (latest version) or "name@3" (pinned)');
 const PARAMS = z.record(z.string(), z.any()).describe('Parameter values, validated against the asset\'s schema');
 const AUTHOR = z.string().optional().describe('Who is writing this (model id or person). Defaults to the server\'s STUDIO_AUTHOR.');
-const COMPOSITION = z.record(z.string(), z.any()).describe('Clip composition: { format | width+height, fps, duration, background, seed, tracks: [{ id, type: visual|text|audio, items: [{ id, asset, start, duration, params, fadeIn, fadeOut, opacity, blend, box:{x,y,width,height as 0..1}, gain (audio), beats (audio) }] }] }. Tracks draw bottom to top.');
+const COMPOSITION = z.record(z.string(), z.any()).describe('Clip composition: { format | width+height, fps, duration, background, seed, easing?, tracks: [{ id, name, type: visual|text|audio, hidden, locked, solo, muted, items: [{ id, asset, start, duration, params, fadeIn, fadeOut, opacity, blend, transform: { space: frame|safe, x, y, width, height (fractions of the space), anchorX, anchorY, scale, scaleX, scaleY, rotation (degrees) }, keyframes: { x|y|scale|rotation|opacity|params.<name>: [{ t, v, ease }] }, formats: { vertical|horizontal|square: { transform, keyframes, params, hidden, opacity } }, offset, assetDuration, gain (audio), beats (audio) }] }] }. Tracks draw bottom to top; a visual track also takes image assets (params.fit: contain|cover|fill). See studio_guide for the layout model.');
 
 const compactAsset = (a) => ({ ref: a.ref, type: a.type, kind: a.kind, title: a.title, description: a.description, tags: a.tags, formats: a.formats, duration: a.duration, params: a.params, author: a.author, originClip: a.originClip, forkedFrom: a.forkedFrom, usedByClips: a.usedByClips });
 const compactRender = (r) => ({ id: r.id, clip: r.clip, status: r.status, progress: Math.round(r.progress * 1000) / 1000, framesDone: r.framesDone, framesTotal: r.framesTotal, error: r.error, output: r.outputPath, poster: r.posterPath, srt: r.srt, log: r.log || undefined, stats: r.status === 'done' ? { renderSeconds: r.stats.renderSeconds, framesPerSecond: r.stats.framesPerSecond, realtimeFactor: r.stats.realtimeFactor, probe: r.stats.probe, frameHashes: r.stats.frameHashes } : undefined });
@@ -250,7 +250,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'edit_clip',
       title: 'Edit a clip with operations',
-      description: 'Apply small edits to a clip without resending the whole composition. Operations: { op: "set", duration?, fps?, background?, seed?, format? } · { op: "add_track", track: { id, type, name }, index? } · { op: "remove_track", id } · { op: "add_item", track, item } · { op: "update_item", id, patch } (patch.params merges; null removes a param) · { op: "remove_item", id } · { op: "move_item", id, track }.',
+      description: 'Apply small edits to a clip without resending the whole composition: timeline, layers and layout. Operations: { op: "set", duration?, fps?, background?, seed?, format? } · { op: "add_track", track: { id, type, name }, index? } · { op: "remove_track", id } · { op: "move_track", id, index } (draw order: the last track is in front) · { op: "update_track", id, patch: { name, hidden, locked, solo, muted } } · { op: "add_item", track, item } · { op: "update_item", id, patch } (patch.params merges; null removes a param) · { op: "remove_item", id } · { op: "move_item", id, track, index? } · { op: "set_transform", id, transform, format? } (merges; null removes a field; with format it edits that format\'s override) · { op: "set_keyframes", id, prop, keyframes, format? } · { op: "add_keyframe", id, prop, t, v, ease?, format? } · { op: "remove_keyframe", id, prop, t, format? } · { op: "set_override", id, format, override } · { op: "split_item", id, at } · { op: "duplicate_item", id, newId?, start?, track? }.',
       input: { clip: z.string(), operations: z.array(z.record(z.string(), z.any())).min(1) },
       run: async (a) => {
         const r = await clips.editClip(a.clip, a.operations);
@@ -320,9 +320,9 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       name: 'start_render',
       title: 'Render a clip to MP4',
       description: 'Queue a render of the clip to H.264/AAC MP4. Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long.',
-      input: { clip: z.string(), wait_seconds: z.number().min(0).max(900).optional() },
+      input: { clip: z.string(), format: FORMAT.optional().describe('Render the same composition in another format; each item\'s overrides for that format apply'), wait_seconds: z.number().min(0).max(900).optional() },
       run: async (a) => {
-        let r = renders.enqueue({ clip: a.clip, requestedBy: defaultAuthor });
+        let r = renders.enqueue({ clip: a.clip, format: a.format, requestedBy: defaultAuthor });
         if (a.wait_seconds) r = await renders.wait(r.id, a.wait_seconds * 1000);
         return { json: compactRender(r) };
       },

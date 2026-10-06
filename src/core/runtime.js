@@ -18,6 +18,7 @@ import { createLib } from './lib/index.js';
 import { createRng, hashSeed } from './rng.js';
 import { normalizeSchema, resolveParams, SchemaError } from './schema.js';
 import { safeZone, formatOf, REF_RE, FORMATS, SAMPLE_RATE } from './engine.js';
+import { forFormat, isV2Item, layerGeometry, sampleItem } from './transform.js';
 
 export const KINDS = ['visual', 'value', 'audio'];
 const MAX_DEPTH = 24;
@@ -403,10 +404,15 @@ export function createRuntime(host) {
       ctx.fillStyle = comp.background ?? '#000000';
       ctx.fillRect(0, 0, width, height);
       const clip = { t, frame, duration: comp.duration, fps, width, height, format: formatOf(width, height), beats: extra.beats ?? comp.beats ?? [], markers: extra.markers ?? comp.markers ?? [] };
+      const format = formatOf(width, height);
+      const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
       for (const tr of comp.tracks) {
-        if (tr.type === 'audio' || tr.hidden) continue;
+        if (tr.type === 'audio' || tr.hidden || (solo && !tr.solo)) continue;
         for (const item of tr.items) {
           if (!activeAt(item, frame, fps)) continue;
+          // composition v2 (transforms, keyframes, formats…) and image layers take the new path;
+          // everything else is drawn exactly as in v1, so old clips keep their pixels
+          if (isV2Item(item) || images.has(item.asset)) { drawLayer(ctx, comp, forFormat(item, format), t, clip); continue; }
           const lt = Math.max(0, t - item.start);
           let opacity = item.opacity ?? 1;
           if (item.fadeIn > 0) opacity *= Math.min(1, lt / item.fadeIn);
@@ -447,6 +453,82 @@ export function createRuntime(host) {
       }
     } finally {
       while (ctx.__saveDepth() > 0) ctx.restore();
+    }
+  }
+
+  const easings = new Map();
+  /** The curve called `name` from the composition's pinned easing asset. */
+  function easeOf(comp) {
+    return (name) => {
+      if (!comp.easing) throw new AssetError(`a keyframe eases with "${name}", but the composition pins no easing asset (set composition.easing, e.g. "easing@1")`);
+      let table = easings.get(comp.easing);
+      if (!table) easings.set(comp.easing, (table = callValue(comp.easing, {})));
+      const fn = table?.[name];
+      if (typeof fn !== 'function') throw new AssetError(`unknown easing "${name}" in ${comp.easing}${Array.isArray(table?.names) ? ` (known: ${table.names.join(', ')})` : ''}`);
+      return fn;
+    };
+  }
+
+  /** Draw an image into a w × h box: contain (default), cover (cropped to the box) or fill. */
+  function drawImageFit(ctx, img, w, h, fit = 'contain') {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if (fit === 'fill') return ctx.drawImage(img, 0, 0, w, h);
+    const k = fit === 'cover' ? Math.max(w / img.width, h / img.height) : Math.min(w / img.width, h / img.height);
+    const dw = img.width * k, dh = img.height * k;
+    if (fit === 'cover') { ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip(); }
+    ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  }
+
+  /**
+   * Draw one composition-v2 item (already merged for the frame's format): its keyframed transform,
+   * opacity and params at this frame, placed with a canvas transform so vectors stay sharp.
+   */
+  function drawLayer(ctx, comp, item, t, clip) {
+    if (item.hidden) return;
+    const { width, height, fps } = comp;
+    const lt = Math.max(0, t - item.start);
+    const offset = item.offset ?? 0;
+    const at = lt + offset;
+    const s = sampleItem(item, at, easeOf(comp));
+    let opacity = s.opacity;
+    if (item.fadeIn > 0) opacity *= Math.min(1, lt / item.fadeIn);
+    if (item.fadeOut > 0) opacity *= Math.min(1, (item.duration - lt) / item.fadeOut);
+    if (opacity <= 0) return;
+    const geo = layerGeometry(s.transform, width, height);
+    const img = images.get(item.asset);
+    const e = img ? null : entry(item.asset);
+    if (e && e.def.kind !== 'visual') throw new AssetError(`item "${item.id}": ${item.asset} is a ${e.def.kind} asset and cannot sit on a visual track`);
+    const layered = opacity < 1 || (item.blend && item.blend !== 'source-over');
+    const target = layered ? offscreen(width, height).ctx : ctx;
+    const depth = target.__saveDepth();
+    target.save();
+    const floor = target.__floor(depth + 1);
+    try {
+      target.beginPath();
+      target.transform(...geo.matrix);
+      if (img) drawImageFit(target, img, geo.width, geo.height, s.params.fit);
+      else {
+        invoke(e, s.params, {
+          ctx: target, width: geo.width, height: geo.height, fps, t: at, duration: item.assetDuration ?? offset + item.duration, depth: 0,
+          seed: hashSeed(comp.seed ?? 1, item.id), clip,
+          format: geo.full ? formatOf(width, height) : formatOf(geo.width, geo.height),
+          safe: geo.full ? safeZone(width, height) : { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: geo.width, height: geo.height },
+        });
+      }
+    } catch (err) {
+      if (err instanceof AssetError) err.message = `item "${item.id}" at ${t.toFixed(3)}s: ${err.message}`;
+      throw err;
+    } finally {
+      target.__floor(floor);
+      while (target.__saveDepth() > depth) target.restore();
+    }
+    if (layered) {
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.globalCompositeOperation = item.blend ?? 'source-over';
+      ctx.drawImage(target.canvas, 0, 0);
+      ctx.restore();
     }
   }
 

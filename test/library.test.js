@@ -142,7 +142,7 @@ test('clips validate their items against the pinned schemas', async () => {
   const comp = (items, type = 'visual') => ({ width: 320, height: 180, fps: 10, duration: 2, tracks: [{ type, items }] });
   await rejects(C.createClip({ slug: 'bad-1', author: AUTHOR, composition: comp([{ asset: 'nope', start: 0, duration: 1 }]) }), /no asset "nope" in the library/);
   await rejects(C.createClip({ slug: 'bad-2', author: AUTHOR, composition: comp([{ id: 'x', asset: 'dot', start: 0, duration: 1, params: { radius: 9000, colr: '#fff' } }]) }), /item "x": params\.colr: unknown parameter[\s\S]*params\.radius: 9000 is above the maximum 200/);
-  await rejects(C.createClip({ slug: 'bad-3', author: AUTHOR, composition: comp([{ asset: 'easing', start: 0, duration: 1 }]) }), /easing@1 is a value asset; a visual track takes visual assets/);
+  await rejects(C.createClip({ slug: 'bad-3', author: AUTHOR, composition: comp([{ asset: 'easing', start: 0, duration: 1 }]) }), /easing@1 is a value asset; a visual track takes visual or image assets/);
   await rejects(C.createClip({ slug: 'bad-4', author: AUTHOR, composition: comp([{ asset: 'dot', start: 0, duration: 1 }], 'audio') }), /an audio track takes audio or sound assets/);
   await rejects(C.createClip({ slug: 'bad-5', author: AUTHOR, composition: comp([{ asset: 'label', start: 0, duration: 1, params: { font: 'Comic Sans' } }]) }), /unknown font family "Comic Sans" \(available: Inter/);
   assert.equal(C.listClips().filter((c) => c.slug.startsWith('bad-')).length, 0);

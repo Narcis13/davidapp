@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, SAMPLE_RATE, makeRef, parseRef } from '../core/engine.js';
 import { normalizeComposition, itemsOf, reformat } from '../core/composition.js';
+import { needsEasing } from '../core/transform.js';
 import { mapParams, resolveParams, walkParams } from '../core/schema.js';
 import { hashSeed } from '../core/rng.js';
 import { encodeWav, detectBeats } from '../render/wav.js';
@@ -14,6 +15,11 @@ import { json, now, transaction } from '../db/db.js';
 import { SLUG_RE, StudioError } from './library.js';
 
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
+
+const round3 = (v) => Math.round(v * 1000) / 1000;
+
+/** What an image layer takes: how the image fits its box. */
+const IMAGE_ITEM_SCHEMA = { fit: { type: 'enum', options: ['contain', 'cover', 'fill'], default: 'contain' } };
 
 /** Write a cache file so that nobody can read it half-written. */
 function writeAtomic(path, data) {
@@ -43,6 +49,7 @@ export function createClips(ctx, library) {
     if (errors.length) throw new StudioError(`The composition is invalid:\n- ${errors.map((e) => `${e.path}: ${e.message}`).join('\n- ')}`, 'invalid', { errors });
     const problems = [];
     const refs = new Set(), fonts = new Set();
+    let wantsEasing = false;
     const pin = (ref, where) => {
       let wanted = ref, row;
       try {
@@ -66,26 +73,48 @@ export function createClips(ctx, library) {
       refs.add(item.asset);
       if (track.type === 'audio') {
         if (!(row.type === 'sound' || (row.type === 'function' && row.kind === 'audio'))) problems.push(`${where}: ${item.asset} is a ${row.kind ?? row.type} asset; an audio track takes audio or sound assets`);
-      } else if (!(row.type === 'function' && row.kind === 'visual')) {
-        problems.push(`${where}: ${item.asset} is a ${row.kind ?? row.type} asset; a ${track.type} track takes visual assets`);
+      } else if (!((row.type === 'function' && row.kind === 'visual') || row.type === 'image')) {
+        problems.push(`${where}: ${item.asset} is a ${row.kind ?? row.type} asset; a ${track.type} track takes visual or image assets`);
       }
-      if (row.type !== 'function') { if (Object.keys(item.params).length) problems.push(`${where}: ${row.type} assets take no params`); continue; }
-      const schema = json(row.schema, {});
-      for (const e of resolveParams(schema, item.params, { strict: true }).errors) problems.push(`${where}: params.${e.path}: ${e.message}`);
-      item.params = mapParams(schema, item.params, ['asset', 'image'], (value, def) => {
-        const dep = pin(value, `${where}: params`);
-        if (!dep) return value;
-        if (def.type === 'image' && dep.type !== 'image') problems.push(`${where}: params: "${value}" is a ${dep.type} asset where an image is expected`);
-        if (def.type === 'asset' && (dep.type !== 'function' || (def.kind && dep.kind !== def.kind))) problems.push(`${where}: params: "${value}" is a ${dep.kind ?? dep.type} asset where a ${def.kind ?? 'function'} asset is expected`);
-        const pinned = makeRef(dep.slug, dep.version);
-        refs.add(pinned);
-        return pinned;
-      });
-      walkParams(schema, item.params, ['font'], (family) => {
-        const ref = library.fontRef(family);
-        if (ref) fonts.add(ref);
-        else problems.push(`${where}: params: unknown font family "${family}" (available: ${library.fontFamilies().join(', ')})`);
-      });
+      const schema = row.type === 'function' ? json(row.schema, {}) : row.type === 'image' && track.type !== 'audio' ? IMAGE_ITEM_SCHEMA : null;
+      if (!schema) { if (Object.keys(item.params).length) problems.push(`${where}: ${row.type} assets take no params`); continue; }
+      // the item's params, and each format's overrides of them, are checked and pinned the same way
+      const pinParams = (params, at) => {
+        for (const e of resolveParams(schema, params, { strict: true }).errors) problems.push(`${at}: params.${e.path}: ${e.message}`);
+        const out = mapParams(schema, params, ['asset', 'image'], (value, def) => {
+          const dep = pin(value, `${at}: params`);
+          if (!dep) return value;
+          if (def.type === 'image' && dep.type !== 'image') problems.push(`${at}: params: "${value}" is a ${dep.type} asset where an image is expected`);
+          if (def.type === 'asset' && (dep.type !== 'function' || (def.kind && dep.kind !== def.kind))) problems.push(`${at}: params: "${value}" is a ${dep.kind ?? dep.type} asset where a ${def.kind ?? 'function'} asset is expected`);
+          const pinned = makeRef(dep.slug, dep.version);
+          refs.add(pinned);
+          return pinned;
+        });
+        walkParams(schema, out, ['font'], (family) => {
+          const ref = library.fontRef(family);
+          if (ref) fonts.add(ref);
+          else problems.push(`${at}: params: unknown font family "${family}" (available: ${library.fontFamilies().join(', ')})`);
+        });
+        return out;
+      };
+      item.params = pinParams(item.params, where);
+      for (const [fname, o] of Object.entries(item.formats ?? {})) if (o.params) o.params = pinParams(o.params, `${where} (${fname})`);
+      // keyframed params must be numbers or colours the schema accepts
+      const keyed = [item.keyframes, ...Object.values(item.formats ?? {}).map((o) => o.keyframes)];
+      for (const kf of keyed) for (const [prop, keys] of Object.entries(kf ?? {})) {
+        if (!prop.startsWith('params.')) continue;
+        const name = prop.slice(7), def = schema[name];
+        if (!def) { problems.push(`${where}: keyframes.${prop}: ${item.asset} has no parameter "${name}" (known: ${Object.keys(schema).join(', ') || 'none'})`); continue; }
+        if (!['number', 'integer', 'color'].includes(def.type)) { problems.push(`${where}: keyframes.${prop}: only number and colour parameters can be keyframed; "${name}" is ${def.type}`); continue; }
+        for (const k of keys) for (const e of resolveParams({ [name]: def }, { [name]: k.v }, { strict: true }).errors) problems.push(`${where}: keyframes.${prop} at ${k.t}s: ${e.message}`);
+      }
+      if (needsEasing(item)) wantsEasing = true;
+    }
+    // keyframe curves come from an easing asset the composition pins, like any other asset
+    if (composition.easing || wantsEasing) {
+      const row = pin(composition.easing ?? 'easing', 'easing');
+      if (row && !(row.type === 'function' && row.kind === 'value')) problems.push(`easing: ${makeRef(row.slug, row.version)} is a ${row.kind ?? row.type} asset; keyframe curves come from a value asset such as "easing"`);
+      else if (row) { composition.easing = makeRef(row.slug, row.version); refs.add(composition.easing); }
     }
     if (problems.length) throw new StudioError(`The composition is invalid:\n- ${problems.join('\n- ')}`, 'invalid', { problems });
     return { composition, refs: [...refs], fonts: [...fonts] };
@@ -102,20 +131,24 @@ export function createClips(ctx, library) {
   /** → { inputs: [{ path, start, duration, gain, fadeIn, fadeOut, id }], beats: [seconds] } */
   async function prepareAudio(composition) {
     const items = [];
-    for (const { track, item } of itemsOf(composition)) if (track.type === 'audio' && !track.hidden) items.push(item);
+    const solo = composition.tracks.some((t) => t.type === 'audio' && t.solo);
+    for (const { track, item } of itemsOf(composition)) if (track.type === 'audio' && !track.hidden && !track.muted && (!solo || track.solo)) items.push(item);
     const explicit = items.some((it) => it.beats !== undefined);
     const inputs = [];
     let beats = [];
     for (const [i, item] of items.entries()) {
       const row = library.requireVersion(item.asset);
       const wantBeats = explicit ? item.beats === true : i === 0;
+      // a split item plays [offset, offset + duration] of an asset timeline assetDuration long
+      const offset = item.offset ?? 0;
+      const span = item.assetDuration ?? offset + item.duration;
       let path, beatFile;
       if (row.type === 'sound') {
         path = library.absFile(row);
-        beatFile = join(audioDir, `${sha1(`${item.asset}|${item.duration}`)}.beats.json`);
+        beatFile = join(audioDir, `${sha1(`${item.asset}|${span}`)}.beats.json`);
         if (wantBeats && !existsSync(beatFile)) {
           const mono = await decodeMono(path);
-          writeAtomic(beatFile, JSON.stringify(detectBeats(mono.subarray(0, Math.round(item.duration * SAMPLE_RATE)), SAMPLE_RATE)));
+          writeAtomic(beatFile, JSON.stringify(detectBeats(mono.subarray(0, Math.round(span * SAMPLE_RATE)), SAMPLE_RATE)));
         }
       } else {
         const seed = hashSeed(composition.seed, item.id);
@@ -123,18 +156,23 @@ export function createClips(ctx, library) {
         const extra = [];
         walkParams(json(row.schema, {}), item.params, ['asset', 'image'], (value) => { if (parseRef(value).version !== null) extra.push(value); });
         const b = library.bundle([item.asset, ...extra]);
-        const key = sha1(JSON.stringify([ENGINE_VERSION, Object.keys(b.assets).sort(), item.asset, item.params, item.duration, seed]));
+        const key = sha1(JSON.stringify([ENGINE_VERSION, Object.keys(b.assets).sort(), item.asset, item.params, span, seed]));
         path = join(audioDir, `${key}.wav`);
         beatFile = join(audioDir, `${key}.beats.json`);
         if (!existsSync(path)) {
-          const r = await pool.run('audio', { ref: item.asset, params: item.params, duration: item.duration, seed }, { bundle: b, timeout: 120000 });
+          const r = await pool.run('audio', { ref: item.asset, params: item.params, duration: span, seed }, { bundle: b, timeout: 120000 });
           const left = new Float32Array(r.left), right = new Float32Array(r.right);
           writeAtomic(beatFile, JSON.stringify(detectBeats(left, SAMPLE_RATE)));
           writeAtomic(path, encodeWav(left, right, SAMPLE_RATE));
         }
       }
-      inputs.push({ id: item.id, path, start: item.start, duration: item.duration, gain: item.gain ?? 1, fadeIn: item.fadeIn ?? 0, fadeOut: item.fadeOut ?? 0 });
-      if (wantBeats) beats = beats.concat(json(readFileSync(beatFile, 'utf8'), []).map((t) => Math.round((t + item.start) * 1000) / 1000));
+      const input = { id: item.id, path, start: item.start, duration: item.duration, gain: item.gain ?? 1, fadeIn: item.fadeIn ?? 0, fadeOut: item.fadeOut ?? 0 };
+      if (offset) input.offset = offset;
+      inputs.push(input);
+      if (wantBeats) {
+        const found = json(readFileSync(beatFile, 'utf8'), []).filter((t) => t >= offset && t < offset + item.duration);
+        beats = beats.concat(found.map((t) => Math.round((t - offset + item.start) * 1000) / 1000));
+      }
     }
     beats.sort((a, b) => a - b);
     return { inputs, beats };
@@ -151,8 +189,12 @@ export function createClips(ctx, library) {
       if (track.type === 'audio') continue;
       refs.add(item.asset);
       const row = library.requireVersion(item.asset);
-      walkParams(json(row.schema, {}), item.params, ['asset', 'image'], (value) => { if (parseRef(value).version !== null) refs.add(value); });
+      const schema = json(row.schema, {});
+      for (const params of [item.params, ...Object.values(item.formats ?? {}).map((o) => o.params)]) {
+        if (params) walkParams(schema, params, ['asset', 'image'], (value) => { if (parseRef(value).version !== null) refs.add(value); });
+      }
     }
+    if (composition.easing) refs.add(composition.easing);
     const audio = await prepareAudio(composition);
     const bundle = library.bundle([...refs], { composition, beats: audio.beats });
     const out = { bundle, audio };
@@ -266,13 +308,36 @@ export function createClips(ctx, library) {
    *   { op: 'add_track', track: { id, type, name }, index? }      { op: 'remove_track', id }
    *   { op: 'add_item', track, item }                             { op: 'remove_item', id }
    *   { op: 'update_item', id, patch }   (patch.params merges; a null value removes that param)
-   *   { op: 'move_item', id, track }
+   *   { op: 'move_item', id, track, index? }                      { op: 'move_track', id, index }   (index: draw order, last is in front)
+   *   { op: 'update_track', id, patch: { name, hidden, locked, solo, muted } }
+   *   { op: 'set_transform', id, transform, format? }  (merges; null removes a field; format: that format's override)
+   *   { op: 'set_keyframes', id, prop, keyframes, format? }       (null or [] removes the property's keyframes)
+   *   { op: 'add_keyframe', id, prop, t, v, ease?, format? }      { op: 'remove_keyframe', id, prop, t, format? }
+   *   { op: 'set_override', id, format, override }                (replace a format's override; null clears it)
+   *   { op: 'split_item', id, at }  (clip seconds; the second part keeps playing where the first stopped)
+   *   { op: 'duplicate_item', id, newId?, start?, track? }
    */
   function applyOps(composition, ops) {
     let c = structuredClone(composition);
     const find = (id) => {
       for (const track of c.tracks) { const i = track.items.findIndex((it) => it.id === id); if (i >= 0) return { track, i, item: track.items[i] }; }
       throw new StudioError(`edit: no item with id "${id}" (items: ${c.tracks.flatMap((t) => t.items.map((it) => it.id)).join(', ') || 'none'})`, 'not_found');
+    };
+    const allIds = () => new Set(c.tracks.flatMap((t) => t.items.map((it) => it.id)));
+    const freeId = (base) => { const ids = allIds(); let id = base, i = 2; while (ids.has(id)) id = `${base}-${i++}`; return id; };
+    const clampIndex = (i, n) => (Number.isInteger(i) ? Math.max(0, Math.min(n, i)) : n);
+    /** The object a layout edit writes to: the item itself, or its override for one format. */
+    const layoutOf = (item, format) => {
+      if (!format) return item;
+      if (!['vertical', 'horizontal', 'square'].includes(format)) throw new StudioError(`edit: unknown format "${format}"`);
+      item.formats = { ...(item.formats ?? {}) };
+      item.formats[format] = { ...(item.formats[format] ?? {}) };
+      return item.formats[format];
+    };
+    /** Drop empty overrides so an item edited back to plain stays plain. */
+    const prune = (item) => {
+      for (const [k, o] of Object.entries(item.formats ?? {})) if (!Object.keys(o).length) delete item.formats[k];
+      if (item.formats && !Object.keys(item.formats).length) delete item.formats;
     };
     const trackOf = (id) => {
       const t = c.tracks.find((x) => x.id === id);
@@ -302,8 +367,84 @@ export function createClips(ctx, library) {
           }
           break;
         }
-        case 'move_item': { const f = find(op.id); f.track.items.splice(f.i, 1); trackOf(op.track).items.push(f.item); break; }
-        default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, add_item, update_item, remove_item, move_item)`);
+        case 'move_item': {
+          const f = find(op.id);
+          const to = trackOf(op.track ?? f.track.id);
+          f.track.items.splice(f.i, 1);
+          to.items.splice(op.index === undefined ? to.items.length : clampIndex(op.index, to.items.length), 0, f.item);
+          break;
+        }
+        case 'move_track': {
+          const t = trackOf(op.id);
+          c.tracks.splice(c.tracks.indexOf(t), 1);
+          c.tracks.splice(clampIndex(op.index, c.tracks.length), 0, t);
+          break;
+        }
+        case 'update_track': {
+          const t = trackOf(op.id);
+          for (const [k, v] of Object.entries(op.patch ?? {})) {
+            if (!['name', 'hidden', 'locked', 'solo', 'muted'].includes(k)) throw new StudioError(`edit: update_track can change name, hidden, locked, solo, muted; not "${k}"`);
+            if (k === 'name') t.name = String(v);
+            else if (v) t[k] = true; else delete t[k];
+          }
+          break;
+        }
+        case 'set_transform': {
+          const at = layoutOf(find(op.id).item, op.format);
+          const tr = { ...(at.transform ?? {}) };
+          for (const [k, v] of Object.entries(op.transform ?? {})) { if (v === null) delete tr[k]; else tr[k] = v; }
+          if (Object.keys(tr).length) at.transform = tr; else delete at.transform;
+          prune(find(op.id).item);
+          break;
+        }
+        case 'set_keyframes': case 'add_keyframe': case 'remove_keyframe': {
+          if (typeof op.prop !== 'string') throw new StudioError(`edit: ${op.op} needs prop (x, y, scale, rotation, opacity, params.<name>…)`);
+          const at = layoutOf(find(op.id).item, op.format);
+          const kf = { ...(at.keyframes ?? {}) };
+          let keys = [...(kf[op.prop] ?? [])];
+          if (op.op === 'set_keyframes') keys = op.keyframes ? [...op.keyframes] : [];
+          else if (op.op === 'add_keyframe') {
+            keys = keys.filter((k) => Math.abs(k.t - op.t) > 1e-6);
+            keys.push(op.ease === undefined ? { t: op.t, v: op.v } : { t: op.t, v: op.v, ease: op.ease });
+          } else keys = keys.filter((k) => Math.abs(k.t - op.t) > 1e-6);
+          keys.sort((a, b) => a.t - b.t);
+          if (keys.length) kf[op.prop] = keys; else delete kf[op.prop];
+          if (Object.keys(kf).length) at.keyframes = kf; else delete at.keyframes;
+          prune(find(op.id).item);
+          break;
+        }
+        case 'set_override': {
+          const { item } = find(op.id);
+          if (!['vertical', 'horizontal', 'square'].includes(op.format)) throw new StudioError('edit: set_override needs format: vertical, horizontal or square');
+          item.formats = { ...(item.formats ?? {}) };
+          if (op.override) item.formats[op.format] = op.override; else delete item.formats[op.format];
+          prune(item);
+          break;
+        }
+        case 'split_item': {
+          const f = find(op.id);
+          const it = f.item;
+          if (!(op.at > it.start + 1e-6 && op.at < it.start + it.duration - 1e-6)) throw new StudioError(`edit: split_item: ${op.at}s is not inside item "${it.id}" (${it.start}s–${round3(it.start + it.duration)}s)`);
+          const offset = it.offset ?? 0;
+          const whole = it.assetDuration ?? offset + it.duration;
+          const cut = round3(op.at - it.start);
+          const second = { ...structuredClone(it), id: freeId(`${it.id}-b`), start: round3(op.at), duration: round3(it.duration - cut), offset: round3(offset + cut), assetDuration: whole };
+          delete second.fadeIn;
+          Object.assign(it, { duration: cut, assetDuration: whole });
+          delete it.fadeOut;
+          f.track.items.splice(f.i + 1, 0, second);
+          break;
+        }
+        case 'duplicate_item': {
+          const f = find(op.id);
+          const copy = { ...structuredClone(f.item), id: op.newId ?? freeId(`${f.item.id}-copy`) };
+          if (op.newId && allIds().has(op.newId)) throw new StudioError(`edit: an item with id "${op.newId}" already exists`, 'conflict');
+          if (op.start !== undefined) copy.start = op.start;
+          const to = op.track ? trackOf(op.track) : f.track;
+          to.items.splice(to === f.track ? f.i + 1 : to.items.length, 0, copy);
+          break;
+        }
+        default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, move_track, update_track, add_item, update_item, remove_item, move_item, set_transform, set_keyframes, add_keyframe, remove_keyframe, set_override, split_item, duplicate_item)`);
       }
     }
     return c;

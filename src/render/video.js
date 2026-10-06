@@ -20,7 +20,8 @@ export function audioGraph(inputs, duration, first = 1) {
   if (!inputs.length) return null;
   const n = (v) => +v.toFixed(3);
   const parts = inputs.map((a, i) => {
-    const chain = ['aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo', `atrim=0:${n(a.duration)}`, 'asetpts=PTS-STARTPTS'];
+    const from = a.offset ?? 0;
+    const chain = ['aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo', `atrim=${n(from)}:${n(from + a.duration)}`, 'asetpts=PTS-STARTPTS'];
     if (a.fadeIn > 0) chain.push(`afade=t=in:st=0:d=${n(a.fadeIn)}`);
     if (a.fadeOut > 0) chain.push(`afade=t=out:st=${n(Math.max(0, a.duration - a.fadeOut))}:d=${n(a.fadeOut)}`);
     if (a.gain !== 1) chain.push(`volume=${n(a.gain)}`);

@@ -16,6 +16,7 @@
 
 import { FORMATS, MAX_CLIP_SECONDS, REF_RE, formatOf } from './engine.js';
 import { isColor } from './schema.js';
+import { FORMAT_NAMES, boxToTransform, checkKeyframes, checkTransform } from './transform.js';
 
 export const TRACK_TYPES = ['visual', 'text', 'audio'];
 export const BLEND_MODES = ['source-over', 'screen', 'multiply', 'overlay', 'lighter', 'soft-light', 'difference'];
@@ -60,6 +61,8 @@ export function normalizeComposition(input) {
     const type = tr.type ?? 'visual';
     if (!TRACK_TYPES.includes(type)) err(`${tp}.type`, `track type must be one of ${TRACK_TYPES.join(', ')}`);
     const track = { id: typeof tr.id === 'string' && tr.id ? tr.id : `track-${ti + 1}`, name: typeof tr.name === 'string' ? tr.name : undefined, type, hidden: tr.hidden ? true : undefined, items: [] };
+    // editor flags (v2): only written when set, so a v1 track normalizes to exactly what it was
+    for (const k of ['locked', 'solo', 'muted']) if (tr[k]) track[k] = true;
     if (!Array.isArray(tr.items)) { err(`${tp}.items`, 'items must be an array'); tracks.push(track); return; }
     tr.items.forEach((it, ii) => {
       const ip = `${tp}.items[${ii}]`;
@@ -80,6 +83,12 @@ export function normalizeComposition(input) {
         if (it[k] === undefined) continue;
         if (!num(it[k]) || it[k] < 0) err(`${ip}.${k}`, `${k} must be a number of seconds ≥ 0`); else if (it[k] > 0) item[k] = it[k];
       }
+      for (const k of ['offset', 'assetDuration']) {
+        if (it[k] === undefined) continue;
+        if (!num(it[k]) || it[k] < 0 || (k === 'assetDuration' && it[k] <= 0)) err(`${ip}.${k}`, k === 'offset' ? 'offset is seconds into the asset where the item starts (≥ 0)' : 'assetDuration is the length of the asset timeline the item is cut from (> 0)');
+        else item[k] = round(it[k]);
+      }
+      if (item.assetDuration !== undefined && item.assetDuration + 1e-6 < (item.offset ?? 0) + item.duration) err(`${ip}.assetDuration`, `assetDuration (${item.assetDuration}s) is shorter than offset + duration (${round((item.offset ?? 0) + item.duration)}s)`);
       if (type === 'audio') {
         if (it.gain !== undefined) { if (!num(it.gain) || it.gain < 0 || it.gain > 4) err(`${ip}.gain`, 'gain must be between 0 and 4'); else item.gain = it.gain; }
         if (it.beats !== undefined) item.beats = !!it.beats;
@@ -90,6 +99,38 @@ export function normalizeComposition(input) {
           const b = it.box;
           if (!isPlain(b) || !['x', 'y', 'width', 'height'].every((k) => num(b[k])) || b.width <= 0 || b.height <= 0) err(`${ip}.box`, 'box is { x, y, width, height } as fractions of the frame (0..1)');
           else item.box = { x: b.x, y: b.y, width: b.width, height: b.height };
+        }
+        if (it.transform !== undefined) {
+          const problems = checkTransform(it.transform, `${ip}.transform`);
+          for (const [p, m] of problems) err(p, m);
+          if (!problems.length) {
+            // a box and a transform: the box becomes the transform's starting geometry
+            if (item.box && it.transform.space === 'safe') err(`${ip}.box`, 'box is in frame fractions; with transform.space "safe" give the geometry in the transform instead');
+            const base = item.box ? boxToTransform(item.box, it.transform.anchorX ?? 0.5, it.transform.anchorY ?? 0.5) : {};
+            delete item.box;
+            item.transform = { ...base, ...it.transform };
+          }
+        }
+        if (it.keyframes !== undefined) {
+          const { problems, keyframes } = checkKeyframes(it.keyframes, `${ip}.keyframes`);
+          for (const [p, m] of problems) err(p, m);
+          if (!problems.length && Object.keys(keyframes).length) item.keyframes = keyframes;
+        }
+        if (it.formats !== undefined) {
+          if (!isPlain(it.formats)) err(`${ip}.formats`, 'formats maps a format name to its overrides: { vertical: { transform, keyframes, params, hidden } }');
+          else for (const [fname, o] of Object.entries(it.formats)) {
+            const fp = `${ip}.formats.${fname}`;
+            if (!FORMAT_NAMES.includes(fname)) { err(fp, `unknown format (use ${FORMAT_NAMES.join(', ')})`); continue; }
+            if (!isPlain(o)) { err(fp, 'an override is an object: { transform, keyframes, params, hidden, opacity }'); continue; }
+            const out = {};
+            for (const k of Object.keys(o)) if (!['transform', 'keyframes', 'params', 'hidden', 'opacity'].includes(k)) err(`${fp}.${k}`, 'unknown override (use transform, keyframes, params, hidden, opacity)');
+            if (o.transform !== undefined) { const pr = checkTransform(o.transform, `${fp}.transform`); for (const [p, m] of pr) err(p, m); if (!pr.length) out.transform = { ...o.transform }; }
+            if (o.keyframes !== undefined) { const r = checkKeyframes(o.keyframes, `${fp}.keyframes`); for (const [p, m] of r.problems) err(p, m); if (!r.problems.length) out.keyframes = r.keyframes; }
+            if (o.params !== undefined) { if (!isPlain(o.params)) err(`${fp}.params`, 'params must be an object'); else out.params = o.params; }
+            if (o.hidden !== undefined) out.hidden = !!o.hidden;
+            if (o.opacity !== undefined) { if (!num(o.opacity) || o.opacity < 0 || o.opacity > 1) err(`${fp}.opacity`, 'opacity must be between 0 and 1'); else out.opacity = o.opacity; }
+            if (Object.keys(out).length) (item.formats ??= {})[fname] = out;
+          }
         }
       }
       track.items.push(item);
@@ -103,9 +144,16 @@ export function normalizeComposition(input) {
     else markers = input.markers.map((m) => ({ t: m.t, label: typeof m.label === 'string' ? m.label : '' }));
   }
 
+  let easing;
+  if (input.easing !== undefined) {
+    if (typeof input.easing !== 'string' || !REF_RE.test(input.easing)) err('easing', 'easing is the reference of the easing asset keyframes take their curves from, e.g. "easing@1"');
+    else easing = input.easing;
+  }
+
   if (errors.length) return { composition: null, errors };
   const composition = { format: formatOf(width, height), width, height, fps, duration, seed, background, tracks };
   if (markers) composition.markers = markers;
+  if (easing) composition.easing = easing;
   return { composition, errors };
 }
 

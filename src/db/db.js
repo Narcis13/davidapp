@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -139,6 +139,11 @@ CREATE TABLE IF NOT EXISTS render_assets (
 );
 `;
 
+/** Columns added since schema v1: [table, column, declaration]. */
+const COLUMNS = [
+  ['renders', 'format', 'TEXT'],   // v2: rendered in another format than the clip's (its overrides apply)
+];
+
 /** Open (and create or migrate) the database at `file`. */
 export function openDb(file) {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
@@ -146,8 +151,12 @@ export function openDb(file) {
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 8000; PRAGMA synchronous = NORMAL;');
   db.exec(SCHEMA);
   const row = db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get();
-  if (!row) db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
-  else if (Number(row.value) > SCHEMA_VERSION) throw new Error(`The database at ${file} is schema v${row.value}; this build understands v${SCHEMA_VERSION}`);
+  if (row && Number(row.value) > SCHEMA_VERSION) throw new Error(`The database at ${file} is schema v${row.value}; this build understands v${SCHEMA_VERSION}`);
+  // columns added after v1: ALTER TABLE on a database made by an older build (idempotent)
+  for (const [table, column, decl] of COLUMNS) {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  }
+  db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(SCHEMA_VERSION));
   return db;
 }
 

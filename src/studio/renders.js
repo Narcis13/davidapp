@@ -4,8 +4,8 @@
 
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { ENGINE_VERSION, makeRef } from '../core/engine.js';
-import { toSrt } from '../core/composition.js';
+import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
+import { toSrt, reformat } from '../core/composition.js';
 import { renderVideo } from '../render/video.js';
 import { probeSummary } from '../render/ffmpeg.js';
 import { json, now, transaction } from '../db/db.js';
@@ -36,9 +36,10 @@ export function createRenders(ctx, library, clips) {
   function shape(row) {
     if (!row) return null;
     const clip = q('SELECT slug, title, format, width, height, fps, duration FROM clips WHERE id = ?').get(row.clip_id);
+    const own = row.format ? FORMATS[row.format] : null;
     return {
       id: row.id, clip: clip.slug, clipTitle: clip.title, clipRevision: row.clip_revision,
-      format: clip.format, width: clip.width, height: clip.height,
+      format: row.format ?? clip.format, width: own?.width ?? clip.width, height: own?.height ?? clip.height,
       status: row.status, progress: row.progress, framesDone: row.frames_done, framesTotal: row.frames_total,
       output: row.output, poster: row.poster, srt: row.srt, error: row.error, log: row.log,
       stats: json(row.stats, {}), engine: row.engine, requestedBy: row.requested_by, runner: row.runner,
@@ -48,17 +49,23 @@ export function createRenders(ctx, library, clips) {
     };
   }
 
-  /** Queue a render of the clip as it is now. The composition is copied, so later edits don't change it. */
-  function enqueue({ clip, requestedBy = 'studio' }) {
+  /**
+   * Queue a render of the clip as it is now. The composition is copied, so later edits don't change it.
+   * format: render it in another format (vertical, horizontal, square); each item's overrides for that format apply.
+   * @param {{ clip: string, requestedBy?: string, format?: string }} o
+   */
+  function enqueue({ clip, requestedBy = 'studio', format }) {
     const row = clips.clipRow(clip);
-    const comp = json(row.composition);
+    if (format && !FORMATS[format]) throw new StudioError(`Unknown format "${format}"; use ${Object.keys(FORMATS).join(', ')}`);
+    const other = format && format !== row.format ? format : null;
+    const comp = other ? reformat(json(row.composition), other) : json(row.composition);
     const visual = comp.tracks.some((t) => t.type !== 'audio' && t.items.length);
     if (!visual) throw new StudioError(`Clip "${clip}" has nothing on its visual tracks yet; add items before rendering.`);
     const total = Math.round(comp.duration * comp.fps);
     if (total < 1) throw new StudioError(`Clip "${clip}" is shorter than one frame.`);
     const id = transaction(db, () => {
-      const rid = q(`INSERT INTO renders (clip_id, clip_revision, composition, status, frames_total, engine, requested_by, created_at) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?)`)
-        .run(row.id, row.revision, row.composition, total, ENGINE_VERSION, requestedBy, now()).lastInsertRowid;
+      const rid = q(`INSERT INTO renders (clip_id, clip_revision, composition, status, frames_total, engine, requested_by, created_at, format) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?)`)
+        .run(row.id, row.revision, other ? JSON.stringify(comp) : row.composition, total, ENGINE_VERSION, requestedBy, now(), other).lastInsertRowid;
       q('INSERT OR IGNORE INTO render_assets (render_id, version_id) SELECT ?, version_id FROM clip_assets WHERE clip_id = ?').run(rid, row.id);
       return rid;
     });
@@ -103,7 +110,7 @@ export function createRenders(ctx, library, clips) {
     current = { id: row.id, abort };
     const comp = json(row.composition);
     const clip = q('SELECT slug FROM clips WHERE id = ?').get(row.clip_id);
-    const base = `renders/${clip.slug}-r${row.id}`;
+    const base = `renders/${clip.slug}-r${row.id}${row.format ? `-${row.format}` : ''}`;
     const outPath = join(dataDir, `${base}.mp4`);
     let lastWrite = 0;
     const lines = [];

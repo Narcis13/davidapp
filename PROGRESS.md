@@ -12,8 +12,8 @@ proven by clips 4, 5 and 6. Brief: `ITERATION_2_PROMPT.md`. Iteration 1's record
 
 Started 2026-10-06 on branch `main` at `f24ab12`.
 
-**Next:** M1, composition v2 in the runtime (`src/core/composition.js`, `src/core/runtime.js`, new
-`src/core/transform.js`), with tests and the hash check.
+**Next:** M2, events and live updates (events table, SSE), then the request queue and proposals
+(`src/studio/requests.js`), MCP tools, HTTP routes, Run now with a stub `claude`.
 
 ## Contract (Done means)
 
@@ -55,7 +55,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 ## Milestones
 
 0. [x] **Baseline**: project.md for macOS (committed on its own), frame-hash and speed baselines, contract and plan
-1. [ ] **Composition v2 in the runtime**: transforms, per-format overrides, keyframes with easing, image layers, layer ops (move track/item, lock/solo/mute, rename), render in another format; old path untouched; tests (D1, D6 groundwork, D7, D9 tests)
+1. [x] **Composition v2 in the runtime**: transforms, per-format overrides, keyframes with easing, image layers, layer ops (move track/item, lock/solo/mute, rename), render in another format; old path untouched; tests (D1, D6 groundwork, D7, D9 tests)
 2. [ ] **Events, requests and proposals**: events table + SSE, request queue, proposals with accept/reject/reply and conflict rules, MCP tools, HTTP routes, Run now with a stub `claude` (D2–D4 backend, D20, D21)
 3. [ ] **New asset kinds**: motion, transition, effect (`f.lib.fx`), masks/mattes, precomps (`f.layers`, save as asset), presets, metadata overlay, version diff, save-params-as-defaults (D5 backend, D10)
 4. [ ] **3D and baking**: `f.lib.solid` software rasterizer, ≥3 3D assets, sequence assets baked from any visual asset (D11)
@@ -81,6 +81,9 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - **Concurrent edits.** An asset proposal made against v2 while the asset moved to v3 is a conflict on accept: the studio says so and offers "accept as v4 anyway" (nothing is lost; versions are immutable) or "ask the agent to rebase". A clip proposal is a list of edit operations plus the base revision; on accept they are re-applied to the current composition, so they rebase cleanly when the ids they touch still exist, and conflict otherwise. An editor with unsaved changes hears about a newer revision live and offers reload or keep (the revision guard refuses a blind overwrite).
 - **Request lifecycle**: `open` (waiting for the agent) → `working` (claimed, with a lease and heartbeat; an expired lease returns it to open) → `review` (a pending proposal) → `done` (accepted, or completed by the agent with a reply) / `cancelled`. A user reply sends it back to `open` and supersedes the pending proposal when the next one arrives. Reject with a reason sends it back to `open`; reject without one closes it.
 - **Live updates are driven by the database**: an `events` table written in the same transaction as every change (by any process); the web server tails it (cheap `PRAGMA data_version` check every 250 ms) and pushes server-sent events; the UI refreshes what it shows. The MCP process and the web server never talk directly.
+- **Split keeps time**: items gained `offset` (seconds into the asset where the item starts) and `assetDuration` (the asset timeline it is cut from). `split_item` gives the second part offset = cut and both parts the whole asset duration, so the frames on both sides of a cut are identical (tested). Audio items honour the offset in the mix (`atrim=offset:offset+duration`).
+- **Image layers**: a visual track takes image assets directly, drawn into the transformed box with `params.fit` contain (default), cover (cropped to the box) or fill.
+- **Render in another format**: `start_render { format }` (and `renders.enqueue`) snapshot the composition reformatted, so one composition renders vertical, horizontal and square with each format's overrides; the render row records its format (`renders.format`, added by an idempotent column migration in `openDb`).
 - *(more decisions are added as each milestone lands)*
 
 ## Blocked
@@ -97,3 +100,4 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 ## Log
 
 - 2026-10-06: baseline on the iteration-1 code (`f24ab12`). `npm run showcase` on an empty dir: 50 steps, renders 25.0 / 26.7 / 15.7 s; a second empty-dir build reproduced all 360 dense hashes and 54 render samples. Speed: medians 27.4 / 30.1 / 17.0 s (3 runs). Gates: typecheck PASS, lint PASS, test PASS (56). Sweep on the showcase data: 17 screens, 0 problems (library reshot after a Chrome cold start); server log 0 ERROR lines.
+- 2026-10-06: M1 done: `src/core/transform.js` (geometry, keyframes, per-format overrides), v2 normalization and validation, a new drawing path for v2 items and image layers (the v1 loop is untouched), easing pinned per composition, edit ops (move_track, move_item index, update_track, set_transform, keyframes, set_override, split_item, duplicate_item), audio offset/mute/solo, render in another format. `test/composition.test.js` (14): v1 shapes normalize unchanged, identity transform = v1 pixels, rotation/scale/keyframes/overrides/z-order/solo/images/split continuity checked on rendered pixels. Showcase rebuilt from empty: all 360 dense + 54 render hashes identical to the baseline. Gates: typecheck PASS, lint PASS, test PASS (70; one expected message changed from "takes visual assets" to "takes visual or image assets").
