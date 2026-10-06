@@ -40,9 +40,11 @@ export async function openBrowser(url) {
     if (msg.id && waiting.has(msg.id)) { waiting.get(msg.id)(msg); waiting.delete(msg.id); return; }
     if (msg.method === 'Runtime.exceptionThrown') problems.push(msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text);
     if (msg.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(msg.params.type)) problems.push(msg.params.args.map((a) => a.value ?? a.description).join(' '));
+    if (msg.method === 'Log.entryAdded' && ['error', 'warning'].includes(msg.params.entry.level)) problems.push(`${msg.params.entry.text} ${msg.params.entry.url ?? ''}`.trim());
   });
   const send = (method, params = {}) => new Promise((r) => { const n = ++id; waiting.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
   await send('Runtime.enable');
+  await send('Log.enable');
   await send('Page.enable');
   await send('Page.navigate', { url });
   await sleep(1500);

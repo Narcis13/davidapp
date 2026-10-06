@@ -6,14 +6,20 @@ says how to check, run and look at **this** code. Keep it short and true, and fi
 ```bash
 S=.claude/skills/goal-loop/scripts       # generic: gates.sh, sweep.sh, cdp.mjs, montage.swift, pdfpng.swift
 P=.claude/goal-loop                      # this repo: project.md, gates, screens, serve.sh
-export TMPDIR=/private/tmp/claude-501/-Users-narcisbrindusescu-newme-davidapp/<session>/scratchpad   # logs, data and shots stay out of the repo
-# cdp.mjs finds /Applications/Google Chrome.app by itself; set CHROME=… only for another browser
-swift $S/montage.swift out.png 0.5 a.png b.png      # screenshots side by side (macOS)
+export TMPDIR=<the session's scratchpad>   # logs, data and shots stay out of the repo
+export TEMP="$TMPDIR" TMP="$TMPDIR"        # Windows: Node's os.tmpdir() reads these, not TMPDIR (tests leave studio-test-* dirs there)
+export CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe"   # Windows: cdp.mjs only looks in the macOS and Linux places
+swift $S/montage.swift out.png 0.5 a.png b.png      # screenshots side by side (macOS only)
 ```
 
-Machine (iteration 2): macOS 15.5, Intel i5-10600 (6 cores / 12 threads), Node 24.21, FFmpeg 8.1 in
-`/usr/local/bin`, Claude Code CLI on PATH (`~/.local/bin/claude`). Iteration 1 ran on Windows; its render
-times and emoji pixels do not carry over.
+Machines: iteration 1 ran on Windows; iteration 2 was built on macOS 15.5 (Intel i5-10600, 12 threads,
+Node 24.21) and finished on Windows 11 (i9-14900KF, 32 threads, 64 GB, Node 24.19, FFmpeg from winget,
+Claude Code CLI `~/.local/bin/claude.exe`, Git Bash for the scripts). Render times and emoji pixels are
+per machine: take the hash and speed baselines again on the machine that compares them
+(`git worktree add <dir> 6c9f8cf`, link `node_modules` into it, `npm run showcase`, `scripts/hashes.mjs`).
+A fresh checkout needs `npm ci`. This machine has no git identity: commit with
+`git -c user.name=Narcis13 -c user.email=Narcis75@gmail.com commit`. Write source files with the Write
+and Edit tools: shell heredocs here drop backslashes.
 
 ## Kind
 
@@ -46,8 +52,15 @@ bash $P/serve.sh stop  8791 "$TMPDIR/data"
 - The user's own studio: port 8787, data in `./data` (git-ignored). Never touch either.
 - Server log: `<data-dir>/server.log`. A line starting with `ERROR` is a server error; API lines are `METHOD url status ms`.
 - The MCP server opens the same data dir: `STUDIO_DATA=<dir> node scripts/mcp.mjs call <tool> '<json>'`.
-- FFmpeg is found through `FFMPEG_PATH`, then PATH (`/usr/local/bin` here), then `%LOCALAPPDATA%\Microsoft\WinGet\Links` on Windows.
-- Emoji draw with Apple Color Emoji on macOS (Skia's font fallback), so emoji pixels, and the hashes of
+- FFmpeg is found through `FFMPEG_PATH`, then PATH, then `%LOCALAPPDATA%\Microsoft\WinGet\Links` on Windows.
+- The studio serves `src/ui` and `src/core` straight from the repo, so a running studio shows edits to
+  those files at the next page load (also half-finished ones, while agents are editing).
+- Scripted workflows with real mouse, keyboard and file-drop input in headless Chrome:
+  `STUDIO_DATA=<dir> node scripts/workflows-v2.mjs http://127.0.0.1:8791 <out-dir> [canvas layers playground request uploads live]`
+  (driver: `scripts/lib/browser.mjs`). They change the data they run on.
+- Claude in Chrome: more than one browser can be connected to the account (a Mac and this PC were);
+  the one in use must be on the machine that runs the studio, or 127.0.0.1 is refused. Ask the user which.
+- Emoji draw with the system emoji font (Apple Color Emoji on macOS, Segoe UI Emoji on Windows; Skia's font fallback), so emoji pixels, and the hashes of
   frames that show them, are per OS. `scripts/hashes.mjs` records and compares the showcase hashes on one machine.
 
 ## Screens and viewports
@@ -115,6 +128,10 @@ dispatching `input` (text, number, range, colour) or `change` (select), or by `.
 | renders `/renders` | `render-row` (+`data-id`, `data-status`), `render-frames`, `render-elapsed`, `render-stats`, `render-error`, `cancel-render`, `open-in-gallery`, `render-clip-select`, `start-render`, `render-count`, `render-message` |
 | gallery `/gallery`, `/gallery/<render id>` | `gallery-card` (+`data-id`), `gallery-count`, `player` (video), `download-mp4`, `download-srt`, `render-assets` → `render-asset` |
 | lineage `/lineage` | `lineage-clips` → `lineage-clip` (+`data-slug`), `lineage-sum`, `legend`, `lineage-matrix`, `lineage-col` (+`data-slug`), `lineage-row` (+`data-slug`), `lineage-cell` (+`data-how` created/as-is/new-version/fork/library, `data-clip`), `most-reused`, `reuse-report` |
+| iteration 2, editor | on-canvas: `handle` (+`data-handle` move, nw, ne, se, sw, rotate; only for the selected layer), `snap-guide` (while dragging), inspector `tf-x` `tf-y` `tf-width` `tf-height` `tf-scale` `tf-rotation` `tf-space`, `layout-format`; layers: `.tl-row[data-track]` (top row = in front), `track-handle` (+`data-track`), `track-name`, `add-track` `add-track-type`, `undo` `redo` (Ctrl+Z / Ctrl+Y); `save-as-asset` → `precomp-dialog` (`precomp-name` `precomp-title` `precomp-replace` `precomp-items` `precomp-unsaved` `precomp-error` `precomp-save` `precomp-cancel`), then `precomp-status` `precomp-link`; `proposal-bar` while a proposal is previewed |
+| iteration 2, ask the agent (playground, editor, `/requests/<id>`) | `agent-open` → `agent-panel`: `agent-input` `agent-send`, `agent-request`, `agent-thread` → `agent-message`, `agent-proposal` → `agent-preview` `agent-accept` `agent-reject` `agent-reject-reason`, `agent-reply-input` `agent-reply`, `agent-run-now` (only with the CLI) |
+| iteration 2, playground | `keep` → `changed-count` `save-defaults` `save-preset` → `preset-name` `preset-title` `preset-create`; `metadata` → `meta-edit` → `meta-title` `meta-description` `meta-tags` `meta-save` `meta-reset`; `versions` → `diff-open` → `diff` (`diff-a` `diff-b` `diff-stats` `diff-view` `diff-frames`) |
+| requests `/requests` | `request-input` `request-send` (goes to `/requests/<id>`), `request-filter` (+`data-status`), `request-list` → `request-row` (+`data-id`, `data-status`), `request-back` |
 | any screen | `loading`, `empty`, `screen-error`; dialogs: `confirm` (`confirm-ok`, `confirm-cancel`) |
 
 Recipes (all are `--js` expressions; wait ~500 ms after each step for the worker to draw):

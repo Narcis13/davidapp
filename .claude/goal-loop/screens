@@ -40,3 +40,22 @@ requests-phone        /requests                         phone --scroll
 request-thread-phone  /requests/1                       phone --scroll
 editor-v2-phone       /clips/v2-demo                    phone --scroll
 asset-3d-phone        /assets/ball                      phone --scroll
+
+# iteration 2 on the showcase's own data (clips 4 to 6 and what they made)
+editor-clip4          /clips/clip-4-direct-the-studio   desktop --full
+editor-clip5          /clips/clip-5-a-library-in-3d     desktop --full
+editor-clip6          /clips/clip-6-what-the-library-holds desktop --full
+asset-orb             /assets/orb-3d                    desktop --full
+asset-orb-spin        /assets/orb-spin                  desktop --full
+asset-preset          /assets/lower-third-studio        desktop --full
+asset-precomp         /assets/studio-title-card         desktop --full
+asset-svg             /assets/studio-logo               desktop --full
+asset-effect          /assets/fx-glow                   desktop --full
+asset-transition      /assets/trans-wipe                desktop --full
+request-clip          /requests/2                       desktop --full
+library-motion        "/?kind=motion"                   desktop
+editor-clip4-phone    /clips/clip-4-direct-the-studio   phone --scroll
+editor-clip5-phone    /clips/clip-5-a-library-in-3d     phone --scroll
+asset-orb-phone       /assets/orb-3d                    phone --scroll
+asset-svg-phone       /assets/studio-logo               phone --scroll
+request-clip-phone    /requests/2                       phone --scroll
