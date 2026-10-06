@@ -1,0 +1,34 @@
+{
+ "render": 4,
+ "checks": {
+  "h264": true,
+  "aac": true,
+  "yuv420p": true,
+  "faststart": true,
+  "size": true,
+  "fps": true,
+  "duration": true,
+  "audible": true,
+  "logClean": true
+ },
+ "frames": 900,
+ "expected": 900,
+ "duration": 30,
+ "video": {
+  "codec": "h264",
+  "profile": "High",
+  "width": 1920,
+  "height": 1080,
+  "pix_fmt": "yuv420p",
+  "fps": "30/1"
+ },
+ "audio": {
+  "codec": "aac",
+  "sample_rate": "48000",
+  "channels": 2
+ },
+ "bytes": 320964271,
+ "renderSeconds": 257.75,
+ "meanVolume": -16.9,
+ "maxVolume": -3.5
+}

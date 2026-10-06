@@ -1,0 +1,38 @@
+Reuse report: 6 clip(s), 66 asset(s) in the library (fonts not counted)
+
+Clip 1 · clip-1-every-frame — "Every frame is a function" (vertical 1080×1920, 32s)
+  uses 28 assets: 28 created for this clip, 0 reused from earlier clips (0 as-is, 0 as a new version, 0 as a fork)
+  created (28): beat-bars@1, bg-gradient-drift@1, code-window@1, logo-sting@1, music-loop@1, progress-segments@1, sfx-whoosh@1, sparkle-field@1, stat-trio@1, text-captions@1, text-char-reveal@1, text-highlight@1, text-kinetic@1, text-line-reveal@1, text-word-reveal@1, watermark@1, drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-counter@1, text-typewriter@1, theme-ember@1, fablecut-mark@1
+
+Clip 2 · clip-2-compounding — "The library compounds" (horizontal 1920×1080, 32s)
+  uses 31 assets: 7 created for this clip, 24 reused from earlier clips (23 as-is, 1 as a new version, 0 as a fork)
+  from clip-1-every-frame (24): bg-gradient-drift@1, logo-sting@1, music-loop@1, progress-segments@1, sfx-whoosh@1, text-captions@1, text-highlight@1, text-line-reveal@1, text-word-reveal@2 [new version], watermark@1, drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-typewriter@1, text-word-reveal@1, theme-ember@1, fablecut-mark@1
+  created (7): bg-grid@1, chart-bars@1, lineage-flow@1, lower-third@1, pin-diagram@1, text-scramble@1, theme-tide@1
+
+Clip 3 · clip-3-release-notes — "What's new in Fablecut" (square 1080×1080, 32s)
+  uses 34 assets: 3 created for this clip, 31 reused from earlier clips (29 as-is, 0 as a new version, 2 as a fork)
+  from clip-1-every-frame (26): beat-bars@1, bg-gradient-drift@1, confetti-burst@1 [fork of sparkle-field@1], logo-sting@1, music-loop@1, progress-segments@1, sparkle-field@1, text-captions@1, text-kinetic@1, theme-ember@1, watermark@1, whoosh-hit@1 [fork of sfx-whoosh@1], drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-line-reveal@1, text-typewriter@1, text-word-reveal@1, fablecut-mark@1
+  from clip-2-compounding (5): bg-grid@1, chart-bars@1, lower-third@1, text-scramble@1, text-word-reveal@2
+  created (3): format-frames@1, template-bullets@1, badge-pill@1
+
+Clip 4 · clip-4-direct-the-studio — "Direct the studio" (horizontal 1920×1080, 30s)
+  uses 38 assets: 15 created for this clip, 23 reused from earlier clips (22 as-is, 0 as a new version, 1 as a fork)
+  from clip-1-every-frame (19): bg-gradient-drift@1, easing@1, logo-sting@1, music-loop@1, stat-trio@1, text-kinetic@1, drum-hat@1, drum-kick@1, drum-snare@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-line-reveal@1, text-word-reveal@1, theme-ember@1, text-typewriter@1
+  from clip-2-compounding (4): lower-third-studio@1 [fork of lower-third@1], text-word-reveal@2, theme-tide@1, lower-third@1
+  created (15): fx-duotone@1, fx-glow@1, fx-grain@1, fx-vignette@1, mask-iris@1, motion-drift@1, motion-pop@1, motion-slide@1, orb-3d@1, svg-draw-on@1, trans-iris@1, trans-push@1, trans-wipe@1, harbour-at-dusk@1, studio-logo@1
+
+Clip 5 · clip-5-a-library-in-3d — "A library in 3D" (vertical 1080×1920, 60s)
+  uses 44 assets: 7 created for this clip, 37 reused from earlier clips (36 as-is, 0 as a new version, 1 as a fork)
+  from clip-1-every-frame (19): bg-gradient-drift@1, easing@1, logo-sting@1, music-loop@1, stat-trio@1, text-line-reveal@1, drum-hat@1, drum-kick@1, drum-snare@1, logo-mark@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-kinetic@1, text-word-reveal@1, theme-ember@1, spring@1, text-typewriter@1
+  from clip-4-direct-the-studio (15): fx-duotone@1, fx-glow@1, fx-grain@1, fx-vignette@1, lower-third-studio@1, motion-drift@1, motion-pop@1, studio-title-card@1, trans-iris@1, trans-push@1, trans-wipe@1, studio-logo@1, orb-spin@1 [fork of orb-3d@1], motion-slide@1, svg-draw-on@1
+  from clip-2-compounding (3): text-word-reveal@2, theme-tide@1, lower-third@1
+  created (7): block-text-3d@2, fx-chromatic@1, motion-bounce@1, motion-orbit@1, terrain-3d@1, trans-glitch@1, mountain-lake-dawn@1
+
+Clip 6 · clip-6-what-the-library-holds — "What the library holds" (square 1080×1080, 90s)
+  uses 47 assets: 0 created for this clip, 47 reused from earlier clips (47 as-is, 0 as a new version, 0 as a fork)
+  from clip-1-every-frame (20): bg-gradient-drift@1, easing@1, logo-sting@1, music-loop@1, stat-trio@1, text-captions@1, text-line-reveal@1, drum-hat@1, drum-kick@1, drum-snare@1, logo-mark@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-kinetic@1, text-word-reveal@1, theme-ember@1, spring@1, text-typewriter@1
+  from clip-5-a-library-in-3d (7): block-text-3d@2, fx-chromatic@1, motion-bounce@1, motion-orbit@1, terrain-3d@1, trans-glitch@1, orb-spin@1
+  from clip-2-compounding (4): chart-bars@1, text-word-reveal@2, theme-tide@1, lower-third@1
+  from clip-4-direct-the-studio (16): fx-duotone@1, fx-glow@1, fx-grain@1, fx-vignette@1, lower-third-studio@1, mask-iris@1, motion-drift@1, motion-pop@1, studio-title-card@1, trans-iris@1, trans-push@1, trans-wipe@1, harbour-at-dusk@1, studio-logo@1, motion-slide@1, svg-draw-on@1
+
+Most reused: easing (5 later clips), spring (5 later clips), text-block (5 later clips), theme-ember (5 later clips), text-word-reveal (5 later clips), text-char-reveal (5 later clips), text-line-reveal (5 later clips), text-typewriter (5 later clips), text-counter (5 later clips), bg-gradient-drift (5 later clips)

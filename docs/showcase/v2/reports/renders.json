@@ -1,0 +1,97 @@
+[
+ {
+  "name": "clip-4-direct-the-studio-vertical",
+  "render": 7,
+  "ok": true,
+  "checks": {
+   "h264": true,
+   "aac": true,
+   "yuv420p": true,
+   "faststart": true,
+   "size": true,
+   "fps": true,
+   "duration": true,
+   "audible": true,
+   "logClean": true
+  },
+  "frames": 900,
+  "meanVolume": -16.9,
+  "mb": 330.2
+ },
+ {
+  "name": "clip-4-direct-the-studio-square",
+  "render": 6,
+  "ok": true,
+  "checks": {
+   "h264": true,
+   "aac": true,
+   "yuv420p": true,
+   "faststart": true,
+   "size": true,
+   "fps": true,
+   "duration": true,
+   "audible": true,
+   "logClean": true
+  },
+  "frames": 900,
+  "meanVolume": -16.9,
+  "mb": 180.1
+ },
+ {
+  "name": "clip-4-direct-the-studio",
+  "render": 4,
+  "ok": true,
+  "checks": {
+   "h264": true,
+   "aac": true,
+   "yuv420p": true,
+   "faststart": true,
+   "size": true,
+   "fps": true,
+   "duration": true,
+   "audible": true,
+   "logClean": true
+  },
+  "frames": 900,
+  "meanVolume": -16.9,
+  "mb": 321
+ },
+ {
+  "name": "clip-5-a-library-in-3d",
+  "render": 8,
+  "ok": true,
+  "checks": {
+   "h264": true,
+   "aac": true,
+   "yuv420p": true,
+   "faststart": true,
+   "size": true,
+   "fps": true,
+   "duration": true,
+   "audible": true,
+   "logClean": true
+  },
+  "frames": 1800,
+  "meanVolume": -17.1,
+  "mb": 597.2
+ },
+ {
+  "name": "clip-6-what-the-library-holds",
+  "render": 9,
+  "ok": true,
+  "checks": {
+   "h264": true,
+   "aac": true,
+   "yuv420p": true,
+   "faststart": true,
+   "size": true,
+   "fps": true,
+   "duration": true,
+   "audible": true,
+   "logClean": true
+  },
+  "frames": 2700,
+  "meanVolume": -17.3,
+  "mb": 481.5
+ }
+]
