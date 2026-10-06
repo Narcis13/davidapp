@@ -25,3 +25,18 @@ renders-phone         /renders                          phone
 gallery-phone         /gallery                          phone
 gallery-open-phone    /gallery                          phone --js "document.querySelector('[data-testid=gallery-card]')?.click()"
 lineage-phone         /lineage                          phone --scroll
+
+# iteration 2 (run on data with `node scripts/dev-seed-v2.mjs` added on top of the showcase)
+requests              /requests                         desktop --full
+request-thread        /requests/1                       desktop --full
+editor-v2             /clips/v2-demo                    desktop --full
+asset-motion          /assets/slide                     desktop --full
+asset-3d              /assets/ball                      desktop --full
+asset-sequence        /assets/ball-spin                 desktop --full
+asset-upload          /assets/dev-logo                  desktop --full
+asset-proposal        /assets/block                     desktop --full
+library-detail        "/?kind=visual&open=ball"         desktop
+requests-phone        /requests                         phone --scroll
+request-thread-phone  /requests/1                       phone --scroll
+editor-v2-phone       /clips/v2-demo                    phone --scroll
+asset-3d-phone        /assets/ball                      phone --scroll
