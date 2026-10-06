@@ -12,6 +12,7 @@
 
 import { parse as parseColor, css as cssColor } from './lib/color.js';
 import { safeZone } from './engine.js';
+import { isColor } from './schema.js';
 
 export const TRANSFORM_KEYS = ['x', 'y', 'width', 'height', 'anchorX', 'anchorY', 'scale', 'scaleX', 'scaleY', 'rotation'];
 export const TRANSFORM_DEFAULTS = Object.freeze({ space: 'frame', x: 0.5, y: 0.5, width: 1, height: 1, anchorX: 0.5, anchorY: 0.5, scale: 1, scaleX: 1, scaleY: 1, rotation: 0 });
@@ -20,7 +21,7 @@ export const SPACES = ['frame', 'safe'];
 export const ANIMATABLE = [...TRANSFORM_KEYS, 'opacity'];
 export const FORMAT_NAMES = ['vertical', 'horizontal', 'square'];
 /** Item fields that only exist in composition v2: an item with none of them is drawn exactly as in v1. */
-export const V2_ITEM_FIELDS = ['transform', 'keyframes', 'formats', 'motions', 'effects', 'mask', 'transition', 'offset', 'assetDuration'];
+export const V2_ITEM_FIELDS = ['transform', 'keyframes', 'formats', 'motions', 'effects', 'mask', 'transition', 'offset', 'assetDuration', 'seedId'];
 
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -32,7 +33,8 @@ export function forFormat(item, format) {
   const o = item.formats?.[format];
   if (!o) return item;
   const out = { ...item };
-  if (o.transform) out.transform = { ...(item.transform ?? {}), ...o.transform };
+  // an override on a v1 item starts from its box (as normalizeComposition does for a box with a transform), not from the full frame
+  if (o.transform) out.transform = { ...(item.transform ?? (item.box ? boxToTransform(item.box, o.transform.anchorX ?? 0.5, o.transform.anchorY ?? 0.5) : {})), ...o.transform };
   if (o.keyframes) out.keyframes = { ...(item.keyframes ?? {}), ...o.keyframes };
   if (o.params) out.params = { ...item.params, ...o.params };
   if (o.hidden !== undefined) out.hidden = o.hidden;
@@ -52,6 +54,8 @@ export function boxToTransform(box, anchorX = 0.5, anchorY = 0.5) {
 }
 
 const isColorValue = (v) => typeof v === 'string';
+/** A keyframe colour is what a colour param accepts, with every channel a number: parseColor alone reads "#zzzzzz" as NaN without throwing. */
+const parsesAsColor = (v) => { try { return isColor(v) && parseColor(v).every(Number.isFinite); } catch { return false; } };
 
 /**
  * The value of a keyframed property at item time t. Before the first key it holds the first value,
@@ -177,7 +181,7 @@ export function checkKeyframes(kf, path) {
       if (!isPlain(k) || typeof k.t !== 'number' || !Number.isFinite(k.t) || k.t < 0) return out.push([`${p}[${i}].t`, 't must be a number of seconds ≥ 0 (item time)']);
       const colour = prop.startsWith('params.') && typeof k.v === 'string';
       if (!colour && (typeof k.v !== 'number' || !Number.isFinite(k.v))) return out.push([`${p}[${i}].v`, prop.startsWith('params.') ? 'v must be a number or a colour' : 'v must be a number']);
-      if (colour) { try { parseColor(k.v); } catch { return out.push([`${p}[${i}].v`, `${JSON.stringify(k.v)} is not a colour`]); } }
+      if (colour && !parsesAsColor(k.v)) return out.push([`${p}[${i}].v`, `${JSON.stringify(k.v)} is not a colour`]);
       if (k.ease !== undefined && (typeof k.ease !== 'string' || !/^[A-Za-z][A-Za-z0-9]*$/.test(k.ease))) return out.push([`${p}[${i}].ease`, 'ease is the name of a curve from the easing asset (outCubic, outBack…), linear or hold']);
       list.push(k.ease === undefined ? { t: k.t, v: k.v } : { t: k.t, v: k.v, ease: k.ease });
     });

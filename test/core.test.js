@@ -10,6 +10,7 @@ import { normalizeComposition, reformat } from '../src/core/composition.js';
 import { createText, graphemes } from '../src/core/lib/text.js';
 import * as color from '../src/core/lib/color.js';
 import * as beat from '../src/core/lib/beat.js';
+import * as svg from '../src/core/lib/svg.js';
 import { parseRef, safeZone, formatOf } from '../src/core/engine.js';
 import { createCanvas, registerFonts } from '../src/render/host.js';
 
@@ -196,6 +197,43 @@ test('color and beat helpers', () => {
   assert.equal(beat.pulse(1, beats), 1);
   assert.ok(beat.pulse(1.4, beats) < 0.2);
   assert.equal(beat.count(1.6, beats), 3);
+});
+
+test('svg paths: arc flags are single characters, so the compact form minifiers write parses like the spaced one', () => {
+  const same = (compact, spaced) => assert.deepEqual(svg.parsePath(compact), svg.parsePath(spaced), compact);
+  same('M0 0a5 5 0 0110 10', 'M 0 0 a 5 5 0 0 1 10 10');
+  same('M0 0a5 5 0 1010-10', 'M 0 0 a 5 5 0 1 0 10 -10');
+  same('M10 10A5 5 0 01.5.5', 'M 10 10 A 5 5 0 0 1 0.5 0.5');
+  same('M0 0a5 5 0 0110 10 5 5 0 1010-10z', 'M 0 0 a 5 5 0 0 1 10 10 a 5 5 0 1 0 10 -10 z');
+  same('M0 0a5,5,0,0,1,10,10', 'M 0 0 a 5 5 0 0 1 10 10');
+  const arc = svg.parsePath('M0 0a5 5 0 0110 10');
+  assert.equal(arc[0][0], 'M');
+  assert.ok(arc.length >= 2 && arc.slice(1).every((c) => c[0] === 'C' && c.every((v, i) => i === 0 || Number.isFinite(v))), 'the arc became finite cubics');
+  assert.deepEqual(arc[arc.length - 1].slice(5).map((v) => +v.toFixed(9)), [10, 10], 'ending where the arc ends');
+  assert.throws(() => svg.parsePath('M0 0a5 5 0 2 1 10 10'), /an arc flag is 0 or 1/);
+});
+
+test('svg draw: a fill with opacity 0 leaves the alpha as it was, so the stroke of the same path is drawn', () => {
+  const square = { d: svg.parsePath('M10 10H30V30H10Z'), fill: '#ff0000', stroke: '#0000ff', strokeWidth: 6, fillOpacity: 0 };
+  const draw = (path, o = {}) => {
+    const c = createCanvas(40, 40);
+    const g = c.getContext('2d');
+    g.globalAlpha = 0.8;
+    svg.draw(g, { width: 40, height: 40, paths: [{ ...path, length: svg.pathLength(path.d) }] }, o);
+    assert.equal(g.globalAlpha, 0.8, 'the caller\'s alpha is back');
+    return (x, y) => [...g.getImageData(x, y, 1, 1).data];
+  };
+  const px = draw(square);
+  assert.deepEqual(px(20, 8), [0, 0, 255, 204], 'the stroke, at the caller\'s alpha');
+  assert.equal(px(20, 20)[3], 0, 'no fill');
+  // a part-transparent fill does not thin the stroke either
+  const half = draw({ ...square, fillOpacity: 0.3 });
+  assert.deepEqual(half(20, 8), [0, 0, 255, 204]);
+  assert.ok(Math.abs(half(20, 20)[3] - 0.3 * 204) <= 2 && half(20, 20)[0] === 255, `the fill at 0.3 of the alpha (${half(20, 20)})`);
+  // drawing on: the same when the fill is fading in
+  const on = draw(square, { progress: 0.999 });
+  assert.equal(on(20, 8)[3], 204, 'the traced stroke');
+  assert.equal(on(20, 20)[3], 0);
 });
 
 test('engine: references, formats and safe zones', () => {

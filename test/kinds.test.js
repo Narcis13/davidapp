@@ -4,11 +4,12 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { createCanvas, loadImage } from '../src/render/host.js';
+import { createCanvas, loadImage, nodeHost, FRAME_CONTEXT, ROOT } from '../src/render/host.js';
+import { createRuntime } from '../src/core/runtime.js';
 import { openDb } from '../src/db/db.js';
 import { tempStudio, AUTHOR, EASING, LABEL } from './helpers.js';
 import * as K from './fixtures/kinds.js';
@@ -27,7 +28,7 @@ before(async () => {
   studio = t.studio;
   await studio.clips.createClip({ slug: 'kinds', title: 'Kinds', author: AUTHOR, width: 320, height: 180, fps: 10, duration: 3 });
   for (const [slug, source] of [['easing', EASING], ['label', LABEL], ['block', BLOCK], ['pop', K.MOTION_POP], ['slide', K.MOTION_SLIDE], ['wiggle', K.MOTION_WIGGLE], ['bounce', K.MOTION_BOUNCE],
-    ['wipe', K.TRANSITION_WIPE], ['push', K.TRANSITION_PUSH], ['iris', K.TRANSITION_IRIS], ['glow', K.EFFECT_GLOW], ['grain', K.EFFECT_GRAIN], ['duotone', K.EFFECT_DUOTONE], ['blur', K.EFFECT_BLUR], ['circle', K.MASK_CIRCLE]]) {
+    ['wipe', K.TRANSITION_WIPE], ['push', K.TRANSITION_PUSH], ['iris', K.TRANSITION_IRIS], ['glow', K.EFFECT_GLOW], ['grain', K.EFFECT_GRAIN], ['duotone', K.EFFECT_DUOTONE], ['blur', K.EFFECT_BLUR], ['circle', K.MASK_CIRCLE], ['bar', K.BAR], ['scatter', K.SCATTER]]) {
     await studio.library.createAsset({ slug, source, author: AUTHOR, forClip: 'kinds' });
   }
 });
@@ -123,6 +124,41 @@ test('effects on an item, on a track and on the whole clip; deterministic frame 
   assert.notEqual(g1.hash, (await frame(plain, 1)).hash);
 });
 
+test('every context that is read back (effects, luma masks) is made with willReadFrequently, the frame\'s own included', () => {
+  // a host whose canvases note the options their context was made with, and every getImageData on it
+  const options = new WeakMap(), reads = [];
+  const watch = (canvas) => {
+    const get = canvas.getContext.bind(canvas);
+    canvas.getContext = (type, o) => {
+      const ctx = get(type, o);
+      if (options.has(ctx)) return ctx;
+      options.set(ctx, o);
+      const read = ctx.getImageData.bind(ctx);
+      ctx.getImageData = (...args) => { reads.push(options.get(ctx)?.willReadFrequently === true); return read(...args); };
+      return ctx;
+    };
+    return canvas;
+  };
+  const rt = createRuntime({ ...nodeHost, createCanvas: (w, h) => watch(createCanvas(w, h)) });
+  rt.load({ 'block@1': { source: BLOCK }, 'grain@1': { source: K.EFFECT_GRAIN }, 'circle@1': { source: K.MASK_CIRCLE } });
+  const fx = [{ asset: 'grain@1', params: {} }];
+  const comp = { width: 64, height: 36, fps: 10, duration: 1, background: '#000000', effects: fx, tracks: [{ id: 'v', type: 'visual', effects: fx,
+    items: [{ id: 'b', asset: 'block@1', start: 0, duration: 1, params: {}, effects: fx, mask: { asset: 'circle@1', params: {}, mode: 'luma' } }] }] };
+  // the frame's context is made by the host, as the render worker makes it
+  rt.renderClipFrame(watch(createCanvas(64, 36)).getContext('2d', FRAME_CONTEXT), comp, 5);
+  assert.equal(reads.length, 4, 'the item effect, the luma mask, the track effect and the clip effect each read a layer back');
+  assert.deepEqual(reads, [true, true, true, true]);
+  // the clip effect is the one that reads the frame itself: without the option on the frame's context a browser warns
+  reads.length = 0;
+  rt.renderClipFrame(watch(createCanvas(64, 36)).getContext('2d'), comp, 5);
+  assert.deepEqual(reads, [true, true, true, false]);
+  // so both hosts ask for it wherever they hand the runtime a frame to draw on
+  for (const file of ['src/render/frame-worker.js', 'src/ui/preview-worker.js']) {
+    const calls = readFileSync(join(ROOT, file), 'utf8').split('\n').filter((line) => /\.render(ClipFrame|Asset)\(/.test(line));
+    assert.ok(calls.length >= 2 && calls.every((line) => /getContext\('2d', (FRAME_CONTEXT|\{ willReadFrequently: true \})\)/.test(line)), `${file}: ${calls.join(' | ')}`);
+  }
+});
+
 test('masks: alpha, inverted and luma; the mask moves with the layer unless it has its own transform', async () => {
   const masked = (mode, extra = {}) => base([{ id: 'v', items: [block('b', { mask: { asset: 'circle', mode, params: { radius: 0.5 }, ...extra } })] }]);
   const a = await frame(masked('alpha'), 1);
@@ -210,6 +246,112 @@ test('precomps: layers saved as one asset with exposed params; replacing them ke
   const [rr, gg] = yellow.at(160, 144);
   assert.ok(gg > 150 && rr < 100, 'an exposed param reaches the layer inside');
   await assert.rejects(studio.clips.savePrecomp({ clip: 'kinds', items: ['nope'], slug: 'x-card', author: AUTHOR }), /No item "nope"/);
+});
+
+test('split_item is a continuation: the seed, the transition, the motions, the effects and the mask carry on over the cut', async () => {
+  const item = (asset, extra = {}) => ({ id: 's', asset, start: 0, duration: 3, ...extra });
+  const motions = [
+    { asset: 'slide', phase: 'in', duration: 1, params: { from: 'left', distance: 0.3 } },
+    { asset: 'pop', phase: 'out', duration: 1 },
+    { asset: 'bounce', phase: 'emphasis', at: 1.6, duration: 0.5 },
+    { asset: 'wiggle', phase: 'loop', params: { angle: 20, speed: 0.4 } },
+  ];
+  // [composition, where "s" is cut, the times to compare: before the cut, on it and after it]
+  /** @type {Record<string, [any, number, number[]]>} */
+  const cases = {
+    'an rng-driven asset': [base([{ id: 'v', items: [item('scatter')] }]), 1.5, [0.7, 1.4, 1.5, 2.3]],
+    'a transition into the item': [base([{ id: 'v', items: [block('a', { duration: 1 }), item('bar', { start: 1, duration: 2, transition: { asset: 'wipe', duration: 0.6 } })] }]), 2, [1.3, 1.9, 2, 2.3, 2.9]],
+    'in, out, emphasis and loop motions': [base([{ id: 'v', items: [item('bar', { transform: { width: 0.5, height: 0.3 }, motions })] }]), 1.5, [0.5, 1.2, 1.4, 1.5, 1.7, 2.5, 2.9]],
+    'an animated, seeded effect': [base([{ id: 'v', items: [item('bar', { effects: [{ asset: 'grain', params: { amount: 0.6 } }] })] }]), 1.5, [0.7, 1.4, 1.5, 2.3]],
+    'an rng-driven mask': [base([{ id: 'v', items: [item('bar', { mask: { asset: 'scatter' } })] }]), 1.5, [0.7, 1.5, 2.3]],
+    'all of it at once': [base([{ id: 'v', items: [block('a', { duration: 1 }), item('scatter', { start: 1, duration: 2, transform: { width: 0.8, height: 0.8 }, transition: { asset: 'wipe', duration: 0.6 },
+      motions: [{ asset: 'pop', phase: 'in', duration: 0.5 }, { asset: 'pop', phase: 'out', duration: 0.5 }], effects: [{ asset: 'grain', params: { amount: 0.6 } }], mask: { asset: 'scatter' } })] }]), 2, [1.3, 1.9, 2, 2.3, 2.8]],
+  };
+  for (const [name, [comp, at, times]] of Object.entries(cases)) {
+    const split = studio.clips.applyOps(comp, [{ op: 'split_item', id: 's', at }]);
+    const [first, second] = split.tracks[0].items.slice(-2);
+    assert.deepEqual([first.id, second.id, second.seedId, second.transition], ['s', 's-b', 's', undefined], name);
+    assert.deepEqual(first.transition, comp.tracks[0].items.at(-1).transition, `${name}: the transition stays on the first part`);
+    assert.deepEqual(studio.clips.prepare(split).composition.tracks[0].items.at(-1).seedId, 's', `${name}: the saved clip keeps the seed id`);
+    for (const t of times) assert.equal((await frame(split, t)).hash, (await frame(comp, t)).hash, `${name}: t=${t} of the split clip is the frame of the whole one`);
+  }
+  // the checks above compare with the whole item; these say the whole item shows what the parts must not repeat
+  const [rng, , moving] = Object.values(cases).map((c) => c[0]);
+  assert.notEqual((await frame(rng, 1.5)).hash, (await frame({ ...rng, seed: 2 }, 1.5)).hash, 'the scatter depends on its seed');
+  assert.notEqual((await frame(moving, 2.5)).hash, (await frame(base([{ id: 'v', items: [item('bar', { transform: { width: 0.5, height: 0.3 } })] }]), 2.5)).hash, 'the out motion is running at 2.5 s');
+});
+
+test('a transition without a duration runs for its asset\'s own, else 0.5 s, and never for longer than its item', async () => {
+  await studio.library.createAsset({ slug: 'wipe-any', source: K.TRANSITION_WIPE.replace("  duration: 1,\n", ''), author: AUTHOR });
+  assert.equal(studio.library.getAsset('wipe-any').duration, null);
+  const comp = (transition, duration = 2) => base([{ id: 'v', items: [block('a', { duration: 1 }), block('b', { start: 1, duration, params: { color: '#0000ff' }, transition })] }]);
+  const same = async (a, b, times) => { for (const t of times) assert.equal((await frame(a, t)).hash, (await frame(b, t)).hash, `t=${t}`); };
+  // the wipe declares duration: 1
+  const mid = await frame(comp({ asset: 'wipe' }), 1.5);
+  assert.ok(isBlue(mid.at(60, 90)) && isRed(mid.at(260, 90)), 'half wiped half a second in');
+  await same(comp({ asset: 'wipe' }), comp({ asset: 'wipe', duration: 1 }), [1, 1.5, 1.9, 2, 2.5]);
+  // one that declares none
+  await same(comp({ asset: 'wipe-any' }), comp({ asset: 'wipe-any', duration: 0.5 }), [1, 1.2, 1.4, 1.5, 2]);
+  const quarter = await frame(comp({ asset: 'wipe-any' }), 1.2);
+  assert.ok(isBlue(quarter.at(100, 90)) && isRed(quarter.at(160, 90)), '0.2 s into 0.5 s: wiped to 40 % of the width');
+  assert.ok(isBlue((await frame(comp({ asset: 'wipe-any' }), 1.6)).at(310, 90)), 'over after 0.5 s');
+  // an item shorter than the transition's own second
+  await same(comp({ asset: 'wipe' }, 0.4), comp({ asset: 'wipe', duration: 0.4 }, 0.4), [1, 1.2, 1.3]);
+  assert.deepEqual(studio.clips.prepare(comp({ asset: 'wipe' })).composition.tracks[0].items[1].transition, { asset: 'wipe@1', params: {} }, 'the default is not written into the composition');
+});
+
+test('precomps: a transition between saved layers still plays, within its track; a layer without a duration lasts as long as the precomp', async () => {
+  // two items joined by a wipe, saved as one asset: the same frames as the clip, before, during and after the handover
+  const joined = base([{ id: 'bg', items: [block('back', { params: { color: '#003300' } })] }, { id: 'fg', items: [
+    block('a', { duration: 1, transform: { width: 0.6, height: 0.6 } }),
+    block('b', { start: 1, duration: 2, params: { color: '#0000ff' }, transform: { width: 0.6, height: 0.6 }, transition: { asset: 'wipe', duration: 1 } }),
+  ] }]);
+  await studio.clips.createClip({ slug: 'handover', title: 'Handover', author: AUTHOR, composition: joined });
+  const r = await studio.clips.savePrecomp({ clip: 'handover', items: ['a', 'b'], slug: 'handover-card', replace: true, author: AUTHOR });
+  assert.deepEqual(r.clip.composition.tracks[1].items.map((i) => i.asset), ['handover-card@1']);
+  for (const t of [0.5, 1.2, 1.5, 1.9, 2.5]) assert.equal((await frame(r.clip.composition, t)).hash, (await frame(joined, t)).hash, `t=${t}`);
+  const mid = await frame(r.clip.composition, 1.5);
+  assert.ok(isBlue(mid.at(100, 90)) && isRed(mid.at(220, 90)) && !isRed(mid.at(20, 90)), 'half wiped inside the precomp: the next on the left, the held previous on the right');
+
+  // layers of two tracks in one precomp: the wipe hands over from the layer before it on its own track, not from the backdrop
+  await studio.library.createAsset({ slug: 'two-tracks', author: AUTHOR, source: `asset({
+  description: 'A backdrop under two blocks joined by a wipe, as layers of two tracks, for precomp tests.',
+  tags: ['precomp', 'test'],
+  duration: 3,
+  uses: ['block', 'wipe'],
+  render(f) {
+    f.layers([
+      { id: 'back', track: 'bg', asset: 'block', start: 0, duration: 3, params: { color: '#003300' } },
+      { id: 'a', track: 'fg', asset: 'block', start: 0, duration: 1, transform: { width: 0.6, height: 0.6 } },
+      { id: 'b', track: 'fg', asset: 'block', start: 1, duration: 2, params: { color: '#0000ff' }, transform: { width: 0.6, height: 0.6 }, transition: { asset: 'wipe', duration: 1 } },
+    ]);
+  },
+});` });
+  const both = base([{ id: 'v', items: [{ id: 'p', asset: 'two-tracks', start: 0, duration: 3 }] }]);
+  for (const t of [0.5, 1.5, 2.5]) assert.equal((await frame(both, t)).hash, (await frame(joined, t)).hash, `two tracks, t=${t}`);
+
+  // layers without a duration: they end with the precomp, so their progress and their out motions run
+  await studio.library.createAsset({ slug: 'open-ended', author: AUTHOR, source: `asset({
+  description: 'Layers without a duration: two time bars and a block that pops out, for precomp tests.',
+  tags: ['precomp', 'test'],
+  duration: 3,
+  uses: ['bar', 'block', 'pop'],
+  render(f) {
+    f.layers([
+      { asset: 'bar', transform: { y: 0.2, height: 0.3 } },
+      { asset: 'bar', start: 1, transform: { y: 0.8, height: 0.3 } },
+      { asset: 'block', transform: { x: 0.9, y: 0.5, width: 0.1, height: 0.1 }, motions: [{ asset: 'pop', phase: 'out', duration: 1 }] },
+    ]);
+  },
+});` });
+  const open = base([{ id: 'v', items: [{ id: 'p', asset: 'open-ended', start: 0, duration: 3 }] }]);
+  const early = await frame(open, 0.5), half = await frame(open, 1.5), late = await frame(open, 2.9);
+  const isWhite = (/** @type {number[]} */ [red, green, blue]) => red > 200 && green > 200 && blue > 200;
+  assert.ok(isWhite(half.at(100, 36)) && isBlack(half.at(220, 36)), 'the first bar is half way through 3 s at 1.5 s');
+  assert.ok(isBlack(early.at(10, 144)), 'the second has not started at 0.5 s');
+  assert.ok(isWhite(half.at(40, 144)) && isBlack(half.at(120, 144)), 'and is a quarter through its 2 s at 1.5 s');
+  assert.ok(isRed(half.at(288, 90)), 'the block rests until its out motion');
+  assert.ok(late.at(288, 90)[0] < 120, `and is popping out at 2.9 s (${late.at(288, 90)})`);
 });
 
 test('metadata is edited without a new code version; search follows; null goes back to the source', () => {

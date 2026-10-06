@@ -99,6 +99,21 @@ test('transforms, keyframes and overrides are validated with paths', () => {
   assert.deepEqual(it.transform, { x: 0.30000000000000004, y: 0.45, width: 0.4, height: 0.5, rotation: 10 });
 });
 
+test('a keyframe colour must parse to a colour, and seedId is a non-empty string kept on the item', () => {
+  const keyed = (v) => normalizeComposition(base([{ id: 'v', items: [block('b', { keyframes: { 'params.color': [{ t: 0, v: '#ff0000' }, { t: 1, v }] } })] }]));
+  for (const bad of ['#zzzzzz', '#12345', 'rgb(a, b, c)', 'rgb(1, 2)', 'reddish']) {
+    const r = keyed(bad);
+    assert.deepEqual(r.errors.map((e) => e.path), ['tracks[0].items[0].keyframes.params.color[1].v'], bad);
+    assert.match(r.errors[0].message, /is not a colour/);
+  }
+  for (const ok of ['#0f0', '#00FF0080', 'rgba(0, 0, 255, 0.5)', 'hsl(120, 100%, 50%)', 'transparent']) assert.deepEqual(keyed(ok).errors, [], ok);
+  const seeded = (seedId) => normalizeComposition(base([{ id: 'v', items: [block('b', { seedId })] }, { id: 'a', type: 'audio', items: [{ id: 'k-b', asset: 'kick', start: 0, duration: 2, seedId: 'k' }] }]));
+  assert.equal(seeded('a').composition.tracks[0].items[0].seedId, 'a');
+  assert.equal(seeded('a').composition.tracks[1].items[0].seedId, 'k', 'audio items too');
+  for (const bad of ['', 7, null]) assert.deepEqual(seeded(bad).errors.map((e) => e.path), ['tracks[0].items[0].seedId'], JSON.stringify(bad));
+  assert.equal('seedId' in normalizeComposition(base([{ id: 'v', items: [block('b')] }])).composition.tracks[0].items[0], false, 'not added to an item that has none');
+});
+
 test('geometry: the anchor sits at (x, y); scale and rotation turn about it; inverse maps back', () => {
   const g = layerGeometry({ x: 0.5, y: 0.5, width: 0.5, height: 0.5, rotation: 90 }, 400, 200);
   assert.equal(g.width, 200); assert.equal(g.height, 100);
@@ -174,6 +189,22 @@ test('per-format overrides: one composition, a layout for each format', async ()
   assert.ok(isBlack(s.at(270, 540)) && isBlack(s.at(540, 540)), 'square: hidden');
 });
 
+test('a format override on a v1 item with a box keeps the box: the override changes only what it names', async () => {
+  const box = { x: 0.5, y: 0.25, width: 0.25, height: 0.25 };
+  const item = block('b', { box, formats: { vertical: { transform: { scale: 1.1 } } } });
+  assert.deepEqual(forFormat(item, 'vertical').transform, { x: 0.625, y: 0.375, width: 0.25, height: 0.25, scale: 1.1 });
+  assert.equal(forFormat(item, 'square'), item, 'no override, no change');
+  // a different anchor keeps the box where it is, as a box with a transform does when the composition is normalized
+  assert.deepEqual(forFormat({ ...item, formats: { vertical: { transform: { anchorX: 0, anchorY: 1 } } } }, 'vertical').transform, { x: 0.5, y: 0.5, width: 0.25, height: 0.25, anchorX: 0, anchorY: 1 });
+  const comp = { format: 'vertical', fps: 10, duration: 2, background: '#000000', tracks: [{ id: 'v', items: [item] }] };
+  const v = await pixels(comp, 0.5);
+  // the box is x 540..810, y 480..960 of 1080 × 1920; scaled by 1.1 about its centre it is x 526.5..823.5, y 456..984
+  assert.ok(isRed(v.at(675, 720)) && isRed(v.at(532, 720)) && isRed(v.at(675, 462)), 'the block is where its box puts it, a little larger');
+  assert.ok(isBlack(v.at(520, 720)) && isBlack(v.at(830, 720)) && isBlack(v.at(675, 450)) && isBlack(v.at(675, 990)) && isBlack(v.at(270, 1440)), 'and nowhere else (not the full frame)');
+  const plain = await pixels({ ...comp, tracks: [{ id: 'v', items: [block('b', { box })] }] }, 0.5);
+  assert.ok(isRed(plain.at(545, 720)) && isBlack(plain.at(532, 720)), 'without the override it is the box itself');
+});
+
 test('z-order follows the track order; move_track and move_item change what is in front', async () => {
   const comp = base([
     { id: 'shape', items: [block('red', { transform: { width: 0.5, height: 0.5 } })] },
@@ -216,9 +247,14 @@ test('image assets are layers: contain, cover and fill inside a transformed box'
 test('split_item keeps playing where the first part stopped (same pixels on both sides of the cut)', async () => {
   const comp = base([{ id: 'v', items: [{ id: 'c', asset: 'clock', start: 0, duration: 2 }] }]);
   const split = studio.clips.applyOps(comp, [{ op: 'split_item', id: 'c', at: 0.8 }]);
-  assert.deepEqual(split.tracks[0].items.map(({ id, start, duration, offset, assetDuration }) => ({ id, start, duration, offset, assetDuration })),
-    [{ id: 'c', start: 0, duration: 0.8, offset: undefined, assetDuration: 2 }, { id: 'c-b', start: 0.8, duration: 1.2, offset: 0.8, assetDuration: 2 }]);
+  assert.deepEqual(split.tracks[0].items.map(({ id, start, duration, offset, assetDuration, seedId }) => ({ id, start, duration, offset, assetDuration, seedId })),
+    [{ id: 'c', start: 0, duration: 0.8, offset: undefined, assetDuration: 2, seedId: undefined }, { id: 'c-b', start: 0.8, duration: 1.2, offset: 0.8, assetDuration: 2, seedId: 'c' }]);
   for (const t of [0.3, 0.8, 1.5]) assert.equal((await pixels(split, t)).hash, (await pixels(comp, t)).hash, `t=${t}`);
+  // a part split again still takes its seed from the item it all started as; the pieces normalize as they are
+  const twice = studio.clips.applyOps(split, [{ op: 'split_item', id: 'c-b', at: 1.4 }]);
+  assert.deepEqual(twice.tracks[0].items.map(({ id, offset, seedId }) => ({ id, offset, seedId })), [{ id: 'c', offset: undefined, seedId: undefined }, { id: 'c-b', offset: 0.8, seedId: 'c' }, { id: 'c-b-b', offset: 1.4, seedId: 'c' }]);
+  assert.deepEqual(normalizeComposition(twice).composition.tracks[0].items.map((i) => i.seedId), [undefined, 'c', 'c']);
+  for (const t of [1.3, 1.4, 1.9]) assert.equal((await pixels(twice, t)).hash, (await pixels(comp, t)).hash, `split twice, t=${t}`);
   assert.throws(() => studio.clips.applyOps(comp, [{ op: 'split_item', id: 'c', at: 2 }]), /not inside item "c"/);
 });
 

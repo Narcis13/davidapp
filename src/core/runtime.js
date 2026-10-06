@@ -151,6 +151,10 @@ const resetState = (ctx) => ctx.__reset();
  *   createCanvas(width, height) → a canvas with getContext('2d'),
  *   lineOffset: lines the host's wrapper adds before the source (for error locations),
  * }
+ * Effects read pixels back with getImageData: from the runtime's own layers, and for an effect on the
+ * whole clip from the frame itself. So every context is asked for with { willReadFrequently: true }
+ * (a browser warns otherwise), here and by the host for the context it passes to renderClipFrame and
+ * renderAsset. Skia in Node ignores the option.
  */
 export function createRuntime(host) {
   const lib = createLib({ sampleRate: SAMPLE_RATE });
@@ -201,10 +205,14 @@ export function createRuntime(host) {
     const { fps } = comp;
     const t = frame / fps;
     const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
-    const want = (item, time) => {
-      for (const ref of [item.asset, item.mask?.asset]) {
+    const format = formatOf(comp.width, comp.height);
+    // the same time and loop flags the draw path reads: the item's params merged for the format, the mask's own params
+    const want = (raw, time) => {
+      const item = forFormat(raw, format);
+      const at = Math.max(0, time - item.start) + (item.offset ?? 0);
+      for (const [ref, params] of [[item.asset, item.params], [item.mask?.asset, item.mask?.params]]) {
         const seq = ref && sequences.get(ref);
-        if (seq) out.push({ ref, index: sequenceIndex(seq, Math.max(0, time - item.start) + (item.offset ?? 0), item.params?.loop) });
+        if (seq) out.push({ ref, index: sequenceIndex(seq, at, params?.loop) });
       }
     };
     for (const tr of comp.tracks) {
@@ -233,7 +241,7 @@ export function createRuntime(host) {
   }
 
   function measureContext() {
-    scratch ??= track(host.createCanvas(8, 8).getContext('2d'));
+    scratch ??= track(host.createCanvas(8, 8).getContext('2d', { willReadFrequently: true }));
     return scratch;
   }
 
@@ -351,19 +359,27 @@ export function createRuntime(host) {
       /**
        * Draw layers inside this asset's box, the way a clip draws its items: a precomp. Each layer is
        * { asset (an alias from uses), start, duration, params, transform, keyframes, motions, effects,
-       * mask, opacity, blend, fadeIn, fadeOut }, bottom first. A param value { $param: "name" } takes
-       * values[name], so a precomp exposes the params it chooses.
+       * mask, transition, track, opacity, blend, fadeIn, fadeOut }, bottom first. A layer without a
+       * duration lasts until this asset ends. A transition hands over from the layer before it, among
+       * the layers with the same `track` (all of them when none names one). A param value
+       * { $param: "name" } takes values[name], so a precomp exposes the params it chooses.
        */
       layers(list, values = {}) {
         if (!Array.isArray(list)) throw new AssetError('f.layers() takes a list of layers', [e.ref]);
         if (e.def.kind !== 'visual') throw new AssetError('f.layers() draws, so only a visual asset can call it', [e.ref]);
         const sub = { width, height, fps: env.fps, seed: env.seed, format: env.format, easing: e.deps.easing ?? null };
         const frame = Math.round(t * env.fps);
-        list.forEach((layer, i) => {
-          const item = bindLayer(e, layer, values, i);
-          if (frame < Math.round(item.start * env.fps) || frame >= Math.round((item.start + item.duration) * env.fps)) return;
+        const items = list.map((layer, i) => bindLayer(e, layer, values, i, duration));
+        const handoffs = new Map();
+        for (const item of items) {
+          let handoff = handoffs.get(item.track);
+          if (!handoff) handoffs.set(item.track, (handoff = transitionsAt({ items: items.filter((other) => other.track === item.track) }, frame, env.fps)));
+          if (handoff.outgoing.has(item)) continue;
+          const tx = handoff.incoming.get(item);
+          if (tx) { drawTransition(ctx, sub, tx, t, env.clip, env.format); continue; }
+          if (!activeAt(item, frame, env.fps)) continue;
           drawLayer(ctx, sub, forFormat(item, env.format), t, env.clip);
-        });
+        }
       },
     };
     try {
@@ -589,7 +605,14 @@ export function createRuntime(host) {
     ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
 
-  /** Where an item is at time t (clip seconds): its sampled state with motions applied, and its geometry. Null when invisible. */
+  /** The length of the timeline an item plays from: its own duration, or for a part of a split item the whole it was cut from. */
+  const wholeOf = (item) => item.assetDuration ?? (item.offset ?? 0) + item.duration;
+
+  /**
+   * Where an item is at time t (clip seconds): its sampled state with motions applied, and its geometry. Null when invisible.
+   * Keyframes, motions, effects and the asset itself run on the item's own timeline (`at` of `whole`), so the parts of a
+   * split item play on as one; fadeIn and fadeOut belong to each part's own start and end on screen.
+   */
   function layerState(comp, item, t, clip) {
     const { width, height } = comp;
     const lt = Math.max(0, t - item.start);
@@ -602,28 +625,32 @@ export function createRuntime(host) {
     let transform = s.transform;
     if (item.motions?.length) {
       const box = layerGeometry(transform, width, height);
-      const m = motionDelta(comp, item, lt, box, clip);
+      const m = motionDelta(comp, item, at, box, clip);
       const R = spaceRect(transform.space, width, height);
       transform = { ...transform, x: transform.x + m.x / R.width, y: transform.y + m.y / R.height, scale: transform.scale * m.scale, scaleX: transform.scaleX * m.scaleX, scaleY: transform.scaleY * m.scaleY, rotation: transform.rotation + m.rotation };
       opacity *= m.opacity;
     }
     if (opacity <= 0) return null;
-    return { lt, at, params: s.params, transform, opacity, geo: layerGeometry(transform, width, height) };
+    return { lt, at, whole: wholeOf(item), params: s.params, transform, opacity, geo: layerGeometry(transform, width, height) };
   }
 
-  /** The combined transform delta of an item's motions at on-screen time lt. */
-  function motionDelta(comp, item, lt, box, clip) {
+  /**
+   * The combined transform delta of an item's motions at time `at` of its own timeline: `in` runs at the
+   * start of the whole and `out` at its end, so neither replays (or plays early) at the cut of a split item.
+   */
+  function motionDelta(comp, item, at, box, clip) {
     const out = { x: 0, y: 0, scale: 1, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1 };
+    const whole = wholeOf(item);
     item.motions.forEach((m, i) => {
       const e = entry(m.asset);
       if (e.def.kind !== 'motion') throw new AssetError(`item "${item.id}": ${m.asset} is a ${e.def.kind} asset, not a motion`);
       const phase = m.phase ?? 'in';
-      const d = phase === 'loop' ? item.duration : Math.min(item.duration, m.duration ?? e.def.duration ?? 0.6);
-      const start = phase === 'out' ? item.duration - d : phase === 'emphasis' ? m.at ?? 0 : 0;
-      if (lt < start || lt > start + d) return;
+      const d = phase === 'loop' ? whole : Math.min(whole, m.duration ?? e.def.duration ?? 0.6);
+      const start = phase === 'out' ? whole - d : phase === 'emphasis' ? m.at ?? 0 : 0;
+      if (at < start || at > start + d) return;
       const r = invoke(e, m.params, {
-        ctx: measureContext(), width: box.width, height: box.height, fps: comp.fps, t: lt - start, duration: d, depth: 0,
-        seed: hashSeed(comp.seed ?? 1, item.id, 'motion', i), clip, phase,
+        ctx: measureContext(), width: box.width, height: box.height, fps: comp.fps, t: at - start, duration: d, depth: 0,
+        seed: hashSeed(comp.seed ?? 1, item.seedId ?? item.id, 'motion', i), clip, phase,
         format: formatOf(box.width, box.height), safe: { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: box.width, height: box.height },
       });
       const delta = checkMotion(r, m.asset);
@@ -667,8 +694,8 @@ export function createRuntime(host) {
       if (img) drawImageFit(target, img, geo.width, geo.height, st.params.fit);
       else {
         invoke(e, st.params, {
-          ctx: target, width: geo.width, height: geo.height, fps, t: st.at, duration: item.assetDuration ?? (item.offset ?? 0) + item.duration, depth: 0,
-          seed: hashSeed(comp.seed ?? 1, item.id), clip,
+          ctx: target, width: geo.width, height: geo.height, fps, t: st.at, duration: st.whole, depth: 0,
+          seed: hashSeed(comp.seed ?? 1, item.seedId ?? item.id), clip,
           format: geo.full ? formatOf(width, height) : formatOf(geo.width, geo.height),
           safe: geo.full ? safeZone(width, height) : { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: geo.width, height: geo.height },
         });
@@ -694,7 +721,7 @@ export function createRuntime(host) {
       if (!layered) return drawContent(ctx, comp, item, st, clip);
       let layer = offscreen(comp.width, comp.height);
       drawContent(layer.ctx, comp, item, st, clip);
-      if (item.effects?.length) layer = applyEffects(layer, item.effects, comp, { t: st.lt, duration: item.duration }, clip, item.id);
+      if (item.effects?.length) layer = applyEffects(layer, item.effects, comp, { t: st.at, duration: st.whole }, clip, item.seedId ?? item.id);
       if (item.mask) applyMask(layer, comp, item, st, t, clip);
       composite(ctx, layer.canvas, st.opacity, item.blend);
     } catch (err) {
@@ -732,7 +759,7 @@ export function createRuntime(host) {
   function applyMask(layer, comp, item, st, t, clip) {
     const m = item.mask;
     const mask = offscreen(comp.width, comp.height);
-    const mItem = { id: `${item.id}:mask`, asset: m.asset, start: item.start, duration: item.duration, params: m.params, offset: item.offset, assetDuration: item.assetDuration, transform: m.transform ?? st.transform };
+    const mItem = { id: `${item.id}:mask`, seedId: `${item.seedId ?? item.id}:mask`, asset: m.asset, start: item.start, duration: item.duration, params: m.params, offset: item.offset, assetDuration: item.assetDuration, transform: m.transform ?? st.transform };
     const mst = layerState(comp, mItem, t, clip);
     if (mst) drawContent(mask.ctx, comp, mItem, { ...mst, geo: m.transform ? mst.geo : st.geo }, clip);
     const mode = m.mode ?? 'alpha';
@@ -770,19 +797,21 @@ export function createRuntime(host) {
   /**
    * Transitions running on a track at this frame. An item with a transition hands over from the item
    * before it on the same track (the latest one that starts earlier); for the transition's duration
-   * that item keeps playing, or holds its last frame if it has already ended.
+   * that item keeps playing, or holds its last frame if it has already ended. Like a motion, a
+   * transition without a duration runs for its asset's own, else 0.5 s, and never for longer than its item.
    */
   function transitionsAt(tr, frame, fps) {
     const incoming = new Map(), outgoing = new Set();
     for (const item of tr.items) {
       if (!item.transition) continue;
-      const a = Math.round(item.start * fps), d = Math.round(item.transition.duration * fps);
+      const duration = Math.min(wholeOf(item), item.transition.duration ?? entries.get(item.transition.asset)?.def.duration ?? 0.5);
+      const a = Math.round(item.start * fps), d = Math.round(duration * fps);
       if (frame < a || frame >= a + d || !activeAt(item, frame, fps)) continue;
       let from = null;
       for (const other of tr.items) if (other !== item && other.start < item.start && (!from || other.start > from.start)) from = other;
       if (from && Math.round((from.start + from.duration) * fps) < a - 1) from = null;
       if (from) outgoing.add(from);
-      incoming.set(item, { item, from, start: item.start, duration: item.transition.duration });
+      incoming.set(item, { item, from, start: item.start, duration });
     }
     return { incoming, outgoing };
   }
@@ -815,8 +844,11 @@ export function createRuntime(host) {
     composite(ctx, out.canvas);
   }
 
-  /** A precomp layer with its aliases resolved through the owner's pins and its $param bindings filled. */
-  function bindLayer(owner, layer, values, i) {
+  /**
+   * A precomp layer with its aliases resolved through the owner's pins and its $param bindings filled.
+   * A layer without a duration lasts for what is left of the owner's (`duration` seconds).
+   */
+  function bindLayer(owner, layer, values, i, duration) {
     if (!layer || typeof layer !== 'object') throw new AssetError(`f.layers(): layer ${i} is not an object`, [owner.ref]);
     const bind = (v) => {
       if (Array.isArray(v)) return v.map(bind);
@@ -828,7 +860,7 @@ export function createRuntime(host) {
     };
     const pin = (alias) => resolve(owner, alias);
     const att = (a) => ({ ...a, asset: pin(a.asset), params: bind(a.params ?? {}) });
-    const item = { ...layer, id: layer.id ?? `layer-${i + 1}`, asset: pin(layer.asset), start: layer.start ?? 0, duration: layer.duration ?? 1e9, params: bind(layer.params ?? {}) };
+    const item = { ...layer, id: layer.id ?? `layer-${i + 1}`, asset: pin(layer.asset), start: layer.start ?? 0, duration: layer.duration ?? Math.max(0, duration - (layer.start ?? 0)), params: bind(layer.params ?? {}) };
     if (layer.motions) item.motions = layer.motions.map(att);
     if (layer.effects) item.effects = layer.effects.map(att);
     if (layer.mask) item.mask = att(layer.mask);

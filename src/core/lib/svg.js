@@ -16,6 +16,13 @@ export function parsePath(d) {
   const out = [];
   let i = 0, cmd = null, x = 0, y = 0, sx = 0, sy = 0, lastC = null, lastQ = null;
   const num = () => { const v = Number(tokens[i++]); if (!Number.isFinite(v)) throw new Error(`bad path data near "${tokens.slice(i - 2, i + 2).join(' ')}"`); return v; };
+  // an arc's two flags are one character each, and minified paths run them into the next number: "a5 5 0 0110 10"
+  const flag = () => {
+    const tok = tokens[i] ?? '';
+    if (tok[0] !== '0' && tok[0] !== '1') throw new Error(`bad path data near "${tokens.slice(Math.max(0, i - 1), i + 3).join(' ')}": an arc flag is 0 or 1`);
+    if (tok.length > 1) tokens[i] = tok.slice(1); else i++;
+    return Number(tok[0]);
+  };
   while (i < tokens.length) {
     if (/[A-Za-z]/.test(tokens[i])) cmd = tokens[i++];
     else if (!cmd) throw new Error('path data must start with a command');
@@ -33,7 +40,7 @@ export function parsePath(d) {
       case 'Q': { const x1 = ox + num(), y1 = oy + num(); x = ox + num(); y = oy + num(); out.push(['Q', x1, y1, x, y]); lastQ = [x1, y1]; lastC = null; break; }
       case 'T': { const x1 = lastQ ? 2 * x - lastQ[0] : x, y1 = lastQ ? 2 * y - lastQ[1] : y; x = ox + num(); y = oy + num(); out.push(['Q', x1, y1, x, y]); lastQ = [x1, y1]; lastC = null; break; }
       case 'A': {
-        const rx = num(), ry = num(), phi = num(), large = num(), sweep = num();
+        const rx = num(), ry = num(), phi = num(), large = flag(), sweep = flag();
         const x2 = ox + num(), y2 = oy + num();
         for (const c of arcToCubics(x, y, rx, ry, phi, large, sweep, x2, y2)) out.push(c);
         x = x2; y = y2; lastC = lastQ = null;
@@ -141,7 +148,8 @@ export function draw(ctx, model, o = {}) {
     if (progress >= 1) {
       ctx.beginPath();
       trace(ctx, p.d);
-      if (fill) { ctx.fillStyle = fill; ctx.globalAlpha *= p.fillOpacity ?? 1; ctx.fill(p.fillRule === 'evenodd' ? 'evenodd' : 'nonzero'); ctx.globalAlpha /= p.fillOpacity ?? 1; }
+      // the fill's opacity is set for the fill and the alpha put back as it was (dividing it back fails for 0)
+      if (fill) { const alpha = ctx.globalAlpha; ctx.fillStyle = fill; ctx.globalAlpha = alpha * (p.fillOpacity ?? 1); ctx.fill(p.fillRule === 'evenodd' ? 'evenodd' : 'nonzero'); ctx.globalAlpha = alpha; }
       if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.globalAlpha *= p.strokeOpacity ?? 1; ctx.stroke(); }
     } else {
       // drawing on: this path's share of the total length traces in, in document order
@@ -149,7 +157,7 @@ export function draw(ctx, model, o = {}) {
       const shown = Math.min(1, Math.max(0, (progress * total - before) / Math.max(1e-9, len)));
       before += len;
       const fillIn = Math.min(1, Math.max(0, (progress - 2 / 3) * 3));
-      if (fill && fillIn > 0) { ctx.beginPath(); trace(ctx, p.d); ctx.fillStyle = fill; ctx.globalAlpha *= fillIn * (p.fillOpacity ?? 1); ctx.fill(p.fillRule === 'evenodd' ? 'evenodd' : 'nonzero'); ctx.globalAlpha /= fillIn * (p.fillOpacity ?? 1); }
+      if (fill && fillIn > 0) { const alpha = ctx.globalAlpha; ctx.beginPath(); trace(ctx, p.d); ctx.fillStyle = fill; ctx.globalAlpha = alpha * (fillIn * (p.fillOpacity ?? 1)); ctx.fill(p.fillRule === 'evenodd' ? 'evenodd' : 'nonzero'); ctx.globalAlpha = alpha; }
       const lineColor = stroke ?? (o.outline !== false ? fill : null);
       if (lineColor && shown > 0) {
         ctx.strokeStyle = lineColor;

@@ -64,6 +64,13 @@ export function evaluate(source, filename = 'asset.js') {
 export const nodeHost = { evaluate, createCanvas };
 export { createCanvas, loadImage };
 
+/**
+ * Options for the context of a canvas the runtime draws a frame on. An effect on the whole clip reads
+ * the frame back (getImageData), and a browser canvas has to be told so when its context is made; the
+ * preview worker passes the same. Skia ignores it: nothing changes in what Node draws.
+ */
+export const FRAME_CONTEXT = /** @type {any} */ ({ willReadFrequently: true });
+
 /** Two PNGs next to each other on one dark canvas (version diffs, before/after). */
 export async function sideBySide(a, b, gap = 12) {
   const [A, B] = await Promise.all([loadImage(a), loadImage(b)]);

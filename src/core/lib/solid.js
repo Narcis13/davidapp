@@ -127,7 +127,7 @@ export function lathe(profile, segments = 24) {
   for (let s = 0; s < segments; s++) {
     for (let i = 0; i < n - 1; i++) {
       const a = s * n + i, b = (s + 1) * n + i;
-      indices.push(a, a + 1, b, b, a + 1, b + 1);
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
     }
   }
   return { positions, indices, colors: null };
@@ -151,7 +151,7 @@ export function torus(R = 1, r = 0.35, segments = 32, tube = 12) {
   for (let i = 0; i < segments; i++) {
     for (let j = 0; j < tube; j++) {
       const a = i * (tube + 1) + j, b = (i + 1) * (tube + 1) + j;
-      indices.push(a, b, a + 1, b, b + 1, a + 1);
+      indices.push(a, a + 1, b, b, a + 1, b + 1);
     }
   }
   return { positions, indices, colors: null };

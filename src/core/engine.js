@@ -1,7 +1,10 @@
 // Engine constants shared by the renderer (Node) and the studio preview (browser).
 
-/** Bumped when the runtime or its standard library changes what existing assets draw. */
-export const ENGINE_VERSION = 1;
+/**
+ * Bumped when the runtime or its standard library changes what existing assets draw.
+ * 2: f.lib.solid's torus, lathe and cylinder face outwards (they were wound inside-out), so assets that use them draw their near side.
+ */
+export const ENGINE_VERSION = 2;
 
 export const MAX_CLIP_SECONDS = 120;
 export const SAMPLE_RATE = 48000;

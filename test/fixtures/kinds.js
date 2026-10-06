@@ -161,6 +161,32 @@ export const MASK_CIRCLE = `asset({
   },
 });`;
 
+// two assets that show their own time and seed, so the parts of a split item can be compared with the whole
+export const BAR = `asset({
+  description: 'A bar whose width is the time over the duration: it shows where on its timeline an item is.',
+  tags: ['shape', 'test'],
+  duration: 3,
+  params: { color: { type: 'color', default: '#ffffff' } },
+  render(f, p) {
+    f.ctx.fillStyle = p.color;
+    f.ctx.fillRect(0, 0, f.width * f.progress, f.height);
+  },
+});`;
+
+export const SCATTER = `asset({
+  description: 'Squares scattered by f.rng that drift to the right over time: it shows its seed and its time.',
+  tags: ['shape', 'random', 'test'],
+  duration: 3,
+  params: { color: { type: 'color', default: '#ffffff' } },
+  render(f, p) {
+    f.ctx.fillStyle = p.color;
+    for (let i = 0; i < 12; i++) {
+      const x = f.rng() * f.width * 0.6, y = f.rng() * f.height * 0.9;
+      f.ctx.fillRect(x + f.progress * f.width * 0.3, y, f.width * 0.05, f.height * 0.08);
+    }
+  },
+});`;
+
 // one broken asset of each new kind
 /** @type {Record<string, [string, RegExp]>} */
 export const BROKEN = {

@@ -77,7 +77,7 @@ const handlers = {
   },
   assetFrame(m) {
     const c = surface(m.width, m.height);
-    rt.renderAsset(c.getContext('2d'), m.ref, m.params ?? {}, m);
+    rt.renderAsset(c.getContext('2d', { willReadFrequently: true }), m.ref, m.params ?? {}, m);
     const bitmap = c.transferToImageBitmap();
     return { result: { bitmap }, transfer: [bitmap] };
   },
@@ -85,7 +85,7 @@ const handlers = {
     const comp = m.composition ?? composition;
     await loadSequenceFrames(comp, m.frame);
     const c = surface(comp.width, comp.height);
-    rt.renderClipFrame(c.getContext('2d'), comp, m.frame, { beats });
+    rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { beats });
     const bitmap = c.transferToImageBitmap();
     return { result: { bitmap }, transfer: [bitmap] };
   },

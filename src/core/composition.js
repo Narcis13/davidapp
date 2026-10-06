@@ -118,6 +118,8 @@ export function normalizeComposition(input) {
         else item[k] = round(it[k]);
       }
       if (item.assetDuration !== undefined && item.assetDuration + 1e-6 < (item.offset ?? 0) + item.duration) err(`${ip}.assetDuration`, `assetDuration (${item.assetDuration}s) is shorter than offset + duration (${round((item.offset ?? 0) + item.duration)}s)`);
+      // the later part of a split item keeps the seed of the item it was cut from, so random layouts carry on over the cut
+      if (it.seedId !== undefined) { if (typeof it.seedId !== 'string' || !it.seedId) err(`${ip}.seedId`, 'seedId is the id of the item this one was split from (a non-empty string); its random seed comes from that id'); else item.seedId = it.seedId; }
       if (type === 'audio') {
         if (it.gain !== undefined) { if (!num(it.gain) || it.gain < 0 || it.gain > 4) err(`${ip}.gain`, 'gain must be between 0 and 4'); else item.gain = it.gain; }
         if (it.beats !== undefined) item.beats = !!it.beats;

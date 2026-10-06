@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { createRuntime, describeError } from '../core/runtime.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
-import { nodeHost, registerFonts, createCanvas, loadImage, takeLogs } from './host.js';
+import { nodeHost, registerFonts, createCanvas, loadImage, takeLogs, FRAME_CONTEXT } from './host.js';
 
 registerFonts();
 
@@ -85,7 +85,7 @@ function isBlank(c) {
 
 function drawAsset(rt, ref, o) {
   const c = surface(o.width, o.height);
-  rt.renderAsset(c.getContext('2d'), ref, o.params ?? {}, o);
+  rt.renderAsset(c.getContext('2d', FRAME_CONTEXT), ref, o.params ?? {}, o);
   return c;
 }
 
@@ -152,7 +152,7 @@ async function validate(msg) {
       if (blank) warnings.push(`all ${format} test frames are blank with the default parameters`);
       if (!thumb) {
         const c = createCanvas(width, height);
-        rt.renderAsset(c.getContext('2d'), msg.ref, params, { ...o, t: Math.round(duration * (msg.thumbAt ?? 0.6) * fps) / fps, background: '#101018' });
+        rt.renderAsset(c.getContext('2d', FRAME_CONTEXT), msg.ref, params, { ...o, t: Math.round(duration * (msg.thumbAt ?? 0.6) * fps) / fps, background: '#101018' });
         thumb = png(c, 640);
         strip = filmstrip(rt, msg.ref, params, { width, height, duration });
       }
@@ -220,7 +220,7 @@ function filmstrip(rt, ref, params, { width, height, duration }) {
   const c = createCanvas(width, height);
   for (let i = 0; i < n; i++) {
     const t = Math.round(((i + 0.5) / n) * duration * 30) / 30;
-    rt.renderAsset(c.getContext('2d'), ref, params, { params, t, duration, width, height, fps: 30, seed: 1, background: '#101018' });
+    rt.renderAsset(c.getContext('2d', FRAME_CONTEXT), ref, params, { params, t, duration, width, height, fps: 30, seed: 1, background: '#101018' });
     g.drawImage(c, i * cw, 0, cw, ch);
   }
   return out.toBuffer('image/png');
@@ -230,7 +230,7 @@ function filmstrip(rt, ref, params, { width, height, duration }) {
 function demoThumb(rt, ref, params, t, duration) {
   const { width, height } = FORMATS.horizontal;
   const c = createCanvas(width, height);
-  rt.renderAsset(c.getContext('2d'), ref, params, { params, t, duration, width, height, fps: 30, seed: 1, background: '#101018' });
+  rt.renderAsset(c.getContext('2d', FRAME_CONTEXT), ref, params, { params, t, duration, width, height, fps: 30, seed: 1, background: '#101018' });
   return png(c, 640);
 }
 
@@ -245,7 +245,7 @@ const handlers = {
     const comp = state.comp;
     await loadSequenceFrames(state.rt, comp, msg.frame);
     const c = surface(comp.width, comp.height);
-    state.rt.renderClipFrame(c.getContext('2d'), comp, msg.frame, { beats: state.beats });
+    state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, msg.frame, { beats: state.beats });
     return output(c, msg);
   },
   assetFrame(msg) {
@@ -259,7 +259,7 @@ const handlers = {
       // each cell is drawn as soon as its sequence frames are in (the cache is smaller than a whole sheet)
       await loadSequenceFrames(state.rt, comp, frame);
       const c = surface(comp.width, comp.height);
-      state.rt.renderClipFrame(c.getContext('2d'), comp, frame, { beats: state.beats });
+      state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, frame, { beats: state.beats });
       // kept at cell size: a full-size copy per cell would be hundreds of MB for a vertical clip
       const copy = createCanvas(msg.cellWidth, Math.round((msg.cellWidth * comp.height) / comp.width));
       const g = copy.getContext('2d');

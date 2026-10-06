@@ -6,7 +6,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { createCanvas, loadImage } from '../src/render/host.js';
+import { createCanvas, loadImage, nodeHost } from '../src/render/host.js';
+import { createRuntime } from '../src/core/runtime.js';
 import * as S from '../src/core/lib/solid.js';
 import { tempStudio, AUTHOR, LABEL } from './helpers.js';
 import { BALL, HILLS, LETTERS } from './fixtures/solid.js';
@@ -41,6 +42,65 @@ test('meshes: icosphere, box, lathe, torus, extrude, terrain, text and instances
   assert.equal(parts.indices.length / 3, 24);
 });
 
+test('every generator winds its triangles counter-clockwise seen from outside (the normals point away from the inside)', () => {
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  /** Triangles whose geometric normal points away from inside(centre of the triangle), towards it, or that have no area. */
+  const facing = (m, inside) => {
+    const P = (i) => [m.positions[i * 3], m.positions[i * 3 + 1], m.positions[i * 3 + 2]];
+    const n = { out: 0, in: 0, flat: 0 };
+    for (let t = 0; t < m.indices.length; t += 3) {
+      const a = P(m.indices[t]), b = P(m.indices[t + 1]), c = P(m.indices[t + 2]);
+      const normal = cross(sub(b, a), sub(c, a));
+      const centre = [0, 1, 2].map((k) => (a[k] + b[k] + c[k]) / 3);
+      const away = sub(centre, inside(centre));
+      const d = normal[0] * away[0] + normal[1] * away[1] + normal[2] * away[2];
+      if (Math.hypot(...normal) < 1e-12) n.flat++; else if (d > 0) n.out++; else n.in++;
+    }
+    return n;
+  };
+  const origin = () => [0, 0, 0];
+  const axis = (/** @type {number[]} */ c) => [0, c[1], 0];
+  // the nearest point of the circle the tube is wrapped around
+  const ring = (R) => (/** @type {number[]} */ c) => { const l = Math.hypot(c[0], c[2]); return [(c[0] / l) * R, 0, (c[2] / l) * R]; };
+  const triangle = [[-0.5, -0.4], [0.5, -0.4], [0, 0.6]];
+  const dot = S.text('.');
+  const middle = [0, 1].map((k) => dot.positions.reduce((s, v, i) => (i % 3 === k ? s + v : s), 0) / (dot.positions.length / 3));
+  // [mesh, the inside nearest to a point, triangles without area]
+  /** @type {Record<string, [any, (c: number[]) => number[], number]>} */
+  const cases = {
+    box: [S.box(1, 2, 3), origin, 0],
+    icosphere: [S.icosphere(2, 1), origin, 0],
+    torus: [S.torus(1, 0.3, 16, 8), ring(1), 0],
+    'lathe (a wall)': [S.lathe([[1, -1], [1, 1]], 12), axis, 0],
+    'lathe (a vase)': [S.lathe([[0.5, -1], [1, 0], [0.4, 1]], 12), axis, 0],
+    // the caps are fans from the axis: one triangle of each quad there has no area
+    cylinder: [S.cylinder(0.5, 0.5, 1, 12), origin, 24],
+    cone: [S.cylinder(0, 0.5, 1, 12), origin, 48],
+    'extrude (counter-clockwise shape)': [S.extrude(triangle, 0.5), origin, 0],
+    'extrude (clockwise shape)': [S.extrude([...triangle].reverse(), 0.5), origin, 0],
+    text: [dot, () => [middle[0], middle[1], 0], 0],
+    // a sheet, not a solid: its outside is up
+    terrain: [S.terrain({ cols: 4, rows: 4, height: (x, z) => Math.sin(x) * 0.2 + z * 0.1 }), (/** @type {number[]} */ c) => [c[0], c[1] - 1, c[2]], 0],
+  };
+  for (const [name, [m, inside, flat]] of Object.entries(cases)) {
+    assert.deepEqual(facing(m, inside), { out: m.indices.length / 3 - flat, in: 0, flat }, name);
+  }
+  // and so the renderer shows the near side, lit from where the light is: a cylinder lit from the right is bright on the right
+  const lit = (mesh, shading, dx) => {
+    const f = frame();
+    S.render(f, { camera: { position: [0, 0, 5] }, lights: [{ type: 'directional', direction: [-1, 0, 0], intensity: 1 }], objects: [{ mesh, color: '#ffffff', shading }] });
+    return { left: f.px(100 - dx, 100), right: f.px(100 + dx, 100) };
+  };
+  for (const shading of ['flat', 'smooth']) {
+    for (const [name, mesh, dx] of /** @type {[string, any, number][]} */ ([['cylinder', S.cylinder(1, 1, 2, 24), 40], ['torus', S.torus(1, 0.3, 32, 12), 60]])) {
+      const p = lit(mesh, shading, dx);
+      assert.ok(p.right[3] === 255 && p.left[3] === 255, `${name} (${shading}) is drawn on both sides of the centre`);
+      assert.ok(p.right[0] > 120 && p.left[0] < 20, `${name} (${shading}): lit on the right ${p.right}, dark on the left ${p.left}`);
+    }
+  }
+});
+
 test('the rasterizer: the nearer surface wins whatever the order; back faces are culled; transparent elsewhere', () => {
   const red = { mesh: S.box(1, 1, 0.1), position: [0, 0, 0.5], color: '#ff0000' };
   const blue = { mesh: S.box(2, 2, 0.1), position: [0, 0, -0.5], color: '#0000ff' };
@@ -66,6 +126,34 @@ test('the rasterizer: a camera inside geometry clips at the near plane instead o
   const r = S.render(f, { camera: { position: [0, 0, 0], target: [0, 0, -1] }, lights: [{ type: 'ambient', intensity: 1 }], objects: [{ mesh: S.box(4, 4, 4), color: '#00ff00', doubleSided: true }] });
   assert.ok(r.drawn > 0);
   assert.ok(near(f.px(100, 100), [0, 255, 0, 255]));
+});
+
+test('sequence frames are preloaded with the loop flag the draw path reads: the format\'s params for an item, its own params for a mask', () => {
+  const rt = createRuntime(nodeHost);
+  rt.load({ 'block@1': { source: "asset({ description: 'A white block that fills its box, for tests.', tags: ['test'], render(f) { f.ctx.fillStyle = '#ffffff'; f.ctx.fillRect(0, 0, f.width, f.height); } });" } });
+  // a 2 s sequence (60 frames at 30 fps) that only holds the frames that were asked for, like a worker with an empty cache
+  const tile = createCanvas(8, 8);
+  tile.getContext('2d').fillRect(0, 0, 8, 8);
+  const loaded = new Set();
+  rt.setSequence('spin@1', { frames: 60, fps: 30, width: 8, height: 8, get: (i) => (loaded.has(i) ? tile : null) });
+  const comp = (item) => ({ width: 1920, height: 1080, fps: 10, duration: 6, background: '#000000', tracks: [{ id: 'v', type: 'visual', items: [{ id: 'x', start: 0, duration: 6, params: {}, ...item }] }] });
+  // at 3 s a sequence that loops is on frame 90 % 60 = 30, one that holds is on its last frame, 59
+  /** @type {Record<string, [any, number[]]>} */
+  const cases = {
+    'a looping mask on an item that does not loop': [{ asset: 'block@1', mask: { asset: 'spin@1', params: { loop: true } } }, [30]],
+    'a mask that holds on an item that loops': [{ asset: 'spin@1', params: { loop: true }, mask: { asset: 'spin@1', params: {} } }, [30, 59]],
+    'a format override that loops': [{ asset: 'spin@1', formats: { horizontal: { params: { loop: true } } } }, [30]],
+    'a format override that stops the loop': [{ asset: 'spin@1', params: { loop: true }, formats: { horizontal: { params: { loop: false } } } }, [59]],
+    'an override for another format': [{ asset: 'spin@1', formats: { vertical: { params: { loop: true } } } }, [59]],
+  };
+  const canvas = createCanvas(1920, 1080);
+  for (const [name, [item, expected]] of Object.entries(cases)) {
+    const wanted = rt.sequenceFramesAt(comp(item), 30);
+    assert.deepEqual(wanted.map((w) => [w.ref, w.index]), expected.map((i) => ['spin@1', i]), name);
+    loaded.clear();
+    for (const w of wanted) loaded.add(w.index);
+    assert.doesNotThrow(() => rt.renderClipFrame(canvas.getContext('2d'), comp(item), 30), `${name}: the frame it draws is the frame that was loaded`);
+  }
 });
 
 let t, studio;
