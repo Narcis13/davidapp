@@ -11,6 +11,7 @@ import * as editor from '/ui/screens/editor.js';
 import * as renders from '/ui/screens/renders.js';
 import * as gallery from '/ui/screens/gallery.js';
 import * as lineage from '/ui/screens/lineage.js';
+import * as requests from '/ui/screens/requests.js';
 
 const ROUTES = [
   { re: /^\/$/, screen: library, nav: 'library' },
@@ -20,8 +21,9 @@ const ROUTES = [
   { re: /^\/renders\/?$/, screen: renders, nav: 'renders' },
   { re: /^\/gallery(?:\/(\d+))?\/?$/, screen: gallery, nav: 'gallery' },
   { re: /^\/lineage\/?$/, screen: lineage, nav: 'lineage' },
+  { re: /^\/requests(?:\/(\d+))?\/?$/, screen: requests, nav: 'requests' },
 ];
-const NOT_APP = /^\/(api|media|fonts|core|ui)\//;
+const NOT_APP = /^\/(api|media|fonts|core|ui|vendor)\//;
 
 const main = document.getElementById('main');
 let current = null;   // { cleanups, alive, guard }

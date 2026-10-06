@@ -20,6 +20,9 @@ const TYPES = {
 };
 const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501 };
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+/** Packages the studio page may load from node_modules (CodeMirror 6 and what it imports). */
+const VENDOR = new Set(['codemirror', '@codemirror/state', '@codemirror/view', '@codemirror/commands', '@codemirror/language', '@codemirror/lang-javascript', '@codemirror/search', '@codemirror/autocomplete', '@codemirror/lint',
+  '@lezer/common', '@lezer/highlight', '@lezer/lr', '@lezer/javascript', 'style-mod', 'w3c-keyname', 'crelt', '@marijn/find-cluster-break']);
 
 /**
  * hosts: the Host names the server answers to (default: loopback names only), or null for any.
@@ -330,6 +333,9 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     if (path.startsWith('/media/')) return send(res, 404, { error: `Not found: ${path}` });
     if (path.startsWith('/fonts/')) return file(req, res, FONTS_DIR, path.slice(7), { cache: 'max-age=86400' });
     if (path.startsWith('/core/')) return file(req, res, CORE, path.slice(6));
+    // the code editor's modules, straight from node_modules (an allowlist of packages; no CDN)
+    const vendor = /^\/vendor\/((?:@[a-z0-9-]+\/)?[a-z0-9-]+)\/(.+)$/.exec(path);
+    if (vendor && VENDOR.has(vendor[1])) return file(req, res, join(ROOT, 'node_modules', vendor[1]), vendor[2], { cache: 'max-age=86400' });
     if (path.startsWith('/ui/')) return file(req, res, UI, path.slice(4));
     if (path === '/favicon.ico') return file(req, res, UI, 'favicon.svg');
     // every other path is a screen of the single-page app

@@ -27,7 +27,7 @@ export const BLOCK = `asset({
     f.ctx.stroke();
   },
 });`;
-const BACKDROP = `asset({
+export const BACKDROP = `asset({
   description: 'A gradient backdrop with a few circles, for parity tests.',
   tags: ['background', 'test'],
   render(f) {
