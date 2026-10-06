@@ -189,6 +189,29 @@ CREATE TABLE IF NOT EXISTS asset_recent (
 CREATE INDEX IF NOT EXISTS asset_recent_at ON asset_recent(at);
 CREATE INDEX IF NOT EXISTS assets_origin ON assets(origin_clip);
 
+-- Every MCP tool call, attributed to the clip being built: the compounding measure (calls, time).
+CREATE TABLE IF NOT EXISTS mcp_calls (
+  id       INTEGER PRIMARY KEY,
+  at       TEXT NOT NULL,
+  session  TEXT NOT NULL,     -- the MCP server process that answered
+  author   TEXT NOT NULL,
+  tool     TEXT NOT NULL,
+  clip_id  INTEGER REFERENCES clips(id),
+  ms       INTEGER NOT NULL,
+  ok       INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS mcp_calls_clip ON mcp_calls(clip_id, id);
+
+-- Notes agents leave on assets for the next agent ("works best under 6 words", "pair with theme-tide").
+CREATE TABLE IF NOT EXISTS asset_notes (
+  id          INTEGER PRIMARY KEY,
+  asset_id    INTEGER NOT NULL REFERENCES assets(id),
+  author      TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS asset_notes_asset ON asset_notes(asset_id);
+
 -- Requests to the agent, made from the studio. Worked by Claude Code over MCP.
 CREATE TABLE IF NOT EXISTS requests (
   id             INTEGER PRIMARY KEY,

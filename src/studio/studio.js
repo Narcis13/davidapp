@@ -18,6 +18,7 @@ import { createLineage } from './lineage.js';
 import { createEvents } from './events.js';
 import { createRequests } from './requests.js';
 import { createUploads } from './uploads.js';
+import { createCompounding } from './compounding.js';
 
 export { StudioError };
 
@@ -39,6 +40,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   // frame helpers below are function declarations, so they exist already
   const requests = createRequests(ctx, library, clips, { assetSheet, clipFrame, clipSheet });
   const uploads = createUploads(ctx, library);
+  const compounding = createCompounding(ctx, library, clips);
   library.seedFonts();
   if (runner) renders.startRunner();
   const framesDir = join(dataDir, 'frames');
@@ -240,5 +242,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }

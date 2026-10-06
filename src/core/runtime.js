@@ -276,6 +276,8 @@ export function createRuntime(host) {
       lib,
       params: p,
       ref: e.ref,
+      /** The clip's theme (a value asset's value), or null: read colours and fonts from it by default. */
+      theme: env.clip?.theme ?? null,
       /** motion: in | out | emphasis | loop. */
       phase: env.phase ?? null,
       /** effect: the layer to process; transition: the outgoing and incoming layers ({ canvas, ctx, width, height } or null). */
@@ -486,6 +488,8 @@ export function createRuntime(host) {
       ctx.fillStyle = comp.background ?? '#000000';
       ctx.fillRect(0, 0, width, height);
       const clip = { t, frame, duration: comp.duration, fps, width, height, format: formatOf(width, height), beats: extra.beats ?? comp.beats ?? [], markers: extra.markers ?? comp.markers ?? [] };
+      // v2: the clip's theme, read by every asset as f.theme (only set when the clip has one)
+      if (comp.theme) clip.theme = themeOf(comp.theme);
       const format = formatOf(width, height);
       const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
       for (const tr of comp.tracks) {
@@ -551,6 +555,13 @@ export function createRuntime(host) {
     } finally {
       while (ctx.__saveDepth() > 0) ctx.restore();
     }
+  }
+
+  const themes = new Map();
+  /** A theme asset's value, computed once per runtime (value assets are pure). */
+  function themeOf(ref) {
+    if (!themes.has(ref)) themes.set(ref, callValue(ref, {}));
+    return themes.get(ref);
   }
 
   const easings = new Map();

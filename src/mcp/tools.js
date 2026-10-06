@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { ENGINE_VERSION, FORMATS } from '../core/engine.js';
 import { ROOT } from '../render/host.js';
 import { StudioError } from '../studio/studio.js';
-import { sideBySide } from '../render/host.js';
+import { sideBySide, createCanvas, loadImage } from '../render/host.js';
 
 const FORMAT = z.enum(['vertical', 'horizontal', 'square']);
 const REF = z.string().describe('Asset reference: "name" (latest version) or "name@3" (pinned)');
@@ -42,6 +42,30 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     json: { proposal: proposal.id, kind: proposal.kind, target: proposal.target, base: proposal.base, wouldBe: proposal.meta.wouldBe, warnings: proposal.meta.warnings, framesChecked: proposal.meta.framesChecked, request: request.id, status: request.status, next: 'The user reviews it in the studio. Stop here, or wait for their reply (claim_request again later).' },
     images: proposal.thumb ? [{ png: readFileSync(join(studio.dataDir, proposal.thumb)), path: join(studio.dataDir, proposal.thumb) }] : [],
   });
+
+  /** Thumbnails of suggested assets in a numbered grid (the numbers match the list). */
+  async function contactSheet(list) {
+    const cols = 4, cw = 240, ch = 135, pad = 6;
+    const rows = Math.ceil(list.length / cols);
+    const c = createCanvas(cols * (cw + pad) + pad, rows * (ch + pad) + pad);
+    const g = c.getContext('2d');
+    g.fillStyle = '#16161d';
+    g.fillRect(0, 0, c.width, c.height);
+    for (const [i, s] of list.entries()) {
+      const x = pad + (i % cols) * (cw + pad), y = pad + Math.floor(i / cols) * (ch + pad);
+      g.fillStyle = '#101018';
+      g.fillRect(x, y, cw, ch);
+      if (s.thumb) {
+        try { const img = await loadImage(join(studio.dataDir, s.thumb)); const k = Math.min(cw / img.width, ch / img.height); g.drawImage(img, x + (cw - img.width * k) / 2, y + (ch - img.height * k) / 2, img.width * k, img.height * k); } catch { /* no thumbnail */ }
+      }
+      g.fillStyle = 'rgba(0,0,0,0.75)';
+      g.fillRect(x, y + ch - 22, cw, 22);
+      g.fillStyle = '#ffffff';
+      g.font = '600 13px "JetBrains Mono"';
+      g.fillText(`${i + 1} ${s.ref}`.slice(0, 30), x + 6, y + ch - 7);
+    }
+    return c.toBuffer('image/png');
+  }
 
   /** @type {{ name: string, title: string, description: string, input: Record<string, any>, readOnly?: boolean, run: (a: any) => Promise<any> | any }[]} */
   const tools = [
@@ -86,10 +110,10 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'get_asset',
       title: 'Inspect an asset',
-      description: 'Everything about one asset version: source code, parameter schema, pinned dependencies, version history, lineage (forked from, made for which clip) and which clips use it.',
+      description: 'Everything about one asset version: source code, parameter schema, pinned dependencies, version history, lineage (forked from, made for which clip), which clips use it, real usage examples from those clips, and notes other agents left on it.',
       input: { ref: REF, include_source: z.boolean().optional().describe('Default true') },
       readOnly: true,
-      run: (a) => ({ json: library.getAsset(a.ref, { includeSource: a.include_source !== false }) }),
+      run: (a) => { const x = library.getAsset(a.ref, { includeSource: a.include_source !== false }); return { json: { ...x, notes: studio.compounding.notesOf(x.slug), examples: studio.compounding.examples(x.slug) } }; },
     },
     {
       name: 'validate_asset',
@@ -547,6 +571,33 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       run: (a) => ({ json: compactRequest(studio.requests.complete({ id: a.id, agent: defaultAuthor, body: a.message })) }),
     },
     {
+      name: 'suggest_assets',
+      title: 'Suggest assets for a brief',
+      description: 'Start here before writing anything: give the brief of a clip or scene ("a 60 s product teaser with a 3D logo, stats and a calm theme") and get the library\'s best candidates, ranked by how well they match and how proven they are (featured, favourites, used by earlier clips), a few of each kind, with their params, matched words, notes from other agents, and a contact sheet of their thumbnails.',
+      input: { brief: z.string().min(3), kinds: z.array(z.enum(['visual', 'value', 'audio', 'motion', 'transition', 'effect', 'image', 'sound', 'sequence'])).optional().describe('Only these kinds/types'), limit: z.number().int().min(1).max(24).optional() },
+      readOnly: true,
+      run: async (a) => {
+        const r = studio.compounding.suggest({ brief: a.brief, kinds: a.kinds, limit: a.limit ?? 12 });
+        const sheet = r.suggestions.length ? await contactSheet(r.suggestions) : null;
+        return { json: { words: r.words, suggestions: r.suggestions.map(({ thumb: _t, ...x }, i) => ({ n: i + 1, ...x })) }, images: sheet ? [image(`suggest-${Date.now().toString(36)}`, sheet)] : [] };
+      },
+    },
+    {
+      name: 'add_asset_note',
+      title: 'Leave a note on an asset',
+      description: 'Leave a note on an asset for the next agent: what it is good for, a pitfall, a param combination that works, what to pair it with. Notes show in get_asset and suggest_assets.',
+      input: { name: z.string(), note: z.string(), author: AUTHOR },
+      run: (a) => ({ json: { notes: studio.compounding.addNote({ slug: a.name, body: a.note, author: who(a.author) }) } }),
+    },
+    {
+      name: 'compounding_report',
+      title: 'How each clip was built',
+      description: 'Per clip: MCP calls while it was built, new lines of asset code (and lines the studio generated for presets and precomps), the share of timeline items that use assets which existed before, where they came from, and the build time (first call or request to the render request) and build time per second of output.',
+      input: { clips: z.array(z.string()).optional() },
+      readOnly: true,
+      run: (a) => ({ text: studio.compounding.table(a.clips), json: { clips: (a.clips ?? clips.listClips().map((c) => c.slug)).map((c) => studio.compounding.metrics(c)) } }),
+    },
+    {
       name: 'reuse_report',
       title: 'Reuse report',
       description: 'How the library compounds: for each clip, which assets it created and which it reused from earlier clips (as-is, as a new version, or as a fork).',
@@ -563,8 +614,11 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
   async function call(name, args = {}) {
     const tool = tools.find((t) => t.name === name);
     if (!tool) return { isError: true, content: [{ type: 'text', text: `Unknown tool "${name}"` }] };
+    const t0 = performance.now();
+    let ok = false;
     try {
       const out = await tool.run(args);
+      ok = true;
       const content = [];
       const paths = (out.images ?? []).map((i) => i.path);
       if (out.text) content.push({ type: 'text', text: out.text });
@@ -574,6 +628,9 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     } catch (e) {
       const known = e instanceof StudioError;
       return { isError: true, content: [{ type: 'text', text: known ? e.message : `Internal error in ${name}: ${e?.stack ?? e}` }] };
+    } finally {
+      // every call is counted against the clip it served: the compounding measure
+      studio.compounding?.logCall({ tool: name, args, author: args?.author ?? defaultAuthor, ms: performance.now() - t0, ok });
     }
   }
 

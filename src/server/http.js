@@ -142,7 +142,8 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       const r = await library.createAsset({ slug: data.name, source: data.source, note: data.note, forClip: data.forClip, author: data.author ?? author });
       return { asset: r.asset, warnings: r.warnings };
     }],
-    ['GET', /^\/api\/assets\/([a-z0-9-]+)$/, ({ params, query }) => library.getAsset(query.get('version') ? makeRef(params[0], Number(query.get('version'))) : params[0])],
+    ['GET', /^\/api\/assets\/([a-z0-9-]+)$/, ({ params, query }) => ({ ...library.getAsset(query.get('version') ? makeRef(params[0], Number(query.get('version'))) : params[0]), notes: studio.compounding.notesOf(params[0]), examples: studio.compounding.examples(params[0]) })],
+    ['GET', /^\/api\/compounding$/, () => ({ clips: clips.listClips().map((c) => studio.compounding.metrics(c.slug)), table: studio.compounding.table() })],
     ['GET', /^\/api\/assets\/([a-z0-9-]+)\/bundle$/, ({ params, query }) => {
       const a = library.getAsset(query.get('version') ? makeRef(params[0], Number(query.get('version'))) : params[0], { includeSource: false });
       // with=ref,ref: assets and images chosen through parameters of type asset/image in the playground

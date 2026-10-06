@@ -132,6 +132,12 @@ export function createClips(ctx, library) {
       }
       if (needsEasing(item)) wantsEasing = true;
     }
+    // the clip's theme (brand kit): a value asset every asset reads as f.theme
+    if (composition.theme) {
+      const row = pin(composition.theme, 'theme');
+      if (row && !(row.type === 'function' && row.kind === 'value')) problems.push(`theme: ${makeRef(row.slug, row.version)} is a ${row.kind ?? row.type} asset; a theme is a value asset such as "theme-ember"`);
+      else if (row) { composition.theme = makeRef(row.slug, row.version); refs.add(composition.theme); }
+    }
     // keyframe curves come from an easing asset the composition pins, like any other asset
     if (composition.easing || wantsEasing) {
       const row = pin(composition.easing ?? 'easing', 'easing');
@@ -217,6 +223,7 @@ export function createClips(ctx, library) {
       }
     }
     if (composition.easing) refs.add(composition.easing);
+    if (composition.theme) refs.add(composition.theme);
     // motions, effects, masks and transitions, with the assets named in their params
     const attachments = [...(composition.effects ?? []), ...composition.tracks.flatMap((t) => t.effects ?? [])];
     for (const { track, item } of itemsOf(composition)) if (track.type !== 'audio') attachments.push(...(item.motions ?? []), ...(item.effects ?? []), ...(item.mask ? [item.mask] : []), ...(item.transition ? [item.transition] : []));

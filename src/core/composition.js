@@ -198,6 +198,11 @@ export function normalizeComposition(input) {
 
   let effects;
   if (input.effects !== undefined) effects = effectList(input.effects, 'effects', err);
+  let theme;
+  if (input.theme !== undefined && input.theme !== null) {
+    if (typeof input.theme !== 'string' || !REF_RE.test(input.theme)) err('theme', 'theme is the reference of a value asset every asset reads as f.theme, e.g. "theme-ember"');
+    else theme = input.theme;
+  }
   let easing;
   if (input.easing !== undefined) {
     if (typeof input.easing !== 'string' || !REF_RE.test(input.easing)) err('easing', 'easing is the reference of the easing asset keyframes take their curves from, e.g. "easing@1"');
@@ -209,6 +214,7 @@ export function normalizeComposition(input) {
   if (markers) composition.markers = markers;
   if (easing) composition.easing = easing;
   if (effects) composition.effects = effects;
+  if (theme) composition.theme = theme;
   return { composition, errors };
 }
 
