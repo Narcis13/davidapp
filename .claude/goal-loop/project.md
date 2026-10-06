@@ -4,17 +4,23 @@ What the goal-loop skill needs to know about this repository. The protocol is in
 says how to check, run and look at **this** code. Keep it short and true, and fix it when you learn otherwise.
 
 ```bash
-S=.claude/skills/goal-loop/scripts       # generic: gates.sh, sweep.sh, cdp.mjs (the .swift helpers are macOS only)
+S=.claude/skills/goal-loop/scripts       # generic: gates.sh, sweep.sh, cdp.mjs, montage.swift, pdfpng.swift
 P=.claude/goal-loop                      # this repo: project.md, gates, screens, serve.sh
-export TMPDIR="$LOCALAPPDATA/Temp/claude/<session>/scratchpad"                 # logs, data and shots stay out of the repo
-export CHROME="/c/Program Files/Google/Chrome/Application/chrome.exe"         # cdp.mjs does not look for Chrome on Windows
+export TMPDIR=/private/tmp/claude-501/-Users-narcisbrindusescu-newme-davidapp/<session>/scratchpad   # logs, data and shots stay out of the repo
+# cdp.mjs finds /Applications/Google Chrome.app by itself; set CHROME=… only for another browser
+swift $S/montage.swift out.png 0.5 a.png b.png      # screenshots side by side (macOS)
 ```
+
+Machine (iteration 2): macOS 15.5, Intel i5-10600 (6 cores / 12 threads), Node 24.21, FFmpeg 8.1 in
+`/usr/local/bin`, Claude Code CLI on PATH (`~/.local/bin/claude`). Iteration 1 ran on Windows; its render
+times and emoji pixels do not carry over.
 
 ## Kind
 
 - **UI:** web (the studio, `src/ui`, served by `src/server`). There is also an MCP server and a library.
-- **Browser:** both. Headless (`cdp.mjs`, `sweep.sh`) for the sweep and the evidence; the desktop app's
-  built-in browser (`mcp__Claude_Browser__*`) for interactive workflows (playground, scrubbing, starting a render).
+- **Browser:** both. Headless (`cdp.mjs`, `sweep.sh`) for the sweep and the evidence;
+  Claude in Chrome (`mcp__claude-in-chrome__*`) for interactive workflows (drag and drop, on-canvas handles,
+  uploads, the ask-the-agent flow), recorded as GIFs.
 
 ## Gates
 
@@ -40,7 +46,9 @@ bash $P/serve.sh stop  8791 "$TMPDIR/data"
 - The user's own studio: port 8787, data in `./data` (git-ignored). Never touch either.
 - Server log: `<data-dir>/server.log`. A line starting with `ERROR` is a server error; API lines are `METHOD url status ms`.
 - The MCP server opens the same data dir: `STUDIO_DATA=<dir> node scripts/mcp.mjs call <tool> '<json>'`.
-- FFmpeg is found through `FFMPEG_PATH`, then PATH, then `%LOCALAPPDATA%\Microsoft\WinGet\Links`.
+- FFmpeg is found through `FFMPEG_PATH`, then PATH (`/usr/local/bin` here), then `%LOCALAPPDATA%\Microsoft\WinGet\Links` on Windows.
+- Emoji draw with Apple Color Emoji on macOS (Skia's font fallback), so emoji pixels, and the hashes of
+  frames that show them, are per OS. `scripts/hashes.mjs` records and compares the showcase hashes on one machine.
 
 ## Screens and viewports
 
@@ -50,6 +58,8 @@ node $S/cdp.mjs shot "<url>" out.png --size 390x844 --mobile [--full|--scroll] -
 ```
 
 - Viewports: 1440×900 desktop, 390×844 phone.
+- The first headless Chrome launch after a while can take longer than `cdp.mjs` waits ("chrome did not
+  start"); `sweep.sh` still prints `ok` for that screen. Check that every screen's PNG exists, and reshoot a missing one.
 - Screens: `/` library · `/assets/<slug>` playground · `/clips` · `/clips/<slug>` editor · `/renders` · `/gallery` · `/lineage`.
 - Selectors and interaction recipes: see "Studio UI selectors" below.
 
@@ -85,7 +95,7 @@ fonts/        bundled OFL fonts and their licenses
 
 - Commit style: see `git log` (imperative title, bulleted body).
 - Node 24, ES modules, plain JS with JSDoc. New dependencies need a reason in PROGRESS.md **Decisions**.
-- Write source files with the Write tool: Git Bash heredocs containing JS break in this harness.
+- Write source files with the Write tool or the Edit tool rather than shell heredocs.
 - UI text: short, sentence case, no exclamation marks.
 
 ## Studio UI selectors
