@@ -159,7 +159,8 @@ export function createLibrary(ctx) {
     if (f.kind && on('kind')) { where.push('v.kind = ?'); args.push(f.kind); }
     // set filters are IN (subquery): computed once, not once per row
     if (on('tag')) for (const tag of f.tags ?? []) { where.push('a.id IN (SELECT asset_id FROM asset_tags WHERE tag = ?)'); args.push(tag); }
-    if (f.format && on('format')) { where.push("(v.formats = '[]' OR EXISTS (SELECT 1 FROM json_each(v.formats) WHERE value = ?))"); args.push(f.format); }
+    // formats is a small JSON array of known names: a string match is exact and far cheaper than json_each per row
+    if (f.format && on('format')) { where.push("(v.formats = '[]' OR v.formats LIKE ?)"); args.push(`%"${String(f.format).replace(/[^a-z]/g, '')}"%`); }
     if (f.originClip && on('origin')) { where.push('a.origin_clip = (SELECT id FROM clips WHERE slug = ?)'); args.push(f.originClip); }
     if (f.usedByClip && on('usedBy')) { where.push('a.id IN (SELECT cv.asset_id FROM clip_assets ca JOIN asset_versions cv ON cv.id = ca.version_id WHERE ca.clip_id = (SELECT id FROM clips WHERE slug = ?))'); args.push(f.usedByClip); }
     if (f.derivedFrom) { where.push('a.forked_from IN (SELECT fv.id FROM asset_versions fv JOIN assets fa ON fa.id = fv.asset_id WHERE fa.slug = ?)'); args.push(f.derivedFrom); }
@@ -186,7 +187,11 @@ export function createLibrary(ctx) {
       kind: by('kind', 'v.kind'),
       // tags narrow each other, so their counts are under the full filter
       tag: count(`SELECT t.tag AS k, COUNT(*) AS n ${BASE} JOIN asset_tags t ON t.asset_id = a.id ${all.sql} GROUP BY t.tag ORDER BY n DESC, t.tag LIMIT 40`, all.args),
-      format: (() => { const w = filterSql(f, 'format'); return count(`SELECT fm.value AS k, COUNT(DISTINCT a.id) AS n ${BASE}, json_each(CASE WHEN v.formats = '[]' THEN '["vertical","horizontal","square"]' ELSE v.formats END) fm ${w.sql} GROUP BY fm.value ORDER BY n DESC, k`, w.args); })(),
+      format: (() => {
+        const w = filterSql(f, 'format');
+        const r = db.prepare(`SELECT ${['vertical', 'horizontal', 'square'].map((x) => `SUM(v.formats = '[]' OR v.formats LIKE '%"${x}"%') AS ${x}`).join(', ')} ${BASE} ${w.sql}`).get(...w.args);
+        return ['vertical', 'horizontal', 'square'].map((x) => ({ value: x, count: r[x] ?? 0 })).filter((x) => x.count).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+      })(),
       author: by('author', 'v.author'),
       origin: by('origin', '(SELECT slug FROM clips WHERE id = a.origin_clip)'),
       usedBy: (() => { const w = filterSql(f, 'usedBy'); return count(`SELECT c.slug AS k, COUNT(DISTINCT a.id) AS n ${BASE} JOIN asset_versions uv ON uv.asset_id = a.id JOIN clip_assets ca ON ca.version_id = uv.id JOIN clips c ON c.id = ca.clip_id ${w.sql} GROUP BY c.slug ORDER BY n DESC, k LIMIT 60`, w.args); })(),

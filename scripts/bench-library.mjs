@@ -53,11 +53,11 @@ try {
     const cardsTop = document.querySelectorAll('[data-testid=asset-card]').length;
     // scroll whatever scrolls the grid to the very end, a screenful at a time
     const grid = document.querySelector('[data-testid=asset-grid]');
-    let pane = grid;
+    let pane = grid.querySelector('.vgrid-scroll') ?? grid;
     while (pane && pane !== document.body && !(pane.scrollHeight > pane.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(pane).overflowY))) pane = pane.parentElement;
     const scroller = pane && pane !== document.body ? pane : document.scrollingElement;
     let maxNodes = nodesTop, steps = 0, last = -1;
-    for (; steps < 4000; steps++) {
+    for (; steps < 20000; steps++) {
       scroller.scrollTop += scroller.clientHeight * 0.9;
       await sleep(25);
       maxNodes = Math.max(maxNodes, document.querySelectorAll('*').length);
