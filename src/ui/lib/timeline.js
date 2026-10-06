@@ -29,7 +29,7 @@ const glyph = (name) => { const el = s('svg', { viewBox: '0 0 20 20', width: 16,
  * @param {{
  *   onSeek: (t: number) => void,
  *   onSelect: (ids: string[], primary: string | null, trackId: string | null) => void,
- *   onBegin?: (key: string) => void,
+ *   onBegin?: (key: string) => boolean | void,
  *   onChange: (itemId: string, patch: { start: number, duration: number }, done: boolean) => void,
  *   onMoveItem?: (itemId: string, trackId: string) => void,
  *   onTrack?: (trackId: string, patch: object) => void,
@@ -260,7 +260,7 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     const edge = e.target instanceof Element ? e.target.dataset.edge ?? null : null;
     const x0 = e.clientX, start0 = item.start, dur0 = item.duration;
     const targets = snapTargets(new Set([item.id]));
-    let moved = false, drop = null;
+    let moved = false, drop = null, last = e;
     e.preventDefault();
     node.focus({ preventScroll: true });
     try { node.setPointerCapture(e.pointerId); } catch { /* synthetic pointers cannot be captured */ }
@@ -269,7 +269,8 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
       const crossed = !edge && ev.clientY !== undefined ? rowAt(ev.clientY, track) : null;
       const leaving = crossed && crossed.track.id !== track.id;
       if (!moved && Math.abs(ev.clientX - x0) < 3 && !leaving) { if (done) finish(); return; }
-      if (!moved) onBegin(`drag:${item.id}:${performance.now()}`);
+      // false: the editor is not taking edits right now, so nothing moves
+      if (!moved && onBegin(`drag:${item.id}:${performance.now()}`) === false) { finish(); return; }
       moved = true;
       const thr = ev.altKey ? -1 : SNAP_PX / pps;
       let start = start0, duration = dur0, snapped = null;
@@ -297,8 +298,9 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
       onChange(item.id, { start: item.start, duration: item.duration }, done && !drop);
       if (done) finish();
     };
-    const move = (ev) => apply(ev, false);
-    const up = (ev) => apply(ev, true);
+    const move = (ev) => { last = ev; apply(ev, false); };
+    // a cancelled pointer (the system took the touch) carries no position of its own: end where the last move was
+    const up = (ev) => apply(ev.type === 'pointercancel' ? last : ev, true);
     const finish = () => {
       node.classList.remove('dragging');
       showSnap(null);

@@ -9,35 +9,47 @@ import { TRANSFORM_DEFAULTS, boxToTransform, forFormat, sampleItem, spaceRect } 
 import { createParamControls } from '/ui/lib/params.js';
 import { clamp, clone, fill, fmtTime, h, icon, nextId, splitRef } from '/ui/lib/util.js';
 
-export const EASES = ['linear', 'hold', 'outCubic', 'outBack', 'inOutCubic', 'outExpo', 'inOutQuad', 'outElastic', 'outBounce'];
+export const EASES = ['linear', 'hold', 'inQuad', 'outQuad', 'inOutQuad', 'inCubic', 'outCubic', 'inOutCubic', 'outQuart', 'outQuint', 'inExpo', 'outExpo', 'inOutExpo', 'inBack', 'outBack', 'outElastic', 'outBounce'];
 const TF_KEYS = ['x', 'y', 'width', 'height', 'scale', 'scaleX', 'scaleY', 'rotation', 'anchorX', 'anchorY'];
+// parameter types set in one go (a switch, a choice): each change is its own undo step, while typing and sliders share one
+const DISCRETE = ['boolean', 'enum', 'font', 'asset', 'image'];
 const round3 = (v) => Math.round(v * 1000) / 1000;
 const round4 = (v) => Math.round(v * 10000) / 10000;
 
 // The editor shows interpolated values with the usual curves; the render takes them from the
-// composition's easing asset (pinned by the server when a keyframe first needs one).
+// composition's easing asset (pinned by the server when a keyframe first needs one). This is the
+// table of assets/easing.js, formula for formula, so handles and fields sit where the render draws.
+const c1 = 1.70158, c3 = c1 + 1, c4 = (2 * Math.PI) / 3;
 const CURVES = {
   linear: (x) => x,
-  outCubic: (x) => 1 - (1 - x) ** 3,
-  inOutCubic: (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2),
+  inQuad: (x) => x * x,
+  outQuad: (x) => 1 - (1 - x) * (1 - x),
   inOutQuad: (x) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2),
-  outExpo: (x) => (x >= 1 ? 1 : 1 - 2 ** (-10 * x)),
-  outBack: (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2; },
-  outElastic: (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 2 ** (-10 * x) * Math.sin((x * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1),
+  inCubic: (x) => x ** 3,
+  outCubic: (x) => 1 - (1 - x) ** 3,
+  inOutCubic: (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2),
+  outQuart: (x) => 1 - (1 - x) ** 4,
+  outQuint: (x) => 1 - (1 - x) ** 5,
+  inExpo: (x) => (x === 0 ? 0 : 2 ** (10 * x - 10)),
+  outExpo: (x) => (x === 1 ? 1 : 1 - 2 ** (-10 * x)),
+  inOutExpo: (x) => (x === 0 ? 0 : x === 1 ? 1 : x < 0.5 ? 2 ** (20 * x - 10) / 2 : (2 - 2 ** (-20 * x + 10)) / 2),
+  outBack: (x) => 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2,
+  inBack: (x) => c3 * x ** 3 - c1 * x * x,
+  outElastic: (x) => (x === 0 ? 0 : x === 1 ? 1 : 2 ** (-10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1),
   outBounce: (x) => {
-    const n1 = 7.5625, d1 = 2.75;
-    if (x < 1 / d1) return n1 * x * x;
-    if (x < 2 / d1) return n1 * (x -= 1.5 / d1) * x + 0.75;
-    if (x < 2.5 / d1) return n1 * (x -= 2.25 / d1) * x + 0.9375;
-    return n1 * (x -= 2.625 / d1) * x + 0.984375;
+    const n = 7.5625, d = 2.75;
+    if (x < 1 / d) return n * x * x;
+    if (x < 2 / d) return n * (x -= 1.5 / d) * x + 0.75;
+    if (x < 2.5 / d) return n * (x -= 2.25 / d) * x + 0.9375;
+    return n * (x -= 2.625 / d) * x + 0.984375;
   },
 };
 export const localEase = (name) => CURVES[name] ?? CURVES.linear;
 
 // ── the layout model ─────────────────────────────────────────────────────────────────────────
 
-/** Item time (seconds into the asset) at clip time t. */
-export const itemTime = (item, t) => round3(t - item.start + (item.offset ?? 0));
+/** Item time (seconds into the asset) at clip time t; outside the item, the time at its nearer end. */
+export const itemTime = (item, t) => round3(clamp(t - item.start, 0, item.duration) + (item.offset ?? 0));
 /** Is clip time t inside the item? */
 export const inside = (item, t) => t >= item.start - 1e-6 && t <= item.start + item.duration + 1e-6;
 
@@ -155,7 +167,7 @@ function kfToggle(prop, onClick) {
 /**
  * The transform and opacity of a visual item.
  * @param {{ item: any, fmt: string, own: string, size: { width: number, height: number }, lt: () => number, t: () => number,
- *   commit: (key: string, fn: (item: any) => void, o?: { structural?: boolean }) => void }} env
+ *   commit: (key: string, fn: (item: any) => void, o?: { structural?: boolean, burst?: boolean }) => void }} env
  */
 export function transformSection(env) {
   const { item, fmt, own } = env;
@@ -171,7 +183,7 @@ export function transformSection(env) {
       const v = Number(input.value);
       if (input.value.trim() === '' || !Number.isFinite(v)) { if (final) sync(); return; }
       const x = clamp(v, min ?? -Infinity, max ?? Infinity);
-      env.commit(`tf-${prop}:${item.id}`, (it) => setProp(it, fmt, own, prop, x, env.lt()));
+      env.commit(`tf-${prop}:${item.id}`, (it) => setProp(it, fmt, own, prop, x, env.lt()), { burst: true });
     };
     input.addEventListener('input', () => commitValue(false));
     input.addEventListener('change', () => commitValue(true));
@@ -240,7 +252,7 @@ export function transformSection(env) {
 /**
  * Parameters (generated controls); numeric and colour ones get a keyframe toggle.
  * @param {{ item: any, fmt: string, own: string, schema: any, fonts: string[], lt: () => number, t: () => number, visual: boolean,
- *   commit: (key: string, fn: (item: any) => void, o?: { structural?: boolean }) => void }} env
+ *   commit: (key: string, fn: (item: any) => void, o?: { structural?: boolean, burst?: boolean }) => void }} env
  */
 export function paramsSection(env) {
   const { item, fmt, own, schema } = env;
@@ -256,7 +268,7 @@ export function paramsSection(env) {
           if (env.visual && keysFor(it, fmt, `params.${k}`)) setProp(it, fmt, own, `params.${k}`, next[k], env.lt());
           else { it.params = { ...it.params }; if (next[k] === undefined) delete it.params[k]; else it.params[k] = clone(next[k]); }
         }
-      }, { structural: m.structural });
+      }, { structural: m.structural, burst: !changed.some((k) => DISCRETE.includes(schema?.[k]?.type)) });
     },
   });
   const toggles = new Map();
@@ -313,7 +325,7 @@ export function paramsSection(env) {
 /**
  * Every keyframe of the item in this format, with its easing.
  * @param {{ item: any, fmt: string, own: string, lt: () => number, seek: (t: number) => void, hasEasing: boolean,
- *   commit: (key: string, fn: (item: any) => void, o?: { structural?: boolean }) => void }} env
+ *   commit: (key: string, fn: (item: any) => void, o?: { structural?: boolean, burst?: boolean }) => void }} env
  */
 export function keyframesSection(env) {
   const { item, fmt, own } = env;
@@ -325,7 +337,9 @@ export function keyframesSection(env) {
     fill(el, props.length ? props.map((prop) => h('div.kf-prop',
       h('span.kf-name', prop),
       h('ul', kf[prop].map((k, i) => {
-        const ease = h('select.small', { 'data-testid': 'kf-ease', 'data-prop': prop, 'data-t': String(k.t), 'aria-label': `Easing after the ${prop} key at ${fmtTime(k.t)}`, disabled: i === kf[prop].length - 1 }, EASES.map((e) => h('option', { value: e }, e)));
+        // a curve this table does not have (a custom easing asset's) stays selectable under its own name
+        const names = EASES.includes(k.ease ?? 'linear') ? EASES : [...EASES, k.ease];
+        const ease = h('select.small', { 'data-testid': 'kf-ease', 'data-prop': prop, 'data-t': String(k.t), 'aria-label': `Easing after the ${prop} key at ${fmtTime(k.t)}`, disabled: i === kf[prop].length - 1 }, names.map((e) => h('option', { value: e }, e)));
         ease.value = k.ease ?? 'linear';
         ease.addEventListener('change', () => {
           const needs = ease.value !== 'linear' && ease.value !== 'hold' && !env.hasEasing;
@@ -348,7 +362,7 @@ export function keyframesSection(env) {
  * @param {{ item: any, readOnly: boolean, fonts: string[],
  *   schemaOf: (ref: string) => Promise<any>, options: (what: string) => Promise<{ value: string, label: string }[]>,
  *   pick: (o: { title: string, kinds: string[] }) => Promise<any>,
- *   commit: (key: string, fn: (item: any) => void, o?: { structural?: boolean }) => void }} env
+ *   commit: (key: string, fn: (item: any) => void, o?: { structural?: boolean, burst?: boolean }) => void }} env
  */
 export function attachmentsSection(env) {
   const { item } = env;
@@ -356,7 +370,7 @@ export function attachmentsSection(env) {
     const box = h('div.att-params');
     env.schemaOf(att.asset).then((schema) => {
       if (!schema || !Object.keys(schema).length) return;
-      const c = createParamControls({ schema, values: att.params ?? {}, fonts: env.fonts, onChange(next, m) { env.commit(`${key}:params`, (it) => { const a = locate(it); if (a) a.params = clone(next); }, { structural: m.structural }); } });
+      const c = createParamControls({ schema, values: att.params ?? {}, fonts: env.fonts, onChange(next, m) { env.commit(`${key}:params`, (it) => { const a = locate(it); if (a) a.params = clone(next); }, { structural: m.structural, burst: !m.structural }); } });
       // attachment params get their own test ids so they do not collide with the item's
       for (const n of c.el.querySelectorAll('[data-testid^="param-"]')) n.dataset.testid = `${key.split(':')[0]}-${n.dataset.testid}`;
       box.append(c.el);

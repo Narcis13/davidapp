@@ -1,7 +1,7 @@
 // Clip editor: the preview with on-canvas handles and a format switcher, a timeline with track
 // controls, keyframe markers and waveforms, a layers view, an inspector (timing, layout with
 // keyframes and per-format overrides, parameters, attachments), undo and redo, clipboard, split,
-// the agent panel, and save / render / remix.
+// saving layers as one asset, the agent panel, and save / render / remix.
 // Edits go to a local draft composition that the preview draws live; changes to the set of assets
 // are pinned and bundled by the server first.
 
@@ -88,7 +88,8 @@ export async function mount(view, ctx) {
   let bundled = refsOf(draft);
   let fmt = draft.format;
   let sel = { ids: [], primary: null, track: null };
-  let dirty = false, busy = false, saving = false, pendingRevision = 0, keptRevision = 0;
+  let dirty = false, busy = false, pendingRevision = 0, keptRevision = 0;
+  let saveError = '';   // why the last save failed, for a dialog that saves first
   let proposal = null, showProposal = false;
   let clipboard = [];
 
@@ -116,6 +117,7 @@ export async function mount(view, ctx) {
   const copyBtn = tool('copy', 'Copy', null, `Copy (${MOD}C)`);
   const pasteBtn = tool('paste', 'Paste', null, `Paste at the playhead (${MOD}V)`);
   const dupBtn = tool('duplicate', 'Duplicate', null, `Duplicate (${MOD}D)`);
+  const assetBtn = tool('save-as-asset', 'Save as asset', null, 'Save the selected layers as one asset in the library');
   const keysBtn = h('button.btn.small.ed-tool', { type: 'button', 'data-testid': 'shortcuts', title: 'Keyboard shortcuts (?)', 'aria-label': 'Keyboard shortcuts' }, '?');
   undoBtn.disabled = true; redoBtn.disabled = true;
   const history = createHistory({ onChange(s) { undoBtn.disabled = !s.canUndo; redoBtn.disabled = !s.canRedo; } });
@@ -151,7 +153,7 @@ export async function mount(view, ctx) {
   const timeline = createTimeline({
     onSeek(t) { stage.pv.pause(); stage.pv.seek(t); },
     onSelect(ids, primary, trackId) { select(ids, primary, trackId, 'timeline'); },
-    onBegin(key) { history.checkpoint(draft, key); },
+    onBegin(key) { if (busy) return false; history.checkpoint(draft, key); return true; },
     onChange(itemId, patch, done) {
       if (sel.primary === itemId) syncTiming();
       live({ timeline: false });
@@ -168,6 +170,7 @@ export async function mount(view, ctx) {
       drawInspector();
     },
     onTrack(trackId, patch) {
+      if (busy) return;
       edit(`track:${trackId}:${Object.keys(patch).join()}`, (c) => {
         const t = c.tracks.find((x) => x.id === trackId);
         if (!t) return;
@@ -179,6 +182,7 @@ export async function mount(view, ctx) {
       edit('tracks-order', (c) => { c.tracks = ids.map((id) => c.tracks.find((t) => t.id === id)).filter(Boolean); });
     },
     onAddTrack(type) {
+      if (busy) return;
       let id = type, n = 1;
       while (draft.tracks.some((t) => t.id === id)) id = `${type}-${++n}`;
       edit('track-add', (c) => { c.tracks.push({ id, name: `${type[0].toUpperCase()}${type.slice(1)} ${n}`, type, items: [] }); });
@@ -186,8 +190,9 @@ export async function mount(view, ctx) {
     },
     async onDeleteTrack(trackId) {
       const t = draft.tracks.find((x) => x.id === trackId);
-      if (!t || t.locked) return;
+      if (!t || t.locked || busy) return;
       if (t.items.length && !(await confirmDialog(`Delete the track "${t.name ?? t.id}" and its ${plural(t.items.length, 'item')}?`, { ok: 'Delete', title: 'Delete track' }))) return;
+      if (busy) return;
       edit('track-del', (c) => { c.tracks = c.tracks.filter((x) => x.id !== trackId); });
       select(sel.ids.filter((id) => findItem(id)), null, null);
     },
@@ -237,6 +242,7 @@ export async function mount(view, ctx) {
     onTransform(id, patch, { begin, done }) {
       const f = findItem(id);
       if (!f || f.track.locked) return;
+      if (busy) return false;
       if (begin) history.checkpoint(draft, `canvas:${id}:${performance.now()}`);
       const lt = itemTime(f.item, time());
       for (const [k, v] of Object.entries(patch)) setProp(f.item, fmt, draft.format, k, v, lt);
@@ -248,7 +254,13 @@ export async function mount(view, ctx) {
 
   // ── state changes ────────────────────────────────────────────────────────────────────────
   function setDirty(on) { dirty = on; unsaved.hidden = !on; if (on) saved.hidden = true; saveBtn.disabled = !on || busy; }
-  function setBusy(on) { busy = on; saveBtn.disabled = !dirty || on; renderBtn.disabled = on; remixBtn.disabled = on; addBtn.disabled = on; }
+  /** The server is working on the draft and its answer replaces it: no edits meanwhile, and news of other revisions waits. */
+  function setBusy(on) {
+    busy = on;
+    saveBtn.disabled = !dirty || on; renderBtn.disabled = on; remixBtn.disabled = on; addBtn.disabled = on;
+    inspector.inert = on;
+    if (!on && pendingRevision > clip.revision) onRevision(pendingRevision);
+  }
 
   /** The draft changed and the loaded bundle can draw it: show it everywhere. */
   function live({ timeline: tl = true, handles: hd = true, inspector: insp = 'sync' } = {}) {
@@ -263,16 +275,20 @@ export async function mount(view, ctx) {
   /**
    * One edit of the draft: a checkpoint for undo, the change, then either a live redraw or (when
    * the edit needs assets the bundle does not have) a round trip to the server for a new bundle.
+   * Each edit is its own undo step; with `burst` (a drag, typing in one field) the edits that
+   * follow under the same key share one.
    */
-  function edit(key, mutate, { structural = false, inspector: insp = 'sync' } = {}) {
-    if (showProposal) return;
+  function edit(key, mutate, { structural = false, inspector: insp = 'sync', burst = false } = {}) {
+    if (showProposal || busy) return;
     const before = JSON.stringify(draft);
-    const took = history.checkpoint(draft, key);
+    const took = history.checkpoint(draft, burst ? key : null);
     mutate(draft);
     if (JSON.stringify(draft) === before) { if (took) history.discard(); return; }
     if (structural || needsBundle(draft)) {
+      // the server may refuse: the draft and the timeline stay as they were until it answers
       const next = draft;
       draft = JSON.parse(before);
+      timeline.setData({ composition: draft, beats });
       rebundle(next).then((ok) => { if (!ok && took) history.discard(); });
       return;
     }
@@ -299,6 +315,7 @@ export async function mount(view, ctx) {
     const ids = sel.ids.filter((id) => findItem(id));
     sel = { ids, primary: ids.includes(sel.primary) ? sel.primary : ids[ids.length - 1] ?? null, track: draft.tracks.some((t) => t.id === sel.track) ? sel.track : null };
     timeline.setSelected(sel.ids, sel.primary, sel.track);
+    updateTools();
   }
 
   function select(ids, primary, trackId, from) {
@@ -314,6 +331,7 @@ export async function mount(view, ctx) {
     const any = sel.ids.length > 0;
     for (const b of [copyBtn, dupBtn, splitBtn]) b.disabled = !any || showProposal;
     pasteBtn.disabled = !clipboard.length || showProposal;
+    assetBtn.disabled = !visualSelected() || showProposal;
   }
 
   function drawMeta() {
@@ -388,8 +406,8 @@ export async function mount(view, ctx) {
 
   async function save() {
     msg.hide();
+    saveError = '';
     setBusy(true);
-    saving = true;
     try {
       const r = await api.put(`/api/clips/${slug}`, { composition: draft, revision: clip.revision });
       if (!ctx.alive()) return false;
@@ -403,35 +421,43 @@ export async function mount(view, ctx) {
       hideChanged();
       return true;
     } catch (e) {
+      saveError = e.message;
       if (e.status === 409) showChanged(pendingRevision || clip.revision + 1, e.message);
       else msg.show(e.message);
       return false;
     } finally {
-      saving = false;
       setBusy(false);
-      if (pendingRevision > clip.revision) onRevision(pendingRevision);
     }
   }
 
-  /** Load the saved clip again (after a change elsewhere, or an accepted proposal). */
+  /** Load the saved clip again (after a change elsewhere, an accepted proposal, or layers replaced by an asset) → did it load. */
   async function reload() {
-    let r;
-    try { r = await api.get(`/api/clips/${slug}`); } catch (e) { msg.show(e.message); return; }
-    if (!ctx.alive()) return;
-    clip = r;
-    adopt(r);
-    history.clear();
-    setDirty(false);
-    hideChanged();
-    drawMeta(); drawAssets(); drawInspector(); drawLayers(); drawFormat();
-    await showClip();
+    setBusy(true);
+    try {
+      const r = await api.get(`/api/clips/${slug}`);
+      if (!ctx.alive()) return false;
+      clip = r;
+      adopt(r);
+      history.clear();
+      setDirty(false);
+      saved.hidden = true;
+      hideChanged();
+      drawMeta(); drawAssets(); drawInspector(); drawLayers(); drawFormat();
+      await showClip();
+      return true;
+    } catch (e) {
+      msg.show(e.message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
 
   // ── changes made elsewhere (live) ────────────────────────────────────────────────────────
   function showChanged(revision, detail) {
     const reloadBtn = h('button.btn.small', { type: 'button', 'data-testid': 'clip-reload' }, 'Reload');
     const keepBtn = h('button.btn.small', { type: 'button', 'data-testid': 'clip-keep' }, 'Keep mine');
-    reloadBtn.addEventListener('click', () => reload());
+    reloadBtn.addEventListener('click', () => { if (!busy) reload(); });
     keepBtn.addEventListener('click', () => { keptRevision = revision; clip.revision = Math.max(clip.revision, revision); drawMeta(); hideChanged(); });
     fill(changedBanner, h('span', `This clip was changed elsewhere (revision ${revision}).`, detail ? h('span.muted', ` ${detail}`) : null), h('span.row', reloadBtn, keepBtn));
     changedBanner.hidden = false;
@@ -439,7 +465,8 @@ export async function mount(view, ctx) {
   function hideChanged() { changedBanner.hidden = true; changedBanner.replaceChildren(); }
   function onRevision(revision) {
     if (revision <= clip.revision || revision <= keptRevision) return;
-    if (saving) { pendingRevision = Math.max(pendingRevision, revision); return; }
+    // a save, bundle or reload is in flight: look again when it is back (setBusy)
+    if (busy) { pendingRevision = Math.max(pendingRevision, revision); return; }
     pendingRevision = 0;
     if (!dirty) reload(); else showChanged(revision);
   }
@@ -454,9 +481,10 @@ export async function mount(view, ctx) {
   }
 
   // ── toolbar actions ──────────────────────────────────────────────────────────────────────
-  async function undo() { const prev = history.undo(draft); if (prev) await replaceDraft(prev); }
-  async function redo() { const next = history.redo(draft); if (next) await replaceDraft(next); }
+  async function undo() { if (busy) return; const prev = history.undo(draft); if (prev) await replaceDraft(prev); }
+  async function redo() { if (busy) return; const next = history.redo(draft); if (next) await replaceDraft(next); }
   const editable = (id) => { const f = findItem(id); return f && !f.track.locked ? f : null; };
+  const visualSelected = () => sel.ids.some((id) => { const f = findItem(id); return !!f && f.track.type !== 'audio'; });
 
   function copy() {
     clipboard = sel.ids.map((id) => findItem(id)).filter(Boolean).map((f) => ({ track: f.track.id, type: f.track.type, item: clone(f.item) }));
@@ -465,7 +493,7 @@ export async function mount(view, ctx) {
   }
 
   function paste() {
-    if (!clipboard.length) return;
+    if (!clipboard.length || busy) return;
     const t0 = Math.min(...clipboard.map((c) => c.item.start));
     const at = time();
     const taken = allIds();
@@ -488,6 +516,7 @@ export async function mount(view, ctx) {
   }
 
   function duplicate() {
+    if (busy) return;
     const taken = allIds();
     const added = [];
     edit('duplicate', (c) => {
@@ -506,13 +535,18 @@ export async function mount(view, ctx) {
 
   function removeSelected() {
     const ids = sel.ids.filter((id) => editable(id));
-    if (!ids.length) return;
+    if (!ids.length || busy) return;
     edit('delete', (c) => { for (const id of ids) { const f = findItem(id, c); if (f) f.track.items.splice(f.track.items.indexOf(f.item), 1); } }, { inspector: 'none' });
     select([], null, sel.track);
   }
 
-  /** Split at the playhead exactly like the server's split_item: the second part continues the asset. */
+  /**
+   * Split at the playhead exactly like the server's split_item: the second part continues the asset
+   * (same offset timeline, the first part's seed, so random-driven assets carry on across the cut)
+   * and does not transition in again.
+   */
   function split() {
+    if (busy) return;
     const at = round(time());
     const targets = sel.ids.map((id) => editable(id)).filter((f) => f && at > f.item.start + 1e-6 && at < f.item.start + f.item.duration - 1e-6);
     if (!targets.length) { msg.show(sel.ids.length ? 'The playhead is not inside the selected items.' : 'Select an item under the playhead to split it.', 'info'); return; }
@@ -526,8 +560,9 @@ export async function mount(view, ctx) {
         const offset = it.offset ?? 0;
         const whole = it.assetDuration ?? offset + it.duration;
         const cut = round(at - it.start);
-        const second = { ...clone(it), id: freeId(`${it.id}-b`, taken), start: at, duration: round(it.duration - cut), offset: round(offset + cut), assetDuration: whole };
+        const second = { ...clone(it), id: freeId(`${it.id}-b`, taken), start: at, duration: round(it.duration - cut), offset: round(offset + cut), assetDuration: whole, seedId: it.seedId ?? it.id };
         delete second.fadeIn;
+        delete second.transition;
         Object.assign(it, { duration: cut, assetDuration: whole });
         delete it.fadeOut;
         f.track.items.splice(f.track.items.indexOf(it) + 1, 0, second);
@@ -535,6 +570,68 @@ export async function mount(view, ctx) {
       }
     }, { inspector: 'none' });
     select(seconds, seconds[seconds.length - 1]);
+  }
+
+  /** Save the selected layers as one asset (a precomp), and optionally put it in their place. */
+  function precompDialog() {
+    if (busy || showProposal || !visualSelected() || document.querySelector('dialog[open]')) return;
+    const ids = [...sel.ids];
+    const name = h('input', { type: 'text', id: 'pc-name', value: `${slug}-${ids[0]}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, ''), 'data-testid': 'precomp-name', autocomplete: 'off', spellcheck: false });
+    const title = h('input', { type: 'text', id: 'pc-title', value: `${clip.title}: ${plural(ids.length, 'layer')}`, 'data-testid': 'precomp-title', autocomplete: 'off' });
+    const replace = h('input', { type: 'checkbox', id: 'pc-replace', 'data-testid': 'precomp-replace', role: 'switch' });
+    const err = notice('precomp-error');
+    const go = h('button.btn.primary', { type: 'submit', 'data-testid': 'precomp-save' }, 'Save');
+    const cancel = h('button.btn', { type: 'button', 'data-testid': 'precomp-cancel' }, 'Cancel');
+    const form = h('form.form', { novalidate: true },
+      h('p.muted', 'The selected layers become one asset in the library, with their timing, layout and attachments.'),
+      dirty ? h('p.notice.info', { 'data-testid': 'precomp-unsaved' }, 'This clip has unsaved changes. They are saved first.') : null,
+      h('div.field', h('label', { for: 'pc-name' }, 'Name'), name, h('p.hint', 'Lowercase letters, digits and dashes.')),
+      h('div.field', h('label', { for: 'pc-title' }, 'Title'), title),
+      h('div.field', h('label', { id: 'pc-items' }, plural(ids.length, 'layer')),
+        h('ul.multi-list', { 'data-testid': 'precomp-items', 'aria-labelledby': 'pc-items' }, ids.map((id) => h('li.ref', id, findItem(id)?.track.type === 'audio' ? ' (audio)' : null)))),
+      h('div.field.inline', h('label', { for: 'pc-replace' }, 'Replace the selected layers with it'), h('label.switch', replace, h('span.switch-track', { 'aria-hidden': 'true' })),
+        h('p.hint', 'Saves the clip as a new revision. Undo starts again from there.')),
+      err.el,
+      h('div.dialog-foot.inline', cancel, go));
+    const d = openDialog({ title: 'Save as asset', body: form, testid: 'precomp-dialog' });
+    cancel.addEventListener('click', () => d.close());
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.hide();
+      const newSlug = name.value.trim();
+      if (!SLUG.test(newSlug)) { err.show('The name needs 2 to 64 lowercase letters, digits or dashes.'); name.focus(); return; }
+      if (replace.checked) {
+        // the new item takes the asset's name as its id, and only unlocked layers can be taken out
+        const locked = ids.find((id) => findItem(id)?.track.locked);
+        if (locked) { err.show(`"${locked}" is on a locked track. Unlock it to replace the layers.`); return; }
+        if (findItem(newSlug) && !ids.includes(newSlug)) { err.show(`An item named "${newSlug}" is already on the timeline. Pick another name.`); name.focus(); return; }
+      }
+      if (busy) return;
+      go.disabled = true;
+      try {
+        // the server reads the saved clip: save first, as Render does
+        if (dirty && !(await save())) throw new Error(`The clip could not be saved first. ${saveError}`);
+        setBusy(true);
+        const r = await api.post(`/api/clips/${slug}/precomp`, { items: ids, name: newSlug, title: title.value.trim() || undefined, replace: replace.checked });
+        d.close();
+        if (!ctx.alive()) return;
+        // replaced: the server saved a new revision, so load it (and start undo again) like any reload
+        if (r.clip && !(await reload())) return;
+        if (r.clip && findItem(newSlug)) select([newSlug], newSlug);
+        msg.show('', 'ok');
+        fill(msg.el, h('span', { 'data-testid': 'precomp-status' }, r.clip ? 'Saved and placed in the clip: ' : 'Saved to the library: ', h('a', { href: `/assets/${r.asset.slug}`, 'data-testid': 'precomp-link' }, r.asset.ref)));
+        // on a phone the toolbar is a screen or two below the message: bring the link into view
+        const at = msg.el.getBoundingClientRect();
+        if (at.top < 0 || at.bottom > window.innerHeight) msg.el.scrollIntoView({ block: 'center' });
+      } catch (e2) {
+        err.show(e2.message);
+        go.disabled = false;
+      } finally {
+        setBusy(false);
+      }
+    });
+    name.focus();
+    name.select();
   }
 
   function shortcutsSheet() {
@@ -548,6 +645,7 @@ export async function mount(view, ctx) {
   copyBtn.addEventListener('click', copy);
   pasteBtn.addEventListener('click', paste);
   dupBtn.addEventListener('click', duplicate);
+  assetBtn.addEventListener('click', precompDialog);
   keysBtn.addEventListener('click', shortcutsSheet);
 
   const onKey = (e) => {
@@ -616,7 +714,7 @@ export async function mount(view, ctx) {
 
   addBtn.addEventListener('click', async () => {
     const picked = await pickAsset({ title: 'Add an item', kinds: ['visual', 'audio'] });
-    if (!picked || !ctx.alive()) return;
+    if (!picked || !ctx.alive() || busy) return;
     const next = clone(draft);
     const audio = picked.kind === 'audio';
     const fits = (t) => (t.type === 'audio') === audio && !t.locked;
@@ -635,7 +733,7 @@ export async function mount(view, ctx) {
     const start = round(clamp(Math.round(time() / 0.05) * 0.05, 0, next.duration - duration));
     track.items.push({ id, asset: picked.ref, start, duration, params: {} });
     sel.track = track.id;
-    history.checkpoint(draft, 'add-item');
+    history.checkpoint(draft);
     if (!(await rebundle(next, id))) history.discard();
     else timeline.setSelected([id], id, track.id);
   });
@@ -757,7 +855,7 @@ export async function mount(view, ctx) {
     const end = Math.max(0.1, ...draft.tracks.flatMap((t) => t.items.map((i) => i.start + i.duration)));
     const duration = numField('Clip duration in seconds', 'clip-duration', draft.duration, { min: Math.ceil(end * 100) / 100, max: 120, step: 0.5 }, (v) => {
       if (v === draft.duration) return;
-      edit('clip-duration', (c) => { c.duration = v; }, { inspector: 'none' });
+      edit('clip-duration', (c) => { c.duration = v; }, { inspector: 'none', burst: true });
       stage.setDuration(draft.duration, draft.fps);
       timeline.setData({ composition: draft, beats });
       drawMeta();
@@ -767,7 +865,7 @@ export async function mount(view, ctx) {
     bg.addEventListener('input', () => {
       const ok = CSS.supports('color', bg.value.trim());
       bg.classList.toggle('invalid', !ok);
-      if (ok) edit('clip-background', (c) => { c.background = bg.value.trim(); }, { inspector: 'none' });
+      if (ok) edit('clip-background', (c) => { c.background = bg.value.trim(); }, { inspector: 'none', burst: true });
     });
     fill(inspector,
       h('h2', 'Inspector'),
@@ -786,7 +884,7 @@ export async function mount(view, ctx) {
       h('p', { 'data-testid': 'selection-count' }, `${plural(sel.ids.length, 'item')} selected.`),
       h('ul.multi-list', sel.ids.map((id) => h('li.ref', id))),
       h('div.row', del),
-      h('p.hint', 'Copy, paste, duplicate, split and delete work on all of them. Shift or ⌘ click to change the selection.'));
+      h('p.hint', 'Copy, paste, duplicate, split, delete and save as asset work on all of them. Shift or ⌘ click to change the selection.'));
   }
 
   let overrideState = null;   // the reset-override button and its label, while an item is shown
@@ -832,19 +930,19 @@ export async function mount(view, ctx) {
 
     const start = numField('Start', 'item-start', item.start, { min: 0, max: round(draft.duration - 0.1), step: 0.05 }, (v) => {
       const x = round(Math.min(v, draft.duration - item.duration));
-      commit(`start:${item.id}`, (it) => { it.start = x; }, { inspector: 'none' });
+      commit(`start:${item.id}`, (it) => { it.start = x; }, { inspector: 'none', burst: true });
       return x;
     });
     const duration = numField('Duration', 'item-duration', item.duration, { min: 0.1, max: draft.duration, step: 0.05 }, (v) => {
       const x = round(Math.min(v, draft.duration - item.start));
-      commit(`duration:${item.id}`, (it) => { it.duration = x; if (it.assetDuration !== undefined && it.assetDuration < (it.offset ?? 0) + x) it.assetDuration = round((it.offset ?? 0) + x); }, { inspector: 'none' });
+      commit(`duration:${item.id}`, (it) => { it.duration = x; if (it.assetDuration !== undefined && it.assetDuration < (it.offset ?? 0) + x) it.assetDuration = round((it.offset ?? 0) + x); }, { inspector: 'none', burst: true });
       return x;
     });
     timing = { start: start.input, duration: duration.input };
-    const optional = (key, v, zero) => commit(`${key}:${item.id}`, (it) => { if (v === zero) delete it[key]; else it[key] = v; }, { inspector: 'none' });
+    const optional = (key, v, zero) => commit(`${key}:${item.id}`, (it) => { if (v === zero) delete it[key]; else it[key] = v; }, { inspector: 'none', burst: true });
     const fadeIn = numField('Fade in', 'item-fadein', item.fadeIn ?? 0, { min: 0, max: 10, step: 0.05 }, (v) => optional('fadeIn', v, 0));
     const fadeOut = numField('Fade out', 'item-fadeout', item.fadeOut ?? 0, { min: 0, max: 10, step: 0.05 }, (v) => optional('fadeOut', v, 0));
-    const gain = audio ? numField('Gain', 'item-gain', item.gain ?? 1, { min: 0, max: 4, step: 0.05, slider: true }, (v) => commit(`gain:${item.id}`, (it) => { it.gain = v; }, { inspector: 'none' })) : null;
+    const gain = audio ? numField('Gain', 'item-gain', item.gain ?? 1, { min: 0, max: 4, step: 0.05, slider: true }, (v) => commit(`gain:${item.id}`, (it) => { it.gain = v; }, { inspector: 'none', burst: true })) : null;
 
     const env = { item, fmt, own: draft.format, size: viewSize(), lt: () => itemTime(item, time()), t: time, commit, seek: (t) => { stage.pv.pause(); stage.pv.seek(clamp(t, 0, draft.duration)); }, hasEasing: !!draft.easing };
     sections = [];
@@ -982,7 +1080,7 @@ export async function mount(view, ctx) {
           stage.el),
         h('section.panel.timeline-panel',
           h('div.panel-head', h('div.row', h('h2', 'Timeline'), position), h('div.row', addBtn, timeline.toolbar)),
-          h('div.ed-toolbar', { role: 'toolbar', 'aria-label': 'Edit' }, undoBtn, redoBtn, splitBtn, copyBtn, pasteBtn, dupBtn, keysBtn),
+          h('div.ed-toolbar', { role: 'toolbar', 'aria-label': 'Edit' }, undoBtn, redoBtn, splitBtn, copyBtn, pasteBtn, dupBtn, assetBtn, keysBtn),
           timeline.el,
           h('p.hint', `Drag an item to move it (also to another track), drag its edges to trim. Moves snap to the playhead, beats and other items; hold Alt to move freely. ${plural(beats.length, 'beat')} detected in the audio.`)),
         layersPanel),

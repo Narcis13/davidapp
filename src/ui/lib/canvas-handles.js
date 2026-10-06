@@ -35,8 +35,8 @@ function hits(geo, p) {
  *   layers: () => { id: string, transform: any, editable: boolean, label?: string }[],
  *   selection: () => { ids: Set<string>, primary: string | null },
  *   onSelect: (id: string | null, additive: boolean) => void,
- *   onTransform: (id: string, patch: object, phase: { begin: boolean, done: boolean }) => void,
- * }} o  layers are listed front to back
+ *   onTransform: (id: string, patch: object, phase: { begin: boolean, done: boolean }) => boolean | void,
+ * }} o  layers are listed front to back; onTransform answers false when it did not take the edit
  */
 export function createCanvasHandles({ host, size, layers, selection, onSelect, onTransform }) {
   const svg = s('svg', { class: 'canvas-overlay', 'data-testid': 'canvas-overlay', preserveAspectRatio: 'none', tabindex: '0', role: 'application', 'aria-label': 'Layers on the preview: click to select, drag to move, arrow keys nudge' });
@@ -114,12 +114,12 @@ export function createCanvasHandles({ host, size, layers, selection, onSelect, o
     const xs = [width / 2, safe.x, safe.x + safe.width, 0, width, ...others.flatMap((b) => [b.l, b.cx, b.r])];
     const ys = [height / 2, safe.y, safe.y + safe.height, 0, height, ...others.flatMap((b) => [b.t, b.cy, b.b])];
     const inv0 = invert(geo0.matrix);
-    let began = false;
+    let began = false, last = e;
     const send = (patch, done) => {
       const r = (v) => Math.round(v * 10000) / 10000;
       const out = Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, r(v)]));
-      onTransform(layer.id, out, { begin: !began, done });
-      began = true;
+      // false: the editor is not taking edits right now, so the drag has not begun
+      if (onTransform(layer.id, out, { begin: !began, done }) !== false) began = true;
     };
 
     const step = (ev, done) => {
@@ -165,8 +165,9 @@ export function createCanvasHandles({ host, size, layers, selection, onSelect, o
       if (done) guides = [];
       redraw();
     };
-    const move = (ev) => step(ev, false);
-    const up = (ev) => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); step(ev, true); guides = []; redraw(); };
+    const move = (ev) => { last = ev; step(ev, false); };
+    // a cancelled pointer (the system took the touch) carries no position of its own: end where the last move was
+    const up = (ev) => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); step(ev.type === 'pointercancel' ? last : ev, true); guides = []; redraw(); };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
