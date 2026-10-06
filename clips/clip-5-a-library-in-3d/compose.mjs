@@ -28,9 +28,8 @@ export default {
     { id: 'titles', name: 'Titles', type: 'text', items: [
       { id: 'opener', asset: 'studio-title-card', start: 0.3, duration: 7.7, params: { words: ['A', 'LIBRARY', 'IN 3D'], logo: 'studio-logo' } },
       { id: 'terrain-line', asset: 'text-line-reveal', start: 10, duration: 7.5, params: { text: 'Land made\nfrom a *seed*', size: 110, color: '#eef4ff', accent: '#ffb347', align: 'left' }, transform: { space: 'safe', x: 0.5, y: 0.16, width: 1, height: 0.26 } },
-      // added through the request flow ("add a lower third at 0:03"), proposed by the agent and accepted
-      { id: 'intro-third', asset: 'lower-third-studio', start: 3, duration: 4.6, params: { title: 'Clip 5 · vertical', subtitle: 'a minute built mostly from clip 4', scale: 1.5 } },
-      { id: 'baked', asset: 'lower-third-studio', start: 19.5, duration: 7.5, params: { title: 'Baked once', subtitle: 'the 3D orb, as frames: reused for free', scale: 1.5 } },
+      // the request flow ("add a lower third at 0:03") adds `intro-third` here (journal: request #2)
+      { id: 'baked', asset: 'lower-third-studio', start: 19.5, duration: 7.5, params: { title: 'Baked once', subtitle: 'the 3D orb, as frames: reused for free' } },
       { id: 'reuse-line', asset: 'text-word-reveal', start: 41, duration: 8, params: { text: 'An uploaded photo, *through 3D letters*', size: 74, color: '#eef4ff', accent: '#5ce1e6' }, transform: { space: 'safe', x: 0.5, y: 0.86, width: 1, height: 0.2 } },
     ] },
     { id: 'music', name: 'Music', type: 'audio', items: [{ id: 'music', asset: 'music-loop', start: 0, duration: 60, gain: 0.8, fadeOut: 2, params: { bpm: 110, root: 43, arpWave: 'triangle' } }] },

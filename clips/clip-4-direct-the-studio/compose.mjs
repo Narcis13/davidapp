@@ -46,8 +46,8 @@ export default {
     { id: 'overlay', name: 'Logo', type: 'visual', items: [
       { id: 'logo', asset: 'svg-draw-on', start: 0.6, duration: 6.4, params: { logo: 'studio-logo', drawFor: 1.8 },
         transform: { space: 'safe', x: 0.92, y: 0.14, width: 0.13, height: 0.22 },
-        // added through the request flow: the user asked for a gentle float, the agent proposed this
-        motions: [{ asset: 'motion-drift', phase: 'emphasis', at: 1.9, duration: 4, params: { amount: 0.01, tilt: 3, period: 3 } }, { asset: 'motion-pop', phase: 'out', duration: 0.4 }],
+        // the request flow adds a drift here (journal: request #1, proposal accepted)
+        motions: [{ asset: 'motion-pop', phase: 'out', duration: 0.4 }],
         formats: { vertical: { transform: { x: 0.85, y: 0.08, width: 0.22, height: 0.12 } }, square: { transform: { x: 0.88, y: 0.12, width: 0.18 } } } },
     ] },
     { id: 'music', name: 'Music', type: 'audio', items: [{ id: 'music', asset: 'music-loop', start: 0, duration: 30, gain: 0.8, fadeOut: 1.5, params: { bpm: 120, arpWave: 'triangle' } }] },

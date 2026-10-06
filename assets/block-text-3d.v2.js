@@ -8,7 +8,9 @@ asset({
   params: { text: { type: 'string', default: 'BUILD', maxLength: 12 }, color: { type: 'color', default: '#ffb347' }, swing: { type: 'number', default: 55, min: 0, max: 180 }, swingFor: { type: 'number', default: 1.4, min: 0.1, max: 10 }, useTheme: { type: 'boolean', default: true } },
   render(f, p) {
     const S = f.lib.solid, k = f.use('easing').outBack(Math.min(1, f.t / p.swingFor));
-    const size = Math.min(1.6, 9 / Math.max(3, p.text.length));
+    // fit the word to the box: the width the camera sees at the text, with a margin
+    const seen = 2 * 6 * Math.tan((34 / 2) * Math.PI / 180) * (f.width / f.height);
+    const size = Math.min(1.6, (0.82 * seen * 7) / (6 * Math.max(1, p.text.length)));
     S.render(f, {
       camera: { position: [0, 0.3, 6], target: [0, 0, 0], fov: 34 },
       lights: [{ type: 'ambient', intensity: 0.35 }, { type: 'directional', direction: [-0.8, -1, -1], intensity: 0.9 }],

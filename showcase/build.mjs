@@ -12,14 +12,52 @@ import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connect, callTool, inlineFiles } from '../scripts/mcp.mjs';
-import { steps, AUTHOR } from './plan.mjs';
+import { readFileSync } from 'node:fs';
+import { steps, AUTHOR, JOURNALS, JOURNAL_AUTHOR } from './plan.mjs';
+import { createStudio } from '../src/studio/studio.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const noRender = argv.includes('--no-render');
 const until = argv.includes('--until') ? Number(argv[argv.indexOf('--until') + 1]) : Infinity;
 
+// clips 4 to 6 were built step by step with scripts/act.mjs: replay their journals after the plan
+// (tool calls through MCP, the user's studio actions in-process; read-only calls are skipped)
+for (const clip of JOURNALS) {
+  for (const line of readFileSync(join(here, 'journal', `${clip}.jsonl`), 'utf8').split('\n').filter(Boolean)) {
+    const e = JSON.parse(line);
+    if (e.kind === 'read' || !e.ok) continue;
+    if (e.kind === 'user') steps.push({ user: e.name, args: e.args, clip });
+    else steps.push({ tool: e.name, args: e.args, render: e.name === 'start_render', journal: true });
+  }
+}
+
+async function modules(v) {
+  if (typeof v === 'string' && v.startsWith('@module:')) return JSON.parse(JSON.stringify((await import(join(here, '..', v.slice(8)))).default));
+  if (Array.isArray(v)) return Promise.all(v.map(modules));
+  if (v && typeof v === 'object') return Object.fromEntries(await Promise.all(Object.entries(v).map(async ([k, x]) => [k, await modules(x)])));
+  return v;
+}
+
+/** What the user did in the studio (uploads, requests, accepting a proposal), done through the studio services. */
+async function userStep({ user, args, clip }) {
+  const studio = createStudio({ role: 'server' });
+  try {
+    const pending = (id) => studio.requests.get(id).proposals.find((p) => p.status === 'pending')?.id;
+    if (user === 'upload') return (await studio.uploads.upload({ name: args.name, data: readFileSync(join(here, '..', args.file)), author: 'studio-user', forClip: clip })).asset.ref;
+    if (user === 'create_request') return `request #${studio.requests.create({ ...args, author: 'studio-user' }).id}`;
+    if (user === 'accept') return (await studio.requests.accept({ proposal: args.proposal ?? pending(args.request), author: 'studio-user', force: !!args.force })).result;
+    if (user === 'reject') return studio.requests.reject({ proposal: args.proposal ?? pending(args.request), author: 'studio-user', reason: args.reason }).status;
+    if (user === 'reply') return studio.requests.reply({ id: args.request, author: 'studio-user', body: args.body }).status;
+    throw new Error(`unknown user step ${user}`);
+  } finally {
+    await studio.close();
+  }
+}
+
 const client = await connect({ author: AUTHOR });
+// the journalled clips were built by another model; their calls are made as that author
+const journalClient = await connect({ author: JOURNAL_AUTHOR });
 const results = [];
 let failed = false;
 try {
@@ -27,7 +65,16 @@ try {
     if (i + 1 > until) break;
     if (step.render && noRender) continue;
     const t0 = performance.now();
-    const r = await callTool(client, step.tool, inlineFiles(step.args, here));
+    if (step.user) {
+      try {
+        const out = await userStep(step);
+        console.log(`✓ ${String(i + 1).padStart(2)} user: ${step.user.padEnd(8)} ${step.clip.padEnd(24)} ${out ?? ''} (${Math.round(performance.now() - t0)}ms)`);
+      } catch (e) { console.error(`✖ ${String(i + 1).padStart(2)} user: ${step.user}\n${e.message}`); failed = true; break; }
+      continue;
+    }
+    const r = step.journal
+      ? await callTool(journalClient, step.tool, inlineFiles(await modules(step.args), join(here, '..')))
+      : await callTool(client, step.tool, inlineFiles(step.args, here));
     const ms = Math.round(performance.now() - t0);
     const what = step.args.name ?? step.args.clip ?? '';
     if (r.isError) {
@@ -53,6 +100,7 @@ try {
   }
 } finally {
   await client.close();
+  await journalClient.close();
 }
 if (process.env.STUDIO_DATA) writeFileSync(join(process.env.STUDIO_DATA, 'showcase-build.json'), JSON.stringify(results, null, 1));
 process.exit(failed ? 1 : 0);
