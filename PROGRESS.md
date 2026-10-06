@@ -12,7 +12,7 @@ proven by clips 4, 5 and 6. Brief: `ITERATION_2_PROMPT.md`. Iteration 1's record
 
 Started 2026-10-06 on branch `main` at `f24ab12`.
 
-**Next:** M9. (1) Write `scripts/act.mjs`: runs one MCP tool call (like scripts/mcp.mjs call, STUDIO_AUTHOR=claude-opus-5-5) or a user action (`--user create_request|accept|reject|reply`, done in-process through the studio services like the web UI) and appends it to `showcase/journal/<clip>.jsonl` (tool, args with `@file:` refs kept, mutating or not). `showcase/plan.mjs` then replays clips 4–6 from the journals (mutating calls and user actions only; `build.mjs` runs user actions through createStudio in-process). (2) Showcase data dir: `$TMPDIR/show` = `npm run showcase` (clips 1–3 rendered); studio on 8791 for user actions and later the Chrome GIFs. (3) Author clip 4 (30 s, horizontal with vertical/square overrides, rendered in all three formats) live via act.mjs, writing new assets to `assets/`: new motion, transition, effect, mask and 3D assets, an uploaded photo (PNG/JPG made here) and SVG logo (handwritten) described over MCP, a preset, a precomp saved from layers, transforms + keyframes, a title dragged behind/in front of the 3D object, a theme; one step through the request flow. (4) Clip 5 (60 s, vertical): reuses clip 4, adds terrain + block-text 3D, a baked sequence, masks, a clip-scoped request "add a lower third at 0:03" proposed and accepted. (5) Render, check ffprobe/sheets, export `compounding_report` metrics. Build time = first MCP call or request of the clip → its start_render call (deciding the concept before the first call is not counted, for all three clips alike).
+**Next:** M9 continues. Clip 4 is built (journal `showcase/journal/clip-4-direct-the-studio.jsonl`, data in `$TMPDIR/show`, studio on 8791), rendered horizontal (r4, 258 s), square (r6) and vertical. To do: (a) make `showcase/plan.mjs`/`build.mjs` replay clips 4–6 from the journals (skip `read` steps; user steps through createStudio; `@module:` compositions); (b) clip 5 per the concept below, same method (act.mjs); (c) clip 6 after clip 5 renders; (d) evidence + compounding report. A regression test for presets with asset-typed params (theme) is still owed (fixed in library.createPreset: values pinned).
 
 ## Contract (Done means)
 
@@ -126,6 +126,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 - The first headless Chrome launch after a while can exceed `cdp.mjs`'s wait ("chrome did not start") and `sweep.sh` still prints `ok`: check every screen's PNG exists.
 - `frame_hashes` takes at most 64 times per call; `start_render` waits at most 900 s.
+- **The disk is small (~4 GB free)**: delete scratch data dirs when done, and always set TMPDIR when running tests (they leave studio-test-* dirs in the temp folder; 1.4 GB had piled up in the system one). A render failed once with ENOSPC.
 - Render time on this machine varies ±15 % run to run (25–32 s for clip 1).
 - Dev data for the screens: `bash .claude/goal-loop/serve.sh seed <port> <dir>`, stop it, then `STUDIO_DATA=<dir> node scripts/dev-seed-v2.mjs`, then `serve.sh start`.
 - Real `claude -p` runs used so far: 1 of 10 (2026-10-06, scratch studio: request → proposal in 12 s, exit 0).

@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { extname, join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef, parseRef } from '../core/engine.js';
 import { staticCheck } from '../core/static-check.js';
-import { walkParams } from '../core/schema.js';
+import { walkParams, mapParams } from '../core/schema.js';
 import { createCanvas, fontManifest, loadImage, registerFonts, FONTS_DIR } from '../render/host.js';
 import { probeSummary } from '../render/ffmpeg.js';
 import { json, now, transaction } from '../db/db.js';
@@ -525,7 +525,9 @@ export function createLibrary(ctx) {
     if (!params || typeof params !== 'object' || !Object.keys(params).length) throw new StudioError('params is the parameter set the preset keeps (at least one)');
     const { values, errors } = resolveParams(schema, params, { strict: true });
     if (errors.length) throw new StudioError(`The preset's params do not fit ${makeRef(row.slug, row.version)}:\n- ${errors.map((e) => `${e.path}: ${e.message}`).join('\n- ')}`);
-    const chosen = Object.fromEntries(Object.keys(params).map((k) => [k, values[k]]));
+    // asset and image values are pinned, as in a clip: the base resolves a pinned ref from the bundle,
+    // but it cannot resolve a bare name it never declared
+    const chosen = mapParams(schema, Object.fromEntries(Object.keys(params).map((k) => [k, values[k]])), ['asset', 'image'], (v) => { const r = requireVersion(v); return makeRef(r.slug, r.version); });
     const baseRef = makeRef(row.slug, row.version);
     const baseTitle = summary(row).title;
     const name = title ?? `${baseTitle} · ${slug}`;

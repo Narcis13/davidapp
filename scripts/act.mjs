@@ -25,6 +25,13 @@ const out = rest.includes('--out') ? rest[rest.indexOf('--out') + 1] : (!user &&
 const author = process.env.STUDIO_AUTHOR ?? 'claude-opus-5-5';
 const journal = join(root, 'showcase', 'journal', `${clip}.jsonl`);
 mkdirSync(dirname(journal), { recursive: true });
+// "@module:path" is a JS module's default export (a composition in clips/<clip>/compose.mjs)
+async function modules(v) {
+  if (typeof v === 'string' && v.startsWith('@module:')) return JSON.parse(JSON.stringify((await import(`${join(root, v.slice(8))}?t=${Date.now()}`)).default));
+  if (Array.isArray(v)) return Promise.all(v.map(modules));
+  if (v && typeof v === 'object') return Object.fromEntries(await Promise.all(Object.entries(v).map(async ([k, x]) => [k, await modules(x)])));
+  return v;
+}
 const t0 = Date.now();
 let result, ok = true, readOnly = false;
 
@@ -53,7 +60,7 @@ if (user) {
   try {
     const { tools } = await client.listTools();
     readOnly = !!tools.find((t) => t.name === name)?.annotations?.readOnlyHint;
-    result = await callTool(client, name, inlineFiles(raw, root));
+    result = await callTool(client, name, inlineFiles(await modules(raw), root));
     ok = !result.isError;
     console.log(result.text);
     if (out && result.images[0]) { writeFileSync(out, result.images[0]); console.log(`image → ${out}`); }
