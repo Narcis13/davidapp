@@ -1,7 +1,7 @@
 // Evidence for clips 4, 5 and 6 (iteration 2): every finished render (clip 4 in all three formats),
 // checked with ffprobe (H.264, AAC, yuv420p, faststart, size, fps, duration within one frame),
 // audio levels (volumedetect), the render log, and FFmpeg contact sheets to read frame by frame.
-// The compounding table is written next to them.
+// The reuse report is written next to them (the other reports: scripts/reports-v2.mjs).
 //
 //   STUDIO_DATA=<dir> node scripts/evidence-v2.mjs [out-dir]     (default docs/showcase/v2)
 
@@ -52,8 +52,6 @@ try {
     }
   }
   writeFileSync(join(out, 'reports', 'renders.json'), `${JSON.stringify(summary.map(({ file: _f, ...x }) => x), null, 1)}\n`);
-  writeFileSync(join(out, 'reports', 'compounding.txt'), `${studio.compounding.table()}\n`);
-  writeFileSync(join(out, 'reports', 'compounding.json'), `${JSON.stringify(studio.clips.listClips().map((c) => studio.compounding.metrics(c.slug)), null, 1)}\n`);
   writeFileSync(join(out, 'reports', 'reuse.txt'), `${studio.lineage.report()}\n`);
 } finally {
   await studio.close();
