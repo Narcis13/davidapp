@@ -69,6 +69,7 @@ export function createRenders(ctx, library, clips) {
       q('INSERT OR IGNORE INTO render_assets (render_id, version_id) SELECT ?, version_id FROM clip_assets WHERE clip_id = ?').run(rid, row.id);
       return rid;
     });
+    ctx.events?.emit('render', id, 'queued', { clip, format: other });
     if (timer) setImmediate(() => { tick().catch(() => {}); });
     return get(id);
   }
@@ -92,6 +93,7 @@ export function createRenders(ctx, library, clips) {
     get(id);
     // a job claimed between the two statements is no longer queued, so the second one catches it
     const dequeued = q("UPDATE renders SET status = 'cancelled', finished_at = ? WHERE id = ? AND status = 'queued'").run(now(), id).changes;
+    if (dequeued) ctx.events?.emit('render', id, 'status', { status: 'cancelled' });
     if (!dequeued && q("UPDATE renders SET cancel_requested = 1 WHERE id = ? AND status = 'running'").run(id).changes && current?.id === id) current.abort.abort();
     return get(id);
   }
@@ -160,13 +162,15 @@ export function createRenders(ctx, library, clips) {
       const done = q(`UPDATE renders SET status = 'done', progress = 1, frames_done = ?, output = ?, poster = ?, srt = ?, error = NULL, log = ?, stats = ?, finished_at = ?, heartbeat = ? WHERE ${mine}`)
         .run(total, `${base}.mp4`, `${base}.png`, srtText ? `${base}.srt` : null, lines.join('\n'), JSON.stringify(stats), now(), now(), row.id, runnerId);
       if (!done.changes) for (const ext of ['mp4', 'png', 'srt']) rmSync(join(dataDir, `${base}.${ext}`), { force: true });
+      else ctx.events?.emit('render', row.id, 'status', { status: 'done', clip: clip.slug });
     } catch (e) {
       rmSync(outPath, { force: true });
       // stopping the runner puts its job back in the queue; a cancel or a failure ends it
       const cancelled = e.cancelled || abort.signal.aborted;
       if (cancelled && stopping) q(`UPDATE renders SET status = 'queued', runner = NULL, progress = 0, frames_done = 0 WHERE ${mine} AND cancel_requested = 0`).run(row.id, runnerId);
-      q(`UPDATE renders SET status = ?, error = ?, log = ?, finished_at = ? WHERE ${mine}`)
+      const ended = q(`UPDATE renders SET status = ?, error = ?, log = ?, finished_at = ? WHERE ${mine}`)
         .run(cancelled ? 'cancelled' : 'failed', cancelled ? null : String(e.message ?? e), lines.join('\n'), now(), row.id, runnerId);
+      if (ended.changes) ctx.events?.emit('render', row.id, 'status', { status: cancelled ? 'cancelled' : 'failed', clip: clip.slug });
     } finally {
       clearInterval(pulse);
       current = null;
@@ -183,6 +187,7 @@ export function createRenders(ctx, library, clips) {
         q("UPDATE renders SET status = 'failed', error = 'The process rendering this clip stopped before it finished.', finished_at = ? WHERE status = 'running' AND (heartbeat IS NULL OR heartbeat < ?)").run(now(), stale);
         const row = q(`UPDATE renders SET status = 'running', runner = ?, started_at = ?, heartbeat = ? WHERE id = (SELECT id FROM renders WHERE status = 'queued' ORDER BY id LIMIT 1) RETURNING *`).get(runnerId, now(), now());
         if (!row) break;
+        ctx.events?.emit('render', row.id, 'status', { status: 'running' });
         await runJob(row);
       }
     } finally {

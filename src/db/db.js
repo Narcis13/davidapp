@@ -137,6 +137,73 @@ CREATE TABLE IF NOT EXISTS render_assets (
   version_id  INTEGER NOT NULL REFERENCES asset_versions(id),
   PRIMARY KEY (render_id, version_id)
 );
+
+-- v2 ─────────────────────────────────────────────────────────────────────────────────────
+
+-- Everything that changed, by any process. The web server tails this table and pushes it to the
+-- studio as server-sent events, so a change made over MCP shows up without a reload.
+CREATE TABLE IF NOT EXISTS events (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  topic   TEXT NOT NULL,              -- asset | clip | render | request | library
+  key     TEXT,                       -- asset slug, clip slug, render id, request id
+  action  TEXT NOT NULL,              -- created | version | updated | status | message | proposal …
+  data    TEXT NOT NULL DEFAULT '{}',
+  source  TEXT NOT NULL,              -- the process that wrote it: server | mcp | test …
+  at      TEXT NOT NULL
+);
+
+-- Requests to the agent, made from the studio. Worked by Claude Code over MCP.
+CREATE TABLE IF NOT EXISTS requests (
+  id             INTEGER PRIMARY KEY,
+  scope          TEXT NOT NULL CHECK (scope IN ('asset', 'clip', 'library')),
+  asset_id       INTEGER REFERENCES assets(id),
+  asset_version  INTEGER,                   -- the version on screen when it was asked
+  clip_id        INTEGER REFERENCES clips(id),
+  clip_revision  INTEGER,
+  items          TEXT NOT NULL DEFAULT '[]', -- selected item ids (clip scope)
+  at             REAL,                      -- playhead seconds when it was asked
+  params         TEXT,                      -- playground params when it was asked (asset scope)
+  title          TEXT NOT NULL,
+  status         TEXT NOT NULL CHECK (status IN ('open', 'working', 'review', 'done', 'cancelled')),
+  claimed_by     TEXT,
+  lease_until    TEXT,
+  run            TEXT,                      -- JSON: the "Run now" session working it, if any
+  author         TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS requests_status ON requests(status);
+
+CREATE TABLE IF NOT EXISTS request_messages (
+  id           INTEGER PRIMARY KEY,
+  request_id   INTEGER NOT NULL REFERENCES requests(id),
+  author       TEXT NOT NULL,
+  role         TEXT NOT NULL CHECK (role IN ('user', 'agent', 'system', 'progress')),
+  body         TEXT NOT NULL,
+  proposal_id  INTEGER,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS request_messages_request ON request_messages(request_id);
+
+-- What the agent suggests: nothing changes until the user accepts it.
+CREATE TABLE IF NOT EXISTS proposals (
+  id          INTEGER PRIMARY KEY,
+  request_id  INTEGER NOT NULL REFERENCES requests(id),
+  kind        TEXT NOT NULL CHECK (kind IN ('asset-version', 'new-asset', 'clip-edit', 'metadata')),
+  target      TEXT NOT NULL,              -- asset or clip slug
+  base        TEXT,                       -- "slug@version" or "clip#revision" it was made against
+  payload     TEXT NOT NULL,              -- JSON: { source, note } | { operations } | { title, description, tags }
+  summary     TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'superseded')),
+  thumb       TEXT,
+  meta        TEXT NOT NULL DEFAULT '{}', -- validation: warnings, test frames, frames checked
+  result      TEXT,                       -- the version or clip revision it became
+  author      TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  decided_at  TEXT,
+  decided_by  TEXT
+);
+CREATE INDEX IF NOT EXISTS proposals_request ON proposals(request_id);
 `;
 
 /** Columns added since schema v1: [table, column, declaration]. */

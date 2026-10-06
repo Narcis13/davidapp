@@ -14,6 +14,8 @@ import { createLibrary, StudioError, SLUG_RE } from './library.js';
 import { createClips } from './clips.js';
 import { createRenders } from './renders.js';
 import { createLineage } from './lineage.js';
+import { createEvents } from './events.js';
+import { createRequests } from './requests.js';
 
 export { StudioError };
 
@@ -25,11 +27,15 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   mkdirSync(dataDir, { recursive: true });
   const db = openDb(join(dataDir, 'studio.db'));
   const pool = new WorkerPool({ size: poolSize });
-  const ctx = { db, dataDir, pool, role };
+  const ctx = { db, dataDir, pool, role, events: null };
+  const events = createEvents(ctx);
+  ctx.events = events;
   const library = createLibrary(ctx);
   const clips = createClips(ctx, library);
   const renders = createRenders(ctx, library, clips);
   const lineage = createLineage(ctx, library, clips);
+  // frame helpers below are function declarations, so they exist already
+  const requests = createRequests(ctx, library, clips, { assetSheet, clipFrame, clipSheet });
   library.seedFonts();
   if (runner) renders.startRunner();
   const framesDir = join(dataDir, 'frames');
@@ -180,5 +186,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, library, clips, renders, lineage, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, saveFrame, close };
 }

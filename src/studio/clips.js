@@ -280,11 +280,12 @@ export function createClips(ctx, library) {
       if (/UNIQUE constraint/i.test(String(e?.message))) throw new StudioError(`A clip named "${slug}" already exists. Use update_clip to change it.`, 'conflict');
       throw e;
     }
+    ctx.events?.emit('clip', slug, 'created', { revision: 1, author, remixedFrom: remixedFrom ?? null });
     return { clip: getClip(slug), checked };
   }
 
   /** Replace a clip's composition and/or its title and description. Bumps the revision. @param {string} slug @param {any} [o] */
-  async function updateClip(slug, { title, description, composition, check: doCheck = true, repin } = {}) {
+  async function updateClip(slug, { title, description, composition, check: doCheck = true, repin, by } = {}) {
     const row = clipRow(slug);
     let c = json(row.composition), p = null, checked = null;
     if (composition !== undefined || repin) {
@@ -299,6 +300,7 @@ export function createClips(ctx, library) {
       if (!done.changes) throw new StudioError(`Clip "${slug}" was changed by someone else while this edit was being checked (it was revision ${row.revision}). Load it again and re-apply the edit.`, 'conflict');
       if (p) writeUsage(row.id, p.refs, p.fonts);
     });
+    ctx.events?.emit('clip', slug, 'updated', { revision: row.revision + 1, by: by ?? null });
     return { clip: getClip(slug), checked };
   }
 

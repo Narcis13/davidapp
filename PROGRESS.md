@@ -12,8 +12,9 @@ proven by clips 4, 5 and 6. Brief: `ITERATION_2_PROMPT.md`. Iteration 1's record
 
 Started 2026-10-06 on branch `main` at `f24ab12`.
 
-**Next:** M2, events and live updates (events table, SSE), then the request queue and proposals
-(`src/studio/requests.js`), MCP tools, HTTP routes, Run now with a stub `claude`.
+**Next:** M3, new asset kinds (motion, transition, effect + `f.lib.fx`, masks, precomps, presets),
+metadata overlay, version diff, save-params-as-defaults. The studio UI for M2 (live updates, the
+ask-agent thread, Run now button) is part of M7.
 
 ## Contract (Done means)
 
@@ -56,7 +57,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 0. [x] **Baseline**: project.md for macOS (committed on its own), frame-hash and speed baselines, contract and plan
 1. [x] **Composition v2 in the runtime**: transforms, per-format overrides, keyframes with easing, image layers, layer ops (move track/item, lock/solo/mute, rename), render in another format; old path untouched; tests (D1, D6 groundwork, D7, D9 tests)
-2. [ ] **Events, requests and proposals**: events table + SSE, request queue, proposals with accept/reject/reply and conflict rules, MCP tools, HTTP routes, Run now with a stub `claude` (D2–D4 backend, D20, D21)
+2. [x] **Events, requests and proposals** (backend; UI in M7): events table + SSE, request queue, proposals with accept/reject/reply and conflict rules, MCP tools, HTTP routes, Run now with a stub `claude` (D2–D4 backend, D20, D21)
 3. [ ] **New asset kinds**: motion, transition, effect (`f.lib.fx`), masks/mattes, precomps (`f.layers`, save as asset), presets, metadata overlay, version diff, save-params-as-defaults (D5 backend, D10)
 4. [ ] **3D and baking**: `f.lib.solid` software rasterizer, ≥3 3D assets, sequence assets baked from any visual asset (D11)
 5. [ ] **Uploads**: upload API, content-hash dedupe, palette, thumbnails, SVG sanitiser + vector model, needs-description queue, MCP image results (D12 backend)
@@ -84,6 +85,8 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - **Split keeps time**: items gained `offset` (seconds into the asset where the item starts) and `assetDuration` (the asset timeline it is cut from). `split_item` gives the second part offset = cut and both parts the whole asset duration, so the frames on both sides of a cut are identical (tested). Audio items honour the offset in the mix (`atrim=offset:offset+duration`).
 - **Image layers**: a visual track takes image assets directly, drawn into the transformed box with `params.fit` contain (default), cover (cropped to the box) or fill.
 - **Render in another format**: `start_render { format }` (and `renders.enqueue`) snapshot the composition reformatted, so one composition renders vertical, horizontal and square with each format's overrides; the render row records its format (`renders.format`, added by an idempotent column migration in `openDb`).
+- **Run now** spawns `claude -p` with `--mcp-config` (only the studio server, on the studio's data dir), `--strict-mcp-config`, `--tools ""` (no built-in tools), `--restricted`, `--permission-mode dontAsk` and an allowlist of the studio tools that read and answer (`RUN_TOOLS`: no create/update/render tools), `--output-format stream-json`; progress lines go into the thread as `progress` messages; timeout `STUDIO_AGENT_TIMEOUT` (default 600 s), cancel, one session per request. The CLI is `STUDIO_CLAUDE_BIN` or `claude` on PATH; without it `/api/status` says `agent.runNow: false` and `POST …/run` answers 501. Tests use `test/fixtures/claude-stub.mjs`.
+- **Proposal validation uses the draft's own defaults**, not the params on screen (a new version may drop a parameter); the side-by-side compare in the playground uses the user's params where they still apply.
 - *(more decisions are added as each milestone lands)*
 
 ## Blocked
@@ -95,9 +98,11 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - The first headless Chrome launch after a while can exceed `cdp.mjs`'s wait ("chrome did not start") and `sweep.sh` still prints `ok`: check every screen's PNG exists.
 - `frame_hashes` takes at most 64 times per call; `start_render` waits at most 900 s.
 - Render time on this machine varies ±15 % run to run (25–32 s for clip 1).
+- Real `claude -p` runs used so far: 1 of 10 (2026-10-06, scratch studio: request → proposal in 12 s, exit 0).
 - `clips/history-of-ai/` is the user's own clip (not in the showcase plan); useful as a second old-shape composition.
 
 ## Log
 
 - 2026-10-06: baseline on the iteration-1 code (`f24ab12`). `npm run showcase` on an empty dir: 50 steps, renders 25.0 / 26.7 / 15.7 s; a second empty-dir build reproduced all 360 dense hashes and 54 render samples. Speed: medians 27.4 / 30.1 / 17.0 s (3 runs). Gates: typecheck PASS, lint PASS, test PASS (56). Sweep on the showcase data: 17 screens, 0 problems (library reshot after a Chrome cold start); server log 0 ERROR lines.
 - 2026-10-06: M1 done: `src/core/transform.js` (geometry, keyframes, per-format overrides), v2 normalization and validation, a new drawing path for v2 items and image layers (the v1 loop is untouched), easing pinned per composition, edit ops (move_track, move_item index, update_track, set_transform, keyframes, set_override, split_item, duplicate_item), audio offset/mute/solo, render in another format. `test/composition.test.js` (14): v1 shapes normalize unchanged, identity transform = v1 pixels, rotation/scale/keyframes/overrides/z-order/solo/images/split continuity checked on rendered pixels. Showcase rebuilt from empty: all 360 dense + 54 render hashes identical to the baseline. Gates: typecheck PASS, lint PASS, test PASS (70; one expected message changed from "takes visual assets" to "takes visual or image assets").
+- 2026-10-06: M2 backend: `events` table + SSE (`/api/events`, tailing every 250 ms, Last-Event-ID replay), `src/studio/requests.js` (queue, leases, proposals for asset versions, new assets and clip edits, accept/reject/reply, conflicts and rebasing), `src/studio/agent-run.js` (Run now), 8 MCP tools, HTTP routes, a stub `claude`. Tests: `test/requests.test.js` (11) and an MCP stdio test of the whole request flow plus layout ops and a vertical render. One real Run now session worked end to end. Gates: typecheck PASS, lint PASS, test PASS (82).

@@ -295,6 +295,7 @@ export function createLibrary(ctx) {
       rmSync(thumbTmp, { force: true });
       throw raceOf(e, slug);
     }
+    ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, clip: forClip ?? null, fork: forkOf ? makeRef(forkOf.slug, forkOf.version) : null });
     return { asset: getAsset(makeRef(slug, version), { includeSource: false }), warnings: v.warnings, logs: v.logs, frames: v.frames, thumbPath: join(dataDir, thumb), thumb: v.thumb };
   }
 
@@ -378,6 +379,7 @@ export function createLibrary(ctx) {
       if (thumbTmp) rmSync(thumbTmp, { force: true });
       throw raceOf(err, slug);
     }
+    ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, type, clip: forClip ?? null });
     return { asset: getAsset(makeRef(slug, version)) };
   }
 

@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { connect, callTool, inlineFiles } from '../scripts/mcp.mjs';
 import { EASING, DOT, LABEL, TONE } from './helpers.js';
+import { createStudio } from '../src/studio/studio.js';
 
 let client, dataDir;
 const call = (name, args) => callTool(client, name, args);
@@ -25,7 +26,8 @@ after(async () => {
 test('the server lists its tools with schemas', async () => {
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name);
-  for (const n of ['studio_guide', 'search_assets', 'get_asset', 'validate_asset', 'create_asset', 'update_asset', 'fork_asset', 'create_clip', 'update_clip', 'edit_clip', 'render_asset_frame', 'render_clip_frame', 'start_render', 'get_render', 'cancel_render', 'list_clip_assets', 'frame_hashes', 'reuse_report']) assert.ok(names.includes(n), `missing tool ${n}`);
+  for (const n of ['studio_guide', 'search_assets', 'get_asset', 'validate_asset', 'create_asset', 'update_asset', 'fork_asset', 'create_clip', 'update_clip', 'edit_clip', 'render_asset_frame', 'render_clip_frame', 'start_render', 'get_render', 'cancel_render', 'list_clip_assets', 'frame_hashes', 'reuse_report',
+    'list_requests', 'claim_request', 'get_request', 'reply_request', 'propose_asset_version', 'propose_new_asset', 'propose_clip_edit', 'complete_request']) assert.ok(names.includes(n), `missing tool ${n}`);
   const create = tools.find((t) => t.name === 'create_asset');
   assert.deepEqual(create.inputSchema.required, ['name', 'source']);
   assert.match((await call('studio_guide')).text, /The frame object `f`[\s\S]*Library now/);
@@ -162,6 +164,59 @@ test('bake a frame into an image asset and an audio asset into a sound, and use 
   assert.equal(render.json.log, undefined, 'ffmpeg wrote warnings');
   const used = (await call('list_clip_assets', { clip: 'mcp-demo' })).json.assets;
   assert.ok(used.some((a) => a.ref === 'kick-baked@1' && a.type === 'sound'));
+});
+
+test('requests: list, claim with frames, reply, propose a version and a clip edit, complete; layout ops through edit_clip', async () => {
+  // the user's side runs in the studio (another process on the same data dir)
+  const studio = createStudio({ dataDir, role: 'server' });
+  try {
+    const ask = studio.requests.create({ asset: 'dot', params: { radius: 40 }, message: 'Make the dot cyan', author: 'user' });
+    const listed = await call('list_requests', {});
+    assert.ok(listed.json.requests.some((r) => r.id === ask.id && r.status === 'open' && r.asset === 'dot@2'));
+    const claimed = await call('claim_request', { id: ask.id });
+    assert.ok(!claimed.isError, claimed.text);
+    assert.equal(claimed.json.request.status, 'working');
+    assert.match(claimed.json.scope.source, /slides from left to right/);
+    assert.deepEqual(claimed.json.scope.params, { radius: 40 });
+    assert.equal(claimed.images.length, 1, 'a filmstrip of the asset with the params on screen');
+    assert.ok(!(await call('reply_request', { id: ask.id, message: 'On it.' })).isError);
+    const bad = await call('propose_asset_version', { request: ask.id, source: 'asset({ description: "Throws when it draws, on purpose.", tags: ["t"], render() { throw new Error("boom"); } });', summary: 'broken' });
+    assert.ok(bad.isError);
+    assert.match(bad.text, /rejected[\s\S]*boom/);
+    const proposed = await call('propose_asset_version', { request: ask.id, source: DOT.replace("default: '#ff3366'", "default: '#22ccff'").replace('default: 20', 'default: 80'), summary: 'Cyan, as asked.' });
+    assert.ok(!proposed.isError, proposed.text);
+    assert.equal(proposed.json.wouldBe, 'dot@3');
+    assert.equal(proposed.images.length, 1);
+    assert.equal((await call('get_asset', { ref: 'dot' })).json.version, 2, 'a proposal saves nothing');
+    const { result } = await studio.requests.accept({ proposal: proposed.json.proposal, author: 'user' });
+    assert.equal(result, 'dot@3');
+    assert.equal((await call('get_asset', { ref: 'dot@3' })).json.author, 'mcp-test-model');
+
+    const clipAsk = studio.requests.create({ clip: 'mcp-demo', items: ['label'], at: 1, message: 'add a dot behind the label at 0:01', author: 'user' });
+    const ctx = await call('claim_request', {});
+    assert.equal(ctx.json.request.id, clipAsk.id, 'claims the oldest open request');
+    assert.equal(ctx.images.length, 2);
+    const edit = await call('propose_clip_edit', { request: clipAsk.id, operations: [{ op: 'add_item', track: 'main', item: { id: 'dot2', asset: 'dot', start: 1, duration: 1, transform: { x: 0.7, width: 0.5, height: 0.5, rotation: 20 } } }, { op: 'move_track', id: 'titles', index: 1 }], summary: 'A dot at 0:01, behind the title' });
+    assert.ok(!edit.isError, edit.text);
+    assert.ok(edit.json.framesChecked > 0);
+    await studio.requests.accept({ proposal: edit.json.proposal, author: 'user' });
+    const comp = (await call('get_clip', { clip: 'mcp-demo' })).json.composition;
+    assert.deepEqual(comp.tracks.map((t) => t.id), ['main', 'titles', 'sound']);
+    assert.deepEqual(comp.tracks[0].items.find((i) => i.id === 'dot2').transform, { x: 0.7, width: 0.5, height: 0.5, rotation: 20 });
+
+    const layout = await call('edit_clip', { clip: 'mcp-demo', operations: [{ op: 'add_keyframe', id: 'dot2', prop: 'rotation', t: 0, v: 0 }, { op: 'add_keyframe', id: 'dot2', prop: 'rotation', t: 1, v: 90, ease: 'outCubic' }, { op: 'set_transform', id: 'dot2', format: 'vertical', transform: { y: 0.3 } }, { op: 'update_track', id: 'main', patch: { locked: true } }] });
+    assert.ok(!layout.isError, layout.text);
+    const vertical = await call('start_render', { clip: 'mcp-demo', format: 'vertical', wait_seconds: 120 });
+    assert.equal(vertical.json.status, 'done', vertical.text);
+    assert.equal(vertical.json.stats.probe.video.height, 1920);
+
+    const q = studio.requests.create({ scope: 'library', message: 'Is there a confetti asset?', author: 'user' });
+    const closed = await call('complete_request', { id: q.id, message: 'Not yet.' });
+    assert.equal(closed.json.status, 'done');
+    assert.equal((await call('claim_request', { wait_seconds: 1 })).json.claimed, null, 'an empty queue, after waiting');
+  } finally {
+    await studio.close();
+  }
 });
 
 test('the CLI helper inlines @file: arguments', () => {

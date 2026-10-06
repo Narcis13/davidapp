@@ -9,6 +9,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { ROOT, FONTS_DIR, fontManifest } from '../render/host.js';
 import { StudioError } from '../studio/studio.js';
+import { createAgentRuns } from '../studio/agent-run.js';
 import { json as parseJson } from '../db/db.js';
 
 const TYPES = {
@@ -16,15 +17,17 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
   '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2', '.ico': 'image/x-icon',
 };
-const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415 };
+const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501 };
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 
 /**
  * hosts: the Host names the server answers to (default: loopback names only), or null for any.
- * @param {any} studio @param {{ log?: (line: string) => void, author?: string, hosts?: string[] | null }} [o]
+ * env: where to look for the claude CLI for "Run now" (PATH, STUDIO_CLAUDE_BIN).
+ * @param {any} studio @param {{ log?: (line: string) => void, author?: string, hosts?: string[] | null, env?: Record<string, string | undefined> }} [o]
  */
-export function createStudioServer(studio, { log = () => {}, author = process.env.STUDIO_AUTHOR ?? 'studio-user', hosts = LOCAL_HOSTS } = {}) {
-  const { library, clips, renders, lineage } = studio;
+export function createStudioServer(studio, { log = () => {}, author = process.env.STUDIO_AUTHOR ?? 'studio-user', hosts = LOCAL_HOSTS, env = process.env } = {}) {
+  const { library, clips, renders, lineage, requests } = studio;
+  const runs = createAgentRuns(studio, { env });
   const UI = join(ROOT, 'src', 'ui');
   const CORE = join(ROOT, 'src', 'core');
 
@@ -102,7 +105,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
   /** @type {[string, RegExp, (ctx: any) => any][]} */
   const routes = [
     ['GET', /^\/api\/status$/, () => ({
-      name: 'Fablecut', engine: ENGINE_VERSION, formats: FORMATS, fonts: fonts(), tags: library.allTags(),
+      name: 'Fablecut', engine: ENGINE_VERSION, formats: FORMATS, fonts: fonts(), tags: library.allTags(), agent: { runNow: runs.available() },
       counts: { assets: library.search({ limit: 1 }).total, clips: clips.listClips().length, renders: renders.list({ limit: 200 }).length },
     })],
 
@@ -175,6 +178,28 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/render$/, ({ params }) => renders.enqueue({ clip: params[0], requestedBy: author })],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/remix$/, async ({ params, data }) => (await clips.remixClip({ slug: params[0], newSlug: data.name, format: data.format, title: data.title, author: data.author ?? author })).clip],
 
+    // requests to the agent, and its proposals
+    ['GET', /^\/api\/requests$/, ({ query }) => ({ requests: requests.list({ status: query.get('status') ? query.get('status').split(',') : undefined, scope: query.get('scope') || undefined, asset: query.get('asset') || undefined, clip: query.get('clip') || undefined, limit: int(query.get('limit') ?? 50, 50, 1, 200) }) })],
+    ['POST', /^\/api\/requests$/, ({ data }) => requests.create({ scope: data.scope, asset: data.asset, version: data.version, clip: data.clip, items: data.items, at: data.at, params: data.params, message: data.message, author: data.author ?? author })],
+    ['GET', /^\/api\/requests\/(\d+)$/, ({ params }) => ({ ...requests.get(Number(params[0])), running: runs.isRunning(params[0]) })],
+    ['POST', /^\/api\/requests\/(\d+)\/messages$/, ({ params, data }) => requests.reply({ id: Number(params[0]), author: data.author ?? author, body: data.body })],
+    ['POST', /^\/api\/requests\/(\d+)\/cancel$/, ({ params }) => { runs.isRunning(params[0]) && runs.cancel(params[0]); return requests.cancel({ id: Number(params[0]), author }); }],
+    ['POST', /^\/api\/requests\/(\d+)\/run$/, ({ params }) => runs.start(Number(params[0]), author)],
+    ['POST', /^\/api\/requests\/(\d+)\/run\/cancel$/, ({ params }) => runs.cancel(Number(params[0]))],
+    ['POST', /^\/api\/proposals\/(\d+)\/accept$/, async ({ params, data }) => requests.accept({ proposal: Number(params[0]), author, force: !!data.force })],
+    ['POST', /^\/api\/proposals\/(\d+)\/reject$/, ({ params, data }) => requests.reject({ proposal: Number(params[0]), author, reason: data.reason })],
+    // what a proposal would look like: a bundle for the preview worker, same as a draft or a clip
+    ['GET', /^\/api\/proposals\/(\d+)\/preview$/, async ({ params }) => {
+      const p = requests.proposal(Number(params[0]));
+      if (p.kind === 'clip-edit') {
+        const current = clips.getClip(p.target);
+        return { proposal: p, current: current.revision, ...(await clipBundle(clips.applyOps(current.composition, p.payload.operations))) };
+      }
+      const d = await studio.draftBundle({ slug: p.target, source: p.payload.source });
+      const m = d.validation.meta;
+      return { proposal: p, ref: d.ref, kind: m.kind, schema: m.schema, duration: m.duration, formats: m.formats, bundle: browserBundle(d.bundle) };
+    }],
+
     // renders, gallery, lineage
     ['GET', /^\/api\/renders$/, ({ query }) => ({ renders: renders.list({ status: query.get('status') || undefined, clip: query.get('clip') || undefined, limit: int(query.get('limit') ?? 50, 50, 1, 200) }) })],
     ['GET', /^\/api\/renders\/(\d+)$/, ({ params }) => renders.get(Number(params[0]))],
@@ -197,10 +222,40 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
 
   const int = (v, fallback, min, max) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : fallback; };
 
+  // ── live updates: the events table, tailed and pushed as server-sent events ───────────────
+  const listeners = new Set();
+  let lastEvent = studio.events.latest();
+  const sse = (res, e) => res.write(`id: ${e.id}\nevent: ${e.topic}\ndata: ${JSON.stringify(e)}\n\n`);
+  const tail = setInterval(() => {
+    try {
+      if (!listeners.size) { lastEvent = studio.events.latest(); return; }
+      for (let rows = studio.events.since(lastEvent, 500); rows.length; rows = studio.events.since(lastEvent, 500)) {
+        lastEvent = rows[rows.length - 1].id;
+        for (const res of listeners) for (const e of rows) sse(res, e);
+      }
+    } catch (e) {
+      if (!/database is locked|busy/i.test(String(e?.message))) console.error(`ERROR event stream: ${e?.stack ?? e}`);
+    }
+  }, 250);
+  tail.unref();
+  const ping = setInterval(() => { for (const res of listeners) res.write(': ping\n\n'); }, 20000);
+  ping.unref();
+
+  function events(req, res) {
+    res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
+    res.write('retry: 2000\n\n');
+    // a reconnecting client says what it saw last, and gets what it missed
+    const seen = Number(req.headers['last-event-id']);
+    if (Number.isInteger(seen) && seen > 0) for (const e of studio.events.since(seen, 1000)) if (e.id <= lastEvent) sse(res, e);
+    listeners.add(res);
+    req.on('close', () => listeners.delete(res));
+  }
+
   async function handle(req, res) {
     guard(req);
     const url = new URL(req.url, 'http://localhost');
     const path = url.pathname;
+    if (path === '/api/events' && req.method === 'GET') return events(req, res);
     if (path.startsWith('/api/')) {
       for (const [method, re, fn] of routes) {
         const m = re.exec(path);
@@ -234,6 +289,13 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       console.error(`ERROR ${req.method} ${req.url}\n${e?.stack ?? e}`);
       return res.headersSent ? res.end() : send(res, 500, { error: 'Internal server error' });
     });
+  });
+  server.on('close', () => {
+    clearInterval(tail);
+    clearInterval(ping);
+    runs.stopAll();
+    for (const res of listeners) res.end();
+    listeners.clear();
   });
   return server;
 }

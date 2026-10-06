@@ -28,6 +28,20 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     images: [{ png: r.thumb, path: r.thumbPath }],
   });
 
+  const compactRequest = (r) => ({ id: r.id, scope: r.scope, title: r.title, status: r.status, asset: r.assetRef, clip: r.clip, items: r.items, at: r.at, params: r.params, claimedBy: r.claimedBy,
+    thread: r.messages.filter((m) => m.role !== 'progress').map((m) => `${m.role === 'user' ? 'user' : m.author} (${m.role}): ${m.body}`),
+    proposals: r.proposals.map((p) => ({ id: p.id, kind: p.kind, target: p.target, base: p.base, status: p.status, summary: p.summary, result: p.result })) });
+
+  async function requestContext(id) {
+    const c = await studio.requests.context(id);
+    return { json: { request: compactRequest(c.request), scope: c.scope, frames: c.images.map((i) => i.caption) }, images: c.images.map((i) => image(i.name, i.png)) };
+  }
+
+  const proposalResult = ({ request, proposal }) => ({
+    json: { proposal: proposal.id, kind: proposal.kind, target: proposal.target, base: proposal.base, wouldBe: proposal.meta.wouldBe, warnings: proposal.meta.warnings, framesChecked: proposal.meta.framesChecked, request: request.id, status: request.status, next: 'The user reviews it in the studio. Stop here, or wait for their reply (claim_request again later).' },
+    images: proposal.thumb ? [{ png: readFileSync(join(studio.dataDir, proposal.thumb)), path: join(studio.dataDir, proposal.thumb) }] : [],
+  });
+
   /** @type {{ name: string, title: string, description: string, input: Record<string, any>, readOnly?: boolean, run: (a: any) => Promise<any> | any }[]} */
   const tools = [
     {
@@ -349,6 +363,74 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       description: 'Cancel a queued or running render.',
       input: { id: z.number().int() },
       run: (a) => ({ json: compactRender(renders.cancel(a.id)) }),
+    },
+    // ── requests from the studio ─────────────────────────────────────────────────────────
+    {
+      name: 'list_requests',
+      title: 'List requests from the studio',
+      description: 'The queue of requests the user wrote in the studio ("a neon lower third", "make this slower", "add a stat scene at 0:12"), newest first, each scoped to an asset, a clip (and selected items) or the library. Status: open (waiting for an agent), working (claimed), review (a proposal waits for the user), done, cancelled.',
+      input: { status: z.array(z.enum(['open', 'working', 'review', 'done', 'cancelled'])).optional().describe('Default: open, working and review'), limit: z.number().int().min(1).max(100).optional() },
+      readOnly: true,
+      run: (a) => ({ json: { requests: studio.requests.list({ status: a.status ?? ['open', 'working', 'review'], limit: a.limit ?? 20 }).map((r) => ({ id: r.id, scope: r.scope, title: r.title, status: r.status, asset: r.assetRef, clip: r.clip, items: r.items, at: r.at, claimedBy: r.claimedBy, messages: r.messages, pendingProposals: r.pending, createdAt: r.createdAt })) } }),
+    },
+    {
+      name: 'claim_request',
+      title: 'Claim a request and read it',
+      description: 'Take a request to work on (the given id, or the oldest open one) and get everything needed to do it: the thread, the scope (asset source, schema and the params on screen; or the clip composition, the selected items and the playhead) and rendered frames. The claim holds for 15 minutes and is renewed by replying or proposing. With wait_seconds, waits for a request to arrive. Answer with propose_asset_version, propose_new_asset or propose_clip_edit (the user accepts it in the studio), or complete_request.',
+      input: { id: z.number().int().optional(), wait_seconds: z.number().min(0).max(300).optional().describe('When the queue is empty, wait up to this long for a request') },
+      run: async (a) => {
+        const end = Date.now() + (a.wait_seconds ?? 0) * 1000;
+        let r = studio.requests.claim({ id: a.id, agent: defaultAuthor });
+        while (!r && Date.now() < end) {
+          await new Promise((res) => setTimeout(res, 1000));
+          r = studio.requests.claim({ id: a.id, agent: defaultAuthor });
+        }
+        if (!r) return { json: { claimed: null, message: 'No open requests.' } };
+        return requestContext(r.id);
+      },
+    },
+    {
+      name: 'get_request',
+      title: 'Read a request',
+      description: 'A request\'s thread, proposals and scope (with rendered frames) without claiming it.',
+      input: { id: z.number().int() },
+      readOnly: true,
+      run: (a) => requestContext(a.id),
+    },
+    {
+      name: 'reply_request',
+      title: 'Reply in a request thread',
+      description: 'Write in the request\'s thread: a question for the user, or a note about the work. The user sees it live in the studio.',
+      input: { id: z.number().int(), message: z.string() },
+      run: (a) => ({ json: compactRequest(studio.requests.reply({ id: a.id, author: defaultAuthor, role: 'agent', body: a.message })) }),
+    },
+    {
+      name: 'propose_asset_version',
+      title: 'Propose a new version of an asset',
+      description: 'Answer a request with a new version of an asset (default: the asset the request is about). The source is validated and test frames are drawn now, but nothing is saved: the user compares it side by side with the current version in the studio and accepts it (then it becomes the next version), rejects it, or replies with more feedback. Returns the proposal\'s thumbnail.',
+      input: { request: z.number().int(), name: z.string().optional().describe('The asset; default: the request\'s asset'), source: z.string().describe('The complete new source'), note: z.string().optional().describe('What changed (becomes the version note)'), summary: z.string().describe('One sentence for the user: what this proposal does') },
+      run: async (a) => proposalResult(await studio.requests.propose({ id: a.request, agent: defaultAuthor, kind: 'asset-version', name: a.name, source: a.source, note: a.note, summary: a.summary })),
+    },
+    {
+      name: 'propose_new_asset',
+      title: 'Propose a new asset',
+      description: 'Answer a request with a new asset (validated now, saved only when the user accepts). For a clip request the new asset is recorded as made for that clip.',
+      input: { request: z.number().int(), name: z.string().describe('Unique lowercase-kebab name'), source: z.string(), note: z.string().optional(), summary: z.string() },
+      run: async (a) => proposalResult(await studio.requests.propose({ id: a.request, agent: defaultAuthor, kind: 'new-asset', name: a.name, source: a.source, note: a.note, summary: a.summary })),
+    },
+    {
+      name: 'propose_clip_edit',
+      title: 'Propose an edit to a clip',
+      description: 'Answer a request with edit_clip operations on a clip (default: the request\'s clip). They are applied to a copy, validated and drawn now; the clip changes only when the user accepts. On accept they are re-applied to the clip as it is then, so the user can keep editing meanwhile. Returns the frame at the request\'s playhead.',
+      input: { request: z.number().int(), clip: z.string().optional(), operations: z.array(z.record(z.string(), z.any())).min(1).describe('The same operations as edit_clip'), summary: z.string() },
+      run: async (a) => proposalResult(await studio.requests.propose({ id: a.request, agent: defaultAuthor, kind: 'clip-edit', clip: a.clip, operations: a.operations, summary: a.summary })),
+    },
+    {
+      name: 'complete_request',
+      title: 'Complete a request without a proposal',
+      description: 'Close a request with an answer when nothing should change (a question answered, or the asked-for thing already exists).',
+      input: { id: z.number().int(), message: z.string().optional() },
+      run: (a) => ({ json: compactRequest(studio.requests.complete({ id: a.id, agent: defaultAuthor, body: a.message })) }),
     },
     {
       name: 'reuse_report',
