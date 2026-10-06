@@ -9,6 +9,7 @@ import { createText } from './text.js';
 import { createAudio } from './audio.js';
 import * as fx from './fx.js';
 import * as solid from './solid.js';
+import * as svg from './svg.js';
 
 /** @param {{ sampleRate?: number }} [o] */
 export function createLib({ sampleRate } = {}) {
@@ -23,5 +24,6 @@ export function createLib({ sampleRate } = {}) {
     audio: createAudio(sampleRate),
     fx,
     solid,
+    svg,
   });
 }

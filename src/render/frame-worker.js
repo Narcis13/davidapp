@@ -21,7 +21,7 @@ const SEQ_CACHE = 96;
 
 async function makeRuntime(bundle) {
   const rt = createRuntime(nodeHost);
-  for (const [ref, img] of Object.entries(bundle.images ?? {})) rt.setImage(ref, await loadImage(img.path));
+  for (const [ref, img] of Object.entries(bundle.images ?? {})) rt.setImage(ref, await loadImage(img.path), img.vector);
   for (const [ref, s] of Object.entries(bundle.sequences ?? {})) {
     rt.setSequence(ref, { frames: s.frames, fps: s.fps, width: s.width, height: s.height, dir: s.dir, get: (i) => seqCache.get(`${ref}#${i}`) ?? null });
   }

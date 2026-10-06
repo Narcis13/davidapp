@@ -30,7 +30,7 @@ test('the server lists its tools with schemas', async () => {
   const names = tools.map((t) => t.name);
   for (const n of ['studio_guide', 'search_assets', 'get_asset', 'validate_asset', 'create_asset', 'update_asset', 'fork_asset', 'create_clip', 'update_clip', 'edit_clip', 'render_asset_frame', 'render_clip_frame', 'start_render', 'get_render', 'cancel_render', 'list_clip_assets', 'frame_hashes', 'reuse_report',
     'list_requests', 'claim_request', 'get_request', 'reply_request', 'propose_asset_version', 'propose_new_asset', 'propose_clip_edit', 'complete_request',
-    'save_defaults', 'create_preset', 'save_precomp', 'set_asset_metadata', 'diff_versions', 'bake_sequence']) assert.ok(names.includes(n), `missing tool ${n}`);
+    'save_defaults', 'create_preset', 'save_precomp', 'set_asset_metadata', 'diff_versions', 'bake_sequence', 'upload_image', 'list_undescribed', 'describe_asset']) assert.ok(names.includes(n), `missing tool ${n}`);
   const create = tools.find((t) => t.name === 'create_asset');
   assert.deepEqual(create.inputSchema.required, ['name', 'source']);
   assert.match((await call('studio_guide')).text, /The frame object `f`[\s\S]*Library now/);
@@ -271,6 +271,28 @@ test('tweak and keep, and the new kinds, over MCP: defaults, presets, metadata, 
   const placed = await call('edit_clip', { clip: 'mcp-demo', operations: [{ op: 'add_item', track: 'main', item: { id: 'spin', asset: 'ball-spin', start: 0, duration: 2, params: { loop: true }, transform: { x: 0.8, width: 0.3, height: 0.5 } } }] });
   assert.ok(!placed.isError, placed.text);
   assert.equal((await call('render_clip_frame', { clip: 'mcp-demo', t: 1.5 })).images.length, 1);
+});
+
+test('uploads over MCP: upload an image and an SVG, see them in list_undescribed, describe them, find them by tag', async () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" onload="x()"><script>x()</script><circle cx="32" cy="32" r="24" fill="#ff5c8a"/></svg>';
+  const up = await call('upload_image', { name: 'Pink dot.svg', data_base64: Buffer.from(svg).toString('base64') });
+  assert.ok(!up.isError, up.text);
+  assert.equal(up.json.asset, 'pink-dot@1');
+  assert.ok(up.json.removedFromSvg.includes('<script>'));
+  assert.equal(up.images.length, 1);
+  const dup = await call('upload_image', { name: 'again.svg', data_base64: Buffer.from(svg).toString('base64') });
+  assert.equal(dup.json.duplicate, true);
+  const list = await call('list_undescribed', {});
+  assert.ok(list.json.uploads.some((u) => u.ref === 'pink-dot@1' && u.format === 'svg' && u.vector));
+  assert.equal(list.images.length, list.json.uploads.length, 'each upload comes with its picture');
+  const d = await call('describe_asset', { name: 'pink-dot', title: 'Pink dot', description: 'A flat pink disc on a transparent background; simple and bold.', tags: ['dot', 'pink', 'shape'], uses: ['a bullet marker', 'drawn on with f.svg'] });
+  assert.ok(!d.isError, d.text);
+  assert.equal(d.json.needsDescription, false);
+  assert.ok((await call('search_assets', { tags: ['pink', 'dot'] })).json.assets.some((a) => a.ref === 'pink-dot@1'));
+  assert.ok(!(await call('list_undescribed', {})).json.uploads.some((u) => u.ref === 'pink-dot@1'));
+  const bad = await call('upload_image', { name: 'x.svg', data_base64: Buffer.from('<!DOCTYPE svg [<!ENTITY a "b">]><svg>&a;</svg>').toString('base64') });
+  assert.ok(bad.isError);
+  assert.match(bad.text, /The SVG was rejected: a DOCTYPE or entity declaration/);
 });
 
 test('the CLI helper inlines @file: arguments', () => {

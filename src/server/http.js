@@ -10,6 +10,7 @@ import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { ROOT, FONTS_DIR, fontManifest } from '../render/host.js';
 import { StudioError } from '../studio/studio.js';
 import { createAgentRuns } from '../studio/agent-run.js';
+import { MAX_UPLOAD } from '../studio/uploads.js';
 import { json as parseJson } from '../db/db.js';
 
 const TYPES = {
@@ -26,7 +27,7 @@ const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
  * @param {any} studio @param {{ log?: (line: string) => void, author?: string, hosts?: string[] | null, env?: Record<string, string | undefined> }} [o]
  */
 export function createStudioServer(studio, { log = () => {}, author = process.env.STUDIO_AUTHOR ?? 'studio-user', hosts = LOCAL_HOSTS, env = process.env } = {}) {
-  const { library, clips, renders, lineage, requests } = studio;
+  const { library, clips, renders, lineage, requests, uploads } = studio;
   const runs = createAgentRuns(studio, { env });
   const UI = join(ROOT, 'src', 'ui');
   const CORE = join(ROOT, 'src', 'core');
@@ -81,7 +82,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
   /** The browser-side bundle: sources and pinned deps, with image URLs instead of paths. */
   function browserBundle(b) {
     const images = {};
-    for (const ref of Object.keys(b.images ?? {})) images[ref] = { url: `/media/${library.requireVersion(ref).file}` };
+    for (const [ref, img] of Object.entries(b.images ?? {})) images[ref] = { url: `/media/${library.requireVersion(ref).file}`, vector: img.vector ?? null };
     // a sequence's frames are fetched as the preview needs them: /media/files/<slug>@<v>/000123.png
     const sequences = {};
     for (const [ref, s] of Object.entries(b.sequences ?? {})) sequences[ref] = { url: `/media/${s.file}/`, frames: s.frames, fps: s.fps, width: s.width, height: s.height };
@@ -117,6 +118,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       query: query.get('query') ?? undefined, type: query.get('type') || undefined, kind: query.get('kind') || undefined,
       tags: query.get('tag') ? query.get('tag').split(',').filter(Boolean) : undefined, format: query.get('format') || undefined,
       originClip: query.get('origin') || undefined, usedByClip: query.get('usedBy') || undefined, derivedFrom: query.get('derivedFrom') || undefined,
+      needsDescription: query.get('needsDescription') ? query.get('needsDescription') === '1' : undefined,
       limit: int(query.get('limit') ?? 100, 100, 1, 200), offset: int(query.get('offset') ?? 0, 0, 0, 1e9),
     })],
     ['POST', /^\/api\/assets\/validate$/, async ({ data }) => {
@@ -200,6 +202,8 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/render$/, ({ params }) => renders.enqueue({ clip: params[0], requestedBy: author })],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/remix$/, async ({ params, data }) => (await clips.remixClip({ slug: params[0], newSlug: data.name, format: data.format, title: data.title, author: data.author ?? author })).clip],
 
+    // uploads waiting for the agent to describe them
+    ['GET', /^\/api\/uploads$/, ({ query }) => ({ assets: uploads.undescribed(int(query.get('limit') ?? 50, 50, 1, 100)) })],
     // requests to the agent, and its proposals
     ['GET', /^\/api\/requests$/, ({ query }) => ({ requests: requests.list({ status: query.get('status') ? query.get('status').split(',') : undefined, scope: query.get('scope') || undefined, asset: query.get('asset') || undefined, clip: query.get('clip') || undefined, limit: int(query.get('limit') ?? 50, 50, 1, 200) }) })],
     ['POST', /^\/api\/requests$/, ({ data }) => requests.create({ scope: data.scope, asset: data.asset, version: data.version, clip: data.clip, items: data.items, at: data.at, params: data.params, message: data.message, author: data.author ?? author })],
@@ -273,11 +277,27 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     req.on('close', () => listeners.delete(res));
   }
 
+  /**
+   * One uploaded file as the raw request body (Content-Type: the image's type), ?name=photo.png.
+   * Not JSON on purpose: a page on another site cannot send an image/* body without a CORS
+   * preflight, which this server never answers, and the Origin check refuses it anyway.
+   */
+  async function receiveUpload(req, url) {
+    const type = String(req.headers['content-type'] ?? '').toLowerCase();
+    if (!/^image\/(png|jpeg|webp|svg\+xml)\b/.test(type)) throw new StudioError('Upload one PNG, JPEG, WebP or SVG file as the request body, with its image/* Content-Type', 'unsupported');
+    const chunks = [];
+    let size = 0;
+    for await (const c of req) { size += c.length; if (size > MAX_UPLOAD) throw new StudioError(`The file is larger than ${MAX_UPLOAD / 1e6} MB`); chunks.push(c); }
+    const r = await uploads.upload({ name: url.searchParams.get('name') || 'upload', data: Buffer.concat(chunks), author: url.searchParams.get('author') || author, forClip: url.searchParams.get('clip') || undefined });
+    return { asset: r.asset, duplicate: r.duplicate, removed: r.removed };
+  }
+
   async function handle(req, res) {
     guard(req);
     const url = new URL(req.url, 'http://localhost');
     const path = url.pathname;
     if (path === '/api/events' && req.method === 'GET') return events(req, res);
+    if (path === '/api/uploads' && req.method === 'POST') return send(res, 200, await receiveUpload(req, url));
     if (path.startsWith('/api/')) {
       for (const [method, re, fn] of routes) {
         const m = re.exec(path);

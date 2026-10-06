@@ -63,7 +63,7 @@ const handlers = {
     const next = createRuntime(host);
     for (const [ref, img] of Object.entries(bundle.images ?? {})) {
       const blob = await (await fetch(img.url)).blob();
-      next.setImage(ref, await createImageBitmap(blob));
+      next.setImage(ref, await createImageBitmap(blob), img.vector);
     }
     for (const [ref, seq] of Object.entries(bundle.sequences ?? {})) {
       next.setSequence(ref, { frames: seq.frames, fps: seq.fps, width: seq.width, height: seq.height, get: (i) => seqCache.get(`${ref}#${i}`) ?? null });

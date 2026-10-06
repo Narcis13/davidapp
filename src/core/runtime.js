@@ -180,7 +180,9 @@ export function createRuntime(host) {
     }
   }
 
-  function setImage(ref, image) { images.set(ref, image); }
+  /** ref → the vector model of an uploaded SVG (f.svg) */
+  const vectors = new Map();
+  function setImage(ref, image, vector = null) { images.set(ref, image); if (vector) vectors.set(ref, vector); }
   function setSequence(ref, seq) { sequences.set(ref, seq); }
 
   /** The frame of a sequence an item shows at asset time `at` (held on its last frame, or looped). */
@@ -330,6 +332,16 @@ export function createRuntime(host) {
         const img = images.get(ref);
         if (!img) throw new AssetError(`"${name}" is not an image asset`, [e.ref]);
         return img;
+      },
+      /**
+       * The vector drawing of an uploaded SVG image: { width, height, viewBox, paths, draw(ctx, { x, y,
+       * width, height, progress, fill, stroke, colors, strokeWidth }) } (see lib.svg). For draw-on and recolouring.
+       */
+      svg(name) {
+        const ref = resolve(e, name);
+        const model = vectors.get(ref);
+        if (!model) throw new AssetError(`"${name}" has no vector drawing: f.svg() takes an uploaded SVG image (use f.image() for other images)`, [e.ref]);
+        return { ...model, draw: (c, o) => lib.svg.draw(c, model, o) };
       },
       /** A cleared scratch canvas: { canvas, ctx, width, height }. Draw it back with ctx.drawImage(layer.canvas, x, y). */
       offscreen: (w = width, h = height) => offscreen(w, h),

@@ -37,7 +37,7 @@ const raceOf = (e, slug) => (/UNIQUE constraint/i.test(String(e?.message)) ? new
 const VERSION_COLS = `v.id AS version_id, v.version, v.kind, v.title, v.description, v.tags, v.duration, v.formats, v.schema, v.uses, v.deps,
   v.source, v.source_hash, v.file, v.mime, v.meta, v.thumb, v.author, v.note, v.parent_version, v.clip_id, v.engine, v.created_at AS version_created_at,
   a.id AS asset_id, a.slug, a.type, a.latest_version, a.forked_from, a.origin_clip, a.created_at,
-  a.meta_title, a.meta_description, a.meta_tags, a.meta_by, a.meta_at, a.derivation, a.needs_description, a.featured`;
+  a.meta_title, a.meta_description, a.meta_tags, a.meta_by, a.meta_at, a.derivation, a.needs_description, a.featured, a.meta_uses`;
 
 export function createLibrary(ctx) {
   const { db, dataDir, pool } = ctx;
@@ -96,6 +96,7 @@ export function createLibrary(ctx) {
       derivation: row.derivation ?? (row.forked_from ? (row.type === 'function' ? 'fork' : 'bake') : null),
       needsDescription: !!row.needs_description,
       featured: !!row.featured,
+      suggestedUses: json(row.meta_uses, []),
       formats: json(row.formats, []),
       duration: row.duration,
       author: row.author,
@@ -147,7 +148,7 @@ export function createLibrary(ctx) {
    * query (full text), type, kind, tags (all must match), format, originClip, usedByClip, derivedFrom, author.
    * @param {any} [o]
    */
-  function search({ query, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, limit = 50, offset = 0 } = {}) {
+  function search({ query, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, needsDescription, limit = 50, offset = 0 } = {}) {
     const where = [], args = [];
     let from = 'assets a JOIN asset_versions v ON v.asset_id = a.id AND v.version = a.latest_version';
     let order = 'a.id DESC';
@@ -166,6 +167,7 @@ export function createLibrary(ctx) {
     if (usedByClip) { where.push('EXISTS (SELECT 1 FROM clip_assets ca JOIN asset_versions cv ON cv.id = ca.version_id WHERE cv.asset_id = a.id AND ca.clip_id = (SELECT id FROM clips WHERE slug = ?))'); args.push(usedByClip); }
     if (derivedFrom) { where.push('a.forked_from IN (SELECT fv.id FROM asset_versions fv JOIN assets fa ON fa.id = fv.asset_id WHERE fa.slug = ?)'); args.push(derivedFrom); }
     if (author) { where.push('v.author = ?'); args.push(author); }
+    if (needsDescription !== undefined) { where.push('a.needs_description = ?'); args.push(needsDescription ? 1 : 0); }
     const sqlWhere = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = db.prepare(`SELECT COUNT(*) AS n FROM ${from} ${sqlWhere}`).get(...args).n;
     const rows = db.prepare(`SELECT ${VERSION_COLS} FROM ${from} ${sqlWhere} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, Math.min(Math.max(1, limit), 200), Math.max(0, offset));
@@ -195,7 +197,7 @@ export function createLibrary(ctx) {
         const deps = json(row.deps, {});
         assets[pinned] = { source: row.source, deps };
         for (const dep of new Set(Object.values(deps))) queue.push({ ref: dep, depth: depth + 1 });
-      } else if (row.type === 'image') images[pinned] = { path: absFile(row) };
+      } else if (row.type === 'image') images[pinned] = { path: absFile(row), vector: json(row.meta, {}).vector ?? null };
       else if (row.type === 'sound') sounds[pinned] = { path: absFile(row) };
       else if (row.type === 'sequence') { const m = json(row.meta, {}); sequences[pinned] = { dir: absFile(row), file: row.file, frames: m.frames, fps: m.fps, width: m.width, height: m.height }; }
     }
@@ -332,9 +334,10 @@ export function createLibrary(ctx) {
   /**
    * Edit an asset's title, description or tags without a new code version. The edit applies to
    * every version and to search; null for a field goes back to what the source declares.
-   * @param {{ slug: string, title?: string | null, description?: string | null, tags?: string[] | null, author: string, keepFlag?: boolean }} o
+   * uses: suggested uses (short phrases), for images the agent describes.
+   * @param {{ slug: string, title?: string | null, description?: string | null, tags?: string[] | null, uses?: string[] | null, author: string, keepFlag?: boolean }} o
    */
-  function setMetadata({ slug, title, description, tags, author, keepFlag = false }) {
+  function setMetadata({ slug, title, description, tags, uses, author, keepFlag = false }) {
     if (!author) throw new StudioError('author is required');
     const a = q('SELECT * FROM assets WHERE slug = ?').get(slug);
     if (!a) throw new StudioError(`No asset named "${slug}" in the library.`, 'not_found');
@@ -351,7 +354,11 @@ export function createLibrary(ctx) {
       if (tags !== null && (!Array.isArray(tags) || !tags.length || tags.length > 24 || !tags.every((t) => typeof t === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(t)))) throw new StudioError('tags is a list of 1–24 lowercase-kebab strings such as ["logo", "brand"]');
       sets.push('meta_tags = ?'); args.push(tags === null ? null : JSON.stringify([...new Set(tags)]));
     }
-    if (!sets.length) throw new StudioError('Give a title, description or tags to change');
+    if (uses !== undefined) {
+      if (uses !== null && (!Array.isArray(uses) || uses.length > 12 || !uses.every((u) => typeof u === 'string' && u.trim() && u.length <= 160))) throw new StudioError('uses is a list of up to 12 short phrases (how the asset could be used)');
+      sets.push('meta_uses = ?'); args.push(uses === null ? null : JSON.stringify(uses.map((u) => u.trim())));
+    }
+    if (!sets.length) throw new StudioError('Give a title, description, tags or uses to change');
     // describing an upload is what takes it off the "needs description" list
     if (!keepFlag && description) sets.push('needs_description = 0');
     transaction(db, () => {
@@ -439,7 +446,8 @@ export function createLibrary(ctx) {
    * derivedFrom: a ref this file was baked from (kept as lineage).
    * @param {any} o
    */
-  async function addFileAsset({ slug, type, path, data, ext, description, tags = [], title, author, forClip, note, license, derivedFrom, meta = {} }) {
+  /** @param {{ slug: string, type: string, path?: string, data?: Buffer, ext?: string, description: string, tags?: string[], title?: string, author: string, forClip?: string, note?: string, license?: string, derivedFrom?: string, meta?: any, needsDescription?: boolean, sidecar?: { ext: string, data: Buffer } }} o */
+  async function addFileAsset({ slug, type, path, data, ext, description, tags = [], title, author, forClip, note, license, derivedFrom, meta = {}, needsDescription = false, sidecar }) {
     if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name`);
     if (!['image', 'sound'].includes(type)) throw new StudioError('type must be image or sound');
     if (!author) throw new StudioError('author is required');
@@ -460,6 +468,9 @@ export function createLibrary(ctx) {
     const fileTmp = join(dataDir, tempOf(file));
     let thumbTmp = null;
     writeFileSync(fileTmp, bytes);
+    // a file kept next to the asset's own (an uploaded SVG next to its raster)
+    const side = sidecar ? `files/${slug}@${version}${sidecar.ext}` : null;
+    if (side) { meta = { ...meta, sidecar: side }; writeFileSync(join(dataDir, side), sidecar.data); }
     try {
     const info = { ...meta, license: license ?? meta.license ?? 'original', bytes: bytes.length };
     let thumb = null, duration = null;
@@ -481,6 +492,7 @@ export function createLibrary(ctx) {
     const prev = existing ? versionRow(slug) : null;
     transaction(db, () => {
       const assetId = existing?.id ?? q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at, derivation) VALUES (?, ?, 0, ?, ?, ?, ?)').run(slug, type, from?.version_id ?? null, clip?.id ?? null, at, from ? 'bake' : null).lastInsertRowid;
+      if (needsDescription) q('UPDATE assets SET needs_description = 1 WHERE id = ?').run(assetId);
       q(`INSERT INTO asset_versions (asset_id, version, title, description, tags, duration, file, mime, meta, thumb, author, note, parent_version, clip_id, engine, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(assetId, version, title ?? null, description.trim(), JSON.stringify(tags), duration, file, mime, JSON.stringify(info), thumb, author, note ?? null, prev?.version_id ?? from?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at);
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
@@ -491,6 +503,7 @@ export function createLibrary(ctx) {
     } catch (err) {
       rmSync(fileTmp, { force: true });
       if (thumbTmp) rmSync(thumbTmp, { force: true });
+      if (side) rmSync(join(dataDir, side), { force: true });
       throw raceOf(err, slug);
     }
     ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, type, clip: forClip ?? null });

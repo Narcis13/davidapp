@@ -6,6 +6,12 @@ import { EASING, LABEL } from '../../test/helpers.js';
 import * as K from '../../test/fixtures/kinds.js';
 import { BALL, LETTERS } from '../../test/fixtures/solid.js';
 
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" viewBox="0 0 160 120">
+  <path d="M20 100 C40 20, 120 20, 140 100" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+  <rect x="50" y="60" width="60" height="40" rx="10" fill="#7b5cff" stroke="#16121f" stroke-width="4"/>
+  <circle cx="80" cy="40" r="14" fill="#ff5c8a"/>
+</svg>`;
+
 export const BLOCK = `asset({
   description: 'A rounded block with a darker border, for parity tests.',
   tags: ['shape', 'test'],
@@ -55,6 +61,14 @@ export async function seedParity(studio, author = 'parity') {
     await studio.library.createAsset({ slug, source, author });
   }
   await studio.bakeSequence({ ref: 'ball', slug: 'ball-seq', params: { color: '#2dd4bf' }, width: 200, height: 200, fps: 10, duration: 2, author });
+  const logo = (await studio.uploads.upload({ name: 'parity-logo.svg', author, data: Buffer.from(LOGO_SVG) })).asset;
+  await studio.library.createAsset({ slug: 'svg-draw', author, source: `asset({
+    description: 'An uploaded SVG drawn on: strokes trace in, then the fills fade in; recolourable.',
+    tags: ['svg', 'test'],
+    duration: 2,
+    params: { logo: { type: 'image', default: '${logo.ref}' }, fill: { type: 'color', default: '#ffd166' } },
+    render(f, p) { f.svg(p.logo).draw(f.ctx, { width: f.width, height: f.height, progress: f.progress * 1.25, fill: p.fill }); },
+  });` });
   const c = createCanvas(64, 32);
   const g = c.getContext('2d');
   g.fillStyle = '#00c2a8'; g.fillRect(0, 0, 32, 32); g.fillStyle = '#ffd166'; g.fillRect(32, 0, 32, 32);
@@ -84,6 +98,7 @@ export const CASES = {
     { id: '3d', items: [item('b', 'ball', { transform: { x: 0.35, width: 0.6, height: 0.9 } }), item('w', 'letters', { params: { text: '3D' }, transform: { x: 0.75, width: 0.4, height: 0.6 } })] },
     { id: 'front', items: [item('f', 'label', { params: { text: 'In front', color: '#ffffff' }, transform: { y: 0.85, height: 0.25 } })] }]), [5, 15]],
   sequence: [comp([{ id: 'v', items: [item('s', 'ball-seq', { transform: { x: 0.3, width: 0.45, height: 0.8 } }), item('l', 'ball-seq', { params: { loop: true }, offset: 0.5, transform: { x: 0.75, width: 0.3, height: 0.5, rotation: 20 } })] }]), [3, 12]],
+  svg: [comp([{ id: 'v', items: [item('a', 'svg-draw', { transform: { x: 0.3, width: 0.45, height: 0.8 } }), item('b', 'svg-draw', { params: { fill: '#2dd4bf' }, offset: 1, transform: { x: 0.72, width: 0.4, height: 0.7, rotation: -8 } })] }]), [6, 14]],
   image: [comp([{ id: 'v', items: [item('i', 'tiles', { transform: { width: 0.5, height: 0.5, rotation: 15 } }), item('j', 'tiles', { params: { fit: 'cover' }, transform: { x: 0.2, y: 0.25, width: 0.2, height: 0.3 } })] }]), [10]],
 };
 

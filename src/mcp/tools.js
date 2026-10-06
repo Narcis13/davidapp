@@ -430,6 +430,41 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       },
     },
 
+    // ── uploads and their descriptions ───────────────────────────────────────────────────
+    {
+      name: 'upload_image',
+      title: 'Upload an image or SVG',
+      description: 'Add a PNG, JPEG, WebP or SVG file as an image asset, the same way a drag-and-drop in the studio does: the type is read from the bytes, a file already in the library is not added twice (duplicate: true), an SVG is sanitised (scripts, event handlers, external references and foreignObject are dropped; a DOCTYPE rejects it) and rasterised, and the size, a dominant palette and a thumbnail are extracted. It then waits on the needs-description list.',
+      input: { path: z.string().optional().describe('Absolute path of the file'), data_base64: z.string().optional().describe('Or the file\'s bytes, base64'), name: z.string().describe('File name, e.g. "skyline.jpg"'), for_clip: z.string().optional(), author: AUTHOR },
+      run: async (a) => {
+        if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64');
+        const data = a.path ? readFileSync(a.path) : Buffer.from(a.data_base64, 'base64');
+        const r = await studio.uploads.upload({ name: a.name, data, author: who(a.author), forClip: a.for_clip });
+        return { json: { asset: r.asset.ref, duplicate: r.duplicate, removedFromSvg: r.removed, width: r.asset.meta.width, height: r.asset.meta.height, palette: r.asset.meta.palette, needsDescription: r.asset.needsDescription }, images: [{ png: readFileSync(join(studio.dataDir, r.asset.thumb)), path: join(studio.dataDir, r.asset.thumb) }] };
+      },
+    },
+    {
+      name: 'list_undescribed',
+      title: 'Uploads waiting for a description',
+      description: 'Uploaded images that still need a title, description, tags and suggested uses, with each image attached so you can see it. Describe each one with describe_asset.',
+      input: { limit: z.number().int().min(1).max(20).optional() },
+      readOnly: true,
+      run: (a) => {
+        const list = studio.uploads.undescribed(a.limit ?? 8);
+        return {
+          json: { count: list.length, uploads: list.map((x, i) => ({ image: i + 1, ref: x.ref, file: x.meta.originalName, format: x.meta.format, size: `${x.meta.natural?.width ?? x.meta.width}×${x.meta.natural?.height ?? x.meta.height}`, palette: x.meta.palette, removedFromSvg: x.meta.sanitized?.removed, vector: !!x.meta.vector })) },
+          images: list.map((x) => ({ png: readFileSync(join(studio.dataDir, x.thumb)), path: join(studio.dataDir, x.thumb) })),
+        };
+      },
+    },
+    {
+      name: 'describe_asset',
+      title: 'Describe an uploaded image',
+      description: 'Write what an uploaded image is: a short title, one or two sentences of description (what it shows, its style and colours), search tags, and suggested uses in a clip ("full-frame background with a slow Ken Burns", "logo drawn on with f.svg"). The studio shows it at once and library search finds the image by these tags.',
+      input: { name: z.string(), title: z.string(), description: z.string(), tags: z.array(z.string()).min(1), uses: z.array(z.string()).optional(), author: AUTHOR },
+      run: (a) => { const r = studio.uploads.describe({ slug: a.name, title: a.title, description: a.description, tags: a.tags, uses: a.uses, author: who(a.author) }); return { json: { described: r.ref, title: r.title, tags: r.tags, uses: r.suggestedUses, needsDescription: r.needsDescription } }; },
+    },
+
     // ── requests from the studio ─────────────────────────────────────────────────────────
     {
       name: 'list_requests',

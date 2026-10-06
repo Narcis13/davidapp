@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS assets (
   meta_at           TEXT,
   derivation        TEXT,                          -- how it came from forked_from: fork | bake | preset | precomp
   needs_description INTEGER NOT NULL DEFAULT 0,    -- an upload waiting for the agent to describe it
-  featured          INTEGER NOT NULL DEFAULT 0
+  featured          INTEGER NOT NULL DEFAULT 0,
+  meta_uses         TEXT                           -- JSON: uses the agent suggests for an image
 );
 
 CREATE TABLE IF NOT EXISTS asset_versions (
@@ -228,6 +229,7 @@ const COLUMNS = [
   ['assets', 'derivation', 'TEXT'],                        // how it came from forked_from: fork | bake | preset | precomp
   ['assets', 'needs_description', 'INTEGER NOT NULL DEFAULT 0'],  // an upload waiting for the agent to describe it
   ['assets', 'featured', 'INTEGER NOT NULL DEFAULT 0'],
+  ['assets', 'meta_uses', 'TEXT'],
 ];
 
 /** Open (and create or migrate) the database at `file`. */
