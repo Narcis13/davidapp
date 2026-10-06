@@ -3,7 +3,8 @@
 // that asset: created it, reused it as-is, made a new version, or forked it.
 
 import { api } from '/ui/lib/api.js';
-import { assetHref, empty, errorBlock, fill, h, plural, s } from '/ui/lib/util.js';
+import { live } from '/ui/lib/live.js';
+import { assetHref, debounce, empty, errorBlock, fill, h, plural, s } from '/ui/lib/util.js';
 
 const HOW = {
   created: { label: 'Created for this clip', short: 'created' },
@@ -130,6 +131,26 @@ export async function mount(view, ctx) {
     return;
   }
   if (!ctx.alive()) return;
+  draw(view, data);
+  // live: new assets, versions and clip saves (from anywhere, the MCP server included) redraw the matrix
+  const reload = debounce(async () => {
+    let next;
+    try { next = await api.get('/api/lineage'); } catch { return; }
+    if (!ctx.alive()) return;
+    const scroll = view.querySelector('[data-testid=lineage-matrix]')?.scrollLeft ?? 0;
+    const reportOpen = view.querySelector('[data-testid=reuse-report]')?.open ?? false;
+    draw(view, next);
+    const m = view.querySelector('[data-testid=lineage-matrix]');
+    if (m) m.scrollLeft = scroll;
+    const r = view.querySelector('[data-testid=reuse-report]');
+    if (r) r.open = reportOpen;
+  }, 300);
+  ctx.onCleanup(live.on('asset', () => reload()));
+  ctx.onCleanup(live.on('clip', () => reload()));
+  ctx.onCleanup(() => reload.cancel());
+}
+
+function draw(view, data) {
   const { clips, assets, report } = data;
   const head = h('div.page-head', h('div', h('h1', 'Lineage'), h('p.sub', 'Each clip leaves assets behind, and later clips are built from them.')));
   if (!clips.length) {

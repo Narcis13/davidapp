@@ -4,6 +4,7 @@
 import { renderQueue } from '/ui/lib/api.js';
 import { errorBlock, fill, h, loading } from '/ui/lib/util.js';
 import { confirmDialog } from '/ui/lib/dialog.js';
+import { startRequestsBadge } from '/ui/lib/requests-badge.js';
 import * as library from '/ui/screens/library.js';
 import * as asset from '/ui/screens/asset.js';
 import * as clips from '/ui/screens/clips.js';
@@ -107,4 +108,5 @@ renderQueue.subscribe((list) => {
   badge.setAttribute('aria-label', `${n} in the queue`);
 });
 
+startRequestsBadge();
 render();

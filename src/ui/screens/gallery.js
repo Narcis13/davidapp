@@ -2,7 +2,8 @@
 // it was made from, grouped by the clip each asset was first made for.
 
 import { api } from '/ui/lib/api.js';
-import { assetHref, empty, errorBlock, fill, fmtBytes, fmtDate, fmtDuration, h, icon, plural, trim } from '/ui/lib/util.js';
+import { live } from '/ui/lib/live.js';
+import { assetHref, debounce, empty, errorBlock, fill, fmtBytes, fmtDate, fmtDuration, h, icon, plural, trim } from '/ui/lib/util.js';
 
 const durationOf = (r) => r.stats?.probe?.duration ?? (r.framesTotal && r.stats?.probe?.video?.fps ? r.framesTotal / r.stats.probe.video.fps : null);
 
@@ -78,11 +79,25 @@ export async function mount(view, ctx) {
     fill(view, detail(r));
     return;
   }
-  fill(view, 
-    h('div.page-head',
-      h('div', h('h1', 'Gallery'), h('p.sub', 'Finished renders, newest first.')),
-      h('div.page-head-side', h('span.count', { 'data-testid': 'gallery-count' }, plural(renders.length, 'render')))),
-    renders.length
+  const count = h('span.count', { 'data-testid': 'gallery-count' });
+  const body = h('div');
+  const draw = () => {
+    count.textContent = plural(renders.length, 'render');
+    fill(body, renders.length
       ? h('div.grid.clips', { 'data-testid': 'gallery-grid' }, renders.map(card))
       : empty('No finished renders yet', 'Render a clip and it appears here as an MP4.', h('a.btn', { href: '/renders' }, 'Open the render queue')));
+  };
+  fill(view,
+    h('div.page-head',
+      h('div', h('h1', 'Gallery'), h('p.sub', 'Finished renders, newest first.')),
+      h('div.page-head-side', count)),
+    body);
+  draw();
+  // live: a render that finishes anywhere joins the gallery without a reload
+  const reload = debounce(async () => {
+    try { ({ renders } = await api.get('/api/gallery')); } catch { return; }
+    if (ctx.alive()) draw();
+  }, 200);
+  ctx.onCleanup(live.on('render', (e) => { if (e.data?.status === 'done') reload(); }));
+  ctx.onCleanup(() => reload.cancel());
 }

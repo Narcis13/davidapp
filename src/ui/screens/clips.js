@@ -1,8 +1,9 @@
 // Clips: every clip as a card with a poster frame drawn by the renderer.
 
 import { api, getStatus } from '/ui/lib/api.js';
+import { live } from '/ui/lib/live.js';
 import { openDialog } from '/ui/lib/dialog.js';
-import { empty, errorBlock, fill, fmtDuration, h, icon, notice, plural } from '/ui/lib/util.js';
+import { debounce, empty, errorBlock, fill, fmtDuration, h, icon, notice, plural } from '/ui/lib/util.js';
 
 const SLUG = '[a-z0-9][a-z0-9-]{1,63}';
 
@@ -72,11 +73,25 @@ export async function mount(view, ctx) {
   }
   if (!ctx.alive()) return;
   const newBtn = h('button.btn', { type: 'button', 'data-testid': 'new-clip', onclick: () => newClipDialog(ctx, status) }, icon('plus', 16), 'New clip');
-  fill(view, 
-    h('div.page-head',
-      h('div', h('h1', 'Clips'), h('p.sub', 'Compositions that pin the asset versions they use.')),
-      h('div.page-head-side', h('span.count', { 'data-testid': 'clip-count' }, plural(clips.length, 'clip')), newBtn)),
-    clips.length
+  const count = h('span.count', { 'data-testid': 'clip-count' });
+  const body = h('div');
+  const draw = () => {
+    count.textContent = plural(clips.length, 'clip');
+    fill(body, clips.length
       ? h('div.grid.clips', { 'data-testid': 'clip-grid' }, clips.map(clipCard))
       : empty('No clips yet', 'A clip is a timeline of assets. Create one here, or let Claude Code build one through the MCP server.'));
+  };
+  fill(view,
+    h('div.page-head',
+      h('div', h('h1', 'Clips'), h('p.sub', 'Compositions that pin the asset versions they use.')),
+      h('div.page-head-side', count, newBtn)),
+    body);
+  draw();
+  // live: a clip made or saved anywhere (another tab, the MCP server) shows up without a reload
+  const reload = debounce(async () => {
+    try { ({ clips } = await api.get('/api/clips')); } catch { return; }
+    if (ctx.alive()) draw();
+  }, 200);
+  ctx.onCleanup(live.on('clip', () => reload()));
+  ctx.onCleanup(() => reload.cancel());
 }

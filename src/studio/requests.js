@@ -385,11 +385,18 @@ export function createRequests(ctx, library, clips, frames) {
     emit(id, 'run', { status: run?.status ?? null });
   }
 
+  /** Give a claim back (a session that ended without answering): the request returns to the queue. */
+  function release(id, agent) {
+    const done = q("UPDATE requests SET status = 'open', claimed_by = NULL, lease_until = NULL, updated_at = ? WHERE id = ? AND status = 'working' AND claimed_by = ?").run(now(), Number(id), agent).changes;
+    if (done) { message(Number(id), 'studio', 'system', `${agent} stopped without an answer; the request is back in the queue.`); emit(id, 'status', { status: 'open' }); }
+    return !!done;
+  }
+
   /** A progress or system line in the thread (from a "Run now" session). */
   function note(id, author, role, body) {
     message(Number(id), author, role, body);
     emit(id, 'message', { role });
   }
 
-  return { create, list, get, reply, cancel, accept, reject, claim, context, propose, complete, setRun, note, proposal: (id) => proposalShape(proposalRow(id)), expireLeases };
+  return { create, list, get, reply, cancel, accept, reject, claim, context, propose, complete, setRun, note, release, proposal: (id) => proposalShape(proposalRow(id)), expireLeases };
 }

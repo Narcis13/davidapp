@@ -121,6 +121,7 @@ export function createAgentRuns(studio, { env = process.env, timeoutSeconds = Nu
       requests.setRun(r.id, { status, startedAt, finishedAt: new Date().toISOString(), exitCode: code, by: user });
       const says = { done: 'Run now: the session ended.', failed: `Run now: the session failed (exit ${code}).${stderr.trim() ? ` ${stderr.trim().slice(0, 600)}` : ''}`, timeout: `Run now: stopped after ${timeoutSeconds} s.`, cancelled: 'Run now: cancelled.' };
       requests.note(r.id, 'studio', 'system', says[status] ?? `Run now: ${status}.`);
+      requests.release(r.id, author);
     });
     return requests.get(r.id);
   }

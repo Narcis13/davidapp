@@ -2,6 +2,7 @@
 // poller (lib/api.js) refreshes the list.
 
 import { api, renderQueue } from '/ui/lib/api.js';
+import { live } from '/ui/lib/live.js';
 import { empty, errorBlock, fill, fmtDate, fmtDuration, h, loading, notice, plural, trim } from '/ui/lib/util.js';
 
 const LABEL = { queued: 'Queued', running: 'Rendering', done: 'Done', failed: 'Failed', cancelled: 'Cancelled' };
@@ -101,6 +102,8 @@ export async function mount(view, ctx) {
       h('div.page-head-side', summary, clips.length ? h('div.row.render-start', select, start) : null)),
     msg.el, body);
 
+  // live: a render queued, started or finished anywhere refreshes now rather than at the next poll
+  ctx.onCleanup(live.on('render', () => renderQueue.refresh()));
   ctx.onCleanup(renderQueue.subscribe((renders, error) => {
     if (error && first) { fill(body, errorBlock(error)); return; }
     if (error) { msg.show(error); return; }
