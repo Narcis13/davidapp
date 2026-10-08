@@ -29,15 +29,15 @@
   "overlay",
   "music"
  ],
- "pixelsThatDiffer": 31968,
+ "pixelsThatDiffer": 31967,
  "titleInkAmongThem": {
   "titleBehind": 37,
-  "titleInFront": 14251
+  "titleInFront": 14255
  },
  "hashes": {
-  "titleBehind": "95d66bb9d6436b561887352b5a34dc1afaae017d39566899d56c52f06c33d478",
-  "titleInFront": "4a098ca78219434142353131953d35bdf1cc5124ab50bcaba4bb2bb7476331aa",
-  "movedBack": "95d66bb9d6436b561887352b5a34dc1afaae017d39566899d56c52f06c33d478"
+  "titleBehind": "2ac50e38ad97d5a744f7bf5b265bed180eb05f05db96e413c6d09376fbf2a99f",
+  "titleInFront": "e2dba0dc086eed069f16dc05a2cedf52cbcdf98f71772502e812460e01bf6cf3",
+  "movedBack": "2ac50e38ad97d5a744f7bf5b265bed180eb05f05db96e413c6d09376fbf2a99f"
  },
  "checks": {
   "the order changes the frame": true,

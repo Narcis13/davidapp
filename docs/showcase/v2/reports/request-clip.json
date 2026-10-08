@@ -43,8 +43,8 @@
   "leaseUntil": null,
   "run": null,
   "author": "studio-user",
-  "createdAt": "2026-10-06T16:18:35.670Z",
-  "updatedAt": "2026-10-06T16:18:56.520Z",
+  "createdAt": "2026-10-08T16:54:40.713Z",
+  "updatedAt": "2026-10-08T16:55:04.351Z",
   "messages": [
    {
     "id": 5,
@@ -52,7 +52,7 @@
     "role": "user",
     "body": "add a lower third at 0:03",
     "proposal": null,
-    "at": "2026-10-06T16:18:35.670Z"
+    "at": "2026-10-08T16:54:40.714Z"
    },
    {
     "id": 6,
@@ -60,7 +60,7 @@
     "role": "system",
     "body": "claude-opus-5-5 is working on it.",
     "proposal": null,
-    "at": "2026-10-06T16:18:35.671Z"
+    "at": "2026-10-08T16:54:40.715Z"
    },
    {
     "id": 7,
@@ -68,7 +68,7 @@
     "role": "agent",
     "body": "A lower third at 0:03 (the studio preset from clip 4): Clip 5 · vertical, a minute built mostly from clip 4.",
     "proposal": 2,
-    "at": "2026-10-06T16:18:47.632Z"
+    "at": "2026-10-08T16:54:54.945Z"
    },
    {
     "id": 8,
@@ -76,7 +76,7 @@
     "role": "system",
     "body": "Accepted proposal #2: it is now clip-5-a-library-in-3d#3.",
     "proposal": 2,
-    "at": "2026-10-06T16:18:56.520Z"
+    "at": "2026-10-08T16:55:04.351Z"
    }
   ],
   "proposals": [
@@ -90,8 +90,8 @@
     "status": "accepted",
     "result": "clip-5-a-library-in-3d#3",
     "author": "claude-opus-5-5",
-    "createdAt": "2026-10-06T16:18:47.632Z",
-    "decidedAt": "2026-10-06T16:18:56.520Z",
+    "createdAt": "2026-10-08T16:54:54.945Z",
+    "decidedAt": "2026-10-08T16:55:04.351Z",
     "decidedBy": "studio-user",
     "payload": {
      "operations": [

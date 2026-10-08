@@ -1,0 +1,7 @@
+Frame hashes of clips 1 to 3 after iteration 2 on the Apple M2 Mac, compared with a baseline taken on the same machine
+from the code before the iteration (a worktree of 6c9f8cf; scripts/hashes.mjs --compare reports/baseline-hashes-macos-m2.json;
+darwin arm64, Node v24.15.0, 2026-10-08):
+
+✓ clip-1-every-frame: 120 dense frames, 18 render samples identical
+✓ clip-2-compounding: 120 dense frames, 18 render samples identical
+✓ clip-3-release-notes: 120 dense frames, 18 render samples identical

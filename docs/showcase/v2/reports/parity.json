@@ -8,21 +8,21 @@
   "transform": [
    {
     "frame": 7,
-    "meanDiff": 0.284,
-    "maxDiff": 120,
-    "over16": 0.099,
-    "over64": 0.01,
+    "meanDiff": 0.279,
+    "maxDiff": 61,
+    "over16": 0.121,
+    "over64": 0,
     "distinct": 333,
     "ok": true,
     "image": "parity-transform-f7.png"
    },
    {
     "frame": 15,
-    "meanDiff": 0.282,
-    "maxDiff": 120,
-    "over16": 0.099,
-    "over64": 0.01,
-    "distinct": 346,
+    "meanDiff": 0.276,
+    "maxDiff": 61,
+    "over16": 0.121,
+    "over64": 0,
+    "distinct": 345,
     "ok": true,
     "image": "parity-transform-f15.png"
    }
@@ -34,7 +34,7 @@
     "maxDiff": 3,
     "over16": 0,
     "over64": 0,
-    "distinct": 352,
+    "distinct": 350,
     "ok": true,
     "image": "parity-motion-f4.png"
    },
@@ -44,17 +44,17 @@
     "maxDiff": 3,
     "over16": 0,
     "over64": 0,
-    "distinct": 375,
+    "distinct": 374,
     "ok": true,
     "image": "parity-motion-f12.png"
    },
    {
     "frame": 18,
-    "meanDiff": 0.287,
+    "meanDiff": 0.239,
     "maxDiff": 3,
     "over16": 0,
     "over64": 0,
-    "distinct": 377,
+    "distinct": 380,
     "ok": true,
     "image": "parity-motion-f18.png"
    }
@@ -62,11 +62,11 @@
   "transition": [
    {
     "frame": 10,
-    "meanDiff": 0.273,
-    "maxDiff": 217,
-    "over16": 0.115,
-    "over64": 0.052,
-    "distinct": 330,
+    "meanDiff": 0.255,
+    "maxDiff": 208,
+    "over16": 0.137,
+    "over64": 0.025,
+    "distinct": 329,
     "ok": true,
     "image": "parity-transition-f10.png"
    }
@@ -74,20 +74,20 @@
   "effect": [
    {
     "frame": 5,
-    "meanDiff": 0.291,
-    "maxDiff": 145,
-    "over16": 0.108,
-    "over64": 0.035,
+    "meanDiff": 0.233,
+    "maxDiff": 89,
+    "over16": 0.127,
+    "over64": 0.005,
     "distinct": 1000,
     "ok": true,
     "image": "parity-effect-f5.png"
    },
    {
     "frame": 15,
-    "meanDiff": 0.291,
-    "maxDiff": 145,
-    "over16": 0.106,
-    "over64": 0.035,
+    "meanDiff": 0.233,
+    "maxDiff": 89,
+    "over16": 0.129,
+    "over64": 0.005,
     "distinct": 1000,
     "ok": true,
     "image": "parity-effect-f15.png"
@@ -96,10 +96,10 @@
   "mask": [
    {
     "frame": 10,
-    "meanDiff": 0.524,
-    "maxDiff": 139,
-    "over16": 0.763,
-    "over64": 0.144,
+    "meanDiff": 0.853,
+    "maxDiff": 218,
+    "over16": 1.235,
+    "over64": 0.545,
     "distinct": 336,
     "ok": true,
     "image": "parity-mask-f10.png"
@@ -108,20 +108,20 @@
   "precomp": [
    {
     "frame": 3,
-    "meanDiff": 0.215,
-    "maxDiff": 6,
+    "meanDiff": 0.213,
+    "maxDiff": 4,
     "over16": 0,
     "over64": 0,
-    "distinct": 329,
+    "distinct": 328,
     "ok": true,
     "image": "parity-precomp-f3.png"
    },
    {
     "frame": 15,
-    "meanDiff": 0.263,
-    "maxDiff": 133,
-    "over16": 0.167,
-    "over64": 0.008,
+    "meanDiff": 0.244,
+    "maxDiff": 117,
+    "over16": 0.103,
+    "over64": 0.012,
     "distinct": 341,
     "ok": true,
     "image": "parity-precomp-f15.png"
@@ -130,20 +130,20 @@
   "3d": [
    {
     "frame": 5,
-    "meanDiff": 0.657,
+    "meanDiff": 0.616,
     "maxDiff": 220,
-    "over16": 0.649,
-    "over64": 0.383,
+    "over16": 0.718,
+    "over64": 0.324,
     "distinct": 389,
     "ok": true,
     "image": "parity-3d-f5.png"
    },
    {
     "frame": 15,
-    "meanDiff": 0.681,
+    "meanDiff": 0.636,
     "maxDiff": 220,
-    "over16": 0.703,
-    "over64": 0.398,
+    "over16": 0.745,
+    "over64": 0.338,
     "distinct": 391,
     "ok": true,
     "image": "parity-3d-f15.png"
@@ -174,21 +174,21 @@
   "svg": [
    {
     "frame": 6,
-    "meanDiff": 0.253,
+    "meanDiff": 0.252,
     "maxDiff": 3,
     "over16": 0,
     "over64": 0,
-    "distinct": 332,
+    "distinct": 329,
     "ok": true,
     "image": "parity-svg-f6.png"
    },
    {
     "frame": 14,
-    "meanDiff": 0.247,
+    "meanDiff": 0.245,
     "maxDiff": 3,
     "over16": 0,
     "over64": 0,
-    "distinct": 379,
+    "distinct": 380,
     "ok": true,
     "image": "parity-svg-f14.png"
    }
@@ -200,7 +200,7 @@
     "maxDiff": 2,
     "over16": 0,
     "over64": 0,
-    "distinct": 307,
+    "distinct": 306,
     "ok": true,
     "image": "parity-image-f10.png"
    }

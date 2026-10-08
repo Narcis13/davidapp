@@ -35,7 +35,7 @@
   },
   "frames": 900,
   "meanVolume": -16.9,
-  "mb": 180.1
+  "mb": 180
  },
  {
   "name": "clip-4-direct-the-studio",
@@ -54,7 +54,7 @@
   },
   "frames": 900,
   "meanVolume": -16.9,
-  "mb": 321.1
+  "mb": 320.8
  },
  {
   "name": "clip-5-a-library-in-3d",
@@ -73,7 +73,7 @@
   },
   "frames": 1800,
   "meanVolume": -17.1,
-  "mb": 597.2
+  "mb": 597.1
  },
  {
   "name": "clip-6-what-the-library-holds",

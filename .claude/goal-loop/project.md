@@ -25,7 +25,9 @@ per machine: take the hash and speed baselines again on the machine that compare
 (`git worktree add <dir> 6c9f8cf`, link `node_modules` into it, `npm run showcase`, `scripts/hashes.mjs`).
 A fresh checkout needs `npm ci`. FFmpeg up to 6.0 warns "Thread message queue blocking" when frames
 arrive faster than it encodes; the render log drops that line (`quietLog` in `src/render/video.js`).
-Always set `STUDIO_DATA`: scripts default to `./data`, the user's studio.
+Always set `STUDIO_DATA`: scripts default to `./data`, the user's studio. On a Mac, run long builds and
+renders under `caffeinate -dimsu …`: when the machine idles to sleep mid-render, the frame in flight
+outlives its 60 s timeout on wake and the render fails (seen on clip 5).
 
 ## Kind
 
