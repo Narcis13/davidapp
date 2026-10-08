@@ -15,6 +15,15 @@ export function defaultWorkers() {
   return Math.max(1, Math.min(8, availableParallelism() - 2));
 }
 
+// FFmpeg 4.x–6.0 report back-pressure on a piped input ("Thread message queue blocking") as a
+// warning whenever the encoder is slower than the frames arrive; it changes nothing in the output.
+const BENIGN = /Thread message queue blocking/;
+
+/** FFmpeg's stderr without the lines that only report back-pressure. */
+export function quietLog(log) {
+  return log.split(/\r?\n/).filter((line) => !BENIGN.test(line)).join('\n').trim();
+}
+
 /** The filter graph that places, trims, fades and mixes the audio inputs (FFmpeg input 0 is `first`). */
 export function audioGraph(inputs, duration, first = 1) {
   if (!inputs.length) return null;
@@ -136,5 +145,5 @@ export async function renderVideo({ bundle, audio = [], outPath, workers = defau
   }
   await pool.destroy();
   const seconds = (performance.now() - started) / 1000;
-  return { frames: total, seconds: Math.round(seconds * 100) / 100, fps: Math.round((total / seconds) * 10) / 10, hashes, log: log.trim(), workers };
+  return { frames: total, seconds: Math.round(seconds * 100) / 100, fps: Math.round((total / seconds) * 10) / 10, hashes, log: quietLog(log), workers };
 }

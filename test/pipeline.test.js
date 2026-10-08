@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { tempStudio, seedAssets, smallComposition, AUTHOR } from './helpers.js';
 import { probeSummary } from '../src/render/ffmpeg.js';
+import { quietLog } from '../src/render/video.js';
 import { detectBeats } from '../src/render/wav.js';
 import { toSrt } from '../src/core/composition.js';
 import { createAudio } from '../src/core/lib/audio.js';
@@ -114,6 +115,12 @@ test('detectBeats finds a regular pulse', () => {
   const beats = detectBeats(out, 48000);
   assert.equal(beats.length, 10);
   assert.ok(beats.every((b, i) => Math.abs(b - i * 0.4) < 0.03));
+});
+
+test('the render log drops FFmpeg back-pressure notes and keeps real warnings', () => {
+  const blocking = '[rawvideo @ 0x1] Thread message queue blocking; consider raising the thread_queue_size option (current value: 8)';
+  assert.equal(quietLog(`${blocking}\n`), '');
+  assert.equal(quietLog(`${blocking}\r\n[aac @ 0x2] Too many bits\n`), '[aac @ 0x2] Too many bits');
 });
 
 test('captions export as SRT with clip-relative times', () => {

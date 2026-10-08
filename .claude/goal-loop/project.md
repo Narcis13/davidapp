@@ -8,18 +8,24 @@ S=.claude/skills/goal-loop/scripts       # generic: gates.sh, sweep.sh, cdp.mjs,
 P=.claude/goal-loop                      # this repo: project.md, gates, screens, serve.sh
 export TMPDIR=<the session's scratchpad>   # logs, data and shots stay out of the repo
 export TEMP="$TMPDIR" TMP="$TMPDIR"        # Windows: Node's os.tmpdir() reads these, not TMPDIR (tests leave studio-test-* dirs there)
-export CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe"   # Windows: cdp.mjs only looks in the macOS and Linux places
+export CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe"   # Windows only: cdp.mjs finds Chrome by itself on macOS
 swift $S/montage.swift out.png 0.5 a.png b.png      # screenshots side by side (macOS only)
 ```
 
 Machines: iteration 1 ran on Windows; iteration 2 was built on macOS 15.5 (Intel i5-10600, 12 threads,
-Node 24.21) and finished on Windows 11 (i9-14900KF, 32 threads, 64 GB, Node 24.19, FFmpeg from winget,
-Claude Code CLI `~/.local/bin/claude.exe`, Git Bash for the scripts). Render times and emoji pixels are
+Node 24.21), continued on Windows 11 (i9-14900KF, 32 threads, 64 GB, Node 24.19, FFmpeg from winget,
+Claude Code CLI `~/.local/bin/claude.exe`, Git Bash for the scripts; no git identity there: commit with
+`git -c user.name=Narcis13 -c user.email=Narcis75@gmail.com commit`; shell heredocs drop backslashes) and
+its final audit ran on a third machine: **macOS 15.4 on an Apple M2 (8 cores), Node 24.15, FFmpeg 6.0 in
+`/opt/homebrew/bin`, Chrome in `/Applications`, git identity set, `swift` available.** On that Mac the
+`claude` CLI is a shell alias, so child processes don't find it: give Run now
+`STUDIO_CLAUDE_BIN=$HOME/.claude/local/claude`. Its disk is small (about 6 GB free): one full showcase
+with renders is about 2 GB, so delete scratch data dirs when done. Render times and emoji pixels are
 per machine: take the hash and speed baselines again on the machine that compares them
 (`git worktree add <dir> 6c9f8cf`, link `node_modules` into it, `npm run showcase`, `scripts/hashes.mjs`).
-A fresh checkout needs `npm ci`. This machine has no git identity: commit with
-`git -c user.name=Narcis13 -c user.email=Narcis75@gmail.com commit`. Write source files with the Write
-and Edit tools: shell heredocs here drop backslashes.
+A fresh checkout needs `npm ci`. FFmpeg up to 6.0 warns "Thread message queue blocking" when frames
+arrive faster than it encodes; the render log drops that line (`quietLog` in `src/render/video.js`).
+Always set `STUDIO_DATA`: scripts default to `./data`, the user's studio.
 
 ## Kind
 
