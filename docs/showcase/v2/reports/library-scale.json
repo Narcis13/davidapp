@@ -3,27 +3,27 @@
  "api": {
   "requests": 300,
   "assets": 5021,
-  "p50": 6.5,
-  "p95": 80.2,
-  "max": 94.1,
+  "p50": 3.9,
+  "p95": 44,
+  "max": 49,
   "failed": 0,
   "slowest": [
    {
-    "ms": 94,
+    "ms": 49,
+    "q": "limit=60&kind=visual&sort=relevance&facets=1"
+   },
+   {
+    "ms": 49,
     "q": "limit=60&format=vertical&sort=relevance&facets=1&offset=1406"
    },
    {
-    "ms": 89,
+    "ms": 48,
     "q": "limit=60&format=vertical&sort=relevance&facets=1&offset=1041"
-   },
-   {
-    "ms": 89,
-    "q": "limit=60&kind=visual&sort=relevance&facets=1"
    }
   ]
  },
  "screen": {
-  "shownMs": 301,
+  "shownMs": 304,
   "nodesTop": 440,
   "cardsTop": 6,
   "nodesEnd": 398,

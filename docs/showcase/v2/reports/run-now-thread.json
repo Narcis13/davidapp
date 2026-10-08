@@ -1,0 +1,181 @@
+{
+ "what": "One request completed through Run now with the real claude CLI (Claude Code 2.1.293), on a scratch copy of the showcase studio on the M2 Mac, 2026-10-08: the user asked in the playground of badge-pill, clicked Run now, the session (studio MCP server only, read/answer tools, 10 min timeout) proposed a new version, the user compared it and accepted it. GIF: gifs/run-now-asset.gif.",
+ "request": {
+  "id": 5,
+  "scope": "asset",
+  "title": "In the vertical format the pill runs off the frame. Keep the whole badge inside the frame ",
+  "status": "done",
+  "assetRef": "badge-pill@1",
+  "run": {
+   "status": "done",
+   "startedAt": "2026-10-08T17:26:39.203Z",
+   "finishedAt": "2026-10-08T17:27:16.456Z",
+   "exitCode": 0,
+   "by": "studio-user"
+  },
+  "author": "studio-user",
+  "createdAt": "2026-10-08T17:26:31.147Z",
+  "updatedAt": "2026-10-08T17:31:35.911Z"
+ },
+ "messages": [
+  {
+   "role": "user",
+   "author": "studio-user",
+   "body": "In the vertical format the pill runs off the frame. Keep the whole badge inside the frame in every format, scaled down to fit when it would not.",
+   "at": "2026-10-08T17:26:31.147Z"
+  },
+  {
+   "role": "system",
+   "author": "studio",
+   "body": "Run now: Claude Code started with the studio's tools only (stops after 10 min).",
+   "at": "2026-10-08T17:26:39.204Z"
+  },
+  {
+   "role": "progress",
+   "author": "claude-code-run",
+   "body": "→ claim_request",
+   "at": "2026-10-08T17:26:41.371Z"
+  },
+  {
+   "role": "system",
+   "author": "claude-code-run",
+   "body": "claude-code-run is working on it.",
+   "at": "2026-10-08T17:26:41.385Z"
+  },
+  {
+   "role": "progress",
+   "author": "claude-code-run",
+   "body": "→ validate_asset",
+   "at": "2026-10-08T17:27:01.911Z"
+  },
+  {
+   "role": "progress",
+   "author": "claude-code-run",
+   "body": "→ propose_asset_version",
+   "at": "2026-10-08T17:27:11.196Z"
+  },
+  {
+   "role": "agent",
+   "author": "claude-code-run",
+   "body": "The pill now scales down to fit its box in every format, including at the peak of the spring pop, and keeps its left, centre or right alignment.",
+   "at": "2026-10-08T17:27:11.304Z"
+  },
+  {
+   "role": "progress",
+   "author": "claude-code-run",
+   "body": "I've sent you a fix for request #5 as `badge-pill@2` (proposal 4). It's waiting for you to compare it with v1 and accept or reject it in the studio.\n\n**Why it ran off:** the pill's width is never less than its height. In the vertical format the box is taller than it is wide, so the pill came out wider than the frame. The spring's overshoot at the start of the pop could also push it past the edges, and that happened in every format.\n\n**What changed:** the pill is now drawn at whichever is smallest: the spring's current size, the size that fits the frame's width, or the size that fits its height",
+   "at": "2026-10-08T17:27:16.074Z"
+  },
+  {
+   "role": "progress",
+   "author": "claude-code-run",
+   "body": "Claude Code finished (success, 4 turns, 36 s).",
+   "at": "2026-10-08T17:27:16.085Z"
+  },
+  {
+   "role": "system",
+   "author": "studio",
+   "body": "Run now: the session ended.",
+   "at": "2026-10-08T17:27:16.456Z"
+  },
+  {
+   "role": "system",
+   "author": "studio-user",
+   "body": "Accepted proposal #4: it is now badge-pill@2.",
+   "at": "2026-10-08T17:31:35.911Z"
+  }
+ ],
+ "proposals": [
+  {
+   "id": 4,
+   "kind": "asset-version",
+   "status": "accepted",
+   "target": "badge-pill",
+   "base": "badge-pill@1",
+   "summary": "The pill now scales down to fit its box in every format, including at the peak of the spring pop, and keeps its left, centre or right alignment.",
+   "result": "badge-pill@2",
+   "meta": {
+    "kind": "visual",
+    "warnings": [],
+    "testFrames": [
+     {
+      "format": "horizontal",
+      "t": 0,
+      "ms": 1.2
+     },
+     {
+      "format": "horizontal",
+      "t": 1.5,
+      "ms": 2.8
+     },
+     {
+      "format": "horizontal",
+      "t": 2.966666666666667,
+      "ms": 0.3
+     },
+     {
+      "format": "vertical",
+      "t": 0,
+      "ms": 0.6
+     },
+     {
+      "format": "vertical",
+      "t": 1.5,
+      "ms": 2.5
+     },
+     {
+      "format": "vertical",
+      "t": 2.966666666666667,
+      "ms": 0.3
+     }
+    ],
+    "wouldBe": "badge-pill@2",
+    "schema": {
+     "text": {
+      "type": "string",
+      "default": "NEW"
+     },
+     "fill": {
+      "type": "color",
+      "default": "#ffd166"
+     },
+     "color": {
+      "type": "color",
+      "default": "#0b0b12"
+     },
+     "font": {
+      "type": "font",
+      "default": "JetBrains Mono"
+     },
+     "weight": {
+      "type": "integer",
+      "default": 700,
+      "min": 100,
+      "max": 900,
+      "step": 100
+     },
+     "align": {
+      "type": "enum",
+      "options": [
+       "left",
+       "center",
+       "right"
+      ],
+      "default": "left"
+     },
+     "outline": {
+      "type": "boolean",
+      "default": false
+     },
+     "outDur": {
+      "type": "number",
+      "default": 0.3,
+      "min": 0,
+      "max": 3,
+      "step": 0.01
+     }
+    }
+   }
+  }
+ ]
+}

@@ -135,6 +135,7 @@ process made the change.
 ![Library with 5,000 assets](docs/showcase/v2/studio/library-5000-desktop.png)
 ![Asking the agent from the playground](docs/showcase/v2/gifs/ask-agent-asset.gif)
 ![Moving a layer on the canvas with snapping](docs/showcase/v2/gifs/on-canvas-move-snap.gif)
+![Dragging a track changes what is in front of the 3D orb](docs/showcase/v2/gifs/workflow-layers.gif)
 ![Lineage](docs/showcase/studio/lineage-desktop.png)
 
 ## Ask the agent
@@ -399,10 +400,12 @@ showcase      the plan and the journals that rebuild the six showcase clips
 - **Rendering.** Worker threads draw frames in parallel with Skia (every frame is a pure function
   of its number, so order does not matter); the main thread writes them in order to FFmpeg's stdin
   as raw RGBA; FFmpeg encodes libx264 `yuv420p` with `+faststart` and mixes the audio inputs into
-  AAC. Clips 1 to 3 (32 seconds, 2D, 1080p) render in about 4 to 8 seconds each on the development
-  machine (an i9 with 32 logical CPUs, 8 render workers); pixel effects and 3D make clips 4 to 6
-  slower than realtime. The numbers, against the code before the second iteration, are in
-  [render-speed.md](docs/showcase/v2/reports/render-speed.md)
+  AAC. Clips 1 to 3 (32 seconds, 2D, 1080p) render in about 4 to 8 seconds each on an i9 with 32
+  logical CPUs (8 render workers) and in 13 to 24 seconds on an Apple M2 (6 workers), within 1 % of
+  the code before the second iteration on both; pixel effects and 3D make clips 4 to 6 slower than
+  realtime (clip 6, 90 seconds, renders in 2.5 minutes on the i9 and 4 on the M2). The numbers are in
+  [render-speed.md](docs/showcase/v2/reports/render-speed.md) (i9) and
+  [render-speed-macos-m2.md](docs/showcase/v2/reports/render-speed-macos-m2.md)
   ([iteration 1's](docs/showcase/reports/render-speed.md)).
 - **One source of truth.** The preview does not re-implement anything: the browser loads the same
   `src/core` modules and the same asset source, and draws on an `OffscreenCanvas` in a worker.
