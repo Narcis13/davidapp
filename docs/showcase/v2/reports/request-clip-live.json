@@ -1,0 +1,92 @@
+{
+ "what": "A clip request made in the editor by scripts/workflows-v2.mjs (the user side in headless Chrome, the agent side over MCP).",
+ "request": {
+  "id": 3,
+  "scope": "clip",
+  "title": "Add a lower third at 0:16 that says who is asking.",
+  "status": "done",
+  "asset": null,
+  "assetVersion": null,
+  "assetRef": null,
+  "clip": "clip-4-direct-the-studio",
+  "clipRevision": 8,
+  "items": [],
+  "at": 16,
+  "params": null,
+  "claimedBy": null,
+  "leaseUntil": null,
+  "run": null,
+  "author": "studio-user",
+  "createdAt": "2026-10-08T17:24:36.628Z",
+  "updatedAt": "2026-10-08T17:24:58.858Z",
+  "messages": [
+   {
+    "id": 9,
+    "author": "studio-user",
+    "role": "user",
+    "body": "Add a lower third at 0:16 that says who is asking.",
+    "proposal": null,
+    "at": "2026-10-08T17:24:36.628Z"
+   },
+   {
+    "id": 10,
+    "author": "claude-code",
+    "role": "system",
+    "body": "claude-code is working on it.",
+    "proposal": null,
+    "at": "2026-10-08T17:24:37.711Z"
+   },
+   {
+    "id": 11,
+    "author": "claude-code",
+    "role": "agent",
+    "body": "A lower third at 0:16 (the studio preset): \"Asked from the studio\".",
+    "proposal": 3,
+    "at": "2026-10-08T17:24:50.004Z"
+   },
+   {
+    "id": 12,
+    "author": "studio-user",
+    "role": "system",
+    "body": "Accepted proposal #3: it is now clip-4-direct-the-studio#9.",
+    "proposal": 3,
+    "at": "2026-10-08T17:24:58.858Z"
+   }
+  ],
+  "proposals": [
+   {
+    "id": 3,
+    "request": 3,
+    "kind": "clip-edit",
+    "target": "clip-4-direct-the-studio",
+    "base": "clip-4-direct-the-studio#8",
+    "summary": "A lower third at 0:16 (the studio preset): \"Asked from the studio\".",
+    "status": "accepted",
+    "result": "clip-4-direct-the-studio#9",
+    "author": "claude-code",
+    "createdAt": "2026-10-08T17:24:50.004Z",
+    "decidedAt": "2026-10-08T17:24:58.858Z",
+    "decidedBy": "studio-user",
+    "payload": {
+     "operations": [
+      {
+       "op": "add_item",
+       "track": "titles",
+       "item": {
+        "id": "asked-third",
+        "asset": "lower-third-studio",
+        "start": 16,
+        "duration": 5,
+        "params": {
+         "title": "Asked from the studio",
+         "subtitle": "a request, a proposal, one click"
+        }
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "running": false
+ }
+}

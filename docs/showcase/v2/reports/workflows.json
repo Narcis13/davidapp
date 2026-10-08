@@ -1,0 +1,94 @@
+{
+ "what": "Studio workflows driven in headless Chrome with real mouse, keyboard and file-drop input (scripts/workflows-v2.mjs); every check is asserted by the script.",
+ "base": "http://127.0.0.1:8791",
+ "workflows": {
+  "canvas": {
+   "what": "move with snapping, scale and rotate on the preview; the inspector stays in sync",
+   "checks": {
+    "the selected layer shows its box and six handles": true,
+    "a snap guide shows while dragging": true,
+    "the layer snapped to the centre and the inspector shows it": true,
+    "width and height grew in the inspector": true,
+    "the opposite corner did not move": true,
+    "the inspector shows the angle": true,
+    "rotation with Shift lands on a multiple of 15°": true,
+    "the rotation handle is straight above the box again": true,
+    "undo restores the layout": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-canvas.gif",
+   "frames": 20
+  },
+  "layers": {
+   "what": "dragging a track or an item to another layer changes what is in front; undo and redo",
+   "checks": {
+    "the title track starts under the 3D track": true,
+    "the track is now above the 3D track": true,
+    "the preview shows the whole title in front of the orb": true,
+    "undo restores the order and the picture": true,
+    "redo reapplies it": true,
+    "the item moved to the other layer": true,
+    "and is drawn in front of the orb": true,
+    "undo puts it back": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-layers.gif",
+   "frames": 13
+  },
+  "playground": {
+   "what": "tweak and keep: new defaults as a version, a preset, metadata, a version diff",
+   "checks": {
+    "the panel counts the changed values": true,
+    "a new version holds the values as defaults": true,
+    "the version before is untouched": true,
+    "the preset is its own asset, pinned to the version it was made from": true,
+    "the clip pins the preset": true,
+    "title and tags changed without a new version": true,
+    "search finds it by the new tag": true,
+    "the diff shows changed lines and two frames": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-playground.gif",
+   "frames": 19
+  },
+  "request": {
+   "what": "ask the agent from the clip editor; the proposal arrives live, is previewed and accepted",
+   "checks": {
+    "the agent got the clip and frames with the request": true,
+    "the proposal appeared without a reload": true,
+    "the clip itself has not changed yet": true,
+    "the request is done and its proposal accepted": true,
+    "the timeline shows the new item in a new revision, still the same page": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-request.gif",
+   "frames": 11
+  },
+  "uploads": {
+   "what": "a PNG, a JPG and an SVG dropped on the library; the agent describes them; search finds them by tag",
+   "checks": {
+    "all three were added": true,
+    "the SVG was sanitised and the studio says what it removed": true,
+    "nothing active is left in the stored SVG": true,
+    "the agent is handed the images themselves": true,
+    "the library updated without a reload": true,
+    "each upload is found by a tag from its description": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-uploads.gif",
+   "frames": 8
+  },
+  "live": {
+   "what": "the library, a clip and the requests screen follow changes made over MCP, with no reload",
+   "checks": {
+    "the new asset appeared in the open library": true,
+    "the editor shows the new revision and the longer item": true,
+    "the open thread followed the agent: claimed, then answered": true,
+    "all of it in the same page, never reloaded": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-live.gif",
+   "frames": 11
+  }
+ }
+}

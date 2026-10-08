@@ -1,0 +1,213 @@
+{
+ "machine": "Apple M2 × 8",
+ "platform": "darwin arm64",
+ "node": "v24.15.0",
+ "runs": 5,
+ "method": "MCP start_render with wait; renderSeconds from the render stats (frames drawn by the worker pool + FFmpeg encode, audio mix excluded once cached); median of the runs; baseline and current code rendered in turns (scripts/speed-compare.mjs)",
+ "clips": {
+  "clip-1-every-frame": {
+   "size": "1080×1920",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    21.48,
+    21.32,
+    21.42,
+    21.23,
+    21.07
+   ],
+   "median": 21.32,
+   "framesPerSecond": 45
+  },
+  "clip-2-compounding": {
+   "size": "1920×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    23.69,
+    23.63,
+    23.66,
+    23.49,
+    23.4
+   ],
+   "median": 23.63,
+   "framesPerSecond": 40.6
+  },
+  "clip-3-release-notes": {
+   "size": "1080×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    13.37,
+    13.43,
+    13.26,
+    13.23,
+    13.53
+   ],
+   "median": 13.37,
+   "framesPerSecond": 71.8
+  }
+ },
+ "comparedWithBaseline": [
+  {
+   "clip": "clip-1-every-frame",
+   "baseline": 21.2,
+   "now": 21.32,
+   "ratio": 1.006,
+   "ok": true
+  },
+  {
+   "clip": "clip-2-compounding",
+   "baseline": 23.64,
+   "now": 23.63,
+   "ratio": 1,
+   "ok": true
+  },
+  {
+   "clip": "clip-3-release-notes",
+   "baseline": 13.34,
+   "now": 13.37,
+   "ratio": 1.002,
+   "ok": true
+  }
+ ],
+ "limit": "no more than 10 % slower",
+ "clips4to6": [
+  {
+   "clip": "clip-6-what-the-library-holds",
+   "format": "square",
+   "size": "1080×1080",
+   "seconds": 90,
+   "frames": 2700,
+   "renderSeconds": 230.15,
+   "framesPerSecond": 11.7,
+   "realtime": 0.39
+  },
+  {
+   "clip": "clip-5-a-library-in-3d",
+   "format": "vertical",
+   "size": "1080×1920",
+   "seconds": 60,
+   "frames": 1800,
+   "renderSeconds": 222.25,
+   "framesPerSecond": 8.1,
+   "realtime": 0.27
+  },
+  {
+   "clip": "clip-4-direct-the-studio",
+   "format": "horizontal",
+   "size": "1920×1080",
+   "seconds": 30,
+   "frames": 900,
+   "renderSeconds": 116.73,
+   "framesPerSecond": 7.7,
+   "realtime": 0.26
+  },
+  {
+   "clip": "clip-4-direct-the-studio",
+   "format": "square",
+   "size": "1080×1080",
+   "seconds": 30,
+   "frames": 900,
+   "renderSeconds": 67.16,
+   "framesPerSecond": 13.4,
+   "realtime": 0.45
+  },
+  {
+   "clip": "clip-4-direct-the-studio",
+   "format": "vertical",
+   "size": "1080×1920",
+   "seconds": 30,
+   "frames": 900,
+   "renderSeconds": 116.12,
+   "framesPerSecond": 7.8,
+   "realtime": 0.26
+  }
+ ],
+ "costs": [
+  {
+   "clip": "clip-4-direct-the-studio",
+   "what": "film grain on the whole clip (fx-grain)",
+   "seconds": [
+    1,
+    29
+   ],
+   "size": "1920×1080",
+   "msPerFrameWith": 241.7,
+   "msPerFrameWithout": 176.6,
+   "costMsPerFrame": 65.1
+  },
+  {
+   "clip": "clip-4-direct-the-studio",
+   "what": "every effect: grain, a vignette on a track, duotone and glow on items",
+   "seconds": [
+    1,
+    29
+   ],
+   "size": "1920×1080",
+   "msPerFrameWith": 237.5,
+   "msPerFrameWithout": 61,
+   "costMsPerFrame": 176.5
+  },
+  {
+   "clip": "clip-4-direct-the-studio",
+   "what": "glow on the numbers scene (fx-glow, 0:15 to 0:23)",
+   "seconds": [
+    16,
+    22
+   ],
+   "size": "1920×1080",
+   "msPerFrameWith": 334.4,
+   "msPerFrameWithout": 166,
+   "costMsPerFrame": 168.4
+  },
+  {
+   "clip": "clip-4-direct-the-studio",
+   "what": "the 3D orb, rasterized every frame (orb-3d, 0:07 to 0:15)",
+   "seconds": [
+    8,
+    14
+   ],
+   "size": "1920×1080",
+   "msPerFrameWith": 245.6,
+   "msPerFrameWithout": 166.1,
+   "costMsPerFrame": 79.6
+  },
+  {
+   "clip": "clip-5-a-library-in-3d",
+   "what": "the 3D terrain, rasterized every frame (terrain-3d)",
+   "seconds": [
+    8.3,
+    18.1
+   ],
+   "size": "1080×1920",
+   "msPerFrameWith": 330,
+   "msPerFrameWithout": 166.6,
+   "costMsPerFrame": 163.4
+  },
+  {
+   "clip": "clip-5-a-library-in-3d",
+   "what": "3D block text, rasterized every frame (block-text-3d)",
+   "seconds": [
+    9.3,
+    17.7
+   ],
+   "size": "1080×1920",
+   "msPerFrameWith": 327.4,
+   "msPerFrameWithout": 300.3,
+   "costMsPerFrame": 27
+  },
+  {
+   "clip": "clip-5-a-library-in-3d",
+   "what": "the orb as a baked sequence (orb-spin)",
+   "seconds": [
+    18.7,
+    27.7
+   ],
+   "size": "1080×1920",
+   "msPerFrameWith": 220,
+   "msPerFrameWithout": 159.1,
+   "costMsPerFrame": 61
+  }
+ ]
+}

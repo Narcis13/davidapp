@@ -1,0 +1,1 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" onload="alert(1)"><script>alert(2)</script><circle cx="100" cy="100" r="88" fill="#1b4dff"/><path d="M60 128 L100 52 L140 128 Z" fill="none" stroke="#5ce1e6" stroke-width="12" stroke-linejoin="round"/><circle cx="100" cy="112" r="10" fill="#ffb347"/></svg>

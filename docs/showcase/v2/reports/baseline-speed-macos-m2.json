@@ -1,0 +1,52 @@
+{
+ "code": "the commit before iteration 2 (6c9f8cf: iteration-1 src)",
+ "machine": "Apple M2 × 8",
+ "platform": "darwin arm64",
+ "node": "v24.15.0",
+ "runs": 5,
+ "method": "MCP start_render with wait; renderSeconds from the render stats (frames drawn by the worker pool + FFmpeg encode, audio mix excluded once cached); median of the runs; baseline and current code rendered in turns (scripts/speed-compare.mjs)",
+ "clips": {
+  "clip-1-every-frame": {
+   "size": "1080×1920",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    21.53,
+    21.41,
+    21.2,
+    21.1,
+    21.09
+   ],
+   "median": 21.2,
+   "framesPerSecond": 45.3
+  },
+  "clip-2-compounding": {
+   "size": "1920×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    23.98,
+    23.64,
+    23.67,
+    23.44,
+    23.41
+   ],
+   "median": 23.64,
+   "framesPerSecond": 40.6
+  },
+  "clip-3-release-notes": {
+   "size": "1080×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    13.34,
+    13.4,
+    13.41,
+    13.3,
+    13.28
+   ],
+   "median": 13.34,
+   "framesPerSecond": 72
+  }
+ }
+}

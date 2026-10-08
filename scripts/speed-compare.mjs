@@ -16,6 +16,7 @@ import { cpus, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createStudio } from '../src/studio/studio.js';
 import { ROOT } from '../src/render/host.js';
+import { defaultWorkers } from '../src/render/video.js';
 
 const argv = process.argv.slice(2);
 const runs = argv.includes('--runs') ? Number(argv[argv.indexOf('--runs') + 1]) : 5;
@@ -111,7 +112,7 @@ const md = [
   '',
   '## The 2D clips against the code before the iteration',
   '',
-  `Clips 1 to 3 (32 s each, 960 frames) rendered ${runs} times with the code before iteration 2 (a worktree of \`6c9f8cf\`, same \`node_modules\`) and ${runs} times with the current code, in turns, each through the MCP server (\`start_render\`); the time is the render's own \`renderSeconds\` (frames drawn by 8 worker threads and piped into FFmpeg, libx264 \`-preset medium -crf 18\`; the audio mix is cached and not counted). Medians:`,
+  `Clips 1 to 3 (32 s each, 960 frames) rendered ${runs} times with the code before iteration 2 (a worktree of \`6c9f8cf\`, same \`node_modules\`) and ${runs} times with the current code, in turns, each through the MCP server (\`start_render\`); the time is the render's own \`renderSeconds\` (frames drawn by ${defaultWorkers()} worker threads and piped into FFmpeg, libx264 \`-preset medium -crf 18\`; the audio mix is cached and not counted). Medians:`,
   '',
   '| clip | size | before | now | now / before | runs before (s) | runs now (s) |',
   '|---|---|---|---|---|---|---|',
