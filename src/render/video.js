@@ -74,7 +74,9 @@ export async function renderVideo({ bundle, audio = [], outPath, workers = defau
   if (audio.length) for (const a of audio) args.push('-guess_layout_max', '0', '-i', a.path);
   else args.push('-f', 'lavfi', '-t', String(comp.duration), '-i', 'anullsrc=r=48000:cl=stereo');
   const graph = audioGraph(audio, comp.duration);
-  const video = '[0:v]scale=in_range=full:out_range=tv:out_color_matrix=bt709:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p[vout]';
+  // setparams tags the frames BT.709: FFmpeg 9 ignores the -color_* output options for a raw input and writes
+  // primaries and transfer as unknown (the pixels are the same either way)
+  const video = '[0:v]scale=in_range=full:out_range=tv:out_color_matrix=bt709:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709[vout]';
   args.push('-filter_complex', graph ? `${video};${graph}` : video, '-map', '[vout]', '-map', graph ? '[aout]' : '1:a',
     '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-r', String(comp.fps),
     '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',

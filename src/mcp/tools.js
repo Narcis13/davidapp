@@ -347,9 +347,11 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'render_clip_frame',
       title: 'Render a clip frame to PNG',
-      description: 'Draw one frame of a clip at time t, or (sheet: true) a contact sheet of frames across the clip, straight from the composition without encoding. Use it to look at your work.',
+      description: 'Draw one frame of a clip at time t, or (sheet: true) a contact sheet of frames across the clip, straight from the composition without encoding. Use it to look at your work. format draws it in another shape (each item\'s overrides for that format apply); composition draws an unsaved draft instead of the saved clip.',
       input: {
-        clip: z.string(),
+        clip: z.string().optional().describe('Clip name (or give composition)'),
+        composition: COMPOSITION.optional().describe('A draft composition to draw instead of the saved clip (validated and pinned, not saved)'),
+        format: FORMAT.optional().describe('Draw it in another format'),
         t: z.number().min(0).optional().describe('Seconds'),
         sheet: z.boolean().optional().describe('Return a contact sheet instead of one frame'),
         frames: z.number().int().min(1).max(48).optional().describe('Frames in the sheet (default 12)'),
@@ -359,21 +361,30 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       },
       readOnly: true,
       run: async (a) => {
+        const name = `${a.clip ?? 'draft'}${a.format ? `-${a.format}` : ''}`;
         if (a.sheet) {
-          const s = await studio.clipSheet({ clip: a.clip, count: a.frames ?? 12, from: a.from, to: a.to });
-          return { json: { clip: a.clip, frames: s.frames }, images: [image(`${a.clip}-sheet${a.from !== undefined ? `-${a.from}-${a.to}` : ''}`, s.png)] };
+          const s = await studio.clipSheet({ clip: a.clip, composition: a.composition, format: a.format, count: a.frames ?? 12, from: a.from, to: a.to });
+          return { json: { clip: a.clip ?? null, format: a.format, frames: s.frames }, images: [image(`${name}-sheet${a.from !== undefined ? `-${a.from}-${a.to}` : ''}`, s.png)] };
         }
-        const r = await studio.clipFrame({ clip: a.clip, t: a.t ?? 0, maxSize: a.max_size ?? 960, hash: true });
-        return { json: { clip: a.clip, t: r.t, frame: r.frame, sha256: r.hash }, images: [image(`${a.clip}-t${r.t.toFixed(2)}`, r.png)] };
+        const r = await studio.clipFrame({ clip: a.clip, composition: a.composition, format: a.format, t: a.t ?? 0, maxSize: a.max_size ?? 960, hash: true });
+        return { json: { clip: a.clip ?? null, format: a.format, t: r.t, frame: r.frame, sha256: r.hash }, images: [image(`${name}-t${r.t.toFixed(2)}`, r.png)] };
       },
     },
     {
       name: 'frame_hashes',
       title: 'Hash clip frames',
-      description: 'SHA-256 of the raw pixels of a clip at the given times. Equal hashes mean identical frames: use it to check determinism and that an old clip is unchanged after its assets got new versions.',
-      input: { clip: z.string(), times: z.array(z.number().min(0)).min(1).max(64) },
+      description: 'SHA-256 of the raw pixels of a clip at the given times. Equal hashes mean identical frames: use it to check determinism and that an old clip is unchanged after its assets got new versions. format and composition work as in render_clip_frame.',
+      input: { clip: z.string().optional(), composition: COMPOSITION.optional(), format: FORMAT.optional(), times: z.array(z.number().min(0)).min(1).max(64) },
       readOnly: true,
-      run: async (a) => ({ json: { clip: a.clip, frames: await studio.frameHashes({ clip: a.clip, times: a.times }) } }),
+      run: async (a) => ({ json: { clip: a.clip ?? null, format: a.format, frames: await studio.frameHashes({ clip: a.clip, composition: a.composition, format: a.format, times: a.times }) } }),
+    },
+    {
+      name: 'layout_report',
+      title: 'Measure the text in a frame',
+      description: 'The layout report of one frame: every text drawn through f.lib.text (and 3D block letters), one entry per text block, with its box in frame pixels (after the item\'s transform, keyframes and motions), font, size in the asset and on screen (px and % of the frame\'s short side), colour, opacity and item; plus the zones it is measured against: title-safe and action-safe (SMPTE), the format\'s safe zone (f.safe), the clip\'s platform profiles (tightest edge) and the caption lane. Works on a saved clip, a draft composition, or the clip in another format. Text drawn with raw ctx.fillText is not measured.',
+      input: { clip: z.string().optional(), composition: COMPOSITION.optional(), format: FORMAT.optional(), t: z.number().min(0).optional().describe('Seconds (default 0)'), frame: z.number().int().min(0).optional() },
+      readOnly: true,
+      run: async (a) => ({ json: await studio.inspect.layoutReport({ clip: a.clip, composition: a.composition, format: a.format, t: a.t, frame: a.frame }) }),
     },
     {
       name: 'start_render',

@@ -20,7 +20,11 @@ let fontsRegistered = false;
 export function registerFonts() {
   if (fontsRegistered) return;
   fontsRegistered = true;
-  for (const fam of fontManifest()) for (const f of fam.files) GlobalFonts.registerFromPath(join(FONTS_DIR, f.file), fam.family);
+  for (const fam of fontManifest()) {
+    for (const f of fam.files) GlobalFonts.registerFromPath(join(FONTS_DIR, f.file), fam.family);
+    // the Latin Extended files go under their own alias, which fontString puts right after the family
+    for (const f of fam.ext?.files ?? []) GlobalFonts.registerFromPath(join(FONTS_DIR, f.file), fam.ext.family);
+  }
 }
 
 // Runs inside each sandbox before the asset: no randomness, no wall clock.

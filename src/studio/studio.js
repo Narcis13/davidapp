@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync, existsSync, renameSync, mkdtempSync, rmSync }
 import { join, resolve } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { openDb, json } from '../db/db.js';
+import { reformat } from '../core/composition.js';
 import { mapParams } from '../core/schema.js';
 import { WorkerPool } from '../render/pool.js';
 import { ROOT } from '../render/host.js';
@@ -19,6 +20,7 @@ import { createEvents } from './events.js';
 import { createRequests } from './requests.js';
 import { createUploads } from './uploads.js';
 import { createCompounding } from './compounding.js';
+import { createInspect } from './inspect.js';
 
 export { StudioError };
 
@@ -41,6 +43,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   const requests = createRequests(ctx, library, clips, { assetSheet, clipFrame, clipSheet });
   const uploads = createUploads(ctx, library);
   const compounding = createCompounding(ctx, library, clips);
+  const inspect = createInspect(ctx, { clips, compositionOf });
   library.seedFonts();
   if (runner) renders.startRunner();
   const framesDir = join(dataDir, 'frames');
@@ -120,17 +123,27 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     return { ...r, png: Buffer.from(r.png), times, ref: a.target };
   }
 
-  async function compositionOf({ clip, composition }) {
-    if (composition) return clips.prepare(composition).composition;
-    return clips.getClip(clip).composition;
+  /**
+   * The composition to draw: a draft (validated and pinned, not saved) or the saved clip, optionally in another
+   * format (each item's overrides for that format apply, as in a render with a format).
+   * @param {{ clip?: string, composition?: any, format?: string }} o
+   */
+  async function compositionOf({ clip, composition, format }) {
+    if (!composition && !clip) throw new StudioError('Give clip (a saved clip) or composition (a draft)');
+    let comp = composition ? clips.prepare(composition).composition : clips.getClip(clip).composition;
+    if (format && format !== comp.format) {
+      if (!FORMATS[format]) throw new StudioError(`Unknown format "${format}"; use ${Object.keys(FORMATS).join(', ')}`);
+      comp = reformat(comp, format);
+    }
+    return comp;
   }
 
   /**
    * One frame of a clip (saved, or a draft composition) → { png, width, height, hash?, frame, t }.
-   * @param {{ clip?: string, composition?: any, t?: number, frame?: number, maxSize?: number, hash?: boolean }} o
+   * @param {{ clip?: string, composition?: any, format?: string, t?: number, frame?: number, maxSize?: number, hash?: boolean }} o
    */
-  async function clipFrame({ clip, composition, t = 0, frame, maxSize, hash }) {
-    const comp = await compositionOf({ clip, composition });
+  async function clipFrame({ clip, composition, format, t = 0, frame, maxSize, hash }) {
+    const comp = await compositionOf({ clip, composition, format });
     const total = Math.round(comp.duration * comp.fps);
     const n = Math.max(0, Math.min(total - 1, frame ?? Math.round(t * comp.fps)));
     const { bundle } = await clips.bundleFor(comp);
@@ -138,9 +151,12 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     return { ...r, png: Buffer.from(r.png), frame: n, t: n / comp.fps };
   }
 
-  /** A contact sheet of a clip drawn straight from its composition (no encode) → { png, frames }. */
-  async function clipSheet({ clip, composition, count = 12, cols, cellWidth, from, to }) {
-    const comp = await compositionOf({ clip, composition });
+  /**
+   * A contact sheet of a clip drawn straight from its composition (no encode) → { png, frames }.
+   * @param {{ clip?: string, composition?: any, format?: string, count?: number, cols?: number, cellWidth?: number, from?: number, to?: number }} o
+   */
+  async function clipSheet({ clip, composition, format, count = 12, cols, cellWidth, from, to }) {
+    const comp = await compositionOf({ clip, composition, format });
     const total = Math.round(comp.duration * comp.fps);
     const a = Math.max(0, Math.round((from ?? 0) * comp.fps)), b = Math.min(total, Math.round((to ?? comp.duration) * comp.fps));
     const n = Math.max(1, Math.min(48, count));
@@ -151,9 +167,12 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     return { ...r, png: Buffer.from(r.png), frames };
   }
 
-  /** SHA-256 of the raw RGBA of frames at the given times → [{ t, frame, hash }]. */
-  async function frameHashes({ clip, composition, times }) {
-    const comp = await compositionOf({ clip, composition });
+  /**
+   * SHA-256 of the raw RGBA of frames at the given times → [{ t, frame, hash }].
+   * @param {{ clip?: string, composition?: any, format?: string, times: number[] }} o
+   */
+  async function frameHashes({ clip, composition, format, times }) {
+    const comp = await compositionOf({ clip, composition, format });
     const total = Math.round(comp.duration * comp.fps);
     const { bundle } = await clips.bundleFor(comp);
     const out = [];
@@ -245,5 +264,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }

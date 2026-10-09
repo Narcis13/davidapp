@@ -14,6 +14,7 @@ import { encodeWav, detectBeats } from '../render/wav.js';
 import { ffmpegPath, run } from '../render/ffmpeg.js';
 import { json, now, transaction } from '../db/db.js';
 import { SLUG_RE, StudioError } from './library.js';
+import { glyphFindings } from './inspect.js';
 
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
 
@@ -255,14 +256,21 @@ export function createClips(ctx, library) {
     const step = Math.max(1, Math.ceil(list.length / 40));
     const picked = list.filter((_, i) => i % step === 0);
     const t0 = performance.now();
+    // what the sampled frames draw as text, so characters the bundled fonts lack are flagged before any render
+    const texts = [];
     for (const frame of picked) {
       try {
-        await pool.run('clipFrame', { frame, output: 'none' }, { bundle, timeout: 30000 });
+        const r = await pool.run('clipFrame', { frame, output: 'none', record: true }, { bundle, timeout: 30000 });
+        if (r.texts) texts.push(...r.texts);
       } catch (e) {
         throw new StudioError(`The composition failed to draw frame ${frame} (${(frame / fps).toFixed(2)}s): ${e.message}`, 'rejected', { frame, logs: e.logs });
       }
     }
-    return { framesChecked: picked.length, msPerFrame: Math.round((performance.now() - t0) / Math.max(1, picked.length)) };
+    /** @type {any} */
+    const out = { framesChecked: picked.length, msPerFrame: Math.round((performance.now() - t0) / Math.max(1, picked.length)) };
+    const glyphs = glyphFindings(texts, composition, library);
+    if (glyphs.length) out.missingGlyphs = glyphs.map((g) => `${g.char} (${g.codepoints.join(' ')}, ${g.kind}) is not in ${g.family}: it falls back to a system font (items ${g.items.join(', ')})`);
+    return out;
   }
 
   // ── storage ───────────────────────────────────────────────────────────────────────────────
@@ -358,6 +366,7 @@ export function createClips(ctx, library) {
    *   { op: 'set_override', id, format, override }                (replace a format's override; null clears it)
    *   { op: 'split_item', id, at }  (clip seconds; the second part keeps playing where the first stopped)
    *   { op: 'duplicate_item', id, newId?, start?, track? }
+   *   { op: 'add_marker', marker: { t, type, label, duration? } }   { op: 'update_marker', index, patch }   { op: 'remove_marker', index }
    */
   function applyOps(composition, ops) {
     let c = structuredClone(composition);
@@ -389,9 +398,30 @@ export function createClips(ctx, library) {
     for (const [n, op] of ops.entries()) {
       switch (op?.op) {
         case 'set':
-          for (const k of ['duration', 'fps', 'background', 'seed', 'markers']) if (op[k] !== undefined) c[k] = op[k];
+          for (const k of ['duration', 'fps', 'background', 'seed', 'markers', 'loudness', 'captions', 'platforms', 'safe', 'checks']) {
+            if (op[k] === undefined) continue;
+            if (op[k] === null) delete c[k]; else c[k] = op[k];
+          }
           if (op.format) c = reformat(c, op.format);
           break;
+        case 'add_marker': {
+          if (!op.marker || typeof op.marker !== 'object') throw new StudioError('edit: add_marker needs marker: { t, type, label, duration? }');
+          c.markers = [...(c.markers ?? []), op.marker].sort((a, b) => (a.t ?? 0) - (b.t ?? 0));
+          break;
+        }
+        case 'update_marker': case 'remove_marker': {
+          const list = [...(c.markers ?? [])];
+          if (!Number.isInteger(op.index) || op.index < 0 || op.index >= list.length) throw new StudioError(`edit: ${op.op}: no marker at index ${op.index} (the clip has ${list.length})`, 'not_found');
+          if (op.op === 'remove_marker') list.splice(op.index, 1);
+          else {
+            const m = { ...list[op.index] };
+            for (const [k, v] of Object.entries(op.patch ?? {})) { if (v === null) delete m[k]; else m[k] = v; }
+            list[op.index] = m;
+          }
+          list.sort((a, b) => (a.t ?? 0) - (b.t ?? 0));
+          if (list.length) c.markers = list; else delete c.markers;
+          break;
+        }
         case 'add_track':
           if (c.tracks.some((t) => t.id === op.track?.id)) throw new StudioError(`edit: a track with id "${op.track.id}" already exists`, 'conflict');
           c.tracks.splice(op.index ?? c.tracks.length, 0, { items: [], ...op.track });
@@ -488,7 +518,7 @@ export function createClips(ctx, library) {
           to.items.splice(to === f.track ? f.i + 1 : to.items.length, 0, copy);
           break;
         }
-        default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, move_track, update_track, add_item, update_item, remove_item, move_item, set_transform, set_keyframes, add_keyframe, remove_keyframe, set_override, split_item, duplicate_item)`);
+        default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, move_track, update_track, add_item, update_item, remove_item, move_item, set_transform, set_keyframes, add_keyframe, remove_keyframe, set_override, split_item, duplicate_item, add_marker, update_marker, remove_marker)`);
       }
     }
     return c;

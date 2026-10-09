@@ -285,7 +285,8 @@ export function text(str, { size = 1, depth = 0.25, spacing = 1 } = {}) {
       if (!lit(x, y + 1)) quad([x0, y0, -z], [x1, y0, -z], [x1, y0, z], [x0, y0, z]);
     }
   }
-  return { positions, indices, colors: null };
+  // tagged so the layout report and the checks know these cubes spell a word
+  return { positions, indices, colors: null, text: String(str) };
 }
 
 // ── rendering ─────────────────────────────────────────────────────────────────────────────────
@@ -358,9 +359,16 @@ export function render(f, scene) {
     return [base[0] * (r + e), base[1] * (g + e), base[2] * (b + e)];
   };
 
+  const inspect = f.lib?.inspect;
+  // block letters: skipped when text is suppressed; their drawn extent is recorded when someone is recording
+  const words = [];
+  let ink = null;
   for (const o of scene.objects ?? []) {
     const m = o.mesh;
     if (!m?.positions || !m?.indices) throw new Error('solid.render: every object needs a mesh (made with f.lib.solid)');
+    if (typeof m.text === 'string' && inspect?.suppress) continue;
+    ink = typeof m.text === 'string' && inspect?.record ? { text: m.text, color: o.color ?? '#ffffff', x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity } : null;
+    if (ink) words.push(ink);
     const model = compose(o);
     const mv = multiply(view, model);
     const tint = rgb(o.color ?? '#ffffff');
@@ -432,6 +440,7 @@ export function render(f, scene) {
         if (fog) { const t = Math.min(1, Math.max(0, (zz - fog.near) / (fog.far - fog.near))); r += (fog.c[0] - r) * t; g += (fog.c[1] - g) * t; bl += (fog.c[2] - bl) * t; }
         const ci = di * 4;
         color[ci] = r; color[ci + 1] = g; color[ci + 2] = bl; color[ci + 3] = 1;
+        if (ink) { if (x < ink.x0) ink.x0 = x; if (x > ink.x1) ink.x1 = x; if (y < ink.y0) ink.y0 = y; if (y > ink.y1) ink.y1 = y; }
         any = true;
       }
     }
@@ -456,5 +465,11 @@ export function render(f, scene) {
   }
   layer.ctx.putImageData(img, 0, 0);
   f.ctx.drawImage(layer.canvas, 0, 0);
+  for (const wd of words) {
+    if (!(wd.x1 >= wd.x0)) continue;
+    const box = [wd.x0 / ss, wd.y0 / ss, (wd.x1 + 1) / ss, (wd.y1 + 1) / ss];
+    inspect.record({ kind: 'blocks3d', text: wd.text, font: '5×7 block letters (3D)', family: null, size: box[3] - box[1], floor: 0, block: null, ink: box, line: box,
+      matrix: f.ctx.getTransform(), canvas: f.ctx.canvas, fill: typeof wd.color === 'string' ? wd.color : 'shaded', alpha: f.ctx.globalAlpha, stroke: false });
+  }
   return { triangles, drawn };
 }

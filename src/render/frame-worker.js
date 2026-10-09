@@ -9,10 +9,11 @@ import { createRuntime, describeError } from '../core/runtime.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
 import { nodeHost, registerFonts, createCanvas, loadImage, takeLogs, FRAME_CONTEXT } from './host.js';
+import { coverageReport } from './glyphs.js';
 
 registerFonts();
 
-let state = { key: null, rt: null, comp: null, beats: [], sequences: {} };
+let state = { key: null, rt: null, comp: null, beats: [], sequences: {}, clip: {} };
 let canvas = null;
 
 // Sequence frames are PNG files, loaded as a frame needs them and kept in a small cache.
@@ -127,6 +128,8 @@ async function validate(msg) {
   const params = msg.params ?? {};
   const seed = 1;
   let thumb, strip = null;
+  // what the test frames draw as text: characters the bundled fonts lack are flagged
+  const drawnTexts = [];
   if (def.kind === 'visual') {
     const duration = msg.duration ?? def.duration ?? 3;
     const fps = 30;
@@ -138,8 +141,9 @@ async function validate(msg) {
       let midHash = null, blank = true;
       for (const t of [0, mid, Math.max(0, duration - 1 / fps)]) {
         const t0 = performance.now();
-        const c = drawAsset(rt, msg.ref, { ...o, t });
+        const c = drawAsset(rt, msg.ref, { ...o, t, record: true });
         const ms = performance.now() - t0;
+        drawnTexts.push(...rt.takeTexts());
         const hash = sha(c.data());
         if (t === mid) midHash = hash;
         if (!isBlank(c)) blank = false;
@@ -208,6 +212,9 @@ async function validate(msg) {
     frames.push({ format: 'audio', t: 0, peak: Math.round(peak * 1000) / 1000 });
     thumb = png(drawAsset(rt, msg.ref, { params, t: 0, duration, width: 1280, height: 720, seed }), 640);
   }
+  for (const g of coverageReport(drawnTexts.filter((x) => x.family).map((x) => ({ text: x.text, family: x.family })))) {
+    warnings.push(`${g.char} (${g.codepoints.join(' ')}) is not in ${g.family}: it falls back to a system font (in "${g.samples[0]}")`);
+  }
   return { result: { meta, warnings, frames, thumb, strip, logs: takeLogs() } };
 }
 
@@ -238,15 +245,19 @@ const handlers = {
   async load(msg) {
     takeLogs();
     const rt = await makeRuntime(msg.bundle);
-    state = { key: msg.bundle.key, rt, comp: msg.bundle.composition ?? null, beats: msg.bundle.beats ?? [], sequences: msg.bundle.sequences ?? {} };
+    const b = msg.bundle;
+    // what reaches assets as f.clip besides the composition: beats, the narration's words, the caption pages and lane
+    state = { key: b.key, rt, comp: b.composition ?? null, beats: b.beats ?? [], sequences: b.sequences ?? {}, clip: { beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane } };
     return { result: {} };
   },
   async clipFrame(msg) {
     const comp = state.comp;
     await loadSequenceFrames(state.rt, comp, msg.frame);
     const c = surface(comp.width, comp.height);
-    state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, msg.frame, { beats: state.beats });
-    return output(c, msg);
+    const r = state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, msg.frame, { ...state.clip, record: !!msg.record, suppressText: !!msg.suppressText });
+    const out = output(c, msg);
+    if (r?.texts) out.result.texts = r.texts;
+    return out;
   },
   assetFrame(msg) {
     return output(drawAsset(state.rt, msg.ref, msg), msg);
@@ -259,7 +270,7 @@ const handlers = {
       // each cell is drawn as soon as its sequence frames are in (the cache is smaller than a whole sheet)
       await loadSequenceFrames(state.rt, comp, frame);
       const c = surface(comp.width, comp.height);
-      state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, frame, { beats: state.beats });
+      state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, frame, state.clip);
       // kept at cell size: a full-size copy per cell would be hundreds of MB for a vertical clip
       const copy = createCanvas(msg.cellWidth, Math.round((msg.cellWidth * comp.height) / comp.width));
       const g = copy.getContext('2d');

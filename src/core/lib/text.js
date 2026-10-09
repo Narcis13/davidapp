@@ -12,9 +12,33 @@
 /** Fonts tried after the named family, so emoji and symbols still render. */
 export const FALLBACK_FONTS = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
 
+/**
+ * The CSS font for a face. Right after the family comes its "<family> Ext" alias: the bundled families register
+ * their Latin Extended files under it, so ă, ș, ț come from the family's own design (Skia and Chrome pick a font
+ * per character down the list, so every character the family's main file has is drawn exactly as before).
+ */
 export function fontString({ font = 'Inter', size = 64, weight = 400, italic = false } = {}) {
-  return `${italic ? 'italic ' : ''}${weight} ${+size.toFixed(2)}px "${String(font).replace(/"/g, '')}", ${FALLBACK_FONTS}`;
+  const family = String(font).replace(/"/g, '');
+  return `${italic ? 'italic ' : ''}${weight} ${+size.toFixed(2)}px "${family}", "${family} Ext", ${FALLBACK_FONTS}`;
 }
+
+/** The family named first in a font string. */
+export const familyOf = (font) => /"([^"]+)"/.exec(font)?.[1] ?? 'sans-serif';
+
+/** A text that cannot be drawn at its size floor: overflowing, truncated, or with a word broken in two. */
+export class TextFloorError extends Error {
+  constructor(message, details) {
+    super(message);
+    this.name = 'TextFloorError';
+    this.details = details;
+  }
+}
+
+/** The scale a context's current transform applies to lengths (√|det|). */
+const scaleOf = (ctx) => {
+  const m = typeof ctx?.getTransform === 'function' ? ctx.getTransform() : null;
+  return m ? Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1 : 1;
+};
 
 let segmenter;
 export function graphemes(text) {
@@ -52,9 +76,14 @@ function tokenize(text, markup) {
   return paragraphs;
 }
 
-export function createText() {
+/**
+ * inspect: the runtime's inspection state, shared with f.lib.solid: { record (fn or null), suppress (skip drawing,
+ * keep recording), frame ({ width, height, short } of the frame being drawn), floor (the asset's default floor) }.
+ */
+export function createText(inspect = { record: null, suppress: false, frame: null, floor: 0 }) {
   const widths = new Map();
   const layouts = new Map();
+  let blocks = 0;
 
   const width = (ctx, font, str) => {
     const key = `${font}\n${str}`;
@@ -198,23 +227,53 @@ export function createText() {
     let str = String(text ?? '');
     if (o.transform === 'upper') str = str.toUpperCase();
     else if (o.transform === 'lower') str = str.toLowerCase();
-    const key = JSON.stringify([str, o]);
+    // a size floor (opt-in): a share of the frame's short side, as a size in this context's units
+    const floor = o.floor ?? inspect.floor ?? 0;
+    const minLocal = floor > 0 && inspect.frame ? ((floor / 100) * inspect.frame.short) / scaleOf(ctx) : 0;
+    const key = minLocal ? JSON.stringify([str, o, Math.round(minLocal * 100) / 100]) : JSON.stringify([str, o]);
     const hit = layouts.get(key);
     if (hit) return hit;
     const paragraphs = tokenize(str, !!o.markup);
     const maxWidth = o.maxWidth ?? Infinity, maxHeight = o.maxHeight ?? Infinity;
     // fitting prefers a smaller size over cutting a word in two or dropping lines
     const fits = (L) => L.width <= maxWidth + 0.5 && L.height <= maxHeight + 0.5 && !L.truncated && !L.broken;
-    let L = build(ctx, paragraphs, o.size, o);
-    if (o.fit && !fits(L)) {
-      let lo = Math.min(o.minSize ?? 8, o.size), hi = o.size;
-      while (hi - lo > 0.5) {
-        const mid = (lo + hi) / 2;
-        if (fits(build(ctx, paragraphs, mid, o))) lo = mid; else hi = mid;
+    let L;
+    if (!minLocal) {
+      L = build(ctx, paragraphs, o.size, o);
+      if (o.fit && !fits(L)) {
+        let lo = Math.min(o.minSize ?? 8, o.size), hi = o.size;
+        while (hi - lo > 0.5) {
+          const mid = (lo + hi) / 2;
+          if (fits(build(ctx, paragraphs, mid, o))) lo = mid; else hi = mid;
+        }
+        L = build(ctx, paragraphs, Math.floor(lo * 2) / 2, o);
       }
-      L = build(ctx, paragraphs, Math.floor(lo * 2) / 2, o);
+    } else {
+      // fit stops at the floor; what still does not fit there is an error, never an ellipsis
+      const px = ((floor / 100) * inspect.frame.short);
+      const fail = (reason, extra = {}) => {
+        throw new TextFloorError(`text "${str.length > 60 ? `${str.slice(0, 57)}…` : str}" cannot be drawn at its size floor (${floor}% of the frame's short side, ${+px.toFixed(1)} px on screen): ${reason}`, { text: str, floor, floorPx: +px.toFixed(1), reason, ...extra });
+      };
+      if (o.size < minLocal - 0.01) fail(`its size is ${+(o.size * (px / minLocal)).toFixed(1)} px on screen`, { size: o.size });
+      L = build(ctx, paragraphs, o.size, o);
+      if (o.fit && !fits(L)) {
+        let lo = Math.max(Math.min(o.minSize ?? 8, o.size), minLocal), hi = o.size;
+        if (!fits(build(ctx, paragraphs, lo, o))) hi = lo;
+        while (hi - lo > 0.5) {
+          const mid = (lo + hi) / 2;
+          if (fits(build(ctx, paragraphs, mid, o))) lo = mid; else hi = mid;
+        }
+        L = build(ctx, paragraphs, Math.max(minLocal, Math.floor(lo * 2) / 2), o);
+      }
+      if (L.truncated) fail(`it needs more than ${o.maxLines} line${o.maxLines === 1 ? '' : 's'}`);
+      if (L.broken) fail('a word does not fit on one line and would break in two');
+      if (L.width > maxWidth + 0.5) fail(`it is ${Math.round(L.width - maxWidth)} px too wide for its box`);
+      if (L.height > maxHeight + 0.5) fail(`it is ${Math.round(L.height - maxHeight)} px too tall for its box`);
     }
     L.text = str;
+    // what the layout report needs about every word and glyph (not enumerable: assets see the same objects as before)
+    const meta = { block: ++blocks, size: L.size, ascent: L.ascent, descent: L.descent, floor };
+    for (const list of [L.words, L.glyphs]) for (const item of list) Object.defineProperty(item, 'layoutMeta', { value: meta });
     // layouts are shared between frames and assets through the cache, so nobody may change one
     for (const list of [L.lines, L.words, L.glyphs]) { for (const item of list) Object.freeze(item); Object.freeze(list); }
     for (const line of L.lines) Object.freeze(line.words);
@@ -231,20 +290,57 @@ export function createText() {
 
   const prep = (ctx, font) => { ctx.font = font; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'; };
 
+  /** The ink extents of a string in the context's current font (relative to its pen position and baseline). */
+  const ink = (ctx, str) => {
+    const key = `${ctx.font}\n\u0001${str}`;
+    let k = widths.get(key);
+    if (!k) {
+      const m = ctx.measureText(str);
+      k = { left: m.actualBoundingBoxLeft ?? 0, right: m.actualBoundingBoxRight ?? m.width, ascent: m.actualBoundingBoxAscent ?? 0, descent: m.actualBoundingBoxDescent ?? 0 };
+      widths.set(key, k);
+    }
+    return k;
+  };
+
+  /** Tell the recorder what a draw call puts on the canvas: the ink box and line box in the context's coordinates. */
+  function record(ctx, part, parts, x, y, stroke) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of parts) {
+      const k = ink(ctx, p.ch ?? p.text);
+      const px = x + p.x, py = y + p.y;
+      x0 = Math.min(x0, px - k.left); x1 = Math.max(x1, px + k.right);
+      y0 = Math.min(y0, py - k.ascent); y1 = Math.max(y1, py + k.descent);
+    }
+    if (!(x1 > x0)) { x0 = x + part.x; x1 = x0 + part.width; y0 = y + part.y; y1 = y0; }
+    const meta = part.layoutMeta ?? {};
+    const style = stroke ? ctx.strokeStyle : ctx.fillStyle;
+    inspect.record({
+      kind: 'text', text: part.text ?? part.ch, font: part.font, family: familyOf(part.font), size: meta.size ?? null, floor: meta.floor ?? 0, block: meta.block ?? null,
+      ink: [x0, y0, x1, y1], line: [x + part.x, y + part.top, x + part.x + part.width, y + part.top + part.height],
+      matrix: ctx.getTransform(), canvas: ctx.canvas, fill: typeof style === 'string' ? style : 'gradient', alpha: ctx.globalAlpha, stroke,
+    });
+  }
+
   /** Draw one word of a layout with the block's top-left at (x, y). */
   function fillWord(ctx, word, x = 0, y = 0) {
     prep(ctx, word.font);
+    if (inspect.record) record(ctx, word, word.tracking ? word.glyphs : [word], x, y, false);
+    if (inspect.suppress) return;
     if (word.tracking) for (const g of word.glyphs) ctx.fillText(g.ch, x + g.x, y + g.y);
     else ctx.fillText(word.text, x + word.x, y + word.y);
   }
   function strokeWord(ctx, word, x = 0, y = 0) {
     prep(ctx, word.font);
+    if (inspect.record) record(ctx, word, word.tracking ? word.glyphs : [word], x, y, true);
+    if (inspect.suppress) return;
     if (word.tracking) for (const g of word.glyphs) ctx.strokeText(g.ch, x + g.x, y + g.y);
     else ctx.strokeText(word.text, x + word.x, y + word.y);
   }
   /** Draw one grapheme of a layout with the block's top-left at (x, y). */
   function fillGlyph(ctx, glyph, x = 0, y = 0) {
     prep(ctx, glyph.font);
+    if (inspect.record) record(ctx, glyph, [glyph], x, y, false);
+    if (inspect.suppress) return;
     ctx.fillText(glyph.ch, x + glyph.x, y + glyph.y);
   }
   /** Draw a line; style: { color, emColor } (fillStyle is left alone when color is omitted). */
@@ -263,5 +359,5 @@ export function createText() {
 
   const clearCache = () => { widths.clear(); layouts.clear(); };
 
-  return { layout, measure, fill, fillLine, fillWord, strokeWord, fillGlyph, fontString, graphemes, clearCache };
+  return { layout, measure, fill, fillLine, fillWord, strokeWord, fillGlyph, fontString, graphemes, clearCache, TextFloorError };
 }

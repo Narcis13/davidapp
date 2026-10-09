@@ -96,7 +96,9 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     return data;
   }
 
-  const fonts = () => fontManifest().map((f) => ({ family: f.family, slug: f.slug, license: f.license, files: f.files.map((x) => ({ url: `/fonts/${x.file}`, weight: x.weight, style: x.style })) }));
+  const fontFile = (x) => ({ url: `/fonts/${x.file}`, weight: x.weight, style: x.style });
+  // ext: the family's Latin Extended files, registered under their own alias (see fontString in core/lib/text.js)
+  const fonts = () => fontManifest().map((f) => ({ family: f.family, slug: f.slug, license: f.license, files: f.files.map(fontFile), ext: f.ext ? { family: f.ext.family, files: f.ext.files.map(fontFile) } : undefined }));
 
   /** The browser-side bundle: sources and pinned deps, with image URLs instead of paths. */
   function browserBundle(b) {

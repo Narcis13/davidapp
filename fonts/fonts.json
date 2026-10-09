@@ -26,7 +26,28 @@
         "weight": 800,
         "style": "normal"
       }
-    ]
+    ],
+    "ext": {
+      "family": "Inter Ext",
+      "subset": "latin-ext",
+      "files": [
+        {
+          "file": "inter-latin-ext-400-normal.woff2",
+          "weight": 400,
+          "style": "normal"
+        },
+        {
+          "file": "inter-latin-ext-600-normal.woff2",
+          "weight": 600,
+          "style": "normal"
+        },
+        {
+          "file": "inter-latin-ext-800-normal.woff2",
+          "weight": 800,
+          "style": "normal"
+        }
+      ]
+    }
   },
   {
     "family": "Space Grotesk",
@@ -50,7 +71,23 @@
         "weight": 700,
         "style": "normal"
       }
-    ]
+    ],
+    "ext": {
+      "family": "Space Grotesk Ext",
+      "subset": "latin-ext",
+      "files": [
+        {
+          "file": "space-grotesk-latin-ext-400-normal.woff2",
+          "weight": 400,
+          "style": "normal"
+        },
+        {
+          "file": "space-grotesk-latin-ext-700-normal.woff2",
+          "weight": 700,
+          "style": "normal"
+        }
+      ]
+    }
   },
   {
     "family": "JetBrains Mono",
@@ -73,7 +110,23 @@
         "weight": 700,
         "style": "normal"
       }
-    ]
+    ],
+    "ext": {
+      "family": "JetBrains Mono Ext",
+      "subset": "latin-ext",
+      "files": [
+        {
+          "file": "jetbrains-mono-latin-ext-400-normal.woff2",
+          "weight": 400,
+          "style": "normal"
+        },
+        {
+          "file": "jetbrains-mono-latin-ext-700-normal.woff2",
+          "weight": 700,
+          "style": "normal"
+        }
+      ]
+    }
   },
   {
     "family": "Anton",
@@ -92,7 +145,18 @@
         "weight": 400,
         "style": "normal"
       }
-    ]
+    ],
+    "ext": {
+      "family": "Anton Ext",
+      "subset": "latin-ext",
+      "files": [
+        {
+          "file": "anton-latin-ext-400-normal.woff2",
+          "weight": 400,
+          "style": "normal"
+        }
+      ]
+    }
   },
   {
     "family": "Playfair Display",
@@ -121,6 +185,27 @@
         "weight": 700,
         "style": "italic"
       }
-    ]
+    ],
+    "ext": {
+      "family": "Playfair Display Ext",
+      "subset": "latin-ext",
+      "files": [
+        {
+          "file": "playfair-display-latin-ext-700-normal.woff2",
+          "weight": 700,
+          "style": "normal"
+        },
+        {
+          "file": "playfair-display-latin-ext-900-normal.woff2",
+          "weight": 900,
+          "style": "normal"
+        },
+        {
+          "file": "playfair-display-latin-ext-700-italic.woff2",
+          "weight": 700,
+          "style": "italic"
+        }
+      ]
+    }
   }
 ]

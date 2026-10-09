@@ -13,6 +13,8 @@ import * as svg from './svg.js';
 
 /** @param {{ sampleRate?: number }} [o] */
 export function createLib({ sampleRate } = {}) {
+  // the runtime's inspection state: who records what is drawn (layout report, checks), whether text is skipped
+  const inspect = { record: null, suppress: false, frame: null, floor: 0 };
   return Object.freeze({
     ...math,
     math,
@@ -20,7 +22,8 @@ export function createLib({ sampleRate } = {}) {
     beat,
     noise,
     fbm,
-    text: createText(),
+    text: createText(inspect),
+    inspect,
     audio: createAudio(sampleRate),
     fx,
     solid,

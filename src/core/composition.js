@@ -16,7 +16,7 @@
 
 import { FORMATS, MAX_CLIP_SECONDS, REF_RE, formatOf } from './engine.js';
 import { isColor } from './schema.js';
-import { FORMAT_NAMES, boxToTransform, checkKeyframes, checkTransform } from './transform.js';
+import { FORMAT_NAMES, boxToTransform, checkAnchor, checkKeyframes, checkTransform } from './transform.js';
 
 export const TRACK_TYPES = ['visual', 'text', 'audio'];
 export const BLEND_MODES = ['source-over', 'screen', 'multiply', 'overlay', 'lighter', 'soft-light', 'difference'];
@@ -51,6 +51,104 @@ const effectList = (list, path, err) => {
   return out.length ? out : undefined;
 };
 const round = (v) => Math.round(v * 1000) / 1000;
+
+/** What a marker marks: a cut between shots, a hold (a still the checks excuse), a beat, a word (anchored to a narration word), or a note. */
+export const MARKER_TYPES = ['cut', 'hold', 'beat', 'word', 'note'];
+/** Easing curves for audio gain keyframes (built in: the mix runs in the studio, where no asset code runs). */
+export const AUDIO_EASINGS = ['linear', 'hold', 'smooth', 'inSine', 'outSine', 'inOutSine', 'inQuad', 'outQuad', 'inOutQuad', 'inCubic', 'outCubic', 'inOutCubic'];
+/** What a track is for, when it matters to the studio: a captions track is not drawn when captions are file only. */
+export const TRACK_ROLES = ['captions', 'narration', 'music', 'sfx'];
+export const DUCK_SOURCES = ['words', 'envelope'];
+
+/**
+ * A marker: { t, type?, label, duration? (a hold's length), anchor? (a word marker's word) }. A marker in the old
+ * shape ({ t, label }) normalizes to exactly that; a missing type reads as a note.
+ */
+function normalizeMarker(m, path, err) {
+  if (!isPlain(m) || !num(m.t) || m.t < 0) { err(path, 'a marker is { t (seconds ≥ 0), type, label, duration }'); return null; }
+  const out = { t: round(m.t), label: typeof m.label === 'string' ? m.label : '' };
+  if (m.type !== undefined) { if (!MARKER_TYPES.includes(m.type)) err(`${path}.type`, `type must be one of ${MARKER_TYPES.join(', ')}`); else out.type = m.type; }
+  if (m.duration !== undefined) { if (!num(m.duration) || m.duration <= 0) err(`${path}.duration`, 'duration must be a number of seconds > 0 (how long a hold lasts)'); else out.duration = round(m.duration); }
+  if (m.anchor !== undefined) { for (const [p, msg] of checkAnchor(m.anchor, `${path}.anchor`)) err(p, msg); out.anchor = m.anchor; }
+  for (const k of Object.keys(m)) if (!['t', 'type', 'label', 'duration', 'anchor'].includes(k)) err(`${path}.${k}`, 'unknown marker field (use t, type, label, duration, anchor)');
+  return out;
+}
+
+const between = (v, lo, hi) => num(v) && v >= lo && v <= hi;
+
+/** Loudness target: true for the defaults, or { target (LUFS), truePeak (dBTP ceiling) }. */
+function normalizeLoudness(v, err) {
+  if (v === true) return { target: -14, truePeak: -1 };
+  if (!isPlain(v)) { err('loudness', 'loudness is true (−14 LUFS, true peak ≤ −1 dBTP) or { target, truePeak }'); return undefined; }
+  const out = { target: v.target ?? -14, truePeak: v.truePeak ?? -1 };
+  if (!between(out.target, -40, -5)) err('loudness.target', 'target is the integrated loudness in LUFS, between −40 and −5');
+  if (!between(out.truePeak, -9, 0)) err('loudness.truePeak', 'truePeak is the ceiling in dBTP, between −9 and 0');
+  for (const k of Object.keys(v)) if (!['target', 'truePeak'].includes(k)) err(`loudness.${k}`, 'unknown field (use target, truePeak)');
+  return out;
+}
+
+const CAPTION_NUMBERS = { maxLines: [1, 3, true], maxChars: [8, 80, true], lead: [0, 2, true], minDuration: [0, 5], closeGap: [0, 2], pauseBreak: [0.1, 5] };
+/** Caption settings and (optionally) the page structure; times always come from the words. */
+function normalizeCaptions(c, err) {
+  if (!isPlain(c)) { err('captions', 'captions is { from, maxLines, maxChars, lead, minDuration, closeGap, burnIn, names, pages }'); return undefined; }
+  const out = {};
+  if (c.from !== undefined) {
+    const list = Array.isArray(c.from) ? c.from : [c.from];
+    if (!list.length || !list.every((x) => typeof x === 'string' && x)) err('captions.from', 'from is the id of a narration item (or a list of them)'); else out.from = list;
+  }
+  for (const [k, [lo, hi, int]] of Object.entries(CAPTION_NUMBERS)) {
+    if (c[k] === undefined) continue;
+    if (!between(c[k], lo, hi) || (int && !Number.isInteger(c[k]))) err(`captions.${k}`, `${k} must be ${int ? 'an integer' : 'a number'} between ${lo} and ${hi}`); else out[k] = c[k];
+  }
+  if (c.burnIn !== undefined) out.burnIn = !!c.burnIn;
+  if (c.names !== undefined) { if (!Array.isArray(c.names) || !c.names.every((x) => typeof x === 'string')) err('captions.names', 'names is a list of names to keep whole'); else out.names = c.names; }
+  if (c.pages !== undefined && c.pages !== null) {
+    const key = (k) => typeof k === 'string' && /^[^:]+:\d+$/.test(k);
+    if (!Array.isArray(c.pages) || !c.pages.every((p) => isPlain(p) && key(p.start) && (p.lines === undefined || (Array.isArray(p.lines) && p.lines.every(key))))) err('captions.pages', 'pages is a list of { start, lines } where each is a word key "<narration item>:<word index>"');
+    else out.pages = c.pages.map((p) => (p.lines?.length ? { start: p.start, lines: [...p.lines] } : { start: p.start }));
+  }
+  for (const k of Object.keys(c)) if (!['from', 'burnIn', 'names', 'pages', ...Object.keys(CAPTION_NUMBERS)].includes(k)) err(`captions.${k}`, 'unknown captions field');
+  return out;
+}
+
+/** Ducking on an audio item: the item drops by `by` dB while the narration speaks. */
+function normalizeDuck(d, path, err) {
+  if (!isPlain(d)) { err(path, 'duck is { by (dB), attack, release, hold, source: words|envelope, under: [track ids], threshold }'); return undefined; }
+  const out = { by: d.by ?? 12, attack: d.attack ?? 0.12, release: d.release ?? 0.4, hold: d.hold ?? 0.25, source: d.source ?? 'words' };
+  if (!between(out.by, 0, 60)) err(`${path}.by`, 'by is how far the item drops, in dB (0–60)');
+  if (!between(out.attack, 0, 2)) err(`${path}.attack`, 'attack is seconds (0–2)');
+  if (!between(out.release, 0, 5)) err(`${path}.release`, 'release is seconds (0–5)');
+  if (!between(out.hold, 0, 2)) err(`${path}.hold`, 'hold is seconds (0–2): speech closer than this counts as one stretch');
+  if (!DUCK_SOURCES.includes(out.source)) err(`${path}.source`, `source must be one of ${DUCK_SOURCES.join(', ')}`);
+  if (d.under !== undefined) { if (!Array.isArray(d.under) || !d.under.every((x) => typeof x === 'string' && x)) err(`${path}.under`, 'under is a list of track ids'); else out.under = d.under; }
+  if (d.threshold !== undefined) { if (!between(d.threshold, -90, 0)) err(`${path}.threshold`, 'threshold is dBFS (−90–0)'); else out.threshold = d.threshold; }
+  for (const k of Object.keys(d)) if (!['by', 'attack', 'release', 'hold', 'source', 'under', 'threshold'].includes(k)) err(`${path}.${k}`, 'unknown duck field');
+  return out;
+}
+
+/** Gain automation of an audio item: { volume: [{ t, v (dB), ease, anchor? }] } on the item's own timeline. */
+function normalizeAudioKeyframes(kf, path, err) {
+  if (!isPlain(kf)) { err(path, 'keyframes on an audio item are { volume: [{ t, v (dB), ease }] }'); return undefined; }
+  const out = {};
+  for (const [prop, keys] of Object.entries(kf)) {
+    if (prop !== 'volume') { err(`${path}.${prop}`, 'an audio item animates only volume (dB)'); continue; }
+    if (!Array.isArray(keys) || !keys.length) { err(`${path}.volume`, 'volume keyframes are a non-empty array of { t, v, ease }'); continue; }
+    const list = [];
+    keys.forEach((k, i) => {
+      const p = `${path}.volume[${i}]`;
+      if (!isPlain(k) || !num(k.t) || k.t < 0) return err(`${p}.t`, 't must be a number of seconds ≥ 0 (item time)');
+      if (!between(k.v, -90, 24)) return err(`${p}.v`, 'v is the gain in dB (−90–24)');
+      if (k.ease !== undefined && !AUDIO_EASINGS.includes(k.ease)) return err(`${p}.ease`, `ease must be one of ${AUDIO_EASINGS.join(', ')}`);
+      const key = { t: k.t, v: k.v };
+      if (k.ease !== undefined) key.ease = k.ease;
+      if (k.anchor !== undefined) { for (const [ap, m] of checkAnchor(k.anchor, `${p}.anchor`)) err(ap, m); key.anchor = k.anchor; }
+      list.push(key);
+    });
+    list.sort((a, b) => a.t - b.t);
+    if (list.length) out.volume = list;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 /**
  * Validate the structure of a composition and return a normalized copy.
@@ -90,6 +188,7 @@ export function normalizeComposition(input) {
     const track = { id: typeof tr.id === 'string' && tr.id ? tr.id : `track-${ti + 1}`, name: typeof tr.name === 'string' ? tr.name : undefined, type, hidden: tr.hidden ? true : undefined, items: [] };
     // editor flags (v2): only written when set, so a v1 track normalizes to exactly what it was
     for (const k of ['locked', 'solo', 'muted']) if (tr[k]) track[k] = true;
+    if (tr.role !== undefined) { if (!TRACK_ROLES.includes(tr.role)) err(`${tp}.role`, `role must be one of ${TRACK_ROLES.join(', ')}`); else track.role = tr.role; }
     // an effect on a track processes everything on it, like an adjustment layer
     if (tr.effects !== undefined) { if (type === 'audio') err(`${tp}.effects`, 'an audio track takes no effects'); else { const fx = effectList(tr.effects, `${tp}.effects`, err); if (fx) track.effects = fx; } }
     if (!Array.isArray(tr.items)) { err(`${tp}.items`, 'items must be an array'); tracks.push(track); return; }
@@ -108,6 +207,8 @@ export function normalizeComposition(input) {
       if (it.params !== undefined && !isPlain(it.params)) err(`${ip}.params`, 'params must be an object');
       const item = { id, asset: it.asset, start: num(start) ? round(start) : 0, duration: num(dur) ? round(dur) : 1, params: isPlain(it.params) ? it.params : {} };
       if (typeof it.label === 'string') item.label = it.label;
+      // v3: the item starts on a narration word (resolved to `start` when the clip is saved)
+      if (it.anchor !== undefined) { for (const [p, m] of checkAnchor(it.anchor, `${ip}.anchor`)) err(p, m); item.anchor = it.anchor; }
       for (const k of ['fadeIn', 'fadeOut']) {
         if (it[k] === undefined) continue;
         if (!num(it[k]) || it[k] < 0) err(`${ip}.${k}`, `${k} must be a number of seconds ≥ 0`); else if (it[k] > 0) item[k] = it[k];
@@ -123,6 +224,9 @@ export function normalizeComposition(input) {
       if (type === 'audio') {
         if (it.gain !== undefined) { if (!num(it.gain) || it.gain < 0 || it.gain > 4) err(`${ip}.gain`, 'gain must be between 0 and 4'); else item.gain = it.gain; }
         if (it.beats !== undefined) item.beats = !!it.beats;
+        // v3: gain automation in dB and ducking under the narration
+        if (it.keyframes !== undefined) { const kf = normalizeAudioKeyframes(it.keyframes, `${ip}.keyframes`, err); if (kf) item.keyframes = kf; }
+        if (it.duck !== undefined) { const d = normalizeDuck(it.duck, `${ip}.duck`, err); if (d) item.duck = d; }
       } else {
         if (it.opacity !== undefined) { if (!num(it.opacity) || it.opacity < 0 || it.opacity > 1) err(`${ip}.opacity`, 'opacity must be between 0 and 1'); else if (it.opacity < 1) item.opacity = it.opacity; }
         if (it.blend !== undefined) { if (!BLEND_MODES.includes(it.blend)) err(`${ip}.blend`, `blend must be one of ${BLEND_MODES.join(', ')}`); else if (it.blend !== 'source-over') item.blend = it.blend; }
@@ -194,8 +298,8 @@ export function normalizeComposition(input) {
 
   let markers;
   if (input.markers !== undefined) {
-    if (!Array.isArray(input.markers) || !input.markers.every((m) => isPlain(m) && num(m.t) && m.t >= 0)) err('markers', 'markers must be an array of { t, label }');
-    else markers = input.markers.map((m) => ({ t: m.t, label: typeof m.label === 'string' ? m.label : '' }));
+    if (!Array.isArray(input.markers)) err('markers', 'markers must be an array of { t, type, label, duration }');
+    else markers = input.markers.map((m, i) => normalizeMarker(m, `markers[${i}]`, err)).filter(Boolean);
   }
 
   let effects;
@@ -211,12 +315,34 @@ export function normalizeComposition(input) {
     else easing = input.easing;
   }
 
+  // v3: loudness target, captions from the words, platform profiles, how f.safe is chosen, check thresholds
+  let loudness, captions, platforms, safe, checks;
+  if (input.loudness !== undefined && input.loudness !== null && input.loudness !== false) loudness = normalizeLoudness(input.loudness, err);
+  if (input.captions !== undefined && input.captions !== null) captions = normalizeCaptions(input.captions, err);
+  if (input.platforms !== undefined) {
+    if (!Array.isArray(input.platforms) || !input.platforms.every((p) => typeof p === 'string' && /^[a-z0-9-]+$/.test(p))) err('platforms', 'platforms is a list of platform profile ids such as ["reels", "tiktok"]');
+    else if (input.platforms.length) platforms = [...new Set(input.platforms)];
+  }
+  if (input.safe !== undefined) {
+    if (!['format', 'platform'].includes(input.safe)) err('safe', 'safe is "format" (f.safe is the format\'s safe zone, the default) or "platform" (the tightest edge of the clip\'s platform profiles)');
+    else if (input.safe === 'platform') { if (!input.platforms?.length) err('safe', 'safe "platform" needs platforms'); safe = 'platform'; }
+  }
+  if (input.checks !== undefined) {
+    if (!isPlain(input.checks) || !Object.values(input.checks).every((v) => num(v) || typeof v === 'boolean')) err('checks', 'checks holds thresholds for check_clip, e.g. { minTextSize: 2.5, contrast: 4.5 }');
+    else checks = { ...input.checks };
+  }
+
   if (errors.length) return { composition: null, errors };
   const composition = { format: formatOf(width, height), width, height, fps, duration, seed, background, tracks };
   if (markers) composition.markers = markers;
   if (easing) composition.easing = easing;
   if (effects) composition.effects = effects;
   if (theme) composition.theme = theme;
+  if (loudness) composition.loudness = loudness;
+  if (captions) composition.captions = captions;
+  if (platforms) composition.platforms = platforms;
+  if (safe) composition.safe = safe;
+  if (checks) composition.checks = checks;
   return { composition, errors };
 }
 

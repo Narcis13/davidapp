@@ -167,6 +167,21 @@ export function checkTransform(t, path) {
   return out;
 }
 
+/**
+ * A word anchor: { item (the narration item's id), word (the script word's index), edge: start | end, offset (seconds) }.
+ * The studio resolves it to a time when the clip is saved; returns [path, message] problems.
+ */
+export function checkAnchor(a, path) {
+  if (!isPlain(a)) return [[path, 'an anchor is { item (narration item id), word (word index), edge: start|end, offset }']];
+  const out = [];
+  if (typeof a.item !== 'string' || !a.item) out.push([`${path}.item`, 'item is the id of the narration item on the clip']);
+  if (!Number.isInteger(a.word) || a.word < 0) out.push([`${path}.word`, 'word is the index of the word in the narration\'s script (0 is the first)']);
+  if (a.edge !== undefined && !['start', 'end'].includes(a.edge)) out.push([`${path}.edge`, 'edge is start or end (of the word)']);
+  if (a.offset !== undefined && (typeof a.offset !== 'number' || !Number.isFinite(a.offset) || Math.abs(a.offset) > 30)) out.push([`${path}.offset`, 'offset is seconds from the word (−30–30)']);
+  for (const k of Object.keys(a)) if (!['item', 'word', 'edge', 'offset'].includes(k)) out.push([`${path}.${k}`, 'unknown anchor field (use item, word, edge, offset)']);
+  return out;
+}
+
 /** Validate keyframes; returns [path, message] problems and the keys sorted by time. */
 export function checkKeyframes(kf, path) {
   const out = [];
@@ -183,7 +198,9 @@ export function checkKeyframes(kf, path) {
       if (!colour && (typeof k.v !== 'number' || !Number.isFinite(k.v))) return out.push([`${p}[${i}].v`, prop.startsWith('params.') ? 'v must be a number or a colour' : 'v must be a number']);
       if (colour && !parsesAsColor(k.v)) return out.push([`${p}[${i}].v`, `${JSON.stringify(k.v)} is not a colour`]);
       if (k.ease !== undefined && (typeof k.ease !== 'string' || !/^[A-Za-z][A-Za-z0-9]*$/.test(k.ease))) return out.push([`${p}[${i}].ease`, 'ease is the name of a curve from the easing asset (outCubic, outBack…), linear or hold']);
-      list.push(k.ease === undefined ? { t: k.t, v: k.v } : { t: k.t, v: k.v, ease: k.ease });
+      const key = k.ease === undefined ? { t: k.t, v: k.v } : { t: k.t, v: k.v, ease: k.ease };
+      if (k.anchor !== undefined) { const pr = checkAnchor(k.anchor, `${p}[${i}].anchor`); if (pr.length) return out.push(...pr); key.anchor = k.anchor; }
+      list.push(key);
     });
     list.sort((a, b) => a.t - b.t);
     if (list.length && list.some((k) => typeof k.v !== typeof list[0].v)) out.push([p, 'all keyframes of a property must be numbers, or all colours']);

@@ -20,6 +20,7 @@ import { normalizeSchema, resolveParams, SchemaError } from './schema.js';
 import { safeZone, formatOf, REF_RE, FORMATS, SAMPLE_RATE } from './engine.js';
 import { forFormat, isV2Item, layerGeometry, sampleItem, spaceRect, TRANSFORM_DEFAULTS } from './transform.js';
 import { drawDemo } from './demo.js';
+import { platformSafe } from './platforms.js';
 
 /**
  * visual draws; value returns a value; audio returns samples; motion returns a transform delta for
@@ -43,12 +44,13 @@ const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 /** Validate what a source passed to asset({...}) and return the normalized definition. */
 export function normalizeDefinition(raw) {
   if (!isPlain(raw)) throw new AssetError('asset() takes one object: asset({ description, tags, params, render(f, p) { … } })');
-  const known = ['kind', 'title', 'description', 'tags', 'duration', 'formats', 'params', 'uses', 'render', 'preview'];
+  const known = ['kind', 'title', 'description', 'tags', 'duration', 'formats', 'params', 'uses', 'render', 'preview', 'floor'];
   for (const k of Object.keys(raw)) if (!known.includes(k)) throw new AssetError(`asset(): unknown key "${k}" (known: ${known.join(', ')})`);
   const kind = raw.kind ?? 'visual';
   if (!KINDS.includes(kind)) throw new AssetError(`asset(): kind must be one of ${KINDS.join(', ')}; got ${JSON.stringify(raw.kind)}`);
   if (typeof raw.render !== 'function') throw new AssetError('asset(): render must be a function render(f, p)');
   if (raw.preview !== undefined && typeof raw.preview !== 'function') throw new AssetError('asset(): preview must be a function preview(f, p)');
+  if (raw.floor !== undefined && !(typeof raw.floor === 'number' && raw.floor >= 0 && raw.floor <= 20)) throw new AssetError('asset(): floor is the smallest on-screen text size, as a percentage of the frame\'s short side (0–20), for every f.lib.text.layout call that does not set its own');
   if (typeof raw.description !== 'string' || raw.description.trim().length < 12) throw new AssetError('asset(): description is required: one or two sentences saying what it draws and when to use it');
   const tags = raw.tags ?? [];
   if (!Array.isArray(tags) || !tags.length || !tags.every((t) => typeof t === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(t))) throw new AssetError('asset(): tags is required: an array of lowercase-kebab strings such as ["text", "reveal"]');
@@ -80,6 +82,7 @@ export function normalizeDefinition(raw) {
     uses,
     render: raw.render,
     preview: raw.preview ?? null,
+    floor: raw.floor ?? 0,
   };
 }
 
@@ -167,6 +170,10 @@ export function createRuntime(host) {
   const layers = [];
   let layerIndex = 0;
   let scratch = null;
+  // inspection (layout report, checks): the item being drawn, and the canvases assets asked for with f.offscreen
+  const inspect = lib.inspect;
+  let cur = null, curTrack = null, inTransition = false;
+  const assetCanvases = new Set();
 
   function compile(ref, source, deps = {}) {
     let raw;
@@ -355,7 +362,7 @@ export function createRuntime(host) {
         return { ...model, draw: (c, o) => lib.svg.draw(c, model, o) };
       },
       /** A cleared scratch canvas: { canvas, ctx, width, height }. Draw it back with ctx.drawImage(layer.canvas, x, y). */
-      offscreen: (w = width, h = height) => offscreen(w, h),
+      offscreen: (w = width, h = height) => { const l = offscreen(w, h); assetCanvases.add(l.canvas); return l; },
       /**
        * Draw layers inside this asset's box, the way a clip draws its items: a precomp. Each layer is
        * { asset (an alias from uses), start, duration, params, transform, keyframes, motions, effects,
@@ -382,10 +389,14 @@ export function createRuntime(host) {
         }
       },
     };
+    const floor = inspect.floor;
+    inspect.floor = e.def.floor;
     try {
       return fn(f, p);
     } catch (err) {
       throw annotate(err, e.ref, host.lineOffset);
+    } finally {
+      inspect.floor = floor;
     }
   }
 
@@ -417,6 +428,12 @@ export function createRuntime(host) {
     track(ctx);
     layerIndex = 0;
     resetState(ctx);
+    // size floors are relative to the frame; o.record collects what f.lib.text draws (takeTexts())
+    inspect.frame = { width: o.width, height: o.height, short: Math.min(o.width, o.height) };
+    assetTexts = o.record ? [] : null;
+    inspect.record = assetTexts ? recorder(assetTexts) : null;
+    assetCanvases.clear();
+    cur = null;
     ctx.save();
     try {
       ctx.clearRect(0, 0, o.width, o.height);
@@ -429,8 +446,12 @@ export function createRuntime(host) {
       return drawValueCard(ctx, e, params, env);
     } finally {
       while (ctx.__saveDepth() > 0) ctx.restore();
+      inspect.record = null;
     }
   }
+  let assetTexts = null;
+  /** What f.lib.text and f.lib.solid drew in the last renderAsset call made with record: true. */
+  const takeTexts = () => { const t = assetTexts ?? []; assetTexts = null; return t; };
 
   function drawValueCard(ctx, e, params, env) {
     const { width: w, height: h } = env;
@@ -493,13 +514,47 @@ export function createRuntime(host) {
   /** Is the item on screen at this frame? Uses frame numbers so float error can't flicker an edge. */
   const activeAt = (item, frame, fps) => frame >= Math.round(item.start * fps) && frame < Math.round((item.start + item.duration) * fps);
 
-  /** Draw one frame of a clip composition (already validated and pinned). */
+  /** Map what f.lib.text or f.lib.solid recorded (context coordinates) to frame pixels, attributed to the item being drawn. */
+  function recorder(out) {
+    return (r) => {
+      const m = r.matrix, M = [m.a, m.b, m.c, m.d, m.e, m.f];
+      const quadOf = ([x0, y0, x1, y1]) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => [M[0] * x + M[2] * y + M[4], M[1] * x + M[3] * y + M[5]]);
+      const aabb = (q) => { const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]); const x = Math.min(...xs), y = Math.min(...ys); return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y }; };
+      const quad = quadOf(r.ink);
+      const scale = Math.sqrt(Math.abs(M[0] * M[3] - M[1] * M[2]));
+      const approximate = assetCanvases.has(r.canvas) ? 'offscreen' : inTransition ? 'transition' : null;
+      out.push({
+        item: cur?.item ?? null, track: cur?.track ?? null, mask: cur?.mask ? true : undefined, kind: r.kind, text: r.text, font: r.font, family: r.family,
+        size: r.size, screenSize: r.size === null ? null : r.size * scale, floor: r.floor, block: r.block, fill: r.fill, alpha: r.alpha * (cur?.opacity ?? 1), stroke: r.stroke || undefined,
+        box: aabb(quad), quad, line: aabb(quadOf(r.line)), approximate: approximate ?? undefined,
+      });
+    };
+  }
+
+  /** Run fn with item attributed as the one being drawn (the outermost item wins: a precomp's layers belong to its item). */
+  function drawingItem(id, opacity, fn) {
+    if (cur || !inspect.record) return fn();
+    cur = { item: id, track: curTrack, opacity };
+    try { return fn(); } finally { cur = null; }
+  }
+
+  /**
+   * Draw one frame of a clip composition (already validated and pinned).
+   * extra: { beats, markers, words, captions, lane, record (collect what f.lib.text and f.lib.solid draw), suppressText (draw everything but text) }.
+   * Returns { texts } when recording (one entry per drawn word, in frame pixels), else undefined.
+   */
   function renderClipFrame(ctx, comp, frame, extra = {}) {
     track(ctx);
     layerIndex = 0;
     resetState(ctx);
     const { width, height, fps } = comp;
     const t = frame / fps;
+    const texts = extra.record ? [] : null;
+    inspect.record = texts ? recorder(texts) : null;
+    inspect.suppress = !!extra.suppressText;
+    inspect.frame = { width, height, short: Math.min(width, height) };
+    assetCanvases.clear();
+    cur = null; inTransition = false;
     ctx.save();
     try {
       ctx.fillStyle = comp.background ?? '#000000';
@@ -507,10 +562,17 @@ export function createRuntime(host) {
       const clip = { t, frame, duration: comp.duration, fps, width, height, format: formatOf(width, height), beats: extra.beats ?? comp.beats ?? [], markers: extra.markers ?? comp.markers ?? [] };
       // v2: the clip's theme, read by every asset as f.theme (only set when the clip has one)
       if (comp.theme) clip.theme = themeOf(comp.theme);
+      // v3: the narration's words and the caption pages in clip time, and the caption lane (only set when the clip has them)
+      if (extra.words?.length) clip.words = extra.words;
+      if (extra.captions) clip.captions = extra.captions;
+      if (extra.lane) clip.lane = extra.lane;
       const format = formatOf(width, height);
       const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
+      // captions that are file only are not drawn
+      const fileOnly = comp.captions && comp.captions.burnIn === false;
       for (const tr of comp.tracks) {
-        if (tr.type === 'audio' || tr.hidden || (solo && !tr.solo)) continue;
+        if (tr.type === 'audio' || tr.hidden || (solo && !tr.solo) || (fileOnly && tr.role === 'captions')) continue;
+        curTrack = tr.id;
         // v2: a track with effects is drawn on its own layer first, then processed (an adjustment layer)
         if (tr.effects?.length) { drawTrackWithEffects(ctx, comp, tr, frame, t, clip, format); continue; }
         const handoff = transitionsAt(tr, frame, fps);
@@ -539,11 +601,11 @@ export function createRuntime(host) {
             target.beginPath();
             if (box) target.translate(box.x, box.y);
             const w = box ? box.width : width, h = box ? box.height : height;
-            invoke(e, item.params, {
+            drawingItem(item.id, layered ? opacity : 1, () => invoke(e, item.params, {
               ctx: target, width: w, height: h, fps, t: lt, duration: item.duration, depth: 0,
               seed: hashSeed(comp.seed ?? 1, item.id), format: formatOf(w, h), clip,
-              safe: box ? { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: w, height: h } : safeZone(width, height),
-            });
+              safe: box ? { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: w, height: h } : clipSafe(comp),
+            }));
           } catch (err) {
             if (err instanceof AssetError) err.message = `item "${item.id}" at ${t.toFixed(3)}s: ${err.message}`;
             throw err;
@@ -571,7 +633,20 @@ export function createRuntime(host) {
       }
     } finally {
       while (ctx.__saveDepth() > 0) ctx.restore();
+      inspect.record = null;
+      inspect.suppress = false;
+      cur = null; curTrack = null; inTransition = false;
     }
+    return texts ? { texts } : undefined;
+  }
+
+  /** The safe zone a clip's full-frame items see as f.safe: the format's, or (opt-in, safe: 'platform') the tightest edge of its platform profiles. */
+  const safes = new Map();
+  function clipSafe(comp) {
+    if (comp.safe !== 'platform' || !comp.platforms?.length) return safeZone(comp.width, comp.height);
+    const key = `${comp.platforms.join(',')}|${comp.width}x${comp.height}`;
+    if (!safes.has(key)) { const p = platformSafe(comp.platforms, comp.width, comp.height); safes.set(key, { top: p.top, right: p.right, bottom: p.bottom, left: p.left, x: p.x, y: p.y, width: p.width, height: p.height }); }
+    return safes.get(key);
   }
 
   const themes = new Map();
@@ -697,7 +772,7 @@ export function createRuntime(host) {
           ctx: target, width: geo.width, height: geo.height, fps, t: st.at, duration: st.whole, depth: 0,
           seed: hashSeed(comp.seed ?? 1, item.seedId ?? item.id), clip,
           format: geo.full ? formatOf(width, height) : formatOf(geo.width, geo.height),
-          safe: geo.full ? safeZone(width, height) : { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: geo.width, height: geo.height },
+          safe: geo.full ? clipSafe(comp) : { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: geo.width, height: geo.height },
         });
       }
     } finally {
@@ -718,12 +793,14 @@ export function createRuntime(host) {
       if (!st) return;
       const own = item.effects?.length || item.mask;
       const layered = own || st.opacity < 1 || (item.blend && item.blend !== 'source-over');
-      if (!layered) return drawContent(ctx, comp, item, st, clip);
-      let layer = offscreen(comp.width, comp.height);
-      drawContent(layer.ctx, comp, item, st, clip);
-      if (item.effects?.length) layer = applyEffects(layer, item.effects, comp, { t: st.at, duration: st.whole }, clip, item.seedId ?? item.id);
-      if (item.mask) applyMask(layer, comp, item, st, t, clip);
-      composite(ctx, layer.canvas, st.opacity, item.blend);
+      drawingItem(item.id, layered ? st.opacity : 1, () => {
+        if (!layered) return drawContent(ctx, comp, item, st, clip);
+        let layer = offscreen(comp.width, comp.height);
+        drawContent(layer.ctx, comp, item, st, clip);
+        if (item.effects?.length) layer = applyEffects(layer, item.effects, comp, { t: st.at, duration: st.whole }, clip, item.seedId ?? item.id);
+        if (item.mask) applyMask(layer, comp, item, st, t, clip);
+        composite(ctx, layer.canvas, st.opacity, item.blend);
+      });
     } catch (err) {
       if (err instanceof AssetError && !err.message.startsWith('item "')) err.message = `item "${item.id}" at ${t.toFixed(3)}s: ${err.message}`;
       throw err;
@@ -748,7 +825,7 @@ export function createRuntime(host) {
       invoke(e, fx.params, {
         ctx: out.ctx, width: comp.width, height: comp.height, fps: comp.fps, t: span.t, duration: span.duration, depth: 0,
         seed: hashSeed(comp.seed ?? 1, owner, 'effect', i), clip, source: src,
-        format: formatOf(comp.width, comp.height), safe: safeZone(comp.width, comp.height),
+        format: formatOf(comp.width, comp.height), safe: clipSafe(comp),
       });
       src = out;
     });
@@ -761,7 +838,13 @@ export function createRuntime(host) {
     const mask = offscreen(comp.width, comp.height);
     const mItem = { id: `${item.id}:mask`, seedId: `${item.seedId ?? item.id}:mask`, asset: m.asset, start: item.start, duration: item.duration, params: m.params, offset: item.offset, assetDuration: item.assetDuration, transform: m.transform ?? st.transform };
     const mst = layerState(comp, mItem, t, clip);
-    if (mst) drawContent(mask.ctx, comp, mItem, { ...mst, geo: m.transform ? mst.geo : st.geo }, clip);
+    // text in a mask (block letters cut out of a photo) is the item's text: recorded as such
+    if (cur) cur.mask = true;
+    try {
+      if (mst) drawContent(mask.ctx, comp, mItem, { ...mst, geo: m.transform ? mst.geo : st.geo }, clip);
+    } finally {
+      if (cur) cur.mask = false;
+    }
     const mode = m.mode ?? 'alpha';
     if (mode.startsWith('luma')) {
       // brightness becomes coverage: the same arithmetic on every platform
@@ -821,13 +904,20 @@ export function createRuntime(host) {
     const e = entry(item.transition.asset);
     if (e.def.kind !== 'transition') throw new AssetError(`item "${item.id}": ${item.transition.asset} is a ${e.def.kind} asset, not a transition`);
     const to = offscreen(comp.width, comp.height);
-    drawLayer(to.ctx, comp, forFormat(item, format), t, clip);
+    // a transition moves and mixes these layers, so what is recorded in them is only roughly where it shows
+    const was = inTransition;
+    inTransition = true;
     let fromLayer = null;
-    if (from) {
-      fromLayer = offscreen(comp.width, comp.height);
-      // the outgoing item holds its last frame once it has ended
-      const last = from.start + from.duration - 1 / comp.fps;
-      drawLayer(fromLayer.ctx, comp, forFormat(from, format), Math.min(t, last), clip);
+    try {
+      drawLayer(to.ctx, comp, forFormat(item, format), t, clip);
+      if (from) {
+        fromLayer = offscreen(comp.width, comp.height);
+        // the outgoing item holds its last frame once it has ended
+        const last = from.start + from.duration - 1 / comp.fps;
+        drawLayer(fromLayer.ctx, comp, forFormat(from, format), Math.min(t, last), clip);
+      }
+    } finally {
+      inTransition = was;
     }
     const out = offscreen(comp.width, comp.height);
     const lt = t - tx.start;
@@ -835,7 +925,7 @@ export function createRuntime(host) {
       invoke(e, item.transition.params, {
         ctx: out.ctx, width: comp.width, height: comp.height, fps: comp.fps, t: lt, duration: tx.duration, depth: 0,
         seed: hashSeed(comp.seed ?? 1, item.id, 'transition'), clip, from: fromLayer, to,
-        format: formatOf(comp.width, comp.height), safe: safeZone(comp.width, comp.height),
+        format: formatOf(comp.width, comp.height), safe: clipSafe(comp),
       });
     } catch (err) {
       if (err instanceof AssetError) err.message = `item "${item.id}" at ${t.toFixed(3)}s (transition): ${err.message}`;
@@ -916,7 +1006,7 @@ export function createRuntime(host) {
   }
 
   return {
-    lib, load, compile, setImage, setSequence, sequenceFramesAt, renderAsset, renderClipFrame, renderAudio, callValue, callMotion,
+    lib, load, compile, setImage, setSequence, sequenceFramesAt, renderAsset, renderClipFrame, renderAudio, callValue, callMotion, takeTexts,
     has: (ref) => entries.has(ref) || images.has(ref) || sequences.has(ref),
     definition: (ref) => entry(ref).def,
     clearTextCache: () => lib.text.clearCache(),

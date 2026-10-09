@@ -55,7 +55,11 @@ function surface(w, h) {
 const handlers = {
   async fonts({ fonts }) {
     const faces = [];
-    for (const fam of fonts) for (const f of fam.files) faces.push(new FontFace(fam.family, `url(${f.url})`, { weight: String(f.weight), style: f.style }));
+    for (const fam of fonts) {
+      for (const f of fam.files) faces.push(new FontFace(fam.family, `url(${f.url})`, { weight: String(f.weight), style: f.style }));
+      // Latin Extended under the family's alias, as in Node (core/lib/text.js fontString)
+      for (const f of fam.ext?.files ?? []) faces.push(new FontFace(fam.ext.family, `url(${f.url})`, { weight: String(f.weight), style: f.style }));
+    }
     await Promise.all(faces.map((face) => face.load().then((loaded) => self.fonts.add(loaded))));
     return {};
   },
