@@ -138,6 +138,16 @@ export async function openSession({ width = 1440, height = 900, mobile = false, 
       await sleep(settle);
       await frame();
     },
+    /** A touch tap (touch start, touch end, as a finger would make it), for the phone-sized sessions. */
+    async tap(target, { settle = 350 } = {}) {
+      const p = typeof target === 'string' ? await rect(target) : { cx: target.x, cy: target.y };
+      at = { x: p.cx, y: p.cy };
+      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.cx, y: p.cy }] });
+      await sleep(60);
+      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await sleep(settle);
+      await frame();
+    },
     /**
      * Press at `from`, move to `to` in steps, release. `during` runs with the button still down.
      * @param {{ x: number, y: number }} from @param {{ x: number, y: number }} to

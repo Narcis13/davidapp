@@ -1,0 +1,126 @@
+{
+ "what": "Iteration-3 studio workflows driven in headless Chrome with real mouse, keyboard and touch input (scripts/workflows-v3.mjs); every check is asserted by the script.",
+ "base": "http://127.0.0.1:8796",
+ "clip": "v3-demo",
+ "workflows": {
+  "words": {
+   "what": "narration words on the timeline: click one to go there; the anchored item shows its anchor and follows another word",
+   "checks": {
+    "every word of the bundle is a block on the narration": true,
+    "the playhead is at the start of the word": true,
+    "the position and the time read-out follow": true,
+    "and moves on to the next one": true,
+    "the block shows its anchor mark": true,
+    "the inspector says which word it starts on": true,
+    "the item sits on the new word on the timeline": true,
+    "the item moved left, the way the word is earlier": true,
+    "the inspector follows the new word": true,
+    "the start in the inspector is the word's start": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-v3-words.gif",
+   "frames": 8
+  },
+  "markers": {
+   "what": "the marker lane: add, drag, retype and delete a marker, the M key, undo, save",
+   "checks": {
+    "the lane shows a flag for each marker of the clip": true,
+    "with all five types: cut, hold, beat, word and note": true,
+    "a cut marker appears at the playhead and the inspector shows it": true,
+    "the time in the inspector changed with the drag": true,
+    "and the flag sits at the new time": true,
+    "the flag is now a beat marker": true,
+    "the marker is gone and the inspector has let go of it": true,
+    "the timeline had the focus": true,
+    "a note marker is at the playhead": true,
+    "undo took the note marker away": true,
+    "the note moved": true,
+    "the saved clip has the edited note": true,
+    "and still the six markers it began with (the added ones are gone)": true,
+    "phone: a tap selects the marker and the inspector shows it": true,
+    "phone: a marker was added by touch": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-v3-markers.gif",
+   "frames": 21,
+   "mobileGif": "gifs/workflow-v3-markers-mobile.gif",
+   "mobileFrames": 3
+  },
+  "audio": {
+   "what": "gain keys and ducking in the inspector: add a key, type a dB value, pick an ease, ducking source, save",
+   "checks": {
+    "the key rows match the composition": true,
+    "a key row appears at the playhead, between its neighbours": true,
+    "the key holds -9 dB": true,
+    "the curve changed (it dips between the neighbours)": true,
+    "the ease is \"outCubic\" and the curve changed again": true,
+    "the box holds 12": true,
+    "the threshold box was not there with the words source and is now": true,
+    "the threshold box is gone again": true,
+    "the saved composition has the key at 5 s with -9 dB and its ease": true,
+    "and ducking by 12 dB from the words": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-v3-audio.gif",
+   "frames": 16
+  },
+  "report": {
+   "what": "the render report: queue row, report dialog, gallery section and downloads",
+   "checks": {
+    "the row shows the measured loudness": true,
+    "and whether the target was met": true,
+    "and a one-sentence note on the master": true,
+    "and how many problems there are": true,
+    "the probe table, loudness and every list are in the report": true,
+    "at least one frame sheet thumbnail loaded": true,
+    "the dialog has the download links": true,
+    "the dialog closed": true,
+    "the gallery has all three download links": true,
+    "download-vtt serves its file": true,
+    "download-words serves its file": true,
+    "download-report serves its file": true,
+    "the gallery section has the loudness line and the frame sheets": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-v3-report.gif",
+   "frames": 7
+  },
+  "issues": {
+   "what": "run the clip checks, open an issue (playhead and still), an edit makes the list stale",
+   "checks": {
+    "the panel showed that it was checking": true,
+    "the count and the rows agree": true,
+    "the playhead moved to the time of the issue": true,
+    "the still is an image that loaded": true,
+    "the item of the issue is selected": true,
+    "nothing says the list is stale yet": true,
+    "the list says the clip has changed since the check": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-v3-issues.gif",
+   "frames": 10
+  },
+  "overlays": {
+   "what": "grid, safe areas, platform, caption lane and text boxes over the preview; never in the pixels of the canvas",
+   "checks": {
+    "with every overlay off the layer is empty": true,
+    "the grid draws thirds and a centre cross (6 lines)": true,
+    "safe areas add the title-safe, action-safe and f.safe zones": true,
+    "the platform button is enabled (the clip names a platform) and its zone is drawn": true,
+    "the caption lane is drawn": true,
+    "boxes appear for the text on screen, named by item": true,
+    "with every overlay on, the canvas has the very same pixels": true,
+    "every toggle is off and the layer is empty again": true,
+    "and the canvas is unchanged": true,
+    "no overlay toggle stayed pressed": true,
+    "phone: the overlays draw on the phone as well": true,
+    "phone: and leave the canvas pixels alone": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/workflow-v3-overlays.gif",
+   "frames": 12,
+   "mobileGif": "gifs/workflow-v3-overlays-mobile.gif",
+   "mobileFrames": 5
+  }
+ }
+}
