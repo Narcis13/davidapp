@@ -30,7 +30,7 @@ const host = {
   createCanvas: (w, h) => new OffscreenCanvas(w, h),
 };
 
-let rt = null, composition = null, beats = [], sequenceUrls = {};
+let rt = null, composition = null, clipExtra = { beats: [] }, sequenceUrls = {};
 let canvas = null;
 // sequence frames are fetched as a frame needs them, and a few seconds of them are kept
 const seqCache = new Map();
@@ -76,7 +76,8 @@ const handlers = {
     sequenceUrls = Object.fromEntries(Object.entries(bundle.sequences ?? {}).map(([ref, seq]) => [ref, seq.url]));
     rt = next;
     composition = comp ?? null;
-    beats = bundle.beats ?? [];
+    // what reaches assets as f.clip besides the composition: beats, the narration's words, caption pages and lane
+    clipExtra = { beats: bundle.beats ?? [], words: bundle.words, captions: bundle.captions, lane: bundle.lane };
     return {};
   },
   assetFrame(m) {
@@ -89,9 +90,10 @@ const handlers = {
     const comp = m.composition ?? composition;
     await loadSequenceFrames(comp, m.frame);
     const c = surface(comp.width, comp.height);
-    rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { beats });
+    const r = rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { ...clipExtra, record: !!m.record });
     const bitmap = c.transferToImageBitmap();
-    return { result: { bitmap }, transfer: [bitmap] };
+    // with record: the measured text boxes, for the editor's overlay
+    return { result: { bitmap, texts: r?.texts }, transfer: [bitmap] };
   },
   // a draft composition with the same assets (param tweaks, moved items): no recompile needed
   setComposition({ composition: comp }) {

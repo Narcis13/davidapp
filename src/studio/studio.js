@@ -2,7 +2,7 @@
 // them. The HTTP server, the MCP server, the CLI and the tests all go through this.
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync, existsSync, renameSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { openDb, json } from '../db/db.js';
@@ -10,7 +10,7 @@ import { reformat } from '../core/composition.js';
 import { mapParams } from '../core/schema.js';
 import { WorkerPool } from '../render/pool.js';
 import { ROOT } from '../render/host.js';
-import { mixToWav, defaultWorkers } from '../render/video.js';
+import { defaultWorkers } from '../render/video.js';
 import { createCanvas, loadImage } from '../render/host.js';
 import { createLibrary, StudioError, SLUG_RE } from './library.js';
 import { createClips } from './clips.js';
@@ -21,6 +21,7 @@ import { createRequests } from './requests.js';
 import { createUploads } from './uploads.js';
 import { createCompounding } from './compounding.js';
 import { createInspect } from './inspect.js';
+import { createAudio } from './audio.js';
 
 export { StudioError };
 
@@ -37,7 +38,8 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   ctx.events = events;
   const library = createLibrary(ctx);
   const clips = createClips(ctx, library);
-  const renders = createRenders(ctx, library, clips);
+  const audio = createAudio(ctx, library, clips);
+  const renders = createRenders(ctx, library, clips, audio);
   const lineage = createLineage(ctx, library, clips);
   // frame helpers below are function declarations, so they exist already
   const requests = createRequests(ctx, library, clips, { assetSheet, clipFrame, clipSheet });
@@ -184,21 +186,13 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     return out;
   }
 
-  const mixing = new Map();
-  /** The clip's audio mixed to a WAV file (cached) → path. */
-  async function clipAudio({ clip, composition }) {
+  /**
+   * The clip's audio mixed to a WAV file (cached) → path: the same file the render encodes. tracks: a stem.
+   * @param {{ clip?: string, composition?: any, tracks?: string[] }} o
+   */
+  async function clipAudio({ clip, composition, tracks }) {
     const comp = await compositionOf({ clip, composition });
-    const { audio } = await clips.bundleFor(comp);
-    const file = join(dataDir, 'cache', 'audio', `mix-${sha1(JSON.stringify([audio.inputs, comp.duration]))}.wav`);
-    if (existsSync(file)) return file;
-    // one mix at a time per file, written under a temp name so a reader never gets half a WAV
-    let job = mixing.get(file);
-    if (!job) {
-      const tmp = file.replace(/\.wav$/, `.${process.pid}.${Date.now()}.tmp.wav`);
-      job = mixToWav(audio.inputs, comp.duration, tmp).then(() => { renameSync(tmp, file); return file; }).finally(() => mixing.delete(file));
-      mixing.set(file, job);
-    }
-    return job;
+    return audio.mixFile(comp, { tracks });
   }
 
   /**
@@ -264,5 +258,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }

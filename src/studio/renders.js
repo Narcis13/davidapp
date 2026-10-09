@@ -2,11 +2,14 @@
 // queue; whichever process has a runner claims the next job atomically. Progress, cancellation and
 // the results (MP4, poster, SRT, ffprobe facts, sampled frame hashes) are all rows and files.
 
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { toSrt, reformat } from '../core/composition.js';
-import { renderVideo } from '../render/video.js';
+import { renderVideo, replaceAudio } from '../render/video.js';
+import { analyseFile, encodedSheets } from '../render/report.js';
+import { toSrt as pagesToSrt, toVtt as pagesToVtt } from '../core/captions.js';
 import { probeSummary } from '../render/ffmpeg.js';
 import { json, now, transaction } from '../db/db.js';
 import { StudioError } from './library.js';
@@ -20,7 +23,16 @@ export function sampleFrames(total, count = 16) {
   return [...out].filter((f) => f >= 0).sort((a, b) => a - b);
 }
 
-export function createRenders(ctx, library, clips) {
+const r2 = (v) => Math.round(v * 100) / 100;
+
+/** Clip words grouped by narration item, as the render report wants them. */
+const narrationOf = (words) => {
+  const by = new Map();
+  for (const w of words ?? []) { if (!by.has(w.item)) by.set(w.item, []); by.get(w.item).push({ text: w.text, start: w.start, end: w.end }); }
+  return [...by].map(([item, list]) => ({ item, words: list }));
+};
+
+export function createRenders(ctx, library, clips, sound) {
   const { db, dataDir, pool } = ctx;
   const dir = join(dataDir, 'renders');
   mkdirSync(dir, { recursive: true });
@@ -132,9 +144,15 @@ export function createRenders(ctx, library, clips) {
       const prep0 = performance.now();
       const { bundle, audio } = await clips.bundleFor(comp);
       const prepSeconds = (performance.now() - prep0) / 1000;
+      // the mix: the same WAV the preview plays (the loudness target, if any, is reached here)
+      const mix0 = performance.now();
+      const mixPath = await sound.mixFile(comp);
+      const mixSeconds = (performance.now() - mix0) / 1000;
+      // the preview plays this very file: its hash is kept with the render
+      const mixSha1 = createHash('sha1').update(readFileSync(mixPath)).digest('hex');
       const total = row.frames_total;
       const result = await renderVideo({
-        bundle, audio: audio.inputs, outPath, signal: abort.signal, hashFrames: sampleFrames(total),
+        bundle, mixPath, outPath, signal: abort.signal, hashFrames: sampleFrames(total),
         onProgress: (done) => {
           const t = Date.now();
           if (t - lastWrite < 400 && done < total) return;
@@ -147,8 +165,42 @@ export function createRenders(ctx, library, clips) {
       const posterFrame = Math.min(total - 1, Math.round(total * 0.4));
       const poster = await pool.run('clipFrame', { frame: posterFrame, output: 'png' }, { bundle, timeout: 60000 });
       writeFileSync(join(dataDir, `${base}.png`), Buffer.from(poster.png));
-      const srtText = toSrt(comp);
+      // subtitles: the caption pages (built from the words) when the clip has captions, else the cues of caption items
+      const pages = bundle.captions ?? null;
+      const srtText = pages?.length ? pagesToSrt(pages) : toSrt(comp);
       if (srtText) writeFileSync(join(dataDir, `${base}.srt`), srtText);
+      const files = {};
+      if (pages?.length) { writeFileSync(join(dataDir, `${base}.vtt`), pagesToVtt(pages)); files.vtt = `${base}.vtt`; }
+      if (bundle.words?.length) { writeFileSync(join(dataDir, `${base}.words.json`), JSON.stringify({ clip: clip.slug, fps: comp.fps, words: bundle.words }, null, 1)); files.words = `${base}.words.json`; }
+      // the report, from the encoded file: probe facts, loudness (EBU R128), black, freezes, jumps, flashes, silences, narration
+      const report0 = performance.now();
+      const reportOpts = { fps: comp.fps, duration: comp.duration, width: comp.width, height: comp.height, markers: (comp.markers ?? []).map((m) => ({ ...m, type: m.type ?? 'note' })), narration: narrationOf(bundle.words) };
+      let report = await analyseFile(outPath, reportOpts);
+      let loudnessSeconds = 0;
+      const loud = { measured: report.loudness, master: await sound.masterInfo(comp) };
+      if (comp.loudness) {
+        // AAC moves the peaks a little: a file that misses the target is corrected once with a fixed gain (and the limiter if it must)
+        const l0 = performance.now();
+        const off = comp.loudness.target - report.loudness.integrated;
+        if (Math.abs(off) > 0.5 || report.loudness.truePeak > comp.loudness.truePeak) {
+          const fixed = await sound.correctedMix(mixPath, comp.loudness, report.loudness);
+          await replaceAudio(outPath, fixed.path);
+          loud.correction = fixed.note;
+          report = await analyseFile(outPath, reportOpts);
+          loud.measured = report.loudness;
+        }
+        loud.target = comp.loudness;
+        loud.met = Math.abs(comp.loudness.target - report.loudness.integrated) <= 1 && report.loudness.truePeak <= comp.loudness.truePeak;
+        loudnessSeconds = (performance.now() - l0) / 1000;
+      }
+      writeFileSync(join(dataDir, `${base}.report.json`), JSON.stringify(report, null, 1));
+      files.report = `${base}.report.json`;
+      files.sheets = [];
+      for (const [i, s] of (await encodedSheets(outPath, { fps: comp.fps, duration: comp.duration, markers: reportOpts.markers })).entries()) {
+        writeFileSync(join(dataDir, `${base}.sheet-${i + 1}.png`), s.png);
+        files.sheets.push(`${base}.sheet-${i + 1}.png`);
+      }
+      const reportSeconds = (performance.now() - report0) / 1000 - loudnessSeconds;
       const probe = await probeSummary(outPath);
       const problems = [];
       if (probe.video?.codec !== 'h264') problems.push(`video codec is ${probe.video?.codec}`);
@@ -161,6 +213,8 @@ export function createRenders(ctx, library, clips) {
         renderSeconds: result.seconds, prepareSeconds: Math.round(prepSeconds * 100) / 100, framesPerSecond: result.fps, workers: result.workers,
         realtimeFactor: Math.round((comp.duration / result.seconds) * 100) / 100,
         probe, frameHashes: result.hashes, audioInputs: audio.inputs.length, beats: audio.beats.length, posterFrame,
+        mixSeconds: r2(mixSeconds), mixSha1, reportSeconds: r2(reportSeconds), loudnessSeconds: r2(loudnessSeconds),
+        loudness: loud, problems: report.problems, files,
       };
       const done = transaction(db, () => {
         const d = q(`UPDATE renders SET status = 'done', progress = 1, frames_done = ?, output = ?, poster = ?, srt = ?, error = NULL, log = ?, stats = ?, finished_at = ?, heartbeat = ? WHERE ${mine}`)
@@ -168,7 +222,7 @@ export function createRenders(ctx, library, clips) {
         if (d.changes) ctx.events?.emit('render', row.id, 'status', { status: 'done', clip: clip.slug });
         return d;
       });
-      if (!done.changes) for (const ext of ['mp4', 'png', 'srt']) rmSync(join(dataDir, `${base}.${ext}`), { force: true });
+      if (!done.changes) for (const f of [`${base}.mp4`, `${base}.png`, `${base}.srt`, ...Object.values(files).flat()]) rmSync(join(dataDir, f), { force: true });
     } catch (e) {
       rmSync(outPath, { force: true });
       // stopping the runner puts its job back in the queue; a cancel or a failure ends it

@@ -4,7 +4,7 @@
 
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { rmSync } from 'node:fs';
+import { renameSync, rmSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { WorkerPool, RenderError } from './pool.js';
 import { ffmpegPath, run } from './ffmpeg.js';
@@ -24,46 +24,27 @@ export function quietLog(log) {
   return log.split(/\r?\n/).filter((line) => !BENIGN.test(line)).join('\n').trim();
 }
 
-/** The filter graph that places, trims, fades and mixes the audio inputs (FFmpeg input 0 is `first`). */
-export function audioGraph(inputs, duration, first = 1) {
-  if (!inputs.length) return null;
-  const n = (v) => +v.toFixed(3);
-  const parts = inputs.map((a, i) => {
-    const from = a.offset ?? 0;
-    const chain = ['aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo', `atrim=${n(from)}:${n(from + a.duration)}`, 'asetpts=PTS-STARTPTS'];
-    if (a.fadeIn > 0) chain.push(`afade=t=in:st=0:d=${n(a.fadeIn)}`);
-    if (a.fadeOut > 0) chain.push(`afade=t=out:st=${n(Math.max(0, a.duration - a.fadeOut))}:d=${n(a.fadeOut)}`);
-    if (a.gain !== 1) chain.push(`volume=${n(a.gain)}`);
-    if (a.start > 0) chain.push(`adelay=${Math.round(a.start * 1000)}:all=1`);
-    return `[${i + first}:a]${chain.join(',')}[a${i}]`;
-  });
-  const labels = inputs.map((_, i) => `[a${i}]`).join('');
-  const mix = inputs.length > 1 ? `${labels}amix=inputs=${inputs.length}:normalize=0:dropout_transition=0,` : `${labels}`;
-  parts.push(`${mix}alimiter=limit=0.95:level=false,apad,atrim=0:${n(duration)}[aout]`);
-  return parts.join(';');
-}
-
-/** Mix the audio inputs to a WAV (the studio plays it under the preview). */
-export async function mixToWav(inputs, duration, outPath) {
-  const args = ['-y', '-hide_banner', '-loglevel', 'error'];
-  if (!inputs.length) args.push('-f', 'lavfi', '-t', String(duration), '-i', 'anullsrc=r=48000:cl=stereo', '-c:a', 'pcm_s16le', outPath);
-  else {
-    for (const a of inputs) args.push('-guess_layout_max', '0', '-i', a.path);
-    args.push('-filter_complex', audioGraph(inputs, duration, 0), '-map', '[aout]', '-c:a', 'pcm_s16le', '-ar', '48000', '-ac', '2', outPath);
-  }
-  const r = await run(ffmpegPath(), args);
-  if (r.code !== 0) throw new RenderError(`ffmpeg could not mix the audio: ${r.stderr.trim()}`);
-  return outPath;
+/**
+ * Replace the audio of an encoded MP4 with a WAV (a loudness correction): the video stream is copied, the audio
+ * encoded as in a render (AAC 192 kb/s, 48 kHz stereo), faststart kept. Writes to a temp file, then over the MP4.
+ */
+export async function replaceAudio(mp4, wav) {
+  const tmp = mp4.replace(/\.mp4$/, `.${process.pid}.audio.mp4`);
+  const r = await run(ffmpegPath(), ['-y', '-hide_banner', '-loglevel', 'error', '-i', mp4, '-guess_layout_max', '0', '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy',
+    '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-shortest', '-movflags', '+faststart', tmp]);
+  if (r.code !== 0) { rmSync(tmp, { force: true }); throw new RenderError(`ffmpeg could not replace the audio: ${r.stderr.trim()}`); }
+  renameSync(tmp, mp4);
 }
 
 /**
  * Render a composition to outPath.
- *   bundle: worker bundle with the composition and beats; audio: [{ path, start, duration, gain, fadeIn, fadeOut }]
+ *   bundle: worker bundle with the composition and beats; mixPath: the clip's mixed audio (a WAV the length of the clip,
+ *   made by studio/audio.js: the same file the preview plays), encoded as it is; without it the clip is silent
  *   onProgress(done, total); signal: AbortSignal; hashFrames: frame numbers to SHA-256 (raw RGBA).
  * Returns { frames, seconds, fps, hashes: { frame: sha256 }, log, workers }.
  * @param {any} o
  */
-export async function renderVideo({ bundle, audio = [], outPath, workers = defaultWorkers(), signal, onProgress = () => {}, hashFrames = [], preset = 'medium', crf = 18 }) {
+export async function renderVideo({ bundle, mixPath = null, outPath, workers = defaultWorkers(), signal, onProgress = () => {}, hashFrames = [], preset = 'medium', crf = 18 }) {
   const comp = bundle.composition;
   const total = Math.round(comp.duration * comp.fps);
   if (total < 1) throw new RenderError('The clip is shorter than one frame');
@@ -71,9 +52,9 @@ export async function renderVideo({ bundle, audio = [], outPath, workers = defau
   const args = ['-y', '-hide_banner', '-loglevel', 'warning', '-nostats',
     '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${comp.width}x${comp.height}`, '-framerate', String(comp.fps), '-i', 'pipe:0'];
   // a WAV without a channel mask would make FFmpeg warn that it guessed the layout; aformat sets it
-  if (audio.length) for (const a of audio) args.push('-guess_layout_max', '0', '-i', a.path);
+  if (mixPath) args.push('-guess_layout_max', '0', '-i', mixPath);
   else args.push('-f', 'lavfi', '-t', String(comp.duration), '-i', 'anullsrc=r=48000:cl=stereo');
-  const graph = audioGraph(audio, comp.duration);
+  const graph = mixPath ? `[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad,atrim=0:${+comp.duration.toFixed(3)}[aout]` : null;
   // setparams tags the frames BT.709: FFmpeg 9 ignores the -color_* output options for a raw input and writes
   // primaries and transfer as unknown (the pixels are the same either way)
   const video = '[0:v]scale=in_range=full:out_range=tv:out_color_matrix=bt709:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709[vout]';

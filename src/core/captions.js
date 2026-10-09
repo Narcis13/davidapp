@@ -225,7 +225,8 @@ function manualRanges(words, link, bc, opt, structure, problems) {
 function pageTimes(ranges, words, opt) {
   const lead = opt.lead / opt.fps;
   const base = ranges.map((r) => ({ ws: words[r.a].start, we: words[r.b].end }));
-  const start = base.map((p, k) => round3(Math.min(p.ws, Math.max(p.ws - lead, k ? base[k - 1].we : 0, 0))));
+  // rounded up to the millisecond: rounding down could put a page more than `lead` frames before its word
+  const start = base.map((p, k) => Math.min(p.ws, Math.max(0, Math.ceil(Math.max(p.ws - lead, k ? base[k - 1].we : 0, 0) * 1000 - 1e-6) / 1000)));
   return base.map((p, k) => {
     const ns = k + 1 < base.length ? start[k + 1] : Infinity;
     let end = Math.max(p.we, Math.min(start[k] + opt.minDuration, ns));

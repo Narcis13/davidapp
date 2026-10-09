@@ -136,11 +136,11 @@ test('lead: a page starts up to two frames early, never after its word, never be
   const w = at([['One', 2, 2.4], ['two', 2.5, 2.9], ['Three', 4, 4.4], ['four', 4.45, 4.9]]);
   const s = { pages: [{ start: 'v:0', lines: [] }, { start: 'v:2', lines: [] }] };
   const { pages } = buildPages(w, { ...O, ...s });
-  assert.equal(pages[0].start, 1.933); // 2 − 2/30
-  assert.equal(pages[1].start, 3.933);
+  assert.equal(pages[0].start, 1.934); // 2 − 2/30, rounded up so it is never more than 2 frames early
+  assert.equal(pages[1].start, 3.934);
   assert.ok(pages.every((p) => p.start <= p.lines[0][0].start));
   // 4 frames at 24 fps
-  assert.equal(buildPages(w, { ...O, fps: 24, lead: 4, ...s }).pages[0].start, 1.833);
+  assert.equal(buildPages(w, { ...O, fps: 24, lead: 4, ...s }).pages[0].start, 1.834);
   assert.equal(buildPages(w, { ...O, lead: 0, ...s }).pages[0].start, 2);
   // the previous word ends 0.03 s before the next page's word: the next page cannot start earlier than that
   const tight = at([['One', 1, 1.5], ['two', 1.51, 1.97], ['Three', 2, 2.5]]);
@@ -183,19 +183,19 @@ test('minDuration: a one-word page lasts 0.8 s when the silence allows, otherwis
   const o = { ...O, pauseBreak: 0.5 };
   const roomy = buildPages(at([['Hi', 1, 1.3], ['there', 2.3, 2.7], ['friend', 2.8, 3.2]]), o).pages;
   assert.equal(roomy[0].text, 'Hi');
-  assert.equal(roomy[0].start, 0.933);
-  assert.equal(roomy[0].end - roomy[0].start, 0.8);
-  assert.equal(roomy[0].end, 1.733);
+  assert.equal(roomy[0].start, 0.934);
+  assert.ok(Math.abs(roomy[0].end - roomy[0].start - 0.8) < 1e-9);
+  assert.equal(roomy[0].end, 1.734);
   // the next page comes 0.6 s after the word: the extension stops at its start (the gap left is under closeGap, so it holds)
   const near = buildPages(at([['Hi', 1, 1.3], ['there', 1.9, 2.3], ['friend', 2.4, 2.8]]), o).pages;
   assert.equal(near[0].end, near[1].start);
-  assert.equal(near[1].start, 1.833);
+  assert.equal(near[1].start, 1.834);
   // a page that is long enough already is not extended
   assert.equal(buildPages(at([['Wonderful', 1, 2], ['news', 2.1, 2.5]]), O).pages[0].end, 2.5);
   // the last page extends too
-  assert.equal(buildPages(at([['Bye', 5, 5.2]]), O).pages[0].end, 5.733);
+  assert.equal(buildPages(at([['Bye', 5, 5.2]]), O).pages[0].end, 5.734);
   // an option
-  assert.equal(buildPages(at([['Hi', 1, 1.3]]), { ...O, minDuration: 1.5 }).pages[0].end, 2.433);
+  assert.equal(buildPages(at([['Hi', 1, 1.3]]), { ...O, minDuration: 1.5 }).pages[0].end, 2.434);
 });
 
 test('maxChars 32 and 20 both hold, and every word lands once in order', () => {
@@ -381,11 +381,11 @@ test('toSrt and toVtt: exact text, and a round trip through parseSrt and parseVt
   const w = words('First we trim the silence, then we normalize the loudness, and finally we export the file.');
   const { pages } = buildPages(w, O);
   const srt = toSrt(pages);
-  assert.match(srt, /^1\n00:00:00\.933|^1\n00:00:00,933 --> /);
-  assert.ok(srt.startsWith('1\n00:00:00,933 --> 00:00:0') && srt.endsWith('\n\n') && !srt.includes('.933'));
+  assert.match(srt, /^1\n00:00:00,934 --> /);
+  assert.ok(srt.startsWith('1\n00:00:00,934 --> 00:00:0') && srt.endsWith('\n\n') && !srt.includes('.934'));
   assert.ok(srt.includes('\n\n2\n'));
   const vtt = toVtt(pages);
-  assert.ok(vtt.startsWith('WEBVTT\n\n00:00:00.933 --> '));
+  assert.ok(vtt.startsWith('WEBVTT\n\n00:00:00.934 --> '));
   assert.ok(!/^\d+$/m.test(vtt.replace(/\d+:\d+:\d+\.\d+/g, '')));
 
   const expected = pages.map((p) => ({ start: p.start, end: p.end, text: p.text }));

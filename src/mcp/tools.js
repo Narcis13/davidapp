@@ -8,6 +8,8 @@ import { ENGINE_VERSION, FORMATS } from '../core/engine.js';
 import { ROOT } from '../render/host.js';
 import { StudioError } from '../studio/studio.js';
 import { sideBySide, createCanvas, loadImage } from '../render/host.js';
+import { checkTranscript } from '../core/words.js';
+import { json } from '../db/db.js';
 
 const FORMAT = z.enum(['vertical', 'horizontal', 'square']);
 const REF = z.string().describe('Asset reference: "name" (latest version) or "name@3" (pinned)');
@@ -16,7 +18,8 @@ const AUTHOR = z.string().optional().describe('Who is writing this (model id or 
 const COMPOSITION = z.record(z.string(), z.any()).describe('Clip composition: { format | width+height, fps, duration, background, seed, theme?, easing?, effects?: [{ asset, params }], tracks: [{ id, name, type: visual|text|audio, hidden, locked, solo, muted, effects?: [{ asset, params }], items: [{ id, asset, start, duration, params, fadeIn, fadeOut, opacity, blend, transform: { space: frame|safe, x, y, width, height (fractions of the space), anchorX, anchorY, scale, scaleX, scaleY, rotation (degrees) }, keyframes: { x|y|scale|rotation|opacity|params.<name>: [{ t, v, ease }] }, formats: { vertical|horizontal|square: { transform, keyframes, params, hidden, opacity } }, motions: [{ asset, phase: in|out|emphasis|loop, duration, at, params }], effects: [{ asset, params }], transition: { asset, duration?, params }, mask: { asset, mode: alpha|alpha-inverted|luma|luma-inverted, params, transform? }, offset, assetDuration, seedId (a part of a split item: where it starts in the asset, the length it was cut from, and the id it takes its random seed from; split_item sets them), gain (audio), beats (audio) }] }] }. Tracks draw bottom to top; a visual track also takes image and sequence assets (params.fit: contain|cover|fill; sequences also params.loop). See studio_guide for the layout model and the kinds.');
 
 const compactAsset = (a) => ({ ref: a.ref, type: a.type, kind: a.kind, title: a.title, description: a.description, tags: a.tags, formats: a.formats, duration: a.duration, params: a.params, author: a.author, originClip: a.originClip, forkedFrom: a.forkedFrom, usedByClips: a.usedByClips });
-const compactRender = (r) => ({ id: r.id, clip: r.clip, status: r.status, progress: Math.round(r.progress * 1000) / 1000, framesDone: r.framesDone, framesTotal: r.framesTotal, error: r.error, output: r.outputPath, poster: r.posterPath, srt: r.srt, log: r.log || undefined, stats: r.status === 'done' ? { renderSeconds: r.stats.renderSeconds, framesPerSecond: r.stats.framesPerSecond, realtimeFactor: r.stats.realtimeFactor, probe: r.stats.probe, frameHashes: r.stats.frameHashes } : undefined });
+const compactRender = (r) => ({ id: r.id, clip: r.clip, format: r.format, status: r.status, progress: Math.round(r.progress * 1000) / 1000, framesDone: r.framesDone, framesTotal: r.framesTotal, error: r.error, output: r.outputPath, poster: r.posterPath, srt: r.srt, log: r.log || undefined,
+  stats: r.status === 'done' ? { renderSeconds: r.stats.renderSeconds, framesPerSecond: r.stats.framesPerSecond, realtimeFactor: r.stats.realtimeFactor, mixSeconds: r.stats.mixSeconds, reportSeconds: r.stats.reportSeconds, loudnessSeconds: r.stats.loudnessSeconds, probe: r.stats.probe, frameHashes: r.stats.frameHashes, loudness: r.stats.loudness, problems: r.stats.problems, files: r.stats.files } : undefined });
 
 /** @param {any} studio @param {{ author?: string }} [o] */
 export function createTools(studio, { author: defaultAuthor = process.env.STUDIO_AUTHOR ?? 'mcp-client' } = {}) {
@@ -377,6 +380,78 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       input: { clip: z.string().optional(), composition: COMPOSITION.optional(), format: FORMAT.optional(), times: z.array(z.number().min(0)).min(1).max(64) },
       readOnly: true,
       run: async (a) => ({ json: { clip: a.clip ?? null, format: a.format, frames: await studio.frameHashes({ clip: a.clip, composition: a.composition, format: a.format, times: a.times }) } }),
+    },
+    // ── narration, words, captions and the mix ───────────────────────────────────────────
+    {
+      name: 'add_narration',
+      title: 'Add a narration (voice + words)',
+      description: 'Add a voice recording as a narration: a sound asset that also knows its script and when each word is spoken. timings is what a voice service or aligner returned: a word list ([{ word|text, start, end }] in seconds or ms; Deepgram, OpenAI verbose_json, AssemblyAI), character alignment (ElevenLabs alignment), or whisper.cpp JSON (-oj, -ojf, -ml 1). The words are aligned to the script, so word i is the script\'s word i in every take: the same name again is a new take (a new version), and everything anchored to its words follows it (repin_clip or update_clip to move a clip to the new take). transcript: a speech-to-text transcript of the take, checked against the script (slips, drops, insertions; case, punctuation and numerals do not count). Put it on an audio track; its words reach every asset as f.clip.words.',
+      input: {
+        name: z.string(), path: z.string().optional().describe('Absolute path of the audio file (wav, mp3, m4a, ogg)'), data_base64: z.string().optional(), ext: z.string().optional().describe('With data_base64: ".wav", ".mp3"…'),
+        script: z.string().describe('The text it was meant to say'),
+        timings: z.any().describe('Word timings in any supported shape (an object or array, or a JSON string)'),
+        timings_path: z.string().optional().describe('Or a JSON file with the timings'),
+        unit: z.enum(['s', 'ms']).optional(), transcript: z.any().optional().describe('Plain text, or timed words'), language: z.string().optional(),
+        voice: z.record(z.string(), z.any()).optional().describe('Who or what spoke it, and its licence: { name, model, license, source }'),
+        license: z.string().optional(), description: z.string().optional(), title: z.string().optional(), tags: z.array(z.string()).optional(), take: z.string().optional(), for_clip: z.string().optional(), author: AUTHOR,
+      },
+      run: async (a) => {
+        let timings = a.timings_path ? readFileSync(a.timings_path, 'utf8') : a.timings;
+        if (typeof timings === 'string') { try { timings = JSON.parse(timings); } catch { throw new StudioError('timings: not valid JSON'); } }
+        if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64 (with ext)');
+        const r = await studio.audio.addNarration({ slug: a.name, path: a.path, data: a.data_base64 ? Buffer.from(a.data_base64, 'base64') : undefined, ext: a.ext, script: a.script, timings, unit: a.unit, transcript: a.transcript, language: a.language, voice: a.voice, license: a.license, description: a.description, title: a.title, tags: a.tags, take: a.take, forClip: a.for_clip, author: who(a.author) });
+        return { json: { added: r.asset.ref, duration: r.asset.duration, words: r.words, stats: r.stats, source: r.source, transcript: r.transcript, warnings: r.warnings } };
+      },
+    },
+    {
+      name: 'check_transcript',
+      title: 'Check a take against its script',
+      description: 'Compare a transcript of a take (from any speech-to-text tool: plain text or timed words) with the script it was meant to say, after normalising case, punctuation and numerals ("14" = "fourteen", "2026" = "twenty twenty-six"): names every slip (a different word), drop (a script word not said) and insertion (a word not in the script), with the script word\'s index. Give a narration (its script is used) or the script itself.',
+      input: { narration: REF.optional(), script: z.string().optional(), transcript: z.any(), language: z.string().optional() },
+      readOnly: true,
+      run: (a) => {
+        let script = a.script;
+        if (!script && a.narration) script = json(library.requireVersion(a.narration).meta, {}).narration?.script;
+        if (!script) throw new StudioError(a.narration ? `${a.narration} is not a narration (it has no script)` : 'Give narration or script');
+        let transcript = a.transcript;
+        if (typeof transcript === 'string' && /^\s*[[{]/.test(transcript)) { try { transcript = JSON.parse(transcript); } catch { /* plain text */ } }
+        return { json: checkTranscript(script, transcript, { language: a.language }) };
+      },
+    },
+    {
+      name: 'caption_pages',
+      title: 'Caption pages of a clip',
+      description: 'The caption pages built from the clip\'s narration words by the rules (at most 2 lines; ~32 characters a line in 16:9, 20 otherwise; breaks at phrases; numbers stay with their units and names stay whole; a page starts on its first word or up to 2 frames before; at least 0.8 s; gaps under 0.3 s close), following the page structure the composition holds (composition.captions.pages) when it has one; with every rule break listed. Adjust them with edit_clip caption ops: caption_split { at: word key }, caption_merge { page }, caption_break { page, at: word key | null }, caption_move { page, at: word key }, caption_auto. Word keys are "<narration item>:<word index>".',
+      input: { clip: z.string().optional(), composition: COMPOSITION.optional(), format: FORMAT.optional() },
+      readOnly: true,
+      run: async (a) => {
+        const comp = await studio.compositionOf({ clip: a.clip, composition: a.composition, format: a.format });
+        const r = clips.captionPages(comp);
+        return { json: { settings: { ...r.settings, pages: undefined }, structure: comp.captions?.pages ? 'manual' : 'rules', pages: r.pages.map((p) => ({ index: p.index, start: p.start, end: p.end, text: p.text, keys: p.keys })), problems: r.problems, words: r.words.length } };
+      },
+    },
+    {
+      name: 'anchor_report',
+      title: 'How far anchored visuals are from their words',
+      description: 'For every item start, keyframe and marker pinned to a narration word (anchor: { item, word, edge, offset }): the word, its time, the time and frame the visual lands on, and the distance in frames. Anchors are resolved whenever the clip is saved, so a new take keeps them on their words.',
+      input: { clip: z.string().optional(), composition: COMPOSITION.optional() },
+      readOnly: true,
+      run: async (a) => ({ json: { anchors: clips.anchorReport(await studio.compositionOf({ clip: a.clip, composition: a.composition })) } }),
+    },
+    {
+      name: 'audio_report',
+      title: 'Measure the mix',
+      description: 'The clip\'s mix, measured (EBU R128 in the studio): the master stage (the loudness target and the gain that reached it, or the 0.95 peak hold without a target), integrated loudness, range and true peak, where the narration speaks, how far the music and effects sit under the voice there (LU), silences longer than min_silence below silence dBFS, clipping, and how many stretches each ducked item ducks for.',
+      input: { clip: z.string().optional(), composition: COMPOSITION.optional(), silence: z.number().min(-90).max(0).optional(), min_silence: z.number().min(0.05).max(30).optional() },
+      readOnly: true,
+      run: async (a) => ({ json: await studio.audio.report(await studio.compositionOf({ clip: a.clip, composition: a.composition }), { silence: a.silence, minSilence: a.min_silence }) }),
+    },
+    {
+      name: 'export_stems',
+      title: 'Export stems',
+      description: 'The mix of chosen tracks as WAV files (voice only, music only…), without editing the clip: each stem sounds exactly as in the mix (its automation and ducking), takes the master\'s gain when the clip has a loudness target, and is measured (loudness, true peak, silences, clipping). groups: { name: [audio track ids] }; default: one stem per audio track.',
+      input: { clip: z.string().optional(), composition: COMPOSITION.optional(), groups: z.record(z.string(), z.array(z.string())).optional() },
+      run: async (a) => ({ json: { stems: await studio.audio.stems(await studio.compositionOf({ clip: a.clip, composition: a.composition }), a.groups) } }),
     },
     {
       name: 'layout_report',

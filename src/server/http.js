@@ -107,7 +107,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     // a sequence's frames are fetched as the preview needs them: /media/files/<slug>@<v>/000123.png
     const sequences = {};
     for (const [ref, s] of Object.entries(b.sequences ?? {})) sequences[ref] = { url: `/media/${s.file}/`, frames: s.frames, fps: s.fps, width: s.width, height: s.height };
-    return { key: b.key, assets: b.assets, images, sequences, beats: b.beats ?? [] };
+    return { key: b.key, assets: b.assets, images, sequences, beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane };
   }
 
   /** What the editor needs to know about each asset version a composition names. */
@@ -124,7 +124,8 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
   async function clipBundle(composition) {
     const pinned = clips.prepare(composition).composition;
     const { bundle, audio } = await clips.bundleFor(pinned);
-    return { composition: pinned, bundle: browserBundle(bundle), beats: audio.beats, assets: describeRefs(pinned) };
+    // the words (for the timeline) and the anchors' distances come with it, so the editor shows the narration
+    return { composition: pinned, bundle: browserBundle(bundle), beats: audio.beats, words: bundle.words ?? [], captions: bundle.captions ?? null, anchors: clips.anchorReport(pinned), assets: describeRefs(pinned) };
   }
 
   /** @type {[string, RegExp, (ctx: any) => any][]} */

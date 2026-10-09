@@ -373,14 +373,16 @@ const lev = (a, b) => {
 
 /**
  * Needleman-Wunsch over two token arrays: pairs [i, j] with -1 for a gap. A match costs 0, a gap 1, a
- * substitution 0.6 to 1 (more for tokens that look less alike, so "colour" for "color" beats unrelated pairings).
+ * substitution 0.6 to 0.6 + slope (more for tokens that look less alike, so "colour" for "color" beats unrelated pairings).
+ * Aligning timings uses slope 0.4 (a misheard word still lends its time); the transcript check uses 0.9, so two
+ * unrelated words pair up only when that beats a drop plus an insertion.
  */
-function nw(a, b) {
+function nw(a, b, slope = 0.4) {
   const memo = new Map();
   const sub = (x, y) => {
-    const key = `${x} ${y}`;
+    const key = `${x}|${y}`;
     let c = memo.get(key);
-    if (c === undefined) { c = 0.6 + 0.4 * (lev(x, y) / Math.max(x.length, y.length, 1)); memo.set(key, c); }
+    if (c === undefined) { c = 0.6 + slope * (lev(x, y) / Math.max(x.length, y.length, 1)); memo.set(key, c); }
     return c;
   };
   let lo = 0;
@@ -418,9 +420,9 @@ function nw(a, b) {
  * Align the words of a take to the script: for every script word whether it was said as written, said
  * differently, or dropped, and which heard words are extra. Times are not involved here.
  */
-function alignCore(scriptTexts, heardTexts, lang) {
+function alignCore(scriptTexts, heardTexts, lang, slope = 0.4) {
   const S = tokenize(scriptTexts, lang), T = tokenize(heardTexts, lang);
-  const ops = nw(S.map((t) => t.t), T.map((t) => t.t));
+  const ops = nw(S.map((t) => t.t), T.map((t) => t.t), slope);
   const sAl = new Array(S.length).fill(-1), tAl = new Array(T.length).fill(-1), after = new Array(T.length).fill(-1);
   let lastWord = -1;
   for (const [s, t] of ops) {
@@ -552,7 +554,7 @@ export function checkTranscript(script, transcript, { language = 'en' } = {}) {
       : null;
   if (!heard) throw new Error('checkTranscript needs the transcript as text, a list of words, or { words } with timed words');
   const sw = scriptWords(script, { language });
-  const { words: al, extras } = alignCore(sw.map((w) => w.text), heard, lang);
+  const { words: al, extras } = alignCore(sw.map((w) => w.text), heard, lang, 0.9);
   const slips = [], drops = [];
   let matched = 0;
   al.forEach((a, i) => {

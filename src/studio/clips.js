@@ -14,7 +14,9 @@ import { encodeWav, detectBeats } from '../render/wav.js';
 import { ffmpegPath, run } from '../render/ffmpeg.js';
 import { json, now, transaction } from '../db/db.js';
 import { SLUG_RE, StudioError } from './library.js';
-import { glyphFindings } from './inspect.js';
+import { glyphFindings, zonesOf } from './inspect.js';
+import { clipWords, narrationOf } from './audio.js';
+import { buildPages, structureOf, splitPage, mergePages, moveBreak, movePageStart } from '../core/captions.js';
 
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
 
@@ -145,8 +147,76 @@ export function createClips(ctx, library) {
       if (row && !(row.type === 'function' && row.kind === 'value')) problems.push(`easing: ${makeRef(row.slug, row.version)} is a ${row.kind ?? row.type} asset; keyframe curves come from a value asset such as "easing"`);
       else if (row) { composition.easing = makeRef(row.slug, row.version); refs.add(composition.easing); }
     }
+    // word anchors: an item's start, a keyframe or a marker on a narration word, resolved now from the pinned take
+    if (!problems.length) resolveAnchors(composition, problems);
     if (problems.length) throw new StudioError(`The composition is invalid:\n- ${problems.join('\n- ')}`, 'invalid', { problems });
     return { composition, refs: [...refs], fonts: [...fonts] };
+  }
+
+  /** The clip time of an anchor's word (start or end, plus its offset) → { time, word, item } or a problem string. */
+  function anchorTime(composition, a) {
+    const found = [...itemsOf(composition)].find((x) => x.item.id === a.item);
+    if (!found) return `no item "${a.item}" to anchor to`;
+    const n = narrationOf(library.versionRow(found.item.asset));
+    if (!n) return `item "${a.item}" is not a narration (${found.item.asset} has no words)`;
+    const w = n.words[a.word];
+    if (!w) return `narration item "${a.item}" has words 0–${n.words.length - 1}; there is no word ${a.word}`;
+    const at = (a.edge === 'end' ? w.end : w.start) + found.item.start - (found.item.offset ?? 0);
+    return { time: at + (a.offset ?? 0), wordTime: at, word: w, item: found.item };
+  }
+
+  /** Set every anchored start, keyframe time and marker time from its word (rounded to the millisecond). */
+  function resolveAnchors(composition, problems) {
+    const at = (a, where) => {
+      const r = anchorTime(composition, a);
+      if (typeof r === 'string') { problems.push(`${where}: anchor: ${r}`); return null; }
+      return r;
+    };
+    for (const { item } of itemsOf(composition)) {
+      if (item.anchor) {
+        const r = at(item.anchor, `item "${item.id}"`);
+        if (r) {
+          item.start = round3(Math.max(0, r.time));
+          // a take that moves the word late must not push the item past the end of the clip
+          if (item.start + item.duration > composition.duration) item.duration = round3(Math.max(1 / composition.fps, composition.duration - item.start));
+        }
+      }
+      for (const [prop, keys] of Object.entries(item.keyframes ?? {})) {
+        for (const k of keys) {
+          if (!k.anchor) continue;
+          const r = at(k.anchor, `item "${item.id}": keyframes.${prop}`);
+          if (r) k.t = round3(Math.max(0, r.time - item.start + (item.offset ?? 0)));
+        }
+        keys.sort((x, y) => x.t - y.t);
+      }
+    }
+    for (const m of composition.markers ?? []) {
+      if (!m.anchor) continue;
+      const r = at(m.anchor, `marker "${m.label || m.t}"`);
+      if (r) m.t = round3(Math.max(0, r.time));
+    }
+    composition.markers?.sort((x, y) => x.t - y.t);
+  }
+
+  /**
+   * How far each anchored thing is from its word, in frames, as the composition stands (after its anchors were
+   * resolved): [{ kind: item|keyframe|marker, id, prop?, word: { i, text, missing? }, wordTime, time, frame, deltaFrames }].
+   */
+  function anchorReport(composition) {
+    const fps = composition.fps;
+    const out = [];
+    const add = (kind, id, a, time, extra = {}) => {
+      const r = anchorTime(composition, a);
+      if (typeof r === 'string') { out.push({ kind, id, ...extra, error: r }); return; }
+      const frame = Math.round(time * fps);
+      out.push({ kind, id, ...extra, word: { i: a.word, text: r.word.text, missing: r.word.missing || undefined }, edge: a.edge ?? 'start', offset: a.offset ?? 0, wordTime: round3(r.time), time: round3(time), frame, deltaFrames: Math.round((frame - r.time * fps) * 100) / 100 });
+    };
+    for (const { item } of itemsOf(composition)) {
+      if (item.anchor) add('item', item.id, item.anchor, item.start);
+      for (const [prop, keys] of Object.entries(item.keyframes ?? {})) for (const k of keys) if (k.anchor) add('keyframe', item.id, k.anchor, item.start + k.t - (item.offset ?? 0), { prop });
+    }
+    for (const m of composition.markers ?? []) if (m.anchor) add('marker', m.label || `marker at ${m.t}`, m.anchor, m.t);
+    return out;
   }
 
   // ── audio: synthesize each audio item once, cache the WAV, find the beats ────────────────
@@ -207,6 +277,18 @@ export function createClips(ctx, library) {
     return { inputs, beats };
   }
 
+  /**
+   * The caption pages of a clip, built from its words by the rules and the composition's caption settings (and page
+   * structure, when it has one) → { pages, problems, settings }. Without captions settings, pages for the defaults.
+   */
+  function captionPages(composition, words = clipWords(composition, library)) {
+    const c = composition.captions ?? {};
+    const from = c.from ? words.filter((w) => c.from.includes(w.item)) : words;
+    const settings = { maxLines: c.maxLines ?? 2, maxChars: c.maxChars ?? (composition.format === 'horizontal' ? 32 : 20), fps: composition.fps, lead: c.lead ?? 2, minDuration: c.minDuration ?? 0.8, closeGap: c.closeGap ?? 0.3, pauseBreak: c.pauseBreak ?? 0.6, names: c.names ?? [], pages: c.pages };
+    const built = buildPages(from, settings);
+    return { ...built, settings, words: from };
+  }
+
   const bundles = new Map();
   /** Everything a worker needs to render the (pinned) composition: { bundle, audio }. */
   async function bundleFor(composition) {
@@ -234,7 +316,10 @@ export function createClips(ctx, library) {
       if (row.type === 'function') walkParams(json(row.schema, {}), a.params ?? {}, ['asset', 'image'], (value) => { if (parseRef(value).version !== null) refs.add(value); });
     }
     const audio = await prepareAudio(composition);
-    const bundle = library.bundle([...refs], { composition, beats: audio.beats });
+    // what reaches assets as f.clip.words, f.clip.captions and f.clip.lane
+    const words = clipWords(composition, library);
+    const captions = composition.captions ? captionPages(composition, words).pages : undefined;
+    const bundle = library.bundle([...refs], { composition, beats: audio.beats, words, captions, lane: zonesOf(composition).lane });
     const out = { bundle, audio };
     if (bundles.size > 12) bundles.delete(bundles.keys().next().value);
     bundles.set(key, out);
@@ -367,6 +452,8 @@ export function createClips(ctx, library) {
    *   { op: 'split_item', id, at }  (clip seconds; the second part keeps playing where the first stopped)
    *   { op: 'duplicate_item', id, newId?, start?, track? }
    *   { op: 'add_marker', marker: { t, type, label, duration? } }   { op: 'update_marker', index, patch }   { op: 'remove_marker', index }
+   *   { op: 'caption_split', at: word key }   { op: 'caption_merge', page }   { op: 'caption_break', page, at: word key | null }
+   *   { op: 'caption_move', page, at: word key }   { op: 'caption_auto' }   (caption page structure; the times stay the words')
    */
   function applyOps(composition, ops) {
     let c = structuredClone(composition);
@@ -404,6 +491,22 @@ export function createClips(ctx, library) {
           }
           if (op.format) c = reformat(c, op.format);
           break;
+        case 'caption_split': case 'caption_merge': case 'caption_break': case 'caption_move': case 'caption_auto': {
+          // the page structure changes; the times stay the words'
+          if (op.op === 'caption_auto') { if (c.captions) delete c.captions.pages; break; }
+          const built = captionPages({ ...c, captions: c.captions ?? {} });
+          const structure = c.captions?.pages ?? structureOf(built.pages);
+          const page = (i) => { if (!Number.isInteger(i) || i < 0 || i >= structure.length) throw new StudioError(`edit: ${op.op}: no caption page ${i} (there are ${structure.length})`, 'not_found'); return i; };
+          let next;
+          try {
+            if (op.op === 'caption_split') next = splitPage(structure, built.words, op.at);
+            else if (op.op === 'caption_merge') next = mergePages(structure, page(op.page));
+            else if (op.op === 'caption_break') next = moveBreak(structure, built.words, page(op.page), op.at ?? null);
+            else next = movePageStart(structure, built.words, page(op.page), op.at);
+          } catch (e) { throw new StudioError(`edit: ${op.op}: ${e.message}`); }
+          c.captions = { ...(c.captions ?? {}), pages: next };
+          break;
+        }
         case 'add_marker': {
           if (!op.marker || typeof op.marker !== 'object') throw new StudioError('edit: add_marker needs marker: { t, type, label, duration? }');
           c.markers = [...(c.markers ?? []), op.marker].sort((a, b) => (a.t ?? 0) - (b.t ?? 0));
@@ -518,7 +621,7 @@ export function createClips(ctx, library) {
           to.items.splice(to === f.track ? f.i + 1 : to.items.length, 0, copy);
           break;
         }
-        default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, move_track, update_track, add_item, update_item, remove_item, move_item, set_transform, set_keyframes, add_keyframe, remove_keyframe, set_override, split_item, duplicate_item, add_marker, update_marker, remove_marker)`);
+        default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, move_track, update_track, add_item, update_item, remove_item, move_item, set_transform, set_keyframes, add_keyframe, remove_keyframe, set_override, split_item, duplicate_item, add_marker, update_marker, remove_marker, caption_split, caption_merge, caption_break, caption_move, caption_auto)`);
       }
     }
     return c;
@@ -696,5 +799,5 @@ export function createClips(ctx, library) {
     }));
   }
 
-  return { prepare, prepareAudio, bundleFor, check, createClip, updateClip, editClip, applyOps, remixClip, repinClip, savePrecomp, addAssets, getClip, listClips, clipAssets, clipRow };
+  return { prepare, prepareAudio, captionPages, anchorReport, bundleFor, check, createClip, updateClip, editClip, applyOps, remixClip, repinClip, savePrecomp, addAssets, getClip, listClips, clipAssets, clipRow };
 }
