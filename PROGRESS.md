@@ -14,9 +14,7 @@ iteration 3"; the brief names `ITERATION_3_PROMPT.md`, which is not in the repo)
 Started 2026-10-09 on branch `main` at `4a394de`, on the Windows 11 PC (i9-14900KF), not the macOS
 Intel machine the brief describes (see `.claude/goal-loop/project.md`).
 
-**Next:** M1 (markers and inspection) and M2 (text you can measure) are in progress in the working tree;
-module agents are writing `src/render/mix.js` + `loudness.js`, `src/core/words.js` + `captions.js`,
-`src/render/report.js` (`glyphs.js`, the fonts and `platforms.js` are done, not yet committed).
+**Next:** M8, the studio UI (agents on disjoint files: timeline words + markers; inspector audio automation + ducking; renders/gallery loudness + report; editor issues panel + overlays), then the scripted workflows and GIFs (`scripts/workflows-v3.mjs`), then clips 7 and 8 (M10). Backend milestones 0–7 and 9 are done and pushed (`c94de42`, `9a643d9`, `0c9f7e3`): 284 tests pass; old clips' hashes identical on a copy of the baseline data.
 
 ## Contract (Done means)
 
@@ -101,10 +99,17 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Notes
 
+- **Voice tools (outside the repo, 2026-10-09):** `C:/newme/fablecut-voice/`: Kokoro TTS via kokoro-js 1.2.1 (q8, CPU, model cache in `cache/`): `cd tts && node say.mjs --voice af_heart --speed 1 --out out.wav --text-file narration.txt` (24 kHz mono WAV; sentences synthesised one by one; Kokoro gives no word times). whisper.cpp tag b5454 (`whisper/Release/whisper-cli.exe`), models `ggml-base.en.bin` and `ggml-small.en.bin` (use small.en: token starts within ~10–50 ms; base.en up to ~350 ms early): `ffmpeg -i in.wav -ar 16000 -ac 1 in16k.wav`, `whisper-cli -m models/ggml-small.en.bin -f in16k.wav -ojf -oj -otxt -of out`. whisper writes "Fourteen" as "14" (the aligner handles numerals); `-ml 1` word starts include the silence before a word (use `-ojf` tokens). Licences in `C:/newme/fablecut-voice/LICENSES.md` (kokoro-js Apache-2.0, Kokoro-82M + voices Apache-2.0, whisper.cpp MIT, Whisper weights MIT). Best voice by Kokoro's own grades: af_heart (A).
+- **Shell edits drop backslashes** in heredocs here (regexes, 
+ in templates): write code with the Write/Edit tools, and check any line with a backslash after a scripted edit.
+- check_clip on clips 1–6 (copy of the baseline data, 2026-10-09): 3–27 s per clip. Findings are by the rules (contrast against the worst 5 % of pixels behind a text box is strict); clip 5's REUSE letters (3D block letters used as a photo mask) measure 1.04:1. Review file to be written in the final audit from the fresh build.
+
 - (Windows) set TEMP and TMP as well as TMPDIR; `CHROME` for `cdp.mjs`; no git identity (commit with `-c user.name=Narcis13 -c user.email=Narcis75@gmail.com`); shell heredocs drop backslashes (write files with Write/Edit).
 - The baseline worktree `C:/newme/davidapp-base` (at `4a394de`) has `node_modules` as a junction to this checkout's: remove it with `git worktree remove --force` at the end (the junction must not be followed: `cmd /c rmdir C:\newme\davidapp-base\node_modules` first).
 
 ## Log
+
+- 2026-10-09: M1–M7 backend. Typed markers + edit ops; frames/hashes/sheets in another format and from drafts. `f.lib.inspect`: layout report (boxes within 2 px of the drawn pixels on plain, scaled, keyframed, moving and rotated items; 3D block letters too), size floors (TextFloorError in validator and render), Latin Extended alias families (Node + preview), glyph coverage from woff2 cmaps (validation warnings, clip-save findings). JS mixer with gain keyframes and ducking; loudness target met on the encoded file (render tests: −14 ±1 LUFS, TP ≤ −1 dBTP with FFmpeg ebur128; limiter case reported); stems and the audio report. Narrations (whisper.cpp/word list/character alignment import, script alignment, transcript check), f.clip.words/captions/lane, word anchors (within 2 frames, and after a re-timed take), caption pages + edits, text-captions@2, SRT/VTT/words JSON, burn-in or file only. Render report + encoded-file sheets on every render. check_clip (every class found on a seeded clip), overlays, render_report. sync-assets guard with --pull/--force. Video now tagged BT.709 (FFmpeg 9 dropped the -color_* tags). Gates: 284 tests pass. Hashes of clips 1–6 + history-of-ai identical (dense frames drawn by the new code on a copy of the baseline data).
 
 - 2026-10-09: M0 baseline from the worktree `C:/newme/davidapp-base` (`4a394de`, node_modules linked), data in the scratchpad: `npm run showcase` built 107 steps and 9 renders, `clips/history-of-ai/compose.mjs --render` added the user's clip, `scripts/hashes.mjs` (now covering clips 1–6 and history-of-ai) recorded 1,186 dense frames and 126 render samples (`docs/showcase/v3/reports/baseline-hashes.json`). `scripts/speed.mjs --runs 5`: medians clip 1 6.39 s, clip 2 8.01 s, clip 3 4.78 s (`baseline-speed.json`). Module agents were writing code meanwhile, so the final comparison also re-measures the base worktree interleaved with the final code on a quiet machine.
 
