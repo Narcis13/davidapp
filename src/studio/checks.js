@@ -43,6 +43,12 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
     const zones = zonesOf(comp);
     const textZone = meet(zones.titleSafe, zones.format, zones.platform);
     const captionTracks = new Set(comp.tracks.filter((t) => t.role === 'captions').map((t) => t.id));
+    // captions follow the speech and have their own rules: items on a captions track, or caption assets (tagged so) anywhere
+    const captionItems = new Set();
+    for (const tr of comp.tracks) for (const it of tr.items) {
+      const row = library.versionRow(it.asset);
+      if (captionTracks.has(tr.id) || (row && JSON.parse(row.tags ?? '[]').includes('captions'))) captionItems.add(it.id);
+    }
     const hasCaptions = !!comp.captions || comp.tracks.some((t) => captionTracks.has(t.id) && t.items.length);
     const { bundle } = await clips.bundleFor(comp);
     const pool = new WorkerPool({ size: defaultWorkers() });
@@ -62,11 +68,11 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
       const measured = await Promise.all([...frames].sort((x, y) => x - y).map((f) => pool.run('inspectFrame', { frame: f, contrast: want('contrast') }, { bundle, timeout: 120000 }).then((r) => ({ f, ...r }))));
       for (const { f, texts, std } of measured) {
         if (f === 0 && want('first-frame') && std < 2) issue('first-frame', 'f0', 0, { severity: 'error', item: null, message: 'The first frame is empty: a single flat colour (it is the thumbnail many feeds show).', numbers: { spread: r2(std) } });
-        const blocks = groupBlocks(texts).map((x) => ({ ...x, caption: captionTracks.has(x.track), screenPct: x.screenSize === null ? null : Math.round((x.screenSize / Math.min(comp.width, comp.height)) * 1000) / 10 }));
+        const blocks = groupBlocks(texts).map((x) => ({ ...x, caption: captionItems.has(x.item), screenPct: x.screenSize === null ? null : Math.round((x.screenSize / Math.min(comp.width, comp.height)) * 1000) / 10 }));
         for (const t of texts) if (t.family) allTexts.push(t);
         for (const blk of blocks) {
           const key = `${blk.item}|${blk.block}`;
-          const s = seen.get(key) ?? { first: f, last: f, words: 0, text: blk.text, item: blk.item, caption: captionTracks.has(blk.track) };
+          const s = seen.get(key) ?? { first: f, last: f, words: 0, text: blk.text, item: blk.item, caption: blk.caption };
           s.last = f; s.words = Math.max(s.words, words(blk.text)); if (words(blk.text) >= s.words) s.text = blk.text;
           seen.set(key, s);
           const label = `"${blk.text.length > 40 ? `${blk.text.slice(0, 37)}…` : blk.text}"`;
@@ -93,7 +99,8 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
       }
       // held long enough to read: words / 3 + 1 seconds (captions follow the speech and have their own rules)
       if (want('hold')) for (const [key, s] of seen) {
-        if (s.caption) continue;
+        // captions, and numbers that count up (a new text every frame), are not held to it
+        if (s.caption || /^[\d\s.,:%+\-–×x$€£#/]*$/.test(s.text)) continue;
         const held = (s.last - s.first + every) / fps, needs = s.words / 3 + 1;
         const visibleWholeRange = s.first > a && s.last < b;
         if (visibleWholeRange && held + 1e-6 < needs) issue('hold', key, s.first, { severity: 'error', item: s.item, message: `"${s.text.slice(0, 40)}" is on screen for about ${r2(held)} s; ${s.words} word${s.words === 1 ? '' : 's'} need ${r2(needs)} s (words / 3 + 1).`, numbers: { held: r2(held), needs: r2(needs), words: s.words } });

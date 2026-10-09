@@ -34,6 +34,13 @@ export class TextFloorError extends Error {
   }
 }
 
+/** A stable id for a layout (FNV-1a of its cache key): the same text and options give the same id in every worker. */
+function blockId(key) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return `b${(h >>> 0).toString(36)}`;
+}
+
 /** The scale a context's current transform applies to lengths (√|det|). */
 const scaleOf = (ctx) => {
   const m = typeof ctx?.getTransform === 'function' ? ctx.getTransform() : null;
@@ -83,7 +90,6 @@ function tokenize(text, markup) {
 export function createText(inspect = { record: null, suppress: false, frame: null, floor: 0 }) {
   const widths = new Map();
   const layouts = new Map();
-  let blocks = 0;
 
   const width = (ctx, font, str) => {
     const key = `${font}\n${str}`;
@@ -272,7 +278,7 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
     }
     L.text = str;
     // what the layout report needs about every word and glyph (not enumerable: assets see the same objects as before)
-    const meta = { block: ++blocks, size: L.size, ascent: L.ascent, descent: L.descent, floor };
+    const meta = { block: blockId(key), size: L.size, ascent: L.ascent, descent: L.descent, floor };
     for (const list of [L.words, L.glyphs]) for (const item of list) Object.defineProperty(item, 'layoutMeta', { value: meta });
     // layouts are shared between frames and assets through the cache, so nobody may change one
     for (const list of [L.lines, L.words, L.glyphs]) { for (const item of list) Object.freeze(item); Object.freeze(list); }
