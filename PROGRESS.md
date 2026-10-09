@@ -14,7 +14,7 @@ iteration 3"; the brief names `ITERATION_3_PROMPT.md`, which is not in the repo)
 Started 2026-10-09 on branch `main` at `4a394de`, on the Windows 11 PC (i9-14900KF), not the macOS
 Intel machine the brief describes (see `.claude/goal-loop/project.md`).
 
-**Next:** M8, the studio UI (agents on disjoint files: timeline words + markers; inspector audio automation + ducking; renders/gallery loudness + report; editor issues panel + overlays), then the scripted workflows and GIFs (`scripts/workflows-v3.mjs`), then clips 7 and 8 (M10). Backend milestones 0–7 and 9 are done and pushed (`c94de42`, `9a643d9`, `0c9f7e3`): 284 tests pass; old clips' hashes identical on a copy of the baseline data.
+**Next:** verify the UI the agents built (headless screenshots at both viewports), write `scripts/workflows-v3.mjs` (real input in headless Chrome, GIFs: words + markers, audio automation + ducking, renders report, issues, overlays), sweep; then docs (README, ASSET_CONTRACT, COOKBOOK, studio_guide, voice LICENSES), reports-v3 (compounding with clips 7 and 8, check review of clips 1–6), speed, reviewer agent, final audit (fresh `npm run showcase` of clips 1–8, hashes incl. history-of-ai, release showcase-v3, INDEX.md). Clips 7 and 8 are built and committed (`a1ee768`, `acb3563`); the UI is committed (`f13c16b`) but not yet verified by me.
 
 ## Contract (Done means)
 
@@ -72,7 +72,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 7. [ ] **Sync guard** (D22)
 8. [ ] **Studio UI**: words and markers on the timeline, gain automation and ducking, loudness and render report, issues panel, overlays; workflows + GIFs (D15, D16, D21, D24)
 9. [ ] **Voice**: Kokoro (or better) and whisper.cpp set up outside the repo, licences (D30)
-10. [ ] **Clips 7 and 8** through the motion prompt (D25–D27)
+10. [x] **Clips 7 and 8** through the motion prompt (D25–D27)
 11. [ ] **Prompt and docs** (D28)
 12. [ ] **Final audit**: reviewer pass, clean rebuild, hashes, speed, sweep, evidence index, release (all)
 
@@ -108,6 +108,8 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 - The baseline worktree `C:/newme/davidapp-base` (at `4a394de`) has `node_modules` as a junction to this checkout's: remove it with `git worktree remove --force` at the end (the junction must not be followed: `cmd /c rmdir C:\newme\davidapp-base\node_modules` first).
 
 ## Log
+
+- 2026-10-09: M8 UI by two agents (editor: words, markers lane, anchors, audio automation and ducking, clip settings, issues panel, overlays; renders/gallery: loudness and the render report); gates green (286 tests). M10: clip 7 (62 s voiced explainer, Kokoro af_heart + whisper.cpp small.en word times, transcript checked with base.en + small.en: 0 slips; 5 new assets revised at the gates; 31 anchors ≤ 0.5 frame; music 16.8 LU under the voice; horizontal + vertical renders: 0 check_clip issues, clean reports, −14.1 LUFS / −1.1 dBTP) and clip 8 (38.4 s vertical Reels, Romanian, cuts within 30 ms of detected beats, 11 calls, 0 new lines, −14.2 LUFS / −1.5 dBTP after one AAC correction). Studio fixes found by making them: caption pages under 0.8 s on fast speech, ticker role for passing text, platform profiles per format, consensus transcript check, loudness correction against the measured AAC overshoot, render-report freezes/black frames led to end-card v2 and drift. Compounding (live build): clip 7 40 calls / 908 lines / 20 % reuse / 711 s; clip 8 11 calls / 0 lines / 100 % / 73 s.
 
 - 2026-10-09: M1–M7 backend. Typed markers + edit ops; frames/hashes/sheets in another format and from drafts. `f.lib.inspect`: layout report (boxes within 2 px of the drawn pixels on plain, scaled, keyframed, moving and rotated items; 3D block letters too), size floors (TextFloorError in validator and render), Latin Extended alias families (Node + preview), glyph coverage from woff2 cmaps (validation warnings, clip-save findings). JS mixer with gain keyframes and ducking; loudness target met on the encoded file (render tests: −14 ±1 LUFS, TP ≤ −1 dBTP with FFmpeg ebur128; limiter case reported); stems and the audio report. Narrations (whisper.cpp/word list/character alignment import, script alignment, transcript check), f.clip.words/captions/lane, word anchors (within 2 frames, and after a re-timed take), caption pages + edits, text-captions@2, SRT/VTT/words JSON, burn-in or file only. Render report + encoded-file sheets on every render. check_clip (every class found on a seeded clip), overlays, render_report. sync-assets guard with --pull/--force. Video now tagged BT.709 (FFmpeg 9 dropped the -color_* tags). Gates: 284 tests pass. Hashes of clips 1–6 + history-of-ai identical (dense frames drawn by the new code on a copy of the baseline data).
 
