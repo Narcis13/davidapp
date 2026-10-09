@@ -9,6 +9,7 @@ import { ROOT } from '../render/host.js';
 import { StudioError } from '../studio/studio.js';
 import { sideBySide, createCanvas, loadImage } from '../render/host.js';
 import { checkTranscript } from '../core/words.js';
+import { drawOverlays, OVERLAYS } from '../render/overlays.js';
 import { json } from '../db/db.js';
 
 const FORMAT = z.enum(['vertical', 'horizontal', 'square']);
@@ -355,6 +356,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         clip: z.string().optional().describe('Clip name (or give composition)'),
         composition: COMPOSITION.optional().describe('A draft composition to draw instead of the saved clip (validated and pinned, not saved)'),
         format: FORMAT.optional().describe('Draw it in another format'),
+        overlays: z.union([z.boolean(), z.array(z.enum(['grid', 'safe', 'platform', 'lane', 'text']))]).optional().describe('Draw guides over the frame (never into a render): true for all, or some of grid, safe (title-safe, action-safe, f.safe), platform (the platform zones of the clip), lane (the caption lane), text (the measured text boxes)'),
         t: z.number().min(0).optional().describe('Seconds'),
         sheet: z.boolean().optional().describe('Return a contact sheet instead of one frame'),
         frames: z.number().int().min(1).max(48).optional().describe('Frames in the sheet (default 12)'),
@@ -370,7 +372,11 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
           return { json: { clip: a.clip ?? null, format: a.format, frames: s.frames }, images: [image(`${name}-sheet${a.from !== undefined ? `-${a.from}-${a.to}` : ''}`, s.png)] };
         }
         const r = await studio.clipFrame({ clip: a.clip, composition: a.composition, format: a.format, t: a.t ?? 0, maxSize: a.max_size ?? 960, hash: true });
-        return { json: { clip: a.clip ?? null, format: a.format, t: r.t, frame: r.frame, sha256: r.hash }, images: [image(`${name}-t${r.t.toFixed(2)}`, r.png)] };
+        if (!a.overlays) return { json: { clip: a.clip ?? null, format: a.format, t: r.t, frame: r.frame, sha256: r.hash }, images: [image(`${name}-t${r.t.toFixed(2)}`, r.png)] };
+        // the guides go on a copy of the frame; the hash is still the frame's own
+        const rep2 = await studio.inspect.layoutReport({ clip: a.clip, composition: a.composition, format: a.format, frame: r.frame });
+        const png = await drawOverlays(r.png, { width: rep2.width, height: rep2.height, zones: rep2.zones, texts: rep2.texts, show: a.overlays === true ? OVERLAYS : a.overlays });
+        return { json: { clip: a.clip ?? null, format: a.format, t: r.t, frame: r.frame, sha256: r.hash, overlays: a.overlays === true ? OVERLAYS : a.overlays, zones: rep2.zones, texts: rep2.texts.length }, images: [image(`${name}-t${r.t.toFixed(2)}-overlays`, png)] };
       },
     },
     {
@@ -452,6 +458,35 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       description: 'The mix of chosen tracks as WAV files (voice only, music only…), without editing the clip: each stem sounds exactly as in the mix (its automation and ducking), takes the master\'s gain when the clip has a loudness target, and is measured (loudness, true peak, silences, clipping). groups: { name: [audio track ids] }; default: one stem per audio track.',
       input: { clip: z.string().optional(), composition: COMPOSITION.optional(), groups: z.record(z.string(), z.array(z.string())).optional() },
       run: async (a) => ({ json: { stems: await studio.audio.stems(await studio.compositionOf({ clip: a.clip, composition: a.composition }), a.groups) } }),
+    },
+    {
+      name: 'check_clip',
+      title: 'Check a clip',
+      description: `What a careful editor would point at, measured on frames sampled every step seconds (default 0.5) of a clip, a time range of it, a draft, or the clip in another format: ${['text outside its safe zone (title-safe ∩ f.safe ∩ the clip\'s platform profiles)', 'text cut by the frame', 'text boxes that overlap', 'text in the caption lane', 'text under the size floor (its own floor, or checks.minTextSize, default 2.5% of the short side)', 'contrast under 4.5:1 against the worst pixels behind the text (the frame drawn without text)', 'text held for less than words / 3 + 1 s', 'caption pages that break a rule', 'characters the bundled fonts lack', 'an empty first frame', 'a last frame held for less than 2 s'].join('; ')}. Each issue has its check, item, time, numbers and a still (PNG path) with the zones and the box drawn in. Thresholds come from composition.checks.`,
+      input: { clip: z.string().optional(), composition: COMPOSITION.optional(), format: FORMAT.optional(), from: z.number().min(0).optional(), to: z.number().min(0).optional(), step: z.number().min(0.04).max(5).optional(), only: z.array(z.string()).optional().describe('Run only these checks'), stills: z.boolean().optional().describe('Default true') },
+      readOnly: true,
+      run: async (a) => {
+        const r = await studio.checks.checkClip({ clip: a.clip, composition: a.composition, format: a.format, from: a.from, to: a.to, step: a.step, only: a.only, stills: a.stills !== false });
+        return { json: r };
+      },
+    },
+    {
+      name: 'render_report',
+      title: 'The report of a render',
+      description: 'What the studio measured on a finished render\'s encoded file: ffprobe facts (codec, size, fps, pixel format, BT.709 tags, AAC 48 kHz, faststart), loudness (EBU R128: integrated, range, true peak) and how the master reached its target, black frames down to one frame, freezes from 0.5 s (hold markers excepted), brightness jumps outside cut markers, flashing (more than 3 a second), silences, where the narration sits against the clip (first and last word to the frame, words across cuts), and the problems found. With sheets: true, the frame sheets drawn from the encoded file (one frame a second plus the middle of every cut, times drawn in).',
+      input: { id: z.number().int(), sheets: z.boolean().optional() },
+      readOnly: true,
+      run: (a) => {
+        const r = renders.get(a.id);
+        if (r.status !== 'done') throw new StudioError(`Render ${a.id} is ${r.status}; a report exists once it is done`);
+        const files = r.stats.files ?? {};
+        if (!files.report) throw new StudioError(`Render ${a.id} was made before the studio wrote render reports; render the clip again`);
+        const abs = (p) => join(studio.dataDir, p);
+        const report = JSON.parse(readFileSync(abs(files.report), 'utf8'));
+        const sheets = (files.sheets ?? []).map(abs);
+        return { json: { render: r.id, clip: r.clip, format: r.format, loudness: r.stats.loudness, timings: { render: r.stats.renderSeconds, mix: r.stats.mixSeconds, report: r.stats.reportSeconds, loudness: r.stats.loudnessSeconds }, report, files: { srt: r.srt ? abs(r.srt) : null, vtt: files.vtt ? abs(files.vtt) : null, words: files.words ? abs(files.words) : null, sheets } },
+          images: a.sheets ? sheets.slice(0, 4).map((p) => ({ png: readFileSync(p), path: p })) : [] };
+      },
     },
     {
       name: 'layout_report',

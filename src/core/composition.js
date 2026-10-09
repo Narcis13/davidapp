@@ -105,7 +105,8 @@ function normalizeCaptions(c, err) {
   if (c.pages !== undefined && c.pages !== null) {
     const key = (k) => typeof k === 'string' && /^[^:]+:\d+$/.test(k);
     if (!Array.isArray(c.pages) || !c.pages.every((p) => isPlain(p) && key(p.start) && (p.lines === undefined || (Array.isArray(p.lines) && p.lines.every(key))))) err('captions.pages', 'pages is a list of { start, lines } where each is a word key "<narration item>:<word index>"');
-    else out.pages = c.pages.map((p) => (p.lines?.length ? { start: p.start, lines: [...p.lines] } : { start: p.start }));
+    // lines: [] is one line on purpose; no lines at all lets the rules break the page
+    else out.pages = c.pages.map((p) => (p.lines ? { start: p.start, lines: [...p.lines] } : { start: p.start }));
   }
   for (const k of Object.keys(c)) if (!['from', 'burnIn', 'names', 'pages', ...Object.keys(CAPTION_NUMBERS)].includes(k)) err(`captions.${k}`, 'unknown captions field');
   return out;

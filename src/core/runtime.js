@@ -524,7 +524,7 @@ export function createRuntime(host) {
       const scale = Math.sqrt(Math.abs(M[0] * M[3] - M[1] * M[2]));
       const approximate = assetCanvases.has(r.canvas) ? 'offscreen' : inTransition ? 'transition' : null;
       out.push({
-        item: cur?.item ?? null, track: cur?.track ?? null, mask: cur?.mask ? true : undefined, kind: r.kind, text: r.text, font: r.font, family: r.family,
+        item: cur?.item ?? null, track: cur?.track ?? null, mask: cur?.mask ? true : undefined, kind: r.kind, text: r.text, glyph: r.glyph, word: r.word, font: r.font, family: r.family,
         size: r.size, screenSize: r.size === null ? null : r.size * scale, floor: r.floor, block: r.block, fill: r.fill, alpha: r.alpha * (cur?.opacity ?? 1), stroke: r.stroke || undefined,
         box: aabb(quad), quad, line: aabb(quadOf(r.line)), approximate: approximate ?? undefined,
       });

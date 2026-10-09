@@ -34,6 +34,18 @@ export function zonesOf(comp) {
   };
 }
 
+/** The text of a block from its drawn parts: glyphs of one word run together, words are separated by a space. */
+export function textOf(parts) {
+  const out = [];
+  let word = null;
+  for (const p of parts) {
+    if (p.glyph && p.word !== undefined && p.word === word) out[out.length - 1] += p.text;
+    else out.push(p.text);
+    word = p.glyph ? p.word : null;
+  }
+  return out.join(' ');
+}
+
 /**
  * Words recorded by the runtime → one entry per drawn text block (one layout of one item), boxes united.
  * Each: { item, track, kind, text, font, family, size, screenSize, screenPct (of the frame's short side), floor, fill, alpha, box, words, mask?, approximate? }.
@@ -47,7 +59,7 @@ export function blocksOf(texts, comp) {
     if (!b) {
       map.set(key, (b = { item: t.item, track: t.track, kind: t.kind, parts: [], font: t.font, family: t.family, size: t.size, screenSize: t.screenSize, floor: t.floor, fill: t.fill, alpha: t.alpha, x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity, mask: t.mask, approximate: t.approximate }));
     }
-    b.parts.push(t.text);
+    b.parts.push(t);
     b.x0 = Math.min(b.x0, t.box.x); b.y0 = Math.min(b.y0, t.box.y);
     b.x1 = Math.max(b.x1, t.box.x + t.box.width); b.y1 = Math.max(b.y1, t.box.y + t.box.height);
     if (t.screenSize !== null && (b.screenSize === null || t.screenSize < b.screenSize)) b.screenSize = t.screenSize;
@@ -55,7 +67,7 @@ export function blocksOf(texts, comp) {
     if (t.approximate) b.approximate = t.approximate;
   }
   return [...map.values()].map((b) => ({
-    item: b.item, track: b.track, kind: b.kind, text: b.parts.join(' '), font: b.font, family: b.family,
+    item: b.item, track: b.track, kind: b.kind, text: textOf(b.parts), font: b.font, family: b.family,
     size: b.size === null ? null : r1(b.size), screenSize: b.screenSize === null ? null : r1(b.screenSize), screenPct: b.screenSize === null ? null : Math.round((b.screenSize / short) * 1000) / 10,
     floor: b.floor || undefined, fill: b.fill, alpha: Math.round(b.alpha * 1000) / 1000,
     box: rect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0), words: b.parts.length,

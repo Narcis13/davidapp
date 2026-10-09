@@ -10,6 +10,7 @@ import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
 import { nodeHost, registerFonts, createCanvas, loadImage, takeLogs, FRAME_CONTEXT } from './host.js';
 import { coverageReport } from './glyphs.js';
+import { boxContrast, thumbGray, grayStd } from './contrast.js';
 
 registerFonts();
 
@@ -44,6 +45,12 @@ async function loadSequenceFrames(rt, comp, frame) {
 function surface(width, height) {
   if (!canvas || canvas.width !== width || canvas.height !== height) canvas = createCanvas(width, height);
   return canvas;
+}
+let bare = null;
+/** A second canvas: the same frame drawn without its text, to measure contrast against. */
+function bareSurface(width, height) {
+  if (!bare || bare.width !== width || bare.height !== height) bare = createCanvas(width, height);
+  return bare;
 }
 
 const sha = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -258,6 +265,26 @@ const handlers = {
     const out = output(c, msg);
     if (r?.texts) out.result.texts = r.texts;
     return out;
+  },
+  /**
+   * A frame measured for the checks: what it draws as text (frame pixels, item, font, size, colour), each text's
+   * contrast against the worst pixels behind it (the frame drawn again without text), and a small greyscale copy.
+   */
+  async inspectFrame(msg) {
+    const comp = state.comp;
+    await loadSequenceFrames(state.rt, comp, msg.frame);
+    const c = surface(comp.width, comp.height);
+    const r = state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, msg.frame, { ...state.clip, record: true });
+    const a = new Uint8Array(c.data());
+    const texts = r.texts;
+    if (msg.contrast && texts.length) {
+      const b2 = bareSurface(comp.width, comp.height);
+      state.rt.renderClipFrame(b2.getContext('2d', FRAME_CONTEXT), comp, msg.frame, { ...state.clip, suppressText: true });
+      const b = new Uint8Array(b2.data());
+      for (const t of texts) t.contrast = boxContrast(a, b, comp.width, comp.height, t.box);
+    }
+    const thumb = thumbGray(a, comp.width, comp.height);
+    return { result: { texts, thumb, std: grayStd(thumb) }, transfer: [thumb.buffer] };
   },
   assetFrame(msg) {
     return output(drawAsset(state.rt, msg.ref, msg), msg);

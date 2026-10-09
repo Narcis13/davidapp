@@ -315,7 +315,7 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
     const meta = part.layoutMeta ?? {};
     const style = stroke ? ctx.strokeStyle : ctx.fillStyle;
     inspect.record({
-      kind: 'text', text: part.text ?? part.ch, font: part.font, family: familyOf(part.font), size: meta.size ?? null, floor: meta.floor ?? 0, block: meta.block ?? null,
+      kind: 'text', text: part.text ?? part.ch, glyph: part.ch !== undefined || undefined, word: part.ch !== undefined ? part.word : part.index, font: part.font, family: familyOf(part.font), size: meta.size ?? null, floor: meta.floor ?? 0, block: meta.block ?? null,
       ink: [x0, y0, x1, y1], line: [x + part.x, y + part.top, x + part.x + part.width, y + part.top + part.height],
       matrix: ctx.getTransform(), canvas: ctx.canvas, fill: typeof style === 'string' ? style : 'gradient', alpha: ctx.globalAlpha, stroke,
     });

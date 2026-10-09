@@ -22,6 +22,7 @@ import { createUploads } from './uploads.js';
 import { createCompounding } from './compounding.js';
 import { createInspect } from './inspect.js';
 import { createAudio } from './audio.js';
+import { createChecks } from './checks.js';
 
 export { StudioError };
 
@@ -46,6 +47,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   const uploads = createUploads(ctx, library);
   const compounding = createCompounding(ctx, library, clips);
   const inspect = createInspect(ctx, { clips, compositionOf });
+  const checks = createChecks(ctx, { clips, library, compositionOf, clipFrame, saveFrame });
   library.seedFonts();
   if (runner) renders.startRunner();
   const framesDir = join(dataDir, 'frames');
@@ -258,5 +260,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, checks, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }
