@@ -47,7 +47,7 @@ money) and the brief doesn't cover it.
 ## 0.5 Set up the project (first run in a repository)
 
 When `$P/project.md` is missing, write the project's facts before planning anything. Use an `Explore`
-agent to find them, then fill in [templates/project.md](templates/project.md):
+agent (`model: sonnet`, see step 5) to find them, then fill in [templates/project.md](templates/project.md):
 
 1. **Kind.** Does it have a UI to look at (`UI: web`, or `none` for a library, CLI or headless service)?
    Which browser tooling checks it (`Browser: headless`, `chrome` or `both`, see "Looking at the UI")?
@@ -110,7 +110,8 @@ but if it stands between you and a contract item, fixing it is part of the goal.
 - **A PROGRESS.md for this goal** → resume it.
 
 Explore the parts of the codebase the goal touches before planning. Use an `Explore` agent for broad
-sweeps so the file dumps stay out of your context. Then split the work into **milestones**:
+sweeps so the file dumps stay out of your context: `haiku` to find things, `sonnet` to explain how they
+work (step 5). Then split the work into **milestones**:
 
 - Each milestone is a vertical slice that can be verified and committed on its own, and leaves the project working.
 - Order them so the foundations come first (model, data, API), then what's built on them (UI, CLI), then
@@ -216,6 +217,26 @@ run in parallel. Before the final audit, have a fresh reviewer agent review the 
 (`feature-dev:code-reviewer` when it's available, otherwise a `general-purpose` agent briefed to look
 for bugs, security problems and departures from the repo's conventions). Fix what holds up; note what
 you rejected and why.
+
+### Which model each agent runs on
+
+Every agent runs on the **cheapest model that can do its task well**. Without `model`, an agent runs on
+whatever its definition or the settings say, which is often your own model, so set `model` on every
+Agent call, including the `Explore` agents in steps 0.5 and 3 and the reviewer. From cheapest to most
+expensive: `haiku`, `sonnet`, `opus`, `fable`.
+
+| the agent's task | `model` |
+|---|---|
+| Mechanical, with one right answer: find files, symbols or usages; list what exists (routes, screens, tests, config); copy facts out of files verbatim; bulk moves and renames | `haiku` |
+| Anything that takes judgment: an Explore sweep that explains how an area works, the project facts in step 0.5, implementing a slice from a full brief, writing tests, fixing what the gates or a sweep found, reviewing the goal's whole diff | `sonnet` |
+| Escalation only: a `sonnet` agent already failed at this task, or a wrong answer would cost more than the model does (a subtle concurrency, data-loss or security bug) | `opus` |
+
+With Opus 5.5 leading, that means `sonnet` (Sonnet 5.5) for nearly every agent and `haiku` for lookups.
+Never pick a model above your own. Don't fork: a fork ignores `model`, runs on your model and carries
+your whole context, so spawn a fresh agent with a full brief instead. A cheaper model needs a tighter
+brief: exact files, exact commands, what done looks like. When an agent's work fails your check, send
+it back once with what was wrong (SendMessage keeps its context); if it fails again, escalate one step
+or do it yourself, and write the escalation and the reason in the Log.
 
 ## 6. Showcase
 
