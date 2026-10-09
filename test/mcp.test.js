@@ -3,7 +3,7 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { connect, callTool, inlineFiles } from '../scripts/mcp.mjs';
@@ -12,6 +12,7 @@ import { createStudio } from '../src/studio/studio.js';
 import { RUN_TOOLS } from '../src/studio/agent-run.js';
 import { MOTION_POP, EFFECT_GRAIN, TRANSITION_WIPE, BROKEN } from './fixtures/kinds.js';
 import { BALL } from './fixtures/solid.js';
+import { encodeWav } from '../src/render/wav.js';
 
 let client, dataDir;
 const call = (name, args) => callTool(client, name, args);
@@ -343,6 +344,89 @@ test('STUDIO_TOOLS limits the server to those tools (a Run now session), and STU
     assert.equal(check.library.versionRow('sneaky'), undefined);
   } finally { await check.close(); }
   try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* Windows may still hold the db file */ }
+});
+
+test('iteration 3 over MCP: narration and words, transcript check, captions, anchors, the mix, checks, layout, overlays, render report; bad inputs get useful errors', async () => {
+  const { tools } = await client.listTools();
+  const names = tools.map((t) => t.name);
+  for (const n of ['add_narration', 'check_transcript', 'caption_pages', 'anchor_report', 'audio_report', 'export_stems', 'check_clip', 'render_report', 'layout_report']) assert.ok(names.includes(n), `missing tool ${n}`);
+  // a stand-in voice (tones at the word times) and whisper.cpp -ojf timings for it
+  const SR = 48000, l = new Float32Array(3 * SR);
+  /** @type {[string, number, number][]} */
+  const words = [['Two', 0.3, 0.6], ['frames', 0.7, 1.1], ['matter.', 1.2, 1.7]];
+  for (const [, a, b] of words) for (let i = Math.round(a * SR); i < Math.round(b * SR); i++) l[i] = 0.2 * Math.sin(i / 9);
+  writeFileSync(join(dataDir, 'voice.wav'), encodeWav(l, l, SR));
+  writeFileSync(join(dataDir, 'voice.json'), JSON.stringify({ transcription: [{ offsets: { from: 0, to: 3000 }, text: ' 2 frames matter.', tokens: [{ text: '[_BEG_]', offsets: { from: 0, to: 0 } }, ...words.map(([w, a, b], i) => ({ text: ` ${i === 0 ? '2' : w}`, offsets: { from: a * 1000, to: b * 1000 } }))] }] }));
+  const nar = await call('add_narration', { name: 'mcp-voice', path: join(dataDir, 'voice.wav'), script: 'Two frames matter.', timings_path: join(dataDir, 'voice.json'), voice: { name: 'test tones', license: 'original' } });
+  assert.ok(!nar.isError, nar.text);
+  assert.equal(nar.json.words, 3);
+  assert.equal(nar.json.transcript.ok, true, 'the numeral "2" for "Two" is not a slip');
+  const badNar = await call('add_narration', { name: 'mcp-voice-2', path: join(dataDir, 'voice.wav'), script: 'Two frames matter.', timings: '{"what": 1}' });
+  assert.ok(badNar.isError && /timings:/.test(badNar.text));
+  const tc = await call('check_transcript', { narration: 'mcp-voice', transcript: 'two frame matter' });
+  assert.deepEqual(tc.json.slips.map((s) => s.i), [1]);
+  assert.ok((await call('check_transcript', { transcript: 'x' })).isError);
+
+  const comp = {
+    width: 320, height: 180, fps: 30, duration: 3, background: '#101018', captions: { maxChars: 20 },
+    markers: [{ t: 0, type: 'word', label: 'matter', anchor: { item: 'vo', word: 2 } }],
+    tracks: [
+      { id: 'main', type: 'visual', items: [{ id: 'dot', asset: 'dot@1', start: 0, duration: 3 }] },
+      { id: 'titles', type: 'text', items: [{ id: 'label', asset: 'label', start: 0, duration: 1.5, anchor: { item: 'vo', word: 1 }, params: { text: 'Frames' } }] },
+      { id: 'voice', type: 'audio', role: 'narration', items: [{ id: 'vo', asset: 'mcp-voice', start: 0, duration: 3 }] },
+      { id: 'music', type: 'audio', role: 'music', items: [{ id: 'kick', asset: 'kick', start: 0, duration: 3, keyframes: { volume: [{ t: 0, v: -10 }, { t: 1, v: 0, ease: 'outCubic' }] }, duck: { by: 15 } }] },
+    ],
+  };
+  const made = await call('create_clip', { name: 'mcp-v3', composition: comp });
+  assert.ok(!made.isError, made.text);
+  const pages = await call('caption_pages', { clip: 'mcp-v3' });
+  assert.equal(pages.json.pages.map((p) => p.text.replace(/\n/g, ' ')).join(' '), 'Two frames matter.');
+  const split = await call('edit_clip', { clip: 'mcp-v3', operations: [{ op: 'caption_split', at: 'vo:2' }, { op: 'add_marker', marker: { t: 2.5, type: 'hold', duration: 0.5 } }] });
+  assert.ok(!split.isError, split.text);
+  assert.equal((await call('caption_pages', { clip: 'mcp-v3' })).json.structure, 'manual');
+  const anchors = await call('anchor_report', { clip: 'mcp-v3' });
+  assert.equal(anchors.json.anchors.length, 2);
+  for (const a of anchors.json.anchors) assert.ok(Math.abs(a.deltaFrames) <= 2);
+  assert.ok((await call('edit_clip', { clip: 'mcp-v3', operations: [{ op: 'remove_marker', index: 7 }] })).isError);
+
+  // frames in another format, from a draft, with overlays; hashes of a draft; the layout report
+  const vert = await call('render_clip_frame', { clip: 'mcp-v3', format: 'vertical', t: 1, overlays: true });
+  assert.ok(!vert.isError, vert.text);
+  assert.ok(vert.json.zones.lane && existsSync(vert.json.png));
+  const draft = await call('render_clip_frame', { composition: { ...comp, background: '#ff0000' }, t: 1 });
+  assert.ok(!draft.isError, draft.text);
+  const badOverlay = await call('render_clip_frame', { clip: 'mcp-v3', t: 1, overlays: ['nonsense'] });
+  assert.ok(badOverlay.isError);
+  const dh = await call('frame_hashes', { composition: comp, times: [1] });
+  assert.equal(dh.json.frames.length, 1);
+  const lay = await call('layout_report', { clip: 'mcp-v3', t: 1 });
+  assert.ok(lay.json.texts.some((x) => x.item === 'label'));
+  assert.ok(lay.json.zones.titleSafe);
+
+  // the mix and the checks
+  const ar = await call('audio_report', { clip: 'mcp-v3' });
+  assert.ok(ar.json.loudness && ar.json.speech.regions >= 1);
+  const stems = await call('export_stems', { clip: 'mcp-v3', groups: { voice: ['voice'], music: ['music'] } });
+  assert.equal(stems.json.stems.length, 2);
+  assert.ok(existsSync(stems.json.stems[0].path));
+  assert.ok((await call('export_stems', { clip: 'mcp-v3', groups: { x: ['nope'] } })).isError);
+  const chk = await call('check_clip', { clip: 'mcp-v3', step: 0.5 });
+  assert.ok(!chk.isError, chk.text);
+  assert.ok(Array.isArray(chk.json.issues) && chk.json.counts);
+  for (const i of chk.json.issues) if (i.still) assert.ok(existsSync(i.still));
+  const noClip = await call('check_clip', { clip: 'no-such-clip' });
+  assert.ok(noClip.isError && /No clip named "no-such-clip"/.test(noClip.text));
+
+  // a render: loudness and the report
+  const r = await call('start_render', { clip: 'mcp-v3', wait_seconds: 120 });
+  assert.equal(r.json.status, 'done', r.text);
+  assert.ok(Number.isFinite(r.json.stats.loudness.measured.integrated));
+  const rep = await call('render_report', { id: r.json.id, sheets: true });
+  assert.ok(!rep.isError, rep.text);
+  assert.equal(rep.json.report.probe.video.codec, 'h264');
+  assert.ok(rep.json.files.vtt && existsSync(rep.json.files.vtt));
+  assert.ok(rep.images.length >= 1, 'the sheets come back as images');
+  assert.ok((await call('render_report', { id: 999999 })).isError);
 });
 
 test('the CLI helper inlines @file: arguments', () => {

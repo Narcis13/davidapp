@@ -52,12 +52,25 @@ asset({
   render(f, p) { f.layers(LAYERS, p); },
 });`;
 
+// Romanian letters in both cases in every bundled family: drawn from each family's own Latin Extended file ("<Family> Ext")
+export const ROMANIAN = `asset({
+  description: 'A line of Romanian letters (ă â î ș ț in both cases) in every bundled family, for font tests.',
+  tags: ['text', 'test', 'fonts'],
+  render(f) {
+    // one family every 0.4 s, so each family's line is its own frame
+    const faces = [['Inter', 800, false], ['Space Grotesk', 700, false], ['JetBrains Mono', 400, false], ['Anton', 400, false], ['Playfair Display', 700, true]];
+    const [font, weight, italic] = faces[Math.min(faces.length - 1, Math.floor(f.t / 0.4))];
+    const L = f.lib.text.layout(f.ctx, 'ăâîșț ĂÂÎȘȚ Țară', { font, weight, italic, size: f.height / 10 });
+    f.ctx.fillStyle = '#ffffff';
+    f.lib.text.fill(f.ctx, L, (f.width - L.width) / 2, (f.height - L.height) / 2);
+  },
+});`;
 
 /** The assets the cases use, created in a studio. */
 export async function seedParity(studio, author = 'parity') {
   for (const [slug, source] of [['easing', EASING], ['label', LABEL], ['block', BLOCK], ['backdrop', BACKDROP], ['pop', K.MOTION_POP], ['slide', K.MOTION_SLIDE], ['wiggle', K.MOTION_WIGGLE],
     ['wipe', K.TRANSITION_WIPE], ['push', K.TRANSITION_PUSH], ['iris', K.TRANSITION_IRIS], ['glow', K.EFFECT_GLOW], ['grain', K.EFFECT_GRAIN], ['duotone', K.EFFECT_DUOTONE], ['blur', K.EFFECT_BLUR], ['circle', K.MASK_CIRCLE], ['card', CARD],
-    ['ball', BALL], ['letters', LETTERS]]) {
+    ['ball', BALL], ['letters', LETTERS], ['romanian', ROMANIAN]]) {
     await studio.library.createAsset({ slug, source, author });
   }
   await studio.bakeSequence({ ref: 'ball', slug: 'ball-seq', params: { color: '#2dd4bf' }, width: 200, height: 200, fps: 10, duration: 2, author });
@@ -99,6 +112,7 @@ export const CASES = {
     { id: 'front', items: [item('f', 'label', { params: { text: 'In front', color: '#ffffff' }, transform: { y: 0.85, height: 0.25 } })] }]), [5, 15]],
   sequence: [comp([{ id: 'v', items: [item('s', 'ball-seq', { transform: { x: 0.3, width: 0.45, height: 0.8 } }), item('l', 'ball-seq', { params: { loop: true }, offset: 0.5, transform: { x: 0.75, width: 0.3, height: 0.5, rotation: 20 } })] }]), [3, 12]],
   svg: [comp([{ id: 'v', items: [item('a', 'svg-draw', { transform: { x: 0.3, width: 0.45, height: 0.8 } }), item('b', 'svg-draw', { params: { fill: '#2dd4bf' }, offset: 1, transform: { x: 0.72, width: 0.4, height: 0.7, rotation: -8 } })] }]), [6, 14]],
+  'latin-ext': [comp([{ id: 'v', items: [item('ro', 'romanian')] }]), [2, 6, 10, 14, 18]],
   image: [comp([{ id: 'v', items: [item('i', 'tiles', { transform: { width: 0.5, height: 0.5, rotation: 15 } }), item('j', 'tiles', { params: { fit: 'cover' }, transform: { x: 0.2, y: 0.25, width: 0.2, height: 0.3 } })] }]), [10]],
 };
 

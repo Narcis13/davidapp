@@ -3,15 +3,16 @@
 // so the preview runs the same runtime the renderer does.
 
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { pipeline } from 'node:stream';
-import { extname, join, normalize, resolve, sep } from 'node:path';
+import { basename, extname, join, normalize, resolve, sep } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { ROOT, FONTS_DIR, fontManifest } from '../render/host.js';
 import { StudioError } from '../studio/studio.js';
 import { createAgentRuns } from '../studio/agent-run.js';
 import { MAX_UPLOAD } from '../studio/uploads.js';
 import { json as parseJson } from '../db/db.js';
+import { zonesOf } from '../studio/inspect.js';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -125,7 +126,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     const pinned = clips.prepare(composition).composition;
     const { bundle, audio } = await clips.bundleFor(pinned);
     // the words (for the timeline) and the anchors' distances come with it, so the editor shows the narration
-    return { composition: pinned, bundle: browserBundle(bundle), beats: audio.beats, words: bundle.words ?? [], captions: bundle.captions ?? null, anchors: clips.anchorReport(pinned), assets: describeRefs(pinned) };
+    return { composition: pinned, bundle: browserBundle(bundle), beats: audio.beats, words: bundle.words ?? [], captions: bundle.captions ?? null, anchors: clips.anchorReport(pinned), zones: zonesOf(pinned), assets: describeRefs(pinned) };
   }
 
   /** @type {[string, RegExp, (ctx: any) => any][]} */
@@ -235,6 +236,13 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       const r = await clips.addAssets({ slug: params[0], assets: data.slugs ?? [], at: data.at, author: data.author ?? author });
       return { clip: r.clip.slug, revision: r.clip.revision, added: r.added };
     }],
+    // v3: what the studio measures about a clip: its issues (check_clip, stills as URLs), a frame's text layout, the mix
+    ['POST', /^\/api\/clips\/([a-z0-9-]+)\/check$/, async ({ params, data }) => {
+      const r = await studio.checks.checkClip({ clip: data.composition ? undefined : params[0], composition: data.composition, format: data.format, from: data.from, to: data.to, step: data.step, only: data.only });
+      return { ...r, clip: params[0], issues: r.issues.map((i) => ({ ...i, still: i.still ? `/media/frames/${basename(i.still)}` : null })) };
+    }],
+    ['POST', /^\/api\/clips\/([a-z0-9-]+)\/layout$/, async ({ params, data }) => studio.inspect.layoutReport({ clip: data.composition ? undefined : params[0], composition: data.composition, format: data.format, t: data.t ?? 0 })],
+    ['POST', /^\/api\/clips\/([a-z0-9-]+)\/audio-report$/, async ({ params, data }) => studio.audio.report(await studio.compositionOf({ clip: data.composition ? undefined : params[0], composition: data.composition }), { silence: data.silence, minSilence: data.minSilence })],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/render$/, ({ params }) => renders.enqueue({ clip: params[0], requestedBy: author })],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/remix$/, async ({ params, data }) => (await clips.remixClip({ slug: params[0], newSlug: data.name, format: data.format, title: data.title, author: data.author ?? author })).clip],
 
@@ -265,6 +273,17 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     // renders, gallery, lineage
     ['GET', /^\/api\/renders$/, ({ query }) => ({ renders: renders.list({ status: query.get('status') || undefined, clip: query.get('clip') || undefined, limit: int(query.get('limit') ?? 50, 50, 1, 200) }) })],
     ['GET', /^\/api\/renders\/(\d+)$/, ({ params }) => renders.get(Number(params[0]))],
+    // the report of a finished render (from its encoded file) with the URLs of its sheets, subtitles and words
+    ['GET', /^\/api\/renders\/(\d+)\/report$/, ({ params }) => {
+      const r = renders.get(Number(params[0]));
+      const files = r.stats?.files ?? {};
+      if (r.status !== 'done' || !files.report) throw new StudioError(r.status !== 'done' ? `Render ${r.id} is ${r.status}` : `Render ${r.id} was made before the studio wrote render reports`, 'not_found');
+      const url = (p) => (p ? `/media/${p}` : null);
+      return {
+        render: r.id, loudness: r.stats.loudness, problems: r.stats.problems ?? [], timings: { render: r.stats.renderSeconds, mix: r.stats.mixSeconds, report: r.stats.reportSeconds, loudness: r.stats.loudnessSeconds },
+        report: JSON.parse(readFileSync(join(studio.dataDir, files.report), 'utf8')), urls: { srt: url(r.srt), vtt: url(files.vtt), words: url(files.words), report: url(files.report), sheets: (files.sheets ?? []).map(url) },
+      };
+    }],
     ['POST', /^\/api\/renders\/(\d+)\/cancel$/, ({ params }) => renders.cancel(Number(params[0]))],
     ['GET', /^\/api\/gallery$/, () => ({ renders: renders.gallery() })],
     ['GET', /^\/api\/lineage$/, () => ({ ...lineage.graph(), report: lineage.report() })],
@@ -346,7 +365,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed' });
     // only what the studio produces for viewing: never the database or the caches
     // each folder is its own root, so "renders/..\studio.db" cannot climb out of it
-    const media = /^\/media\/(thumbs|files|renders)\/(.+)$/.exec(path);
+    const media = /^\/media\/(thumbs|files|renders|frames)\/(.+)$/.exec(path);
     if (media) return file(req, res, join(studio.dataDir, media[1]), media[2]);
     if (path.startsWith('/media/')) return send(res, 404, { error: `Not found: ${path}` });
     if (path.startsWith('/fonts/')) return file(req, res, FONTS_DIR, path.slice(7), { cache: 'max-age=86400' });

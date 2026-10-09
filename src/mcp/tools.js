@@ -395,7 +395,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       input: {
         name: z.string(), path: z.string().optional().describe('Absolute path of the audio file (wav, mp3, m4a, ogg)'), data_base64: z.string().optional(), ext: z.string().optional().describe('With data_base64: ".wav", ".mp3"…'),
         script: z.string().describe('The text it was meant to say'),
-        timings: z.any().describe('Word timings in any supported shape (an object or array, or a JSON string)'),
+        timings: z.any().optional().describe('Word timings in any supported shape (an object or array, or a JSON string); or give timings_path'),
         timings_path: z.string().optional().describe('Or a JSON file with the timings'),
         unit: z.enum(['s', 'ms']).optional(), transcript: z.any().optional().describe('Plain text, or timed words'), language: z.string().optional(),
         voice: z.record(z.string(), z.any()).optional().describe('Who or what spoke it, and its licence: { name, model, license, source }'),
@@ -403,6 +403,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       },
       run: async (a) => {
         let timings = a.timings_path ? readFileSync(a.timings_path, 'utf8') : a.timings;
+        if (timings === undefined || timings === null) throw new StudioError('Give timings (the word timings) or timings_path (a JSON file of them)');
         if (typeof timings === 'string') { try { timings = JSON.parse(timings); } catch { throw new StudioError('timings: not valid JSON'); } }
         if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64 (with ext)');
         const r = await studio.audio.addNarration({ slug: a.name, path: a.path, data: a.data_base64 ? Buffer.from(a.data_base64, 'base64') : undefined, ext: a.ext, script: a.script, timings, unit: a.unit, transcript: a.transcript, language: a.language, voice: a.voice, license: a.license, description: a.description, title: a.title, tags: a.tags, take: a.take, forClip: a.for_clip, author: who(a.author) });
