@@ -24,12 +24,14 @@ const until = argv.includes('--until') ? Number(argv[argv.indexOf('--until') + 1
 // clips 4 to 6 were built step by step with scripts/act.mjs: replay their journals after the plan
 // (tool calls through MCP, the user's studio actions in-process; read-only calls are skipped)
 for (const clip of JOURNALS) {
-  for (const line of readFileSync(join(here, 'journal', `${clip}.jsonl`), 'utf8').split('\n').filter(Boolean)) {
-    const e = JSON.parse(line);
-    if (e.kind === 'read' || !e.ok) continue;
+  const entries = readFileSync(join(here, 'journal', `${clip}.jsonl`), 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((e) => e.kind !== 'read' && e.ok);
+  // a render a later render of the same clip and format replaced (the first try at a gate) is not made again
+  const lastRender = new Map();
+  entries.forEach((e, i) => { if (e.name === 'start_render') lastRender.set(`${e.args.clip}|${e.args.format ?? ''}`, i); });
+  entries.forEach((e, i) => {
     if (e.kind === 'user') steps.push({ user: e.name, args: e.args, clip });
-    else steps.push({ tool: e.name, args: e.args, render: e.name === 'start_render', journal: true });
-  }
+    else if (e.name !== 'start_render' || lastRender.get(`${e.args.clip}|${e.args.format ?? ''}`) === i) steps.push({ tool: e.name, args: e.args, render: e.name === 'start_render', journal: true });
+  });
 }
 
 async function modules(v) {

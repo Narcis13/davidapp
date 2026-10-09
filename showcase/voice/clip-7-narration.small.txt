@@ -1,0 +1,20 @@
+Every video starts as words.
+In this studio, the words come first.
+The voice you are hearing was read by an open model,
+and the studio knows the moment each word is spoken.
+That timing drives everything.
+The captions below are built from it, two lines at a time,
+and each word lights up as it is said.
+Visuals land on their words, too.
+When I say contrast, a title appears,
+and it stays on its word even if the take changes.
+The music steps back while I speak
+and comes forward in the pauses.
+Before render, the studio checks every frame.
+Text sits inside the safe zone, big enough to read,
+with a contrast of at least four and a half to one,
+and it stays long enough to finish.
+After the render, it measures the file itself.
+Loudness lands at minus 14,
+with no flashes and no frozen frames.
+Nothing here was checked by eye alone.

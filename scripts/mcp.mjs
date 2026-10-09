@@ -28,9 +28,10 @@ export async function connect({ dataDir, author } = {}) {
   return client;
 }
 
-/** Replace "@file:path" strings anywhere in the arguments with the file's contents. */
+/** Replace "@file:path" strings anywhere in the arguments with the file's contents, and "@path:path" with its absolute path. */
 export function inlineFiles(value, base = process.cwd()) {
   if (typeof value === 'string' && value.startsWith('@file:')) return readFileSync(join(base, value.slice(6)), 'utf8');
+  if (typeof value === 'string' && value.startsWith('@path:')) return join(base, value.slice(6));
   if (Array.isArray(value)) return value.map((v) => inlineFiles(v, base));
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, inlineFiles(v, base)]));
   return value;

@@ -1,0 +1,1279 @@
+{
+ "clip": "clip-7-a-video-that-checks-itself",
+ "fps": 30,
+ "words": [
+  {
+   "key": "vo:0",
+   "item": "vo",
+   "i": 0,
+   "text": "Every",
+   "start": 1.31,
+   "end": 1.43
+  },
+  {
+   "key": "vo:1",
+   "item": "vo",
+   "i": 1,
+   "text": "video",
+   "start": 1.46,
+   "end": 1.86
+  },
+  {
+   "key": "vo:2",
+   "item": "vo",
+   "i": 2,
+   "text": "starts",
+   "start": 1.86,
+   "end": 2.38
+  },
+  {
+   "key": "vo:3",
+   "item": "vo",
+   "i": 3,
+   "text": "as",
+   "start": 2.38,
+   "end": 2.55
+  },
+  {
+   "key": "vo:4",
+   "item": "vo",
+   "i": 4,
+   "text": "words.",
+   "start": 2.55,
+   "end": 3.5
+  },
+  {
+   "key": "vo:5",
+   "item": "vo",
+   "i": 5,
+   "text": "In",
+   "start": 3.67,
+   "end": 3.67
+  },
+  {
+   "key": "vo:6",
+   "item": "vo",
+   "i": 6,
+   "text": "this",
+   "start": 3.81,
+   "end": 4.01
+  },
+  {
+   "key": "vo:7",
+   "item": "vo",
+   "i": 7,
+   "text": "studio,",
+   "start": 4.01,
+   "end": 4.69
+  },
+  {
+   "key": "vo:8",
+   "item": "vo",
+   "i": 8,
+   "text": "the",
+   "start": 4.74,
+   "end": 4.93
+  },
+  {
+   "key": "vo:9",
+   "item": "vo",
+   "i": 9,
+   "text": "words",
+   "start": 4.93,
+   "end": 5.27
+  },
+  {
+   "key": "vo:10",
+   "item": "vo",
+   "i": 10,
+   "text": "come",
+   "start": 5.31,
+   "end": 5.42
+  },
+  {
+   "key": "vo:11",
+   "item": "vo",
+   "i": 11,
+   "text": "first.",
+   "start": 6.06,
+   "end": 6.3
+  },
+  {
+   "key": "vo:12",
+   "item": "vo",
+   "i": 12,
+   "text": "The",
+   "start": 6.51,
+   "end": 6.51
+  },
+  {
+   "key": "vo:13",
+   "item": "vo",
+   "i": 13,
+   "text": "voice",
+   "start": 6.61,
+   "end": 6.86
+  },
+  {
+   "key": "vo:14",
+   "item": "vo",
+   "i": 14,
+   "text": "you",
+   "start": 6.86,
+   "end": 7.07
+  },
+  {
+   "key": "vo:15",
+   "item": "vo",
+   "i": 15,
+   "text": "are",
+   "start": 7.07,
+   "end": 7.26
+  },
+  {
+   "key": "vo:16",
+   "item": "vo",
+   "i": 16,
+   "text": "hearing",
+   "start": 7.27,
+   "end": 7.8
+  },
+  {
+   "key": "vo:17",
+   "item": "vo",
+   "i": 17,
+   "text": "was",
+   "start": 7.8,
+   "end": 8
+  },
+  {
+   "key": "vo:18",
+   "item": "vo",
+   "i": 18,
+   "text": "read",
+   "start": 8,
+   "end": 8.21
+  },
+  {
+   "key": "vo:19",
+   "item": "vo",
+   "i": 19,
+   "text": "by",
+   "start": 8.47,
+   "end": 8.47
+  },
+  {
+   "key": "vo:20",
+   "item": "vo",
+   "i": 20,
+   "text": "an",
+   "start": 8.64,
+   "end": 8.64
+  },
+  {
+   "key": "vo:21",
+   "item": "vo",
+   "i": 21,
+   "text": "open",
+   "start": 8.98,
+   "end": 8.98
+  },
+  {
+   "key": "vo:22",
+   "item": "vo",
+   "i": 22,
+   "text": "model,",
+   "start": 9.15,
+   "end": 9.6
+  },
+  {
+   "key": "vo:23",
+   "item": "vo",
+   "i": 23,
+   "text": "and",
+   "start": 9.84,
+   "end": 9.84
+  },
+  {
+   "key": "vo:24",
+   "item": "vo",
+   "i": 24,
+   "text": "the",
+   "start": 9.91,
+   "end": 10.08
+  },
+  {
+   "key": "vo:25",
+   "item": "vo",
+   "i": 25,
+   "text": "studio",
+   "start": 10.08,
+   "end": 10.56
+  },
+  {
+   "key": "vo:26",
+   "item": "vo",
+   "i": 26,
+   "text": "knows",
+   "start": 10.56,
+   "end": 10.98
+  },
+  {
+   "key": "vo:27",
+   "item": "vo",
+   "i": 27,
+   "text": "the",
+   "start": 10.98,
+   "end": 11.22
+  },
+  {
+   "key": "vo:28",
+   "item": "vo",
+   "i": 28,
+   "text": "moment",
+   "start": 11.22,
+   "end": 11.5
+  },
+  {
+   "key": "vo:29",
+   "item": "vo",
+   "i": 29,
+   "text": "each",
+   "start": 11.7,
+   "end": 11.75
+  },
+  {
+   "key": "vo:30",
+   "item": "vo",
+   "i": 30,
+   "text": "word",
+   "start": 12.35,
+   "end": 12.35
+  },
+  {
+   "key": "vo:31",
+   "item": "vo",
+   "i": 31,
+   "text": "is",
+   "start": 12.45,
+   "end": 12.51
+  },
+  {
+   "key": "vo:32",
+   "item": "vo",
+   "i": 32,
+   "text": "spoken.",
+   "start": 12.51,
+   "end": 13.14
+  },
+  {
+   "key": "vo:33",
+   "item": "vo",
+   "i": 33,
+   "text": "That",
+   "start": 13.61,
+   "end": 13.64
+  },
+  {
+   "key": "vo:34",
+   "item": "vo",
+   "i": 34,
+   "text": "timing",
+   "start": 13.64,
+   "end": 14.15
+  },
+  {
+   "key": "vo:35",
+   "item": "vo",
+   "i": 35,
+   "text": "drives",
+   "start": 14.15,
+   "end": 14.66
+  },
+  {
+   "key": "vo:36",
+   "item": "vo",
+   "i": 36,
+   "text": "everything.",
+   "start": 14.66,
+   "end": 15.8
+  },
+  {
+   "key": "vo:37",
+   "item": "vo",
+   "i": 37,
+   "text": "The",
+   "start": 15.98,
+   "end": 15.98
+  },
+  {
+   "key": "vo:38",
+   "item": "vo",
+   "i": 38,
+   "text": "captions",
+   "start": 16.11,
+   "end": 16.47
+  },
+  {
+   "key": "vo:39",
+   "item": "vo",
+   "i": 39,
+   "text": "below",
+   "start": 16.47,
+   "end": 16.76
+  },
+  {
+   "key": "vo:40",
+   "item": "vo",
+   "i": 40,
+   "text": "are",
+   "start": 16.77,
+   "end": 16.96
+  },
+  {
+   "key": "vo:41",
+   "item": "vo",
+   "i": 41,
+   "text": "built",
+   "start": 16.96,
+   "end": 17.27
+  },
+  {
+   "key": "vo:42",
+   "item": "vo",
+   "i": 42,
+   "text": "from",
+   "start": 17.27,
+   "end": 17.52
+  },
+  {
+   "key": "vo:43",
+   "item": "vo",
+   "i": 43,
+   "text": "it,",
+   "start": 17.52,
+   "end": 17.71
+  },
+  {
+   "key": "vo:44",
+   "item": "vo",
+   "i": 44,
+   "text": "two",
+   "start": 18.07,
+   "end": 18.07
+  },
+  {
+   "key": "vo:45",
+   "item": "vo",
+   "i": 45,
+   "text": "lines",
+   "start": 18.53,
+   "end": 18.53
+  },
+  {
+   "key": "vo:46",
+   "item": "vo",
+   "i": 46,
+   "text": "at",
+   "start": 18.65,
+   "end": 18.71
+  },
+  {
+   "key": "vo:47",
+   "item": "vo",
+   "i": 47,
+   "text": "a",
+   "start": 18.71,
+   "end": 18.8
+  },
+  {
+   "key": "vo:48",
+   "item": "vo",
+   "i": 48,
+   "text": "time,",
+   "start": 18.8,
+   "end": 19.2
+  },
+  {
+   "key": "vo:49",
+   "item": "vo",
+   "i": 49,
+   "text": "and",
+   "start": 19.47,
+   "end": 19.47
+  },
+  {
+   "key": "vo:50",
+   "item": "vo",
+   "i": 50,
+   "text": "each",
+   "start": 19.51,
+   "end": 19.83
+  },
+  {
+   "key": "vo:51",
+   "item": "vo",
+   "i": 51,
+   "text": "word",
+   "start": 19.83,
+   "end": 20.16
+  },
+  {
+   "key": "vo:52",
+   "item": "vo",
+   "i": 52,
+   "text": "lights",
+   "start": 20.18,
+   "end": 20.73
+  },
+  {
+   "key": "vo:53",
+   "item": "vo",
+   "i": 53,
+   "text": "up",
+   "start": 20.73,
+   "end": 20.9
+  },
+  {
+   "key": "vo:54",
+   "item": "vo",
+   "i": 54,
+   "text": "as",
+   "start": 20.9,
+   "end": 21.09
+  },
+  {
+   "key": "vo:55",
+   "item": "vo",
+   "i": 55,
+   "text": "it",
+   "start": 21.09,
+   "end": 21.12
+  },
+  {
+   "key": "vo:56",
+   "item": "vo",
+   "i": 56,
+   "text": "is",
+   "start": 21.27,
+   "end": 21.35
+  },
+  {
+   "key": "vo:57",
+   "item": "vo",
+   "i": 57,
+   "text": "said.",
+   "start": 21.81,
+   "end": 22.1
+  },
+  {
+   "key": "vo:58",
+   "item": "vo",
+   "i": 58,
+   "text": "Visuals",
+   "start": 22.41,
+   "end": 22.68
+  },
+  {
+   "key": "vo:59",
+   "item": "vo",
+   "i": 59,
+   "text": "land",
+   "start": 22.68,
+   "end": 23.01
+  },
+  {
+   "key": "vo:60",
+   "item": "vo",
+   "i": 60,
+   "text": "on",
+   "start": 23.01,
+   "end": 23.17
+  },
+  {
+   "key": "vo:61",
+   "item": "vo",
+   "i": 61,
+   "text": "their",
+   "start": 23.17,
+   "end": 23.58
+  },
+  {
+   "key": "vo:62",
+   "item": "vo",
+   "i": 62,
+   "text": "words",
+   "start": 23.58,
+   "end": 24.02
+  },
+  {
+   "key": "vo:63",
+   "item": "vo",
+   "i": 63,
+   "text": "too.",
+   "start": 24.15,
+   "end": 24.7
+  },
+  {
+   "key": "vo:64",
+   "item": "vo",
+   "i": 64,
+   "text": "When",
+   "start": 25.01,
+   "end": 25.03
+  },
+  {
+   "key": "vo:65",
+   "item": "vo",
+   "i": 65,
+   "text": "I",
+   "start": 25.03,
+   "end": 25.11
+  },
+  {
+   "key": "vo:66",
+   "item": "vo",
+   "i": 66,
+   "text": "say",
+   "start": 25.16,
+   "end": 25.36
+  },
+  {
+   "key": "vo:67",
+   "item": "vo",
+   "i": 67,
+   "text": "contrast,",
+   "start": 25.36,
+   "end": 26.2
+  },
+  {
+   "key": "vo:68",
+   "item": "vo",
+   "i": 68,
+   "text": "a",
+   "start": 26.2,
+   "end": 26.3
+  },
+  {
+   "key": "vo:69",
+   "item": "vo",
+   "i": 69,
+   "text": "title",
+   "start": 26.3,
+   "end": 26.6
+  },
+  {
+   "key": "vo:70",
+   "item": "vo",
+   "i": 70,
+   "text": "appears,",
+   "start": 27.55,
+   "end": 27.6
+  },
+  {
+   "key": "vo:71",
+   "item": "vo",
+   "i": 71,
+   "text": "and",
+   "start": 27.85,
+   "end": 27.85
+  },
+  {
+   "key": "vo:72",
+   "item": "vo",
+   "i": 72,
+   "text": "it",
+   "start": 27.91,
+   "end": 28.01
+  },
+  {
+   "key": "vo:73",
+   "item": "vo",
+   "i": 73,
+   "text": "stays",
+   "start": 28.06,
+   "end": 28.42
+  },
+  {
+   "key": "vo:74",
+   "item": "vo",
+   "i": 74,
+   "text": "on",
+   "start": 28.42,
+   "end": 28.56
+  },
+  {
+   "key": "vo:75",
+   "item": "vo",
+   "i": 75,
+   "text": "its",
+   "start": 28.57,
+   "end": 28.79
+  },
+  {
+   "key": "vo:76",
+   "item": "vo",
+   "i": 76,
+   "text": "word",
+   "start": 28.84,
+   "end": 29.16
+  },
+  {
+   "key": "vo:77",
+   "item": "vo",
+   "i": 77,
+   "text": "even",
+   "start": 29.16,
+   "end": 29.49
+  },
+  {
+   "key": "vo:78",
+   "item": "vo",
+   "i": 78,
+   "text": "if",
+   "start": 29.49,
+   "end": 29.52
+  },
+  {
+   "key": "vo:79",
+   "item": "vo",
+   "i": 79,
+   "text": "the",
+   "start": 29.65,
+   "end": 29.65
+  },
+  {
+   "key": "vo:80",
+   "item": "vo",
+   "i": 80,
+   "text": "take",
+   "start": 30.23,
+   "end": 30.23
+  },
+  {
+   "key": "vo:81",
+   "item": "vo",
+   "i": 81,
+   "text": "changes.",
+   "start": 30.45,
+   "end": 31.1
+  },
+  {
+   "key": "vo:82",
+   "item": "vo",
+   "i": 82,
+   "text": "The",
+   "start": 31.31,
+   "end": 31.31
+  },
+  {
+   "key": "vo:83",
+   "item": "vo",
+   "i": 83,
+   "text": "music",
+   "start": 31.41,
+   "end": 31.66
+  },
+  {
+   "key": "vo:84",
+   "item": "vo",
+   "i": 84,
+   "text": "steps",
+   "start": 31.66,
+   "end": 32.01
+  },
+  {
+   "key": "vo:85",
+   "item": "vo",
+   "i": 85,
+   "text": "back",
+   "start": 32.01,
+   "end": 32.28
+  },
+  {
+   "key": "vo:86",
+   "item": "vo",
+   "i": 86,
+   "text": "while",
+   "start": 32.34,
+   "end": 32.64
+  },
+  {
+   "key": "vo:87",
+   "item": "vo",
+   "i": 87,
+   "text": "I",
+   "start": 32.64,
+   "end": 32.71
+  },
+  {
+   "key": "vo:88",
+   "item": "vo",
+   "i": 88,
+   "text": "speak,",
+   "start": 32.71,
+   "end": 33
+  },
+  {
+   "key": "vo:89",
+   "item": "vo",
+   "i": 89,
+   "text": "and",
+   "start": 33.35,
+   "end": 33.35
+  },
+  {
+   "key": "vo:90",
+   "item": "vo",
+   "i": 90,
+   "text": "comes",
+   "start": 33.41,
+   "end": 33.78
+  },
+  {
+   "key": "vo:91",
+   "item": "vo",
+   "i": 91,
+   "text": "forward",
+   "start": 33.78,
+   "end": 34.36
+  },
+  {
+   "key": "vo:92",
+   "item": "vo",
+   "i": 92,
+   "text": "in",
+   "start": 34.38,
+   "end": 34.55
+  },
+  {
+   "key": "vo:93",
+   "item": "vo",
+   "i": 93,
+   "text": "the",
+   "start": 34.55,
+   "end": 34.8
+  },
+  {
+   "key": "vo:94",
+   "item": "vo",
+   "i": 94,
+   "text": "pauses.",
+   "start": 34.8,
+   "end": 35.6
+  },
+  {
+   "key": "vo:95",
+   "item": "vo",
+   "i": 95,
+   "text": "Before",
+   "start": 35.91,
+   "end": 36.11
+  },
+  {
+   "key": "vo:96",
+   "item": "vo",
+   "i": 96,
+   "text": "a",
+   "start": 36.11,
+   "end": 36.111,
+   "missing": true
+  },
+  {
+   "key": "vo:97",
+   "item": "vo",
+   "i": 97,
+   "text": "render,",
+   "start": 36.11,
+   "end": 36.79
+  },
+  {
+   "key": "vo:98",
+   "item": "vo",
+   "i": 98,
+   "text": "the",
+   "start": 36.84,
+   "end": 37.03
+  },
+  {
+   "key": "vo:99",
+   "item": "vo",
+   "i": 99,
+   "text": "studio",
+   "start": 37.03,
+   "end": 37.5
+  },
+  {
+   "key": "vo:100",
+   "item": "vo",
+   "i": 100,
+   "text": "checks",
+   "start": 38.06,
+   "end": 38.06
+  },
+  {
+   "key": "vo:101",
+   "item": "vo",
+   "i": 101,
+   "text": "every",
+   "start": 38.45,
+   "end": 38.48
+  },
+  {
+   "key": "vo:102",
+   "item": "vo",
+   "i": 102,
+   "text": "frame.",
+   "start": 38.48,
+   "end": 39.14
+  },
+  {
+   "key": "vo:103",
+   "item": "vo",
+   "i": 103,
+   "text": "Text",
+   "start": 39.51,
+   "end": 39.51
+  },
+  {
+   "key": "vo:104",
+   "item": "vo",
+   "i": 104,
+   "text": "sits",
+   "start": 39.51,
+   "end": 39.78
+  },
+  {
+   "key": "vo:105",
+   "item": "vo",
+   "i": 105,
+   "text": "inside",
+   "start": 39.82,
+   "end": 40.28
+  },
+  {
+   "key": "vo:106",
+   "item": "vo",
+   "i": 106,
+   "text": "the",
+   "start": 40.28,
+   "end": 40.51
+  },
+  {
+   "key": "vo:107",
+   "item": "vo",
+   "i": 107,
+   "text": "safe",
+   "start": 40.51,
+   "end": 40.82
+  },
+  {
+   "key": "vo:108",
+   "item": "vo",
+   "i": 108,
+   "text": "zone,",
+   "start": 40.82,
+   "end": 41.3
+  },
+  {
+   "key": "vo:109",
+   "item": "vo",
+   "i": 109,
+   "text": "big",
+   "start": 41.3,
+   "end": 41.35
+  },
+  {
+   "key": "vo:110",
+   "item": "vo",
+   "i": 110,
+   "text": "enough",
+   "start": 42.05,
+   "end": 42.07
+  },
+  {
+   "key": "vo:111",
+   "item": "vo",
+   "i": 111,
+   "text": "to",
+   "start": 42.07,
+   "end": 42.24
+  },
+  {
+   "key": "vo:112",
+   "item": "vo",
+   "i": 112,
+   "text": "read,",
+   "start": 42.24,
+   "end": 42.6
+  },
+  {
+   "key": "vo:113",
+   "item": "vo",
+   "i": 113,
+   "text": "with",
+   "start": 42.88,
+   "end": 42.88
+  },
+  {
+   "key": "vo:114",
+   "item": "vo",
+   "i": 114,
+   "text": "a",
+   "start": 42.91,
+   "end": 42.95
+  },
+  {
+   "key": "vo:115",
+   "item": "vo",
+   "i": 115,
+   "text": "contrast",
+   "start": 42.95,
+   "end": 43.52
+  },
+  {
+   "key": "vo:116",
+   "item": "vo",
+   "i": 116,
+   "text": "of",
+   "start": 43.52,
+   "end": 43.65
+  },
+  {
+   "key": "vo:117",
+   "item": "vo",
+   "i": 117,
+   "text": "at",
+   "start": 43.65,
+   "end": 43.79
+  },
+  {
+   "key": "vo:118",
+   "item": "vo",
+   "i": 118,
+   "text": "least",
+   "start": 43.84,
+   "end": 44.15
+  },
+  {
+   "key": "vo:119",
+   "item": "vo",
+   "i": 119,
+   "text": "four",
+   "start": 44.15,
+   "end": 44.37
+  },
+  {
+   "key": "vo:120",
+   "item": "vo",
+   "i": 120,
+   "text": "and",
+   "start": 44.41,
+   "end": 44.51
+  },
+  {
+   "key": "vo:121",
+   "item": "vo",
+   "i": 121,
+   "text": "a",
+   "start": 44.71,
+   "end": 44.71
+  },
+  {
+   "key": "vo:122",
+   "item": "vo",
+   "i": 122,
+   "text": "half",
+   "start": 44.71,
+   "end": 44.75
+  },
+  {
+   "key": "vo:123",
+   "item": "vo",
+   "i": 123,
+   "text": "to",
+   "start": 44.99,
+   "end": 45.13
+  },
+  {
+   "key": "vo:124",
+   "item": "vo",
+   "i": 124,
+   "text": "one,",
+   "start": 45.4,
+   "end": 45.4
+  },
+  {
+   "key": "vo:125",
+   "item": "vo",
+   "i": 125,
+   "text": "and",
+   "start": 45.65,
+   "end": 45.65
+  },
+  {
+   "key": "vo:126",
+   "item": "vo",
+   "i": 126,
+   "text": "it",
+   "start": 45.71,
+   "end": 45.81
+  },
+  {
+   "key": "vo:127",
+   "item": "vo",
+   "i": 127,
+   "text": "stays",
+   "start": 45.86,
+   "end": 46.22
+  },
+  {
+   "key": "vo:128",
+   "item": "vo",
+   "i": 128,
+   "text": "long",
+   "start": 46.22,
+   "end": 46.55
+  },
+  {
+   "key": "vo:129",
+   "item": "vo",
+   "i": 129,
+   "text": "enough",
+   "start": 46.55,
+   "end": 47.05
+  },
+  {
+   "key": "vo:130",
+   "item": "vo",
+   "i": 130,
+   "text": "to",
+   "start": 47.05,
+   "end": 47.17
+  },
+  {
+   "key": "vo:131",
+   "item": "vo",
+   "i": 131,
+   "text": "finish.",
+   "start": 47.2,
+   "end": 48
+  },
+  {
+   "key": "vo:132",
+   "item": "vo",
+   "i": 132,
+   "text": "After",
+   "start": 48.31,
+   "end": 48.4
+  },
+  {
+   "key": "vo:133",
+   "item": "vo",
+   "i": 133,
+   "text": "the",
+   "start": 48.4,
+   "end": 48.64
+  },
+  {
+   "key": "vo:134",
+   "item": "vo",
+   "i": 134,
+   "text": "render,",
+   "start": 48.64,
+   "end": 49.26
+  },
+  {
+   "key": "vo:135",
+   "item": "vo",
+   "i": 135,
+   "text": "it",
+   "start": 49.28,
+   "end": 49.44
+  },
+  {
+   "key": "vo:136",
+   "item": "vo",
+   "i": 136,
+   "text": "measures",
+   "start": 49.44,
+   "end": 49.9
+  },
+  {
+   "key": "vo:137",
+   "item": "vo",
+   "i": 137,
+   "text": "the",
+   "start": 50.07,
+   "end": 50.15
+  },
+  {
+   "key": "vo:138",
+   "item": "vo",
+   "i": 138,
+   "text": "file",
+   "start": 50.64,
+   "end": 50.64
+  },
+  {
+   "key": "vo:139",
+   "item": "vo",
+   "i": 139,
+   "text": "itself.",
+   "start": 50.85,
+   "end": 51.4
+  },
+  {
+   "key": "vo:140",
+   "item": "vo",
+   "i": 140,
+   "text": "Loudness",
+   "start": 51.71,
+   "end": 52.04
+  },
+  {
+   "key": "vo:141",
+   "item": "vo",
+   "i": 141,
+   "text": "lands",
+   "start": 52.04,
+   "end": 52.4
+  },
+  {
+   "key": "vo:142",
+   "item": "vo",
+   "i": 142,
+   "text": "at",
+   "start": 52.44,
+   "end": 52.59
+  },
+  {
+   "key": "vo:143",
+   "item": "vo",
+   "i": 143,
+   "text": "minus",
+   "start": 52.64,
+   "end": 52.947
+  },
+  {
+   "key": "vo:144",
+   "item": "vo",
+   "i": 144,
+   "text": "fourteen,",
+   "start": 52.947,
+   "end": 53.5
+  },
+  {
+   "key": "vo:145",
+   "item": "vo",
+   "i": 145,
+   "text": "with",
+   "start": 53.81,
+   "end": 53.9
+  },
+  {
+   "key": "vo:146",
+   "item": "vo",
+   "i": 146,
+   "text": "no",
+   "start": 53.9,
+   "end": 54.08
+  },
+  {
+   "key": "vo:147",
+   "item": "vo",
+   "i": 147,
+   "text": "flashes",
+   "start": 54.12,
+   "end": 54.79
+  },
+  {
+   "key": "vo:148",
+   "item": "vo",
+   "i": 148,
+   "text": "and",
+   "start": 54.79,
+   "end": 55.09
+  },
+  {
+   "key": "vo:149",
+   "item": "vo",
+   "i": 149,
+   "text": "no",
+   "start": 55.09,
+   "end": 55.27
+  },
+  {
+   "key": "vo:150",
+   "item": "vo",
+   "i": 150,
+   "text": "frozen",
+   "start": 55.3,
+   "end": 55.42
+  },
+  {
+   "key": "vo:151",
+   "item": "vo",
+   "i": 151,
+   "text": "frames.",
+   "start": 56.35,
+   "end": 56.8
+  },
+  {
+   "key": "vo:152",
+   "item": "vo",
+   "i": 152,
+   "text": "Nothing",
+   "start": 57.11,
+   "end": 57.23
+  },
+  {
+   "key": "vo:153",
+   "item": "vo",
+   "i": 153,
+   "text": "here",
+   "start": 57.26,
+   "end": 57.48
+  },
+  {
+   "key": "vo:154",
+   "item": "vo",
+   "i": 154,
+   "text": "was",
+   "start": 57.5,
+   "end": 57.69
+  },
+  {
+   "key": "vo:155",
+   "item": "vo",
+   "i": 155,
+   "text": "checked",
+   "start": 57.69,
+   "end": 58.14
+  },
+  {
+   "key": "vo:156",
+   "item": "vo",
+   "i": 156,
+   "text": "by",
+   "start": 58.14,
+   "end": 58.26
+  },
+  {
+   "key": "vo:157",
+   "item": "vo",
+   "i": 157,
+   "text": "eye",
+   "start": 58.26,
+   "end": 58.45
+  },
+  {
+   "key": "vo:158",
+   "item": "vo",
+   "i": 158,
+   "text": "alone.",
+   "start": 58.45,
+   "end": 59.08
+  }
+ ]
+}
