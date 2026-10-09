@@ -59,3 +59,20 @@ editor-clip5-phone    /clips/clip-5-a-library-in-3d     phone --scroll
 asset-orb-phone       /assets/orb-3d                    phone --scroll
 asset-svg-phone       /assets/studio-logo               phone --scroll
 request-clip-phone    /requests/2                       phone --scroll
+
+# iteration 3 on the showcase's own data (clips 7 and 8, the narration, captions@2, render reports)
+editor-clip7          /clips/clip-7-a-video-that-checks-itself desktop --full
+editor-clip8          /clips/clip-8-cuvinte-pe-ritm     desktop --full
+asset-narration       /assets/clip-7-voice              desktop --full
+asset-captions        /assets/text-captions             desktop --full
+asset-check-list      /assets/check-list                desktop --full
+renders-report        /renders                          desktop --js "document.querySelector('[data-testid=render-report-open]')?.click()"
+gallery-clip7         /gallery/9                        desktop --full
+editor-clip7-phone    /clips/clip-7-a-video-that-checks-itself phone --scroll
+editor-clip8-phone    /clips/clip-8-cuvinte-pe-ritm     phone --scroll
+renders-report-phone  /renders                          phone --js "document.querySelector('[data-testid=render-report-open]')?.click()"
+gallery-clip7-phone   /gallery/9                        phone --scroll
+
+# iteration 3 dev seed (run `node scripts/dev-seed-v3.mjs` on top: clip v3-demo)
+editor-v3             /clips/v3-demo                    desktop --full
+editor-v3-phone       /clips/v3-demo                    phone --scroll

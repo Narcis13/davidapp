@@ -1,137 +1,84 @@
 {
- "render": 6,
- "clip": "clip-7-a-video-that-checks-itself",
- "format": "vertical",
- "loudness": {
-  "measured": {
-   "integrated": -14.1,
-   "range": 2.7,
-   "truePeak": -1.1
-  },
-  "master": {
-   "mode": "target",
-   "target": -14,
-   "truePeak": -1,
-   "before": {
-    "integrated": -22.46,
-    "range": 2.89,
-    "truePeak": -5.46,
-    "samplePeak": -5.5
-   },
-   "after": {
-    "integrated": -14.03,
-    "range": 2.73,
-    "truePeak": -1.51,
-    "samplePeak": -1.51
-   },
-   "gainDb": 8.65,
-   "limited": true,
-   "limitDb": -10.16,
-   "note": "The peaks were limited to −10.2 dBTP first: one gain alone would have put the true peak at +3.0 dBTP. Then +8.7 dB reached −14.0 LUFS."
-  },
-  "target": {
-   "target": -14,
-   "truePeak": -1
-  },
-  "met": true
- },
- "timings": {
-  "render": 9.77,
-  "mix": 0,
-  "report": 2.92,
-  "loudness": 0
- },
- "report": {
-  "probe": {
-   "duration": 62,
-   "size": 19568701,
-   "video": {
-    "codec": "h264",
-    "width": 1080,
-    "height": 1920,
-    "fps": 30,
-    "pixFmt": "yuv420p",
-    "frames": 1860
-   },
-   "audio": {
-    "codec": "aac",
-    "sampleRate": 48000,
-    "channels": 2
-   },
-   "color": {
-    "primaries": "bt709",
-    "transfer": "bt709",
-    "space": "bt709",
-    "range": "tv"
-   },
-   "faststart": true,
+ "probe": {
+  "duration": 62,
+  "size": 19568701,
+  "video": {
+   "codec": "h264",
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "pixFmt": "yuv420p",
    "frames": 1860
   },
-  "loudness": {
-   "integrated": -14.1,
-   "range": 2.7,
-   "truePeak": -1.1
+  "audio": {
+   "codec": "aac",
+   "sampleRate": 48000,
+   "channels": 2
   },
-  "black": [],
-  "freezes": [
-   {
-    "start": 58.167,
-    "end": 59.033,
-    "duration": 0.867,
-    "excused": "hold"
-   },
-   {
-    "start": 59.1,
-    "end": 62,
-    "duration": 2.9,
-    "excused": "hold"
-   }
-  ],
-  "jumps": [],
-  "flashes": {
-   "maxPerSecond": 0,
-   "failing": []
+  "color": {
+   "primaries": "bt709",
+   "transfer": "bt709",
+   "space": "bt709",
+   "range": "tv"
   },
-  "silences": [],
-  "narration": [
-   {
-    "item": "vo",
-    "first": {
-     "t": 1.31,
-     "frame": 39
-    },
-    "last": {
-     "t": 59.08,
-     "frame": 1772
-    },
-    "head": 1.31,
-    "tail": 2.92,
-    "overCuts": [
-     {
-      "word": "render,",
-      "t": 48.64,
-      "end": 49.26,
-      "cut": 49.08
-     },
-     {
-      "word": "here",
-      "t": 57.26,
-      "end": 57.48,
-      "cut": 57.39
-     }
-    ],
-    "outside": []
-   }
-  ],
-  "problems": []
+  "faststart": true,
+  "frames": 1860
  },
- "files": {
-  "srt": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\C--newme-davidapp\\7b8e9dcc-3198-491a-b273-e0641c534d54\\scratchpad\\show-data\\renders\\clip-7-a-video-that-checks-itself-r6-vertical.srt",
-  "vtt": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\C--newme-davidapp\\7b8e9dcc-3198-491a-b273-e0641c534d54\\scratchpad\\show-data\\renders\\clip-7-a-video-that-checks-itself-r6-vertical.vtt",
-  "words": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\C--newme-davidapp\\7b8e9dcc-3198-491a-b273-e0641c534d54\\scratchpad\\show-data\\renders\\clip-7-a-video-that-checks-itself-r6-vertical.words.json",
-  "sheets": [
-   "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\C--newme-davidapp\\7b8e9dcc-3198-491a-b273-e0641c534d54\\scratchpad\\show-data\\renders\\clip-7-a-video-that-checks-itself-r6-vertical.sheet-1.png",
-   "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\C--newme-davidapp\\7b8e9dcc-3198-491a-b273-e0641c534d54\\scratchpad\\show-data\\renders\\clip-7-a-video-that-checks-itself-r6-vertical.sheet-2.png"
-  ]
- }
+ "loudness": {
+  "integrated": -14.1,
+  "range": 2.7,
+  "truePeak": -1.1
+ },
+ "black": [],
+ "freezes": [
+  {
+   "start": 58.167,
+   "end": 59.033,
+   "duration": 0.867,
+   "excused": "hold"
+  },
+  {
+   "start": 59.1,
+   "end": 62,
+   "duration": 2.9,
+   "excused": "hold"
+  }
+ ],
+ "jumps": [],
+ "flashes": {
+  "maxPerSecond": 0,
+  "failing": []
+ },
+ "silences": [],
+ "narration": [
+  {
+   "item": "vo",
+   "first": {
+    "t": 1.31,
+    "frame": 39
+   },
+   "last": {
+    "t": 59.08,
+    "frame": 1772
+   },
+   "head": 1.31,
+   "tail": 2.92,
+   "overCuts": [
+    {
+     "word": "render,",
+     "t": 48.64,
+     "end": 49.26,
+     "cut": 49.08
+    },
+    {
+     "word": "here",
+     "t": 57.26,
+     "end": 57.48,
+     "cut": 57.39
+    }
+   ],
+   "outside": []
+  }
+ ],
+ "problems": []
 }

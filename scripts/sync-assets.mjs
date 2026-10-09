@@ -6,7 +6,7 @@
 // not come from assets/ (a proposal accepted in the studio, a save in the playground), syncing the older
 // file would make a new version that throws that change away: the sync stops before writing anything and
 // names the conflicts. --pull writes the library's version into assets/ (as name.v<N>.js), so the file
-// and the library agree again; --force makes the new version from the file anyway. assets/.sync-state.json
+// and the library agree again; --force makes the new version from the file anyway. <data dir>/sync-state.json
 // remembers the hashes of the sources the files and the library agreed on, so a pulled file can be edited
 // and synced again.
 //
@@ -18,7 +18,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connect, callTool } from './mcp.mjs';
 
@@ -27,14 +27,21 @@ export const ASSETS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'a
 export const SYNC_NOTE = 'Synced from assets/';
 
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
-const STATE = '.sync-state.json';
+/**
+ * Where the agreed hashes live: next to the library they describe (the data dir's sync-state.json) when syncing the
+ * repo's assets/, so two data dirs never share one record and nothing machine-local lands in git; inside the folder
+ * itself for any other folder of sources (tests).
+ */
+// the data dir as the studio resolves it (src/studio/studio.js defaultDataDir)
+const dataDir = () => resolve(process.env.STUDIO_DATA ?? join(ASSETS_DIR, '..', 'data'));
+const stateFile = (dir) => (resolve(dir) === resolve(ASSETS_DIR) ? join(dataDir(), 'sync-state.json') : join(dir, '.sync-state.json'));
 /** name → hashes of the sources the files and the library agreed on. */
-const readState = (dir) => { try { return existsSync(join(dir, STATE)) ? JSON.parse(readFileSync(join(dir, STATE), 'utf8')) : {}; } catch { return {}; } };
+const readState = (dir) => { try { return existsSync(stateFile(dir)) ? JSON.parse(readFileSync(stateFile(dir), 'utf8')) : {}; } catch { return {}; } };
 function remember(dir, state, name, source) {
   const h = sha1(source);
   if ((state[name] ??= []).includes(h)) return;
   state[name].push(h);
-  writeFileSync(join(dir, STATE), `${JSON.stringify(Object.fromEntries(Object.entries(state).sort()), null, 1)}\n`);
+  try { writeFileSync(stateFile(dir), `${JSON.stringify(Object.fromEntries(Object.entries(state).sort()), null, 1)}\n`); } catch { /* no data dir yet: the next sync records it */ }
 }
 
 /** name → { path, v } of every source file in assets/, all versions. */

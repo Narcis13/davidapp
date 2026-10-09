@@ -1,0 +1,184 @@
+✓  1 create_clip    clip-1-every-frame       clip-1-every-frame (4ms)
+✓  2 create_asset   easing                   easing@1 (108ms)
+✓  3 create_asset   spring                   spring@1 (11ms)
+✓  4 create_asset   text-block               text-block@1 (20ms)
+✓  5 create_asset   theme-ember              theme-ember@1 (11ms)
+✓  6 create_asset   text-word-reveal         text-word-reveal@1 (106ms)
+✓  7 create_asset   text-char-reveal         text-char-reveal@1 (90ms)
+✓  8 create_asset   text-line-reveal         text-line-reveal@1 (82ms)
+✓  9 create_asset   text-typewriter          text-typewriter@1 (87ms)
+✓ 10 create_asset   text-kinetic             text-kinetic@1 (92ms)
+✓ 11 create_asset   text-highlight           text-highlight@1 (93ms)
+✓ 12 create_asset   text-counter             text-counter@1 (80ms)
+✓ 13 create_asset   text-captions            text-captions@1 (90ms)
+✓ 14 create_asset   bg-gradient-drift        bg-gradient-drift@1 (302ms)
+✓ 15 create_asset   beat-bars                beat-bars@1 (78ms)
+✓ 16 create_asset   progress-segments        progress-segments@1 (78ms)
+✓ 17 create_asset   sparkle-field            sparkle-field@1 (81ms)
+✓ 18 create_asset   logo-mark                logo-mark@1 (84ms)
+✓ 19 create_asset   code-window              code-window@1 (176ms)
+✓ 20 create_asset   stat-trio                stat-trio@1 (118ms)
+✓ 21 create_asset   logo-sting               logo-sting@1 (113ms)
+✓ 22 create_asset   drum-kick                drum-kick@1 (26ms)
+✓ 23 create_asset   drum-snare               drum-snare@1 (19ms)
+✓ 24 create_asset   drum-hat                 drum-hat@1 (12ms)
+✓ 25 create_asset   synth-note               synth-note@1 (15ms)
+✓ 26 create_asset   music-loop               music-loop@1 (38ms)
+✓ 27 create_asset   sfx-whoosh               sfx-whoosh@1 (39ms)
+✓ 28 bake_asset     fablecut-mark            fablecut-mark@1 (18ms)
+✓ 29 create_asset   watermark                watermark@1 (77ms)
+✓ 30 update_clip    clip-1-every-frame       clip-1-every-frame (337ms)
+✓ 31 start_render   clip-1-every-frame       render #1 done in 6.61s (145.3 fps, 4.84× realtime) → <data>\renders\clip-1-every-frame-r1.mp4 (9583ms)
+✓ 32 create_clip    clip-2-compounding       clip-2-compounding (7ms)
+✓ 33 update_asset   text-word-reveal         text-word-reveal@2 (117ms)
+✓ 34 create_asset   theme-tide               theme-tide@1 (13ms)
+✓ 35 create_asset   bg-grid                  bg-grid@1 (235ms)
+✓ 36 create_asset   text-scramble            text-scramble@1 (102ms)
+✓ 37 create_asset   lower-third              lower-third@1 (98ms)
+✓ 38 create_asset   chart-bars               chart-bars@1 (117ms)
+✓ 39 create_asset   lineage-flow             lineage-flow@1 (130ms)
+✓ 40 create_asset   pin-diagram              pin-diagram@1 (114ms)
+     warning: → (U+2192) is not in JetBrains Mono: it falls back to a system font (in "→")
+✓ 41 update_clip    clip-2-compounding       clip-2-compounding (542ms)
+✓ 42 start_render   clip-2-compounding       render #2 done in 8.32s (115.5 fps, 3.85× realtime) → <data>\renders\clip-2-compounding-r2.mp4 (10484ms)
+✓ 43 create_clip    clip-3-release-notes     clip-3-release-notes (2ms)
+✓ 44 bake_asset     whoosh-hit               whoosh-hit@1 (122ms)
+✓ 45 create_asset   badge-pill               badge-pill@1 (101ms)
+✓ 46 create_asset   template-bullets         template-bullets@1 (126ms)
+✓ 47 create_asset   format-frames            format-frames@1 (107ms)
+✓ 48 fork_asset     confetti-burst           confetti-burst@1 (99ms)
+✓ 49 update_clip    clip-3-release-notes     clip-3-release-notes (426ms)
+✓ 50 start_render   clip-3-release-notes     render #3 done in 5.02s (191.3 fps, 6.37× realtime) → <data>\renders\clip-3-release-notes-r3.mp4 (7353ms)
+✓ 51 create_clip    clip-4-direct-the-studio clip-4-direct-the-studio (9ms)
+✓ 52 create_asset   motion-pop               motion-pop@1 (141ms)
+✓ 53 create_asset   motion-slide             motion-slide@1 (42ms)
+✓ 54 create_asset   motion-drift             motion-drift@1 (41ms)
+     warning: at the end of its "in" phase the motion returns {"x":2.912461179749811,"y":2.054282075197532,"rotation":1.8634359652988024}, not rest (x, y, rotation 0; scale, opacity 1): the item will jump when the motion ends
+✓ 55 create_asset   motion-wiggle            motion-wiggle@1 (50ms)
+✓ 56 create_asset   trans-wipe               trans-wipe@1 (372ms)
+✓ 57 create_asset   trans-push               trans-push@1 (261ms)
+✓ 58 create_asset   trans-iris               trans-iris@1 (214ms)
+✓ 59 create_asset   fx-glow                  fx-glow@1 (2419ms)
+✓ 60 create_asset   fx-grain                 fx-grain@1 (1074ms)
+✓ 61 create_asset   fx-vignette              fx-vignette@1 (757ms)
+✓ 62 create_asset   fx-duotone               fx-duotone@1 (630ms)
+✓ 63 create_asset   mask-iris                mask-iris@1 (137ms)
+✓ 64 create_asset   orb-3d                   orb-3d@1 (2236ms)
+✓ 65 create_asset   svg-draw-on              svg-draw-on@1 (93ms)
+     warning: all horizontal test frames are blank with the default parameters
+     warning: all vertical test frames are blank with the default parameters
+✓ 66 user: upload   clip-4-direct-the-studio harbour-at-dusk@1 (41ms)
+✓ 67 user: upload   clip-4-direct-the-studio studio-logo@1 (166ms)
+✓ 68 describe_asset harbour-at-dusk           (2ms)
+✓ 69 describe_asset studio-logo               (1ms)
+✓ 70 create_preset  lower-third-studio       lower-third-studio@1 (147ms)
+✓ 71 update_clip    clip-4-direct-the-studio clip-4-direct-the-studio (5901ms)
+✓ 72 edit_clip      clip-4-direct-the-studio clip-4-direct-the-studio (5933ms)
+✓ 73 edit_clip      clip-4-direct-the-studio clip-4-direct-the-studio (5822ms)
+✓ 74 edit_clip      clip-4-direct-the-studio clip-4-direct-the-studio (5647ms)
+✓ 75 user: create_request clip-4-direct-the-studio request #1 (4ms)
+✓ 76 claim_request                            (3457ms)
+✓ 77 propose_clip_edit                           (6098ms)
+✓ 78 user: accept   clip-4-direct-the-studio clip-4-direct-the-studio#6 (5325ms)
+✓ 79 save_precomp   studio-title-card        studio-title-card@1 (128ms)
+✓ 80 edit_clip      clip-4-direct-the-studio clip-4-direct-the-studio (5590ms)
+✓ 81 start_render   clip-4-direct-the-studio render #4 done in 84.85s (10.6 fps, 0.35× realtime) → <data>\renders\clip-4-direct-the-studio-r4.mp4 (89572ms)
+✓ 82 start_render   clip-4-direct-the-studio render #5 done in 49.59s (18.1 fps, 0.6× realtime) → <data>\renders\clip-4-direct-the-studio-r5-square.mp4 (52853ms)
+✓ 83 start_render   clip-4-direct-the-studio render #6 done in 84.73s (10.6 fps, 0.35× realtime) → <data>\renders\clip-4-direct-the-studio-r6-vertical.mp4 (90046ms)
+✓ 84 create_clip    clip-5-a-library-in-3d   clip-5-a-library-in-3d (6ms)
+✓ 85 create_asset   terrain-3d               terrain-3d@1 (3692ms)
+✓ 86 create_asset   block-text-3d            block-text-3d@1 (1760ms)
+✓ 87 create_asset   fx-chromatic             fx-chromatic@1 (853ms)
+✓ 88 create_asset   trans-glitch             trans-glitch@1 (227ms)
+✓ 89 create_asset   motion-bounce            motion-bounce@1 (48ms)
+✓ 90 create_asset   motion-orbit             motion-orbit@1 (40ms)
+     warning: at the end of its "in" phase the motion returns {"x":13.121435293585408,"y":5.544831558022378,"scale":1.0547637684742952}, not rest (x, y, rotation 0; scale, opacity 1): the item will jump when the motion ends
+✓ 91 bake_sequence  orb-spin                  (2713ms)
+✓ 92 user: upload   clip-5-a-library-in-3d   mountain-lake-dawn@1 (26ms)
+✓ 93 describe_asset mountain-lake-dawn        (1ms)
+✓ 94 update_clip    clip-5-a-library-in-3d   clip-5-a-library-in-3d (10003ms)
+✓ 95 user: create_request clip-5-a-library-in-3d   request #2 (4ms)
+✓ 96 claim_request                            (3569ms)
+✓ 97 propose_clip_edit                           (9946ms)
+✓ 98 user: accept   clip-5-a-library-in-3d   clip-5-a-library-in-3d#3 (10136ms)
+✓ 99 update_asset   block-text-3d            block-text-3d@2 (1576ms)
+✓ 100 repin_clip     clip-5-a-library-in-3d    (9758ms)
+✓ 101 edit_clip      clip-5-a-library-in-3d   clip-5-a-library-in-3d (9294ms)
+✓ 102 start_render   clip-5-a-library-in-3d   render #7 done in 154.46s (11.7 fps, 0.39× realtime) → <data>\renders\clip-5-a-library-in-3d-r7.mp4 (163326ms)
+✓ 103 create_clip    clip-6-what-the-library-holds clip-6-what-the-library-holds (5ms)
+✓ 104 update_clip    clip-6-what-the-library-holds clip-6-what-the-library-holds (4575ms)
+✓ 105 start_render   clip-6-what-the-library-holds render #8 done in 166.06s (16.3 fps, 0.54× realtime) → <data>\renders\clip-6-what-the-library-holds-r8.mp4 (173367ms)
+✓ 106 create_clip    clip-7-a-video-that-checks-itself clip-7-a-video-that-checks-itself (7ms)
+✓ 107 add_narration  clip-7-voice              (64ms)
+     warning: 1 script word was not found in the timings; their times are interpolated (missing: true).
+✓ 108 create_asset   title-plate              title-plate@1 (91ms)
+✓ 109 create_asset   word-strip               word-strip@1 (84ms)
+✓ 110 create_asset   duck-meter               duck-meter@1 (96ms)
+✓ 111 create_asset   check-list               check-list@1 (94ms)
+✓ 112 create_asset   end-card                 end-card@1 (83ms)
+✓ 113 update_asset   text-captions            text-captions@2 (105ms)
+✓ 114 update_asset   duck-meter               duck-meter@2 (96ms)
+✓ 115 update_asset   check-list               check-list@2 (93ms)
+✓ 116 update_asset   word-strip               word-strip@2 (89ms)
+✓ 117 update_asset   check-list               check-list@3 (103ms)
+✓ 118 update_asset   word-strip               word-strip@3 (119ms)
+✓ 119 update_asset   end-card                 end-card@2 (90ms)
+✓ 120 update_clip    clip-7-a-video-that-checks-itself clip-7-a-video-that-checks-itself (448ms)
+✓ 121 start_render   clip-7-a-video-that-checks-itself render #9 done in 10.17s (182.8 fps, 6.1× realtime) → <data>\renders\clip-7-a-video-that-checks-itself-r9.mp4 (13834ms)
+✓ 122 start_render   clip-7-a-video-that-checks-itself render #10 done in 10.24s (181.7 fps, 6.05× realtime) → <data>\renders\clip-7-a-video-that-checks-itself-r10-vertical.mp4 (13468ms)
+✓ 123 create_clip    clip-8-cuvinte-pe-ritm   clip-8-cuvinte-pe-ritm (5ms)
+✓ 124 update_clip    clip-8-cuvinte-pe-ritm   clip-8-cuvinte-pe-ritm (247ms)
+✓ 125 start_render   clip-8-cuvinte-pe-ritm   render #11 done in 6.34s (181.8 fps, 6.06× realtime) → <data>\renders\clip-8-cuvinte-pe-ritm-r11.mp4 (11101ms)
+
+Reuse report: 8 clip(s), 72 asset(s) in the library (fonts not counted)
+
+Clip 1 · clip-1-every-frame — "Every frame is a function" (vertical 1080×1920, 32s)
+  uses 28 assets: 28 created for this clip, 0 reused from earlier clips (0 as-is, 0 as a new version, 0 as a fork)
+  created (28): beat-bars@1, bg-gradient-drift@1, code-window@1, logo-sting@1, music-loop@1, progress-segments@1, sfx-whoosh@1, sparkle-field@1, stat-trio@1, text-captions@1, text-char-reveal@1, text-highlight@1, text-kinetic@1, text-line-reveal@1, text-word-reveal@1, watermark@1, drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-counter@1, text-typewriter@1, theme-ember@1, fablecut-mark@1
+
+Clip 2 · clip-2-compounding — "The library compounds" (horizontal 1920×1080, 32s)
+  uses 31 assets: 7 created for this clip, 24 reused from earlier clips (23 as-is, 1 as a new version, 0 as a fork)
+  from clip-1-every-frame (24): bg-gradient-drift@1, logo-sting@1, music-loop@1, progress-segments@1, sfx-whoosh@1, text-captions@1, text-highlight@1, text-line-reveal@1, text-word-reveal@2 [new version], watermark@1, drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-typewriter@1, text-word-reveal@1, theme-ember@1, fablecut-mark@1
+  created (7): bg-grid@1, chart-bars@1, lineage-flow@1, lower-third@1, pin-diagram@1, text-scramble@1, theme-tide@1
+
+Clip 3 · clip-3-release-notes — "What's new in Fablecut" (square 1080×1080, 32s)
+  uses 34 assets: 3 created for this clip, 31 reused from earlier clips (29 as-is, 0 as a new version, 2 as a fork)
+  from clip-1-every-frame (26): beat-bars@1, bg-gradient-drift@1, confetti-burst@1 [fork of sparkle-field@1], logo-sting@1, music-loop@1, progress-segments@1, sparkle-field@1, text-captions@1, text-kinetic@1, theme-ember@1, watermark@1, whoosh-hit@1 [fork of sfx-whoosh@1], drum-hat@1, drum-kick@1, drum-snare@1, easing@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-line-reveal@1, text-typewriter@1, text-word-reveal@1, fablecut-mark@1
+  from clip-2-compounding (5): bg-grid@1, chart-bars@1, lower-third@1, text-scramble@1, text-word-reveal@2
+  created (3): format-frames@1, template-bullets@1, badge-pill@1
+
+Clip 4 · clip-4-direct-the-studio — "Direct the studio" (horizontal 1920×1080, 30s)
+  uses 38 assets: 15 created for this clip, 23 reused from earlier clips (22 as-is, 0 as a new version, 1 as a fork)
+  from clip-1-every-frame (19): bg-gradient-drift@1, easing@1, logo-sting@1, music-loop@1, stat-trio@1, text-kinetic@1, drum-hat@1, drum-kick@1, drum-snare@1, logo-mark@1, spring@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-line-reveal@1, text-word-reveal@1, theme-ember@1, text-typewriter@1
+  from clip-2-compounding (4): lower-third-studio@1 [fork of lower-third@1], text-word-reveal@2, theme-tide@1, lower-third@1
+  created (15): fx-duotone@1, fx-glow@1, fx-grain@1, fx-vignette@1, mask-iris@1, motion-drift@1, motion-pop@1, motion-slide@1, orb-3d@1, svg-draw-on@1, trans-iris@1, trans-push@1, trans-wipe@1, harbour-at-dusk@1, studio-logo@1
+
+Clip 5 · clip-5-a-library-in-3d — "A library in 3D" (vertical 1080×1920, 60s)
+  uses 44 assets: 7 created for this clip, 37 reused from earlier clips (36 as-is, 0 as a new version, 1 as a fork)
+  from clip-1-every-frame (19): bg-gradient-drift@1, easing@1, logo-sting@1, music-loop@1, stat-trio@1, text-line-reveal@1, drum-hat@1, drum-kick@1, drum-snare@1, logo-mark@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-kinetic@1, text-word-reveal@1, theme-ember@1, spring@1, text-typewriter@1
+  from clip-4-direct-the-studio (15): fx-duotone@1, fx-glow@1, fx-grain@1, fx-vignette@1, lower-third-studio@1, motion-drift@1, motion-pop@1, studio-title-card@1, trans-iris@1, trans-push@1, trans-wipe@1, studio-logo@1, orb-spin@1 [fork of orb-3d@1], motion-slide@1, svg-draw-on@1
+  from clip-2-compounding (3): text-word-reveal@2, theme-tide@1, lower-third@1
+  created (7): block-text-3d@2, fx-chromatic@1, motion-bounce@1, motion-orbit@1, terrain-3d@1, trans-glitch@1, mountain-lake-dawn@1
+
+Clip 6 · clip-6-what-the-library-holds — "What the library holds" (square 1080×1080, 90s)
+  uses 47 assets: 0 created for this clip, 47 reused from earlier clips (47 as-is, 0 as a new version, 0 as a fork)
+  from clip-1-every-frame (20): bg-gradient-drift@1, easing@1, logo-sting@1, music-loop@1, stat-trio@1, text-captions@1, text-line-reveal@1, drum-hat@1, drum-kick@1, drum-snare@1, logo-mark@1, synth-note@1, text-block@1, text-char-reveal@1, text-counter@1, text-kinetic@1, text-word-reveal@1, theme-ember@1, spring@1, text-typewriter@1
+  from clip-5-a-library-in-3d (7): block-text-3d@2, fx-chromatic@1, motion-bounce@1, motion-orbit@1, terrain-3d@1, trans-glitch@1, orb-spin@1
+  from clip-2-compounding (4): chart-bars@1, text-word-reveal@2, theme-tide@1, lower-third@1
+  from clip-4-direct-the-studio (16): fx-duotone@1, fx-glow@1, fx-grain@1, fx-vignette@1, lower-third-studio@1, mask-iris@1, motion-drift@1, motion-pop@1, studio-title-card@1, trans-iris@1, trans-push@1, trans-wipe@1, harbour-at-dusk@1, studio-logo@1, motion-slide@1, svg-draw-on@1
+
+Clip 7 · clip-7-a-video-that-checks-itself — "A video that checks itself" (horizontal 1920×1080, 62s)
+  uses 18 assets: 6 created for this clip, 12 reused from earlier clips (11 as-is, 1 as a new version, 0 as a fork)
+  from clip-1-every-frame (10): bg-gradient-drift@1, easing@1, music-loop@1, sparkle-field@1, text-captions@2 [new version], drum-hat@1, drum-kick@1, drum-snare@1, synth-note@1, fablecut-mark@1
+  from clip-4-direct-the-studio (1): motion-drift@1
+  from clip-2-compounding (1): theme-tide@1
+  created (6): check-list@3, duck-meter@2, end-card@2, title-plate@1, word-strip@3, clip-7-voice@1
+
+Clip 8 · clip-8-cuvinte-pe-ritm — "Cuvinte pe ritm" (vertical 1080×1920, 38.4s)
+  uses 15 assets: 0 created for this clip, 15 reused from earlier clips (15 as-is, 0 as a new version, 0 as a fork)
+  from clip-1-every-frame (10): beat-bars@1, bg-gradient-drift@1, easing@1, music-loop@1, sparkle-field@1, drum-hat@1, drum-kick@1, drum-snare@1, synth-note@1, fablecut-mark@1
+  from clip-7-a-video-that-checks-itself (3): check-list@3, end-card@2, title-plate@1
+  from clip-4-direct-the-studio (1): motion-drift@1
+  from clip-2-compounding (1): theme-tide@1
+
+Most reused: easing (7 later clips), bg-gradient-drift (7 later clips), drum-kick (7 later clips), drum-snare (7 later clips), drum-hat (7 later clips), synth-note (7 later clips), music-loop (7 later clips), spring (5 later clips), text-block (5 later clips), theme-ember (5 later clips)

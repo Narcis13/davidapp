@@ -1,8 +1,8 @@
-beats 86 0.01 0.6 1.2 1.8 2.4 3 3.6 4.2 4.83 5.15 5.4 6.03 6.35 6.6 7.2 7.52 7.8 8.42 8.72 9
-cut 0 nearest beat 0.01 off 10 ms
-cut 4.8 nearest beat 4.83 off 30 ms
-cut 9.6 nearest beat 9.6 off 0 ms
-cut 14.4 nearest beat 14.43 off 30 ms
-cut 19.2 nearest beat 19.2 off 0 ms
-cut 26.4 nearest beat 26.4 off 0 ms
-cut 31.2 nearest beat 31.2 off 0 ms
+86 beats detected in the music (100 bpm, a bar is 2.4 s); each cut marker against the nearest one:
+cut at 0 s · nearest beat 0.01 s · 10 ms off
+cut at 4.8 s · nearest beat 4.83 s · 30 ms off
+cut at 9.6 s · nearest beat 9.6 s · 0 ms off
+cut at 14.4 s · nearest beat 14.43 s · 30 ms off
+cut at 19.2 s · nearest beat 19.2 s · 0 ms off
+cut at 26.4 s · nearest beat 26.4 s · 0 ms off
+cut at 31.2 s · nearest beat 31.2 s · 0 ms off

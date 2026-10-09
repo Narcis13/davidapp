@@ -1,0 +1,7 @@
+✓ clip-1-every-frame: 120 dense frames, 18 render samples identical
+✓ clip-2-compounding: 120 dense frames, 18 render samples identical
+✓ clip-3-release-notes: 120 dense frames, 18 render samples identical
+✓ clip-4-direct-the-studio: 113 dense frames, 18 render samples identical
+✓ clip-5-a-library-in-3d: 225 dense frames, 18 render samples identical
+✓ clip-6-what-the-library-holds: 338 dense frames, 18 render samples identical
+✓ history-of-ai: 150 dense frames, 18 render samples identical

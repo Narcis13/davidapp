@@ -1,0 +1,262 @@
+{
+ "method": "The same composition frame drawn by the studio preview worker in headless Chrome (OffscreenCanvas) and by the Node renderer (Skia, /api/frame/clip); per-channel absolute differences.",
+ "limit": {
+  "meanDiff": 1.5,
+  "over64": 1
+ },
+ "cases": {
+  "transform": [
+   {
+    "frame": 7,
+    "meanDiff": 0.284,
+    "maxDiff": 120,
+    "over16": 0.099,
+    "over64": 0.01,
+    "distinct": 333,
+    "ok": true,
+    "image": "parity-transform-f7.png"
+   },
+   {
+    "frame": 15,
+    "meanDiff": 0.282,
+    "maxDiff": 120,
+    "over16": 0.099,
+    "over64": 0.01,
+    "distinct": 346,
+    "ok": true,
+    "image": "parity-transform-f15.png"
+   }
+  ],
+  "motion": [
+   {
+    "frame": 4,
+    "meanDiff": 0.224,
+    "maxDiff": 3,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 352,
+    "ok": true,
+    "image": "parity-motion-f4.png"
+   },
+   {
+    "frame": 12,
+    "meanDiff": 0.227,
+    "maxDiff": 3,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 375,
+    "ok": true,
+    "image": "parity-motion-f12.png"
+   },
+   {
+    "frame": 18,
+    "meanDiff": 0.287,
+    "maxDiff": 3,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 377,
+    "ok": true,
+    "image": "parity-motion-f18.png"
+   }
+  ],
+  "transition": [
+   {
+    "frame": 10,
+    "meanDiff": 0.273,
+    "maxDiff": 217,
+    "over16": 0.115,
+    "over64": 0.052,
+    "distinct": 330,
+    "ok": true,
+    "image": "parity-transition-f10.png"
+   }
+  ],
+  "effect": [
+   {
+    "frame": 5,
+    "meanDiff": 0.291,
+    "maxDiff": 145,
+    "over16": 0.108,
+    "over64": 0.035,
+    "distinct": 1000,
+    "ok": true,
+    "image": "parity-effect-f5.png"
+   },
+   {
+    "frame": 15,
+    "meanDiff": 0.291,
+    "maxDiff": 145,
+    "over16": 0.106,
+    "over64": 0.035,
+    "distinct": 1000,
+    "ok": true,
+    "image": "parity-effect-f15.png"
+   }
+  ],
+  "mask": [
+   {
+    "frame": 10,
+    "meanDiff": 0.524,
+    "maxDiff": 139,
+    "over16": 0.763,
+    "over64": 0.144,
+    "distinct": 336,
+    "ok": true,
+    "image": "parity-mask-f10.png"
+   }
+  ],
+  "precomp": [
+   {
+    "frame": 3,
+    "meanDiff": 0.215,
+    "maxDiff": 6,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 329,
+    "ok": true,
+    "image": "parity-precomp-f3.png"
+   },
+   {
+    "frame": 15,
+    "meanDiff": 0.263,
+    "maxDiff": 133,
+    "over16": 0.167,
+    "over64": 0.008,
+    "distinct": 341,
+    "ok": true,
+    "image": "parity-precomp-f15.png"
+   }
+  ],
+  "3d": [
+   {
+    "frame": 5,
+    "meanDiff": 0.657,
+    "maxDiff": 220,
+    "over16": 0.649,
+    "over64": 0.383,
+    "distinct": 389,
+    "ok": true,
+    "image": "parity-3d-f5.png"
+   },
+   {
+    "frame": 15,
+    "meanDiff": 0.681,
+    "maxDiff": 220,
+    "over16": 0.703,
+    "over64": 0.398,
+    "distinct": 391,
+    "ok": true,
+    "image": "parity-3d-f15.png"
+   }
+  ],
+  "sequence": [
+   {
+    "frame": 3,
+    "meanDiff": 0.219,
+    "maxDiff": 12,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 501,
+    "ok": true,
+    "image": "parity-sequence-f3.png"
+   },
+   {
+    "frame": 12,
+    "meanDiff": 0.218,
+    "maxDiff": 10,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 508,
+    "ok": true,
+    "image": "parity-sequence-f12.png"
+   }
+  ],
+  "svg": [
+   {
+    "frame": 6,
+    "meanDiff": 0.253,
+    "maxDiff": 3,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 332,
+    "ok": true,
+    "image": "parity-svg-f6.png"
+   },
+   {
+    "frame": 14,
+    "meanDiff": 0.247,
+    "maxDiff": 3,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 379,
+    "ok": true,
+    "image": "parity-svg-f14.png"
+   }
+  ],
+  "latin-ext": [
+   {
+    "frame": 2,
+    "meanDiff": 0.447,
+    "maxDiff": 142,
+    "over16": 0.432,
+    "over64": 0.057,
+    "distinct": 315,
+    "ok": true,
+    "image": "parity-latin-ext-f2.png"
+   },
+   {
+    "frame": 6,
+    "meanDiff": 0.502,
+    "maxDiff": 181,
+    "over16": 0.444,
+    "over64": 0.108,
+    "distinct": 324,
+    "ok": true,
+    "image": "parity-latin-ext-f6.png"
+   },
+   {
+    "frame": 10,
+    "meanDiff": 0.466,
+    "maxDiff": 96,
+    "over16": 0.488,
+    "over64": 0.052,
+    "distinct": 263,
+    "ok": true,
+    "image": "parity-latin-ext-f10.png"
+   },
+   {
+    "frame": 14,
+    "meanDiff": 0.603,
+    "maxDiff": 223,
+    "over16": 0.613,
+    "over64": 0.179,
+    "distinct": 323,
+    "ok": true,
+    "image": "parity-latin-ext-f14.png"
+   },
+   {
+    "frame": 18,
+    "meanDiff": 0.672,
+    "maxDiff": 221,
+    "over16": 0.735,
+    "over64": 0.235,
+    "distinct": 352,
+    "ok": true,
+    "image": "parity-latin-ext-f18.png"
+   }
+  ],
+  "image": [
+   {
+    "frame": 10,
+    "meanDiff": 0.186,
+    "maxDiff": 2,
+    "over16": 0,
+    "over64": 0,
+    "distinct": 307,
+    "ok": true,
+    "image": "parity-image-f10.png"
+   }
+  ]
+ },
+ "consoleProblems": []
+}

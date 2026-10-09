@@ -9,6 +9,7 @@ P=.claude/goal-loop                      # this repo: project.md, gates, screens
 export TMPDIR=<the session's scratchpad>   # logs, data and shots stay out of the repo
 export TEMP="$TMPDIR" TMP="$TMPDIR"        # Windows: Node's os.tmpdir() reads these, not TMPDIR (tests leave studio-test-* dirs there)
 export CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe"   # Windows only: cdp.mjs finds Chrome by itself on macOS
+# headless Chrome (cdp.mjs, sweep.sh, workflows-*.mjs, parity.mjs): set only TMPDIR and CHROME; TEMP/TMP in the scratchpad break its start-up
 swift $S/montage.swift out.png 0.5 a.png b.png      # screenshots side by side (macOS only)
 ```
 
@@ -36,6 +37,7 @@ per machine: take the hash and speed baselines again on the machine that compare
 (`git worktree add <dir> 6c9f8cf`, link `node_modules` into it, `npm run showcase`, `scripts/hashes.mjs`).
 A fresh checkout needs `npm ci`. FFmpeg up to 6.0 warns "Thread message queue blocking" when frames
 arrive faster than it encodes; the render log drops that line (`quietLog` in `src/render/video.js`).
+Never pipe `serve.sh` (`… | tail` hangs the shell: the server keeps the pipe); read `<data-dir>/server.log` instead.
 Always set `STUDIO_DATA`: scripts default to `./data`, the user's studio. On a Mac, run long builds and
 renders under `caffeinate -dimsu …`: when the machine idles to sleep mid-render, the frame in flight
 outlives its 60 s timeout on wake and the render fails (seen on clip 5).
@@ -116,8 +118,16 @@ fonts/        bundled OFL fonts and their licenses
 
 ## Showcase and evidence
 
-- `npm run showcase` (= `node showcase/build.mjs`) rebuilds the library and renders the three clips through the
-  MCP server into `STUDIO_DATA`. `--no-render` builds the library and clips only.
+- `npm run showcase` (= `node showcase/build.mjs`) rebuilds the library and clips 1–8 (plan for 1–3, the
+  journals in `showcase/journal/` for 4–8) and their renders through the MCP server into `STUDIO_DATA`: about
+  13 min on this PC. `--no-render` builds the library and clips only. Then `node clips/history-of-ai/compose.mjs --render`
+  and `scripts/hashes.mjs <out.json> --compare docs/showcase/v3/reports/baseline-hashes.json` (the out file comes first).
+- Journalled clips are made with `scripts/act.mjs` (each MCP call appended with its kind). The replay keeps the last
+  `start_render` per (clip, format) and skips an `@module` `update_clip` that a later identical one supersedes;
+  arguments may use `@file:` (text), `@path:` (a file path, checked to exist) and `@module:` (a module's default export).
+- Iteration 3 evidence: `scripts/reports-v3.mjs` (compounding, check_clip on every clip, clip 7's voice, clip 8's cuts),
+  `scripts/workflows-v3.mjs` (UI with real input + GIFs; it changes its data), `scripts/speed.mjs --check`, `scripts/parity.mjs`.
+- The voice tools live outside the repo in `C:/newme/fablecut-voice/` (kokoro-js + whisper.cpp; see PROGRESS Notes).
 - `npm run evidence` / `verify` write to `output/showcase/` (git-ignored). A snapshot without videos is committed in
   `docs/showcase/` (`posters/`, `sheets/`, `reports/`, `studio/`) with an `INDEX.md`
   mapping each contract item to its files. MP4s go on a GitHub release, never in git. Loop screenshots stay in the scratchpad.

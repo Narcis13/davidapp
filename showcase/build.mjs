@@ -28,8 +28,23 @@ for (const clip of JOURNALS) {
   // a render a later render of the same clip and format replaced (the first try at a gate) is not made again
   const lastRender = new Map();
   entries.forEach((e, i) => { if (e.name === 'start_render') lastRender.set(`${e.args.clip}|${e.args.format ?? ''}`, i); });
+  // an update_clip with "@module:<file>" inlines that file as it is now, so every such save of a clip is the final
+  // composition: an earlier one is the same input as a later one, and it can name asset versions the replay has not made
+  // yet. It is skipped when a later save of the same clip and module follows with nothing in between that edits the clip.
+  const moduleSave = (e) => e.kind !== 'user' && e.name === 'update_clip' && typeof e.args.composition === 'string' && e.args.composition.startsWith('@module:');
+  const edits = (e, c) => e.kind === 'user' || (e.name !== 'start_render' && !moduleSave(e) && (e.args?.clip === c || e.args?.slug === c));
+  const superseded = (i) => {
+    const e = entries[i];
+    for (let j = i + 1; j < entries.length; j++) {
+      const x = entries[j];
+      if (moduleSave(x) && x.args.clip === e.args.clip && x.args.composition === e.args.composition) return true;
+      if (edits(x, e.args.clip)) return false;
+    }
+    return false;
+  };
   entries.forEach((e, i) => {
     if (e.kind === 'user') steps.push({ user: e.name, args: e.args, clip });
+    else if (moduleSave(e) && superseded(i)) return;
     else if (e.name !== 'start_render' || lastRender.get(`${e.args.clip}|${e.args.format ?? ''}`) === i) steps.push({ tool: e.name, args: e.args, render: e.name === 'start_render', journal: true });
   });
 }

@@ -1,0 +1,583 @@
+{
+ "narration": {
+  "asset": "clip-7-voice@1",
+  "words": 159,
+  "stats": {
+   "matched": 158,
+   "substituted": 0,
+   "missing": 1,
+   "extra": 0
+  },
+  "source": "whisper.cpp",
+  "voice": {
+   "name": "af_heart",
+   "model": "Kokoro-82M v1.0 (kokoro-js 1.2.1, q8)",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+   "timings": "whisper.cpp b5454, ggml-small.en (-ojf tokens)",
+   "transcripts": "whisper.cpp ggml-base.en and ggml-small.en"
+  }
+ },
+ "transcriptCheck": {
+  "ok": true,
+  "counts": {
+   "script": 159,
+   "transcripts": 2,
+   "slips": 0,
+   "drops": 0,
+   "insertions": 0,
+   "disputed": 2
+  },
+  "disputed": [
+   {
+    "kind": "slip",
+    "transcript": 0,
+    "i": 157,
+    "script": "eye",
+    "heard": "I"
+   },
+   {
+    "kind": "drop",
+    "transcript": 1,
+    "i": 96,
+    "script": "a"
+   }
+  ]
+ },
+ "anchors": {
+  "count": 31,
+  "maxFramesOff": 0.5,
+  "list": [
+   {
+    "kind": "item",
+    "id": "strip",
+    "word": {
+     "i": 5,
+     "text": "In"
+    },
+    "edge": "start",
+    "offset": -0.3,
+    "wordTime": 3.37,
+    "time": 3.37,
+    "frame": 101,
+    "deltaFrames": -0.1
+   },
+   {
+    "kind": "item",
+    "id": "knows",
+    "word": {
+     "i": 26,
+     "text": "knows"
+    },
+    "edge": "start",
+    "offset": -0.2,
+    "wordTime": 10.36,
+    "time": 10.36,
+    "frame": 311,
+    "deltaFrames": 0.2
+   },
+   {
+    "kind": "item",
+    "id": "captions-from",
+    "word": {
+     "i": 38,
+     "text": "captions"
+    },
+    "edge": "start",
+    "offset": -0.2,
+    "wordTime": 15.91,
+    "time": 15.91,
+    "frame": 477,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "item",
+    "id": "visuals",
+    "word": {
+     "i": 58,
+     "text": "Visuals"
+    },
+    "edge": "start",
+    "offset": -0.15,
+    "wordTime": 22.26,
+    "time": 22.26,
+    "frame": 668,
+    "deltaFrames": 0.2
+   },
+   {
+    "kind": "item",
+    "id": "contrast",
+    "word": {
+     "i": 67,
+     "text": "contrast,"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 25.36,
+    "time": 25.36,
+    "frame": 761,
+    "deltaFrames": 0.2
+   },
+   {
+    "kind": "item",
+    "id": "ducking",
+    "word": {
+     "i": 83,
+     "text": "music"
+    },
+    "edge": "start",
+    "offset": -0.3,
+    "wordTime": 31.11,
+    "time": 31.11,
+    "frame": 933,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "item",
+    "id": "checks",
+    "word": {
+     "i": 95,
+     "text": "Before"
+    },
+    "edge": "start",
+    "offset": -0.2,
+    "wordTime": 35.71,
+    "time": 35.71,
+    "frame": 1071,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "keyframe",
+    "id": "checks",
+    "prop": "params.progress",
+    "word": {
+     "i": 107,
+     "text": "safe"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 40.51,
+    "time": 40.51,
+    "frame": 1215,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "keyframe",
+    "id": "checks",
+    "prop": "params.progress",
+    "word": {
+     "i": 107,
+     "text": "safe"
+    },
+    "edge": "start",
+    "offset": 0.35,
+    "wordTime": 40.86,
+    "time": 40.86,
+    "frame": 1226,
+    "deltaFrames": 0.2
+   },
+   {
+    "kind": "keyframe",
+    "id": "checks",
+    "prop": "params.progress",
+    "word": {
+     "i": 109,
+     "text": "big"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 41.3,
+    "time": 41.3,
+    "frame": 1239,
+    "deltaFrames": 0
+   },
+   {
+    "kind": "keyframe",
+    "id": "checks",
+    "prop": "params.progress",
+    "word": {
+     "i": 109,
+     "text": "big"
+    },
+    "edge": "start",
+    "offset": 0.35,
+    "wordTime": 41.65,
+    "time": 41.65,
+    "frame": 1250,
+    "deltaFrames": 0.5
+   },
+   {
+    "kind": "keyframe",
+    "id": "checks",
+    "prop": "params.progress",
+    "word": {
+     "i": 115,
+     "text": "contrast"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 42.95,
+    "time": 42.95,
+    "frame": 1289,
+    "deltaFrames": 0.5
+   },
+   {
+    "kind": "keyframe",
+    "id": "checks",
+    "prop": "params.progress",
+    "word": {
+     "i": 115,
+     "text": "contrast"
+    },
+    "edge": "start",
+    "offset": 0.35,
+    "wordTime": 43.3,
+    "time": 43.3,
+    "frame": 1299,
+    "deltaFrames": 0
+   },
+   {
+    "kind": "keyframe",
+    "id": "checks",
+    "prop": "params.progress",
+    "word": {
+     "i": 127,
+     "text": "stays"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 45.86,
+    "time": 45.86,
+    "frame": 1376,
+    "deltaFrames": 0.2
+   },
+   {
+    "kind": "keyframe",
+    "id": "checks",
+    "prop": "params.progress",
+    "word": {
+     "i": 127,
+     "text": "stays"
+    },
+    "edge": "start",
+    "offset": 0.35,
+    "wordTime": 46.21,
+    "time": 46.21,
+    "frame": 1386,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "item",
+    "id": "measured",
+    "word": {
+     "i": 135,
+     "text": "it"
+    },
+    "edge": "start",
+    "offset": -0.2,
+    "wordTime": 49.08,
+    "time": 49.08,
+    "frame": 1472,
+    "deltaFrames": -0.4
+   },
+   {
+    "kind": "keyframe",
+    "id": "measured",
+    "prop": "params.progress",
+    "word": {
+     "i": 140,
+     "text": "Loudness"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 51.71,
+    "time": 51.71,
+    "frame": 1551,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "keyframe",
+    "id": "measured",
+    "prop": "params.progress",
+    "word": {
+     "i": 140,
+     "text": "Loudness"
+    },
+    "edge": "start",
+    "offset": 0.35,
+    "wordTime": 52.06,
+    "time": 52.06,
+    "frame": 1562,
+    "deltaFrames": 0.2
+   },
+   {
+    "kind": "keyframe",
+    "id": "measured",
+    "prop": "params.progress",
+    "word": {
+     "i": 147,
+     "text": "flashes"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 54.12,
+    "time": 54.12,
+    "frame": 1624,
+    "deltaFrames": 0.4
+   },
+   {
+    "kind": "keyframe",
+    "id": "measured",
+    "prop": "params.progress",
+    "word": {
+     "i": 147,
+     "text": "flashes"
+    },
+    "edge": "start",
+    "offset": 0.35,
+    "wordTime": 54.47,
+    "time": 54.47,
+    "frame": 1634,
+    "deltaFrames": -0.1
+   },
+   {
+    "kind": "keyframe",
+    "id": "measured",
+    "prop": "params.progress",
+    "word": {
+     "i": 150,
+     "text": "frozen"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 55.3,
+    "time": 55.3,
+    "frame": 1659,
+    "deltaFrames": 0
+   },
+   {
+    "kind": "keyframe",
+    "id": "measured",
+    "prop": "params.progress",
+    "word": {
+     "i": 150,
+     "text": "frozen"
+    },
+    "edge": "start",
+    "offset": 0.35,
+    "wordTime": 55.65,
+    "time": 55.65,
+    "frame": 1670,
+    "deltaFrames": 0.5
+   },
+   {
+    "kind": "item",
+    "id": "end",
+    "word": {
+     "i": 155,
+     "text": "checked"
+    },
+    "edge": "start",
+    "offset": -0.3,
+    "wordTime": 57.39,
+    "time": 57.39,
+    "frame": 1722,
+    "deltaFrames": 0.3
+   },
+   {
+    "kind": "marker",
+    "id": "the voice",
+    "word": {
+     "i": 12,
+     "text": "The"
+    },
+    "edge": "start",
+    "offset": -0.1,
+    "wordTime": 6.41,
+    "time": 6.41,
+    "frame": 192,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "marker",
+    "id": "captions",
+    "word": {
+     "i": 37,
+     "text": "The"
+    },
+    "edge": "start",
+    "offset": -0.1,
+    "wordTime": 15.88,
+    "time": 15.88,
+    "frame": 476,
+    "deltaFrames": -0.4
+   },
+   {
+    "kind": "marker",
+    "id": "visuals",
+    "word": {
+     "i": 58,
+     "text": "Visuals"
+    },
+    "edge": "start",
+    "offset": -0.2,
+    "wordTime": 22.21,
+    "time": 22.21,
+    "frame": 666,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "marker",
+    "id": "contrast",
+    "word": {
+     "i": 67,
+     "text": "contrast,"
+    },
+    "edge": "start",
+    "offset": 0,
+    "wordTime": 25.36,
+    "time": 25.36,
+    "frame": 761,
+    "deltaFrames": 0.2
+   },
+   {
+    "kind": "marker",
+    "id": "the mix",
+    "word": {
+     "i": 82,
+     "text": "The"
+    },
+    "edge": "start",
+    "offset": -0.2,
+    "wordTime": 31.11,
+    "time": 31.11,
+    "frame": 933,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "marker",
+    "id": "checks",
+    "word": {
+     "i": 95,
+     "text": "Before"
+    },
+    "edge": "start",
+    "offset": -0.2,
+    "wordTime": 35.71,
+    "time": 35.71,
+    "frame": 1071,
+    "deltaFrames": -0.3
+   },
+   {
+    "kind": "marker",
+    "id": "measured",
+    "word": {
+     "i": 135,
+     "text": "it"
+    },
+    "edge": "start",
+    "offset": -0.2,
+    "wordTime": 49.08,
+    "time": 49.08,
+    "frame": 1472,
+    "deltaFrames": -0.4
+   },
+   {
+    "kind": "marker",
+    "id": "end card",
+    "word": {
+     "i": 155,
+     "text": "checked"
+    },
+    "edge": "start",
+    "offset": -0.3,
+    "wordTime": 57.39,
+    "time": 57.39,
+    "frame": 1722,
+    "deltaFrames": 0.3
+   }
+  ]
+ },
+ "captions": {
+  "horizontal": {
+   "pages": 19,
+   "problems": [],
+   "settings": {
+    "maxLines": 2,
+    "maxChars": 32,
+    "fps": 30,
+    "lead": 2,
+    "minDuration": 0.8,
+    "closeGap": 0.3,
+    "pauseBreak": 0.6,
+    "names": []
+   }
+  },
+  "vertical": {
+   "pages": 27,
+   "problems": [],
+   "settings": {
+    "maxLines": 2,
+    "maxChars": 20,
+    "fps": 30,
+    "lead": 2,
+    "minDuration": 0.8,
+    "closeGap": 0.3,
+    "pauseBreak": 0.6,
+    "names": []
+   }
+  }
+ },
+ "mix": {
+  "master": {
+   "mode": "target",
+   "target": -14,
+   "truePeak": -1,
+   "before": {
+    "integrated": -22.46,
+    "range": 2.89,
+    "truePeak": -5.46,
+    "samplePeak": -5.5
+   },
+   "after": {
+    "integrated": -14.03,
+    "range": 2.73,
+    "truePeak": -1.51,
+    "samplePeak": -1.51
+   },
+   "gainDb": 8.65,
+   "limited": true,
+   "limitDb": -10.16,
+   "note": "The peaks were limited to −10.2 dBTP first: one gain alone would have put the true peak at +3.0 dBTP. Then +8.7 dB reached −14.0 LUFS."
+  },
+  "loudness": {
+   "integrated": -14.03,
+   "range": 2.73,
+   "truePeak": -1.51,
+   "samplePeak": -1.51
+  },
+  "underVoice": {
+   "voice": -22.35,
+   "rest": -39.18,
+   "lu": 16.83,
+   "voiceTracks": [
+    "voice"
+   ],
+   "restTracks": [
+    "music"
+   ]
+  },
+  "speech": {
+   "regions": 31,
+   "seconds": 42.45,
+   "first": 1.31,
+   "last": 59.08
+  },
+  "silences": [],
+  "clipping": {
+   "samples": 0,
+   "events": [],
+   "peakDb": -1.512087589782938
+  }
+ }
+}

@@ -1,0 +1,2262 @@
+[
+ {
+  "clip": "clip-1-every-frame",
+  "format": "vertical",
+  "frames": 65,
+  "seconds": 1.04,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 1,
+   "contrast": 11,
+   "hold": 4,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 1
+  },
+  "issues": [
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "hook",
+    "message": "\"VIDEO\" is on screen for about 0.5 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 0.5,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 15,
+    "t": 0.5,
+    "until": 0.5,
+    "frames": 1
+   },
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "hook",
+    "message": "\"WAS\" is on screen for about 0.5 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 0.5,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 30,
+    "t": 1,
+    "until": 1,
+    "frames": 1
+   },
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "hook",
+    "message": "\"WRITTEN\" is on screen for about 0.5 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 0.5,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 45,
+    "t": 1.5,
+    "until": 1.5,
+    "frames": 1
+   },
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "hook",
+    "message": "\"NOT\" is on screen for about 0.5 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 0.5,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 60,
+    "t": 2,
+    "until": 2,
+    "frames": 1
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "hook",
+    "message": "\"EDITED\" has a contrast of 1.63:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.63,
+     "min": 1.5,
+     "textColor": "#ff5c8a",
+     "background": "#8e61a1",
+     "textPixels": 91942,
+     "needs": 4.5
+    },
+    "frame": 105,
+    "t": 3.5,
+    "until": 3.5,
+    "frames": 2
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "mark",
+    "message": "\"fablecut\" is 21.84 px on screen (2% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 21.84,
+     "screenPct": 2,
+     "floorPct": 2.5
+    },
+    "frame": 120,
+    "t": 4,
+    "until": 27,
+    "frames": 47
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "idea",
+    "message": "\"Every frame is a function of time\" has a contrast of 2.32:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.32,
+     "min": 2.17,
+     "textColor": "#fed066",
+     "background": "#bc73b9",
+     "textPixels": 38875,
+     "needs": 4.5
+    },
+    "frame": 150,
+    "t": 5,
+    "until": 9.5,
+    "frames": 11
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "nokeys",
+    "message": "\"No timeline. No keyframes. Just code.\" has a contrast of 1.44:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.44,
+     "min": 1.37,
+     "textColor": "#fd5c8a",
+     "background": "#9c67ad",
+     "textPixels": 4862,
+     "needs": 4.5
+    },
+    "frame": 315,
+    "t": 10.5,
+    "until": 15.5,
+    "frames": 11
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "stats",
+    "message": "\"ASSETS LEFT IN THE LIBRARY\" has a contrast of 1.6:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.6,
+     "min": 1.59,
+     "textColor": "#f0dbd9",
+     "background": "#e9a2ac",
+     "textPixels": 507,
+     "needs": 4.5
+    },
+    "frame": 600,
+    "t": 20,
+    "until": 21.5,
+    "frames": 8
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "stats",
+    "message": "\"One clip, by the numbers\" has a contrast of 3.23:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.23,
+     "min": 3.17,
+     "textColor": "#fb5b88",
+     "background": "#4e4346",
+     "textPixels": 1645,
+     "needs": 4.5
+    },
+    "frame": 645,
+    "t": 21.5,
+    "until": 21.5,
+    "frames": 11
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "stats",
+    "message": "\"KEYFRAMES SET BY HAND\" has a contrast of 1.61:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.61,
+     "min": 1.6,
+     "textColor": "#ecdee1",
+     "background": "#d6a6c8",
+     "textPixels": 547,
+     "needs": 4.5
+    },
+    "frame": 645,
+    "t": 21.5,
+    "until": 21.5,
+    "frames": 9
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "stats",
+    "message": "\"FRAMES RENDERED\" has a contrast of 2.44:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.44,
+     "min": 2.4,
+     "textColor": "#ddd4d3",
+     "background": "#a0828f",
+     "textPixels": 2462,
+     "needs": 4.5
+    },
+    "frame": 645,
+    "t": 21.5,
+    "until": 21.5,
+    "frames": 7
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "same",
+    "message": "\"Same input. Same pixels.\" has a contrast of 2.92:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.92,
+     "min": 2.86,
+     "textColor": "#7cf3bf",
+     "background": "#9c796b",
+     "textPixels": 3447,
+     "needs": 4.5
+    },
+    "frame": 690,
+    "t": 23,
+    "until": 27,
+    "frames": 10
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "determinism",
+    "message": "\"Rendering is deterministic by design\" has a contrast of 3.09:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.09,
+     "min": 3.06,
+     "textColor": "#f3efe9",
+     "background": "#b175ad",
+     "textPixels": 2733,
+     "needs": 4.5
+    },
+    "frame": 810,
+    "t": 27,
+    "until": 27,
+    "frames": 7
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "logo",
+    "message": "\"Fablecut\" has a contrast of 2.07:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.07,
+     "min": 2.05,
+     "textColor": "#f4f0ea",
+     "background": "#da93c7",
+     "textPixels": 3622,
+     "needs": 4.5
+    },
+    "frame": 855,
+    "t": 28.5,
+    "until": 30,
+    "frames": 4
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "logo",
+    "message": "\"Every clip leaves building blocks behind\" has a contrast of 1.25:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.25,
+     "min": 1.22,
+     "textColor": "#9a95ad",
+     "background": "#a576af",
+     "textPixels": 3753,
+     "needs": 4.5
+    },
+    "frame": 885,
+    "t": 29.5,
+    "until": 31,
+    "frames": 5
+   },
+   {
+    "check": "last-frame",
+    "severity": "error",
+    "item": null,
+    "message": "The last frame is held for 0.1 s; it should hold for at least 2 s.",
+    "numbers": {
+     "held": 0.1,
+     "needs": 2,
+     "lastChange": 31.87
+    },
+    "frame": 959,
+    "t": 31.97,
+    "until": 31.97,
+    "frames": 1
+   }
+  ]
+ },
+ {
+  "clip": "clip-2-compounding",
+  "format": "horizontal",
+  "frames": 65,
+  "seconds": 1.28,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 6,
+   "contrast": 15,
+   "hold": 1,
+   "captions": 0,
+   "glyphs": 1,
+   "first-frame": 0,
+   "last-frame": 1
+  },
+  "issues": [
+   {
+    "check": "glyphs",
+    "severity": "error",
+    "item": "pins",
+    "message": "→ (U+2192) is not in JetBrains Mono: it would be drawn with a system font.",
+    "numbers": {
+     "family": "JetBrains Mono",
+     "kind": "symbol",
+     "count": 16,
+     "samples": [
+      "→"
+     ],
+     "items": [
+      "pins"
+     ]
+    },
+    "frame": 0,
+    "t": 0,
+    "until": 0,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "mark",
+    "message": "\"fablecut\" is 21.84 px on screen (2% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 21.84,
+     "screenPct": 2,
+     "floorPct": 2.5
+    },
+    "frame": 15,
+    "t": 0.5,
+    "until": 26.5,
+    "frames": 53
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "l1",
+    "message": "\"horizonta\" is 22.95 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.95,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 45,
+    "t": 1.5,
+    "until": 4.5,
+    "frames": 7
+   },
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "subtitle",
+    "message": "\"Clip two starts with 28 assets already w\" is on screen for about 3 s; 8 words need 3.67 s (words / 3 + 1).",
+    "numbers": {
+     "held": 3,
+     "needs": 3.67,
+     "words": 8
+    },
+    "frame": 60,
+    "t": 2,
+    "until": 2,
+    "frames": 1
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "subtitle",
+    "message": "\"Clip two starts with 28 assets alread…\" has a contrast of 2.38:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.38,
+     "min": 1.72,
+     "textColor": "#f7b04d",
+     "background": "#4c78d5",
+     "textPixels": 960,
+     "needs": 4.5
+    },
+    "frame": 105,
+    "t": 3.5,
+    "until": 4.5,
+    "frames": 6
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "title",
+    "message": "\"THE LIBRARY COMPOUNDS\" has a contrast of 1.85:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.85,
+     "min": 1.53,
+     "textColor": "#5ce0e6",
+     "background": "#5e95ff",
+     "textPixels": 7509,
+     "needs": 4.5
+    },
+    "frame": 135,
+    "t": 4.5,
+    "until": 4.5,
+    "frames": 8
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"Assets behind each clip\" has a contrast of 2.99:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.99,
+     "min": 2.28,
+     "textColor": "#ebf2ff",
+     "background": "#568de8",
+     "textPixels": 3176,
+     "needs": 4.5
+    },
+    "frame": 165,
+    "t": 5.5,
+    "until": 12.5,
+    "frames": 4
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "l2",
+    "message": "\"reuse, count\" is 22.95 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.95,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 180,
+    "t": 6,
+    "until": 12.5,
+    "frames": 14
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"written for it\" has a contrast of 4.16:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 4.16,
+     "min": 2.49,
+     "textColor": "#8599b9",
+     "background": "#203c64",
+     "textPixels": 783,
+     "needs": 4.5
+    },
+    "frame": 195,
+    "t": 6.5,
+    "until": 11.5,
+    "frames": 3
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"reused\" has a contrast of 3.35:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.35,
+     "min": 2.09,
+     "textColor": "#869aba",
+     "background": "#2a4a78",
+     "textPixels": 741,
+     "needs": 4.5
+    },
+    "frame": 195,
+    "t": 6.5,
+    "until": 12.5,
+    "frames": 2
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "l2",
+    "message": "\"reuse, counted from the database\" has a contrast of 2.1:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.1,
+     "min": 2.1,
+     "textColor": "#849bba",
+     "background": "#366b8e",
+     "textPixels": 45,
+     "needs": 4.5
+    },
+    "frame": 255,
+    "t": 8.5,
+    "until": 12.5,
+    "frames": 14
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "l3",
+    "message": "\"which clip m\" is 22.95 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.95,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 420,
+    "t": 14,
+    "until": 20.5,
+    "frames": 14
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "flow",
+    "message": "\"28 new\" has a contrast of 2.47:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.47,
+     "min": 1.79,
+     "textColor": "#849abb",
+     "background": "#345c9b",
+     "textPixels": 301,
+     "needs": 4.5
+    },
+    "frame": 465,
+    "t": 15.5,
+    "until": 17.5,
+    "frames": 9
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "flow",
+    "message": "\"Clip 2\" has a contrast of 3.68:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.68,
+     "min": 3.34,
+     "textColor": "#e8eeff",
+     "background": "#5172fc",
+     "textPixels": 1104,
+     "needs": 4.5
+    },
+    "frame": 465,
+    "t": 15.5,
+    "until": 15.5,
+    "frames": 2
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "flow",
+    "message": "\"7 new · 24 reused\" has a contrast of 1.32:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.32,
+     "min": 1.21,
+     "textColor": "#879dc4",
+     "background": "#5582fc",
+     "textPixels": 305,
+     "needs": 4.5
+    },
+    "frame": 465,
+    "t": 15.5,
+    "until": 20.5,
+    "frames": 12
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "l3",
+    "message": "\"which clip made what\" has a contrast of 3.94:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.94,
+     "min": 3.94,
+     "textColor": "#7d92b5",
+     "background": "#1b3576",
+     "textPixels": 78,
+     "needs": 4.5
+    },
+    "frame": 615,
+    "t": 20.5,
+    "until": 20.5,
+    "frames": 4
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "l4",
+    "message": "\"immutable, p\" is 22.95 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.95,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 660,
+    "t": 22,
+    "until": 26.5,
+    "frames": 10
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "l4",
+    "message": "\"immutable, p\" has a contrast of 4.03:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 4.03,
+     "min": 3.97,
+     "textColor": "#8398b9",
+     "background": "#1f387b",
+     "textPixels": 73,
+     "needs": 4.5
+    },
+    "frame": 660,
+    "t": 22,
+    "until": 23.5,
+    "frames": 3
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "pins",
+    "message": "\"update_asset\" is 24 px on screen (2.2% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 24,
+     "screenPct": 2.2,
+     "floorPct": 2.5
+    },
+    "frame": 675,
+    "t": 22.5,
+    "until": 26.5,
+    "frames": 9
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "never",
+    "message": "\"Edit an asset. Old clips never change.\" has a contrast of 1.61:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.61,
+     "min": 1.61,
+     "textColor": "#eaf0fb",
+     "background": "#ffb347",
+     "textPixels": 7389,
+     "needs": 4.5
+    },
+    "frame": 735,
+    "t": 24.5,
+    "until": 26.5,
+    "frames": 5
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "pins",
+    "message": "\"update_asset\" has a contrast of 1.94:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.94,
+     "min": 1.64,
+     "textColor": "#879dbf",
+     "background": "#3b6bc1",
+     "textPixels": 1084,
+     "needs": 4.5
+    },
+    "frame": 795,
+    "t": 26.5,
+    "until": 26.5,
+    "frames": 8
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "pins",
+    "message": "\"same frames\" has a contrast of 3.07:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.07,
+     "min": 2.21,
+     "textColor": "#af9afc",
+     "background": "#285b8d",
+     "textPixels": 1196,
+     "needs": 4.5
+    },
+    "frame": 795,
+    "t": 26.5,
+    "until": 26.5,
+    "frames": 3
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "logo",
+    "message": "\"The library compounds\" has a contrast of 2.28:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.28,
+     "min": 1.92,
+     "textColor": "#899fbf",
+     "background": "#2f60b4",
+     "textPixels": 1613,
+     "needs": 4.5
+    },
+    "frame": 855,
+    "t": 28.5,
+    "until": 31,
+    "frames": 6
+   },
+   {
+    "check": "last-frame",
+    "severity": "error",
+    "item": null,
+    "message": "The last frame is held for 0.13 s; it should hold for at least 2 s.",
+    "numbers": {
+     "held": 0.13,
+     "needs": 2,
+     "lastChange": 31.83
+    },
+    "frame": 959,
+    "t": 31.97,
+    "until": 31.97,
+    "frames": 1
+   }
+  ]
+ },
+ {
+  "clip": "clip-3-release-notes",
+  "format": "square",
+  "frames": 65,
+  "seconds": 1.01,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 7,
+   "contrast": 20,
+   "hold": 0,
+   "captions": 0,
+   "glyphs": 1,
+   "first-frame": 0,
+   "last-frame": 1
+  },
+  "issues": [
+   {
+    "check": "glyphs",
+    "severity": "warning",
+    "item": "captions",
+    "message": "🚀 (U+1F680) is not in Inter: it would be drawn with a system font (emoji are drawn with the system emoji font, so they differ per OS).",
+    "numbers": {
+     "family": "Inter",
+     "kind": "emoji",
+     "count": 8,
+     "samples": [
+      "🚀",
+      "Every clip leaves the next one a head start 🚀"
+     ],
+     "items": [
+      "captions"
+     ]
+    },
+    "frame": 0,
+    "t": 0,
+    "until": 0,
+    "frames": 1
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "hook",
+    "message": "\"NEW\" has a contrast of 3.78:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.78,
+     "min": 2.87,
+     "textColor": "#fed067",
+     "background": "#6b5ac1",
+     "textPixels": 23980,
+     "needs": 4.5
+    },
+    "frame": 60,
+    "t": 2,
+    "until": 3.5,
+    "frames": 6
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "hook",
+    "message": "\"FABLECUT\" has a contrast of 1.93:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.93,
+     "min": 1.4,
+     "textColor": "#ff5c8a",
+     "background": "#675ea3",
+     "textPixels": 37826,
+     "needs": 4.5
+    },
+    "frame": 105,
+    "t": 3.5,
+    "until": 3.5,
+    "frames": 4
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "mark",
+    "message": "\"fablecut\" is 19.32 px on screen (1.8% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 19.32,
+     "screenPct": 1.8,
+     "floorPct": 2.5
+    },
+    "frame": 120,
+    "t": 4,
+    "until": 26.5,
+    "frames": 46
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "notes",
+    "message": "\"RELEASE NOTES\" is 24.84 px on screen (2.3% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 24.84,
+     "screenPct": 2.3,
+     "floorPct": 2.5
+    },
+    "frame": 135,
+    "t": 4.5,
+    "until": 12.5,
+    "frames": 17
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "notes",
+    "message": "\"An AI edits both through MCP\" has a contrast of 3.13:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.13,
+     "min": 2.59,
+     "textColor": "#f1ede8",
+     "background": "#8c81b8",
+     "textPixels": 2713,
+     "needs": 4.5
+    },
+    "frame": 300,
+    "t": 10,
+    "until": 12.5,
+    "frames": 7
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "notes",
+    "message": "\"Clips pin the versions they use\" has a contrast of 1.5:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.5,
+     "min": 1.46,
+     "textColor": "#fb5c8b",
+     "background": "#7d6cbe",
+     "textPixels": 1067,
+     "needs": 4.5
+    },
+    "frame": 330,
+    "t": 11,
+    "until": 12.5,
+    "frames": 11
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "notes",
+    "message": "\"Assets are functions with parameters\" has a contrast of 2.94:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.94,
+     "min": 2.76,
+     "textColor": "#f9cd68",
+     "background": "#7e75a1",
+     "textPixels": 2902,
+     "needs": 4.5
+    },
+    "frame": 375,
+    "t": 12.5,
+    "until": 12.5,
+    "frames": 14
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "notes",
+    "message": "\"Three ideas, one studio\" has a contrast of 4.25:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 4.25,
+     "min": 3.78,
+     "textColor": "#facd67",
+     "background": "#655a91",
+     "textPixels": 5095,
+     "needs": 4.5
+    },
+    "frame": 375,
+    "t": 12.5,
+    "until": 12.5,
+    "frames": 2
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "l2",
+    "message": "\"counted from\" is 18.36 px on screen (1.7% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 18.36,
+     "screenPct": 1.7,
+     "floorPct": 2.5
+    },
+    "frame": 420,
+    "t": 14,
+    "until": 19.5,
+    "frames": 12
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"24\" has a contrast of 2.94:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.94,
+     "min": 2.94,
+     "textColor": "#fff4f7",
+     "background": "#ff5c8a",
+     "textPixels": 332,
+     "needs": 4.5
+    },
+    "frame": 435,
+    "t": 14.5,
+    "until": 19.5,
+    "frames": 11
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"reused\" has a contrast of 2.16:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.16,
+     "min": 1.57,
+     "textColor": "#9792a9",
+     "background": "#6b5e58",
+     "textPixels": 714,
+     "needs": 4.5
+    },
+    "frame": 435,
+    "t": 14.5,
+    "until": 19.5,
+    "frames": 11
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"29\" has a contrast of 2.94:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.94,
+     "min": 2.94,
+     "textColor": "#fff5f8",
+     "background": "#ff5c8a",
+     "textPixels": 345,
+     "needs": 4.5
+    },
+    "frame": 450,
+    "t": 15,
+    "until": 19.5,
+    "frames": 10
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "l2",
+    "message": "\"counted from the database\" has a contrast of 3.73:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.73,
+     "min": 3.62,
+     "textColor": "#8a859b",
+     "background": "#352c23",
+     "textPixels": 50,
+     "needs": 4.5
+    },
+    "frame": 555,
+    "t": 18.5,
+    "until": 19,
+    "frames": 5
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"written for it\" has a contrast of 1.44:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.44,
+     "min": 1.37,
+     "textColor": "#9994ad",
+     "background": "#8473ad",
+     "textPixels": 693,
+     "needs": 4.5
+    },
+    "frame": 570,
+    "t": 19,
+    "until": 19.5,
+    "frames": 11
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "formats",
+    "message": "\"vertical\" is 13.61 px on screen (1.3% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 13.61,
+     "screenPct": 1.3,
+     "floorPct": 2.5
+    },
+    "frame": 615,
+    "t": 20.5,
+    "until": 26.5,
+    "frames": 13
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "formats",
+    "message": "\"horizontal\" is 13.61 px on screen (1.3% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 13.61,
+     "screenPct": 1.3,
+     "floorPct": 2.5
+    },
+    "frame": 615,
+    "t": 20.5,
+    "until": 26.5,
+    "frames": 13
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "formats",
+    "message": "\"square\" is 13.61 px on screen (1.3% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 13.61,
+     "screenPct": 1.3,
+     "floorPct": 2.5
+    },
+    "frame": 630,
+    "t": 21,
+    "until": 26.5,
+    "frames": 12
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "l3",
+    "message": "\"vertical · h\" is 18.36 px on screen (1.7% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 18.36,
+     "screenPct": 1.7,
+     "floorPct": 2.5
+    },
+    "frame": 630,
+    "t": 21,
+    "until": 26.5,
+    "frames": 12
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "formats",
+    "message": "\"9:16\" has a contrast of 3.43:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.43,
+     "min": 2.86,
+     "textColor": "#f7cb68",
+     "background": "#776a8f",
+     "textPixels": 570,
+     "needs": 4.5
+    },
+    "frame": 645,
+    "t": 21.5,
+    "until": 23,
+    "frames": 5
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "formats",
+    "message": "\"vertical\" has a contrast of 1.92:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.92,
+     "min": 1.82,
+     "textColor": "#938ea9",
+     "background": "#685f8c",
+     "textPixels": 147,
+     "needs": 4.5
+    },
+    "frame": 645,
+    "t": 21.5,
+    "until": 26.5,
+    "frames": 12
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "formats",
+    "message": "\"16:9\" has a contrast of 1.91:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.91,
+     "min": 1.73,
+     "textColor": "#f85c8a",
+     "background": "#765e8c",
+     "textPixels": 503,
+     "needs": 4.5
+    },
+    "frame": 720,
+    "t": 24,
+    "until": 25,
+    "frames": 4
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "l3",
+    "message": "\"vertical · horizontal · square\" has a contrast of 3.8:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.8,
+     "min": 3.69,
+     "textColor": "#89849b",
+     "background": "#362c2b",
+     "textPixels": 48,
+     "needs": 4.5
+    },
+    "frame": 750,
+    "t": 25,
+    "until": 25.5,
+    "frames": 2
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "formats",
+    "message": "\"horizontal\" has a contrast of 1.74:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.74,
+     "min": 1.41,
+     "textColor": "#958ea6",
+     "background": "#7b6477",
+     "textPixels": 190,
+     "needs": 4.5
+    },
+    "frame": 765,
+    "t": 25.5,
+    "until": 26.5,
+    "frames": 12
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "formats",
+    "message": "\"square\" has a contrast of 3.05:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.05,
+     "min": 2.94,
+     "textColor": "#8f88a3",
+     "background": "#533a61",
+     "textPixels": 125,
+     "needs": 4.5
+    },
+    "frame": 765,
+    "t": 25.5,
+    "until": 26.5,
+    "frames": 5
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "logo",
+    "message": "\"Fablecut\" has a contrast of 1.28:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.28,
+     "min": 1.08,
+     "textColor": "#f2efe8",
+     "background": "#7aecb9",
+     "textPixels": 2915,
+     "needs": 4.5
+    },
+    "frame": 840,
+    "t": 28,
+    "until": 29,
+    "frames": 3
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "captions",
+    "message": "\"Every clip leaves the next one a head…\" has a contrast of 3.59:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.59,
+     "min": 3.28,
+     "textColor": "#8e8b8c",
+     "background": "#38373c",
+     "textPixels": 1592,
+     "needs": 4.5
+    },
+    "frame": 870,
+    "t": 29,
+    "until": 30.5,
+    "frames": 6
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "logo",
+    "message": "\"Made with code , built from parts\" has a contrast of 1.77:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.77,
+     "min": 1.59,
+     "textColor": "#9994ab",
+     "background": "#806a52",
+     "textPixels": 1941,
+     "needs": 4.5
+    },
+    "frame": 885,
+    "t": 29.5,
+    "until": 31,
+    "frames": 6
+   },
+   {
+    "check": "last-frame",
+    "severity": "error",
+    "item": null,
+    "message": "The last frame is held for 0.07 s; it should hold for at least 2 s.",
+    "numbers": {
+     "held": 0.07,
+     "needs": 2,
+     "lastChange": 31.9
+    },
+    "frame": 959,
+    "t": 31.97,
+    "until": 31.97,
+    "frames": 1
+   }
+  ]
+ },
+ {
+  "clip": "clip-4-direct-the-studio",
+  "format": "horizontal",
+  "frames": 61,
+  "seconds": 11.39,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 7,
+   "hold": 2,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 1
+  },
+  "issues": [
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "title",
+    "message": "\"DIRECT\" is on screen for about 1 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 1,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 15,
+    "t": 0.5,
+    "until": 0.5,
+    "frames": 1
+   },
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "title",
+    "message": "\"THE\" is on screen for about 0.5 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 0.5,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 45,
+    "t": 1.5,
+    "until": 1.5,
+    "frames": 1
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "title",
+    "message": "\"STUDIO\" has a contrast of 2.52:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.52,
+     "min": 1,
+     "textColor": "#fcb347",
+     "background": "#727a62",
+     "textPixels": 263757,
+     "needs": 4.5
+    },
+    "frame": 60,
+    "t": 2,
+    "until": 6.5,
+    "frames": 10
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "behind-title",
+    "message": "\"Titles go behind it\" has a contrast of 1.02:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.02,
+     "min": 1,
+     "textColor": "#fbb249",
+     "background": "#ffb649",
+     "textPixels": 10588,
+     "needs": 4.5
+    },
+    "frame": 285,
+    "t": 9.5,
+    "until": 14,
+    "frames": 13
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"Iteration 2, by the numbers\" has a contrast of 3.32:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.32,
+     "min": 2.9,
+     "textColor": "#f0f5fc",
+     "background": "#5682f0",
+     "textPixels": 6731,
+     "needs": 4.5
+    },
+    "frame": 615,
+    "t": 20.5,
+    "until": 21.5,
+    "frames": 7
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"ASSETS IN ONE SEARCH\" has a contrast of 3.27:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.27,
+     "min": 2.84,
+     "textColor": "#c2ceea",
+     "background": "#446bc3",
+     "textPixels": 1416,
+     "needs": 4.5
+    },
+    "frame": 615,
+    "t": 20.5,
+    "until": 22,
+    "frames": 6
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"MCP TOOLS\" has a contrast of 2.63:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.63,
+     "min": 2.32,
+     "textColor": "#c4d7f0",
+     "background": "#4586cb",
+     "textPixels": 3770,
+     "needs": 4.5
+    },
+    "frame": 645,
+    "t": 21.5,
+    "until": 22.5,
+    "frames": 6
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"NEW ASSET KINDS\" has a contrast of 2.99:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.99,
+     "min": 2.61,
+     "textColor": "#c1d3e6",
+     "background": "#3b7cae",
+     "textPixels": 2056,
+     "needs": 4.5
+    },
+    "frame": 660,
+    "t": 22,
+    "until": 22.5,
+    "frames": 3
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "end",
+    "message": "\"A studio you direct\" has a contrast of 2.13:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.13,
+     "min": 1.91,
+     "textColor": "#899fbe",
+     "background": "#366c8f",
+     "textPixels": 1604,
+     "needs": 4.5
+    },
+    "frame": 840,
+    "t": 28,
+    "until": 29,
+    "frames": 10
+   },
+   {
+    "check": "last-frame",
+    "severity": "error",
+    "item": null,
+    "message": "The last frame is held for 0.1 s; it should hold for at least 2 s.",
+    "numbers": {
+     "held": 0.1,
+     "needs": 2,
+     "lastChange": 29.87
+    },
+    "frame": 899,
+    "t": 29.97,
+    "until": 29.97,
+    "frames": 1
+   }
+  ]
+ },
+ {
+  "clip": "clip-5-a-library-in-3d",
+  "format": "vertical",
+  "frames": 121,
+  "seconds": 26.29,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 13,
+   "hold": 2,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 1
+  },
+  "issues": [
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "opener",
+    "message": "\"A\" is on screen for about 0.5 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 0.5,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 15,
+    "t": 0.5,
+    "until": 0.5,
+    "frames": 1
+   },
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "opener",
+    "message": "\"LIBRARY\" is on screen for about 1 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 1,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 30,
+    "t": 1,
+    "until": 1,
+    "frames": 1
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "opener",
+    "message": "\"IN 3D\" has a contrast of 2.06:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.06,
+     "min": 1.66,
+     "textColor": "#fdb347",
+     "background": "#738a87",
+     "textPixels": 99389,
+     "needs": 4.5
+    },
+    "frame": 75,
+    "t": 2.5,
+    "until": 6.5,
+    "frames": 10
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "intro-third",
+    "message": "\"Clip 5 · vertical\" has a contrast of 3.28:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.28,
+     "min": 2.95,
+     "textColor": "#ecf2fb",
+     "background": "#7c8981",
+     "textPixels": 1438,
+     "needs": 4.5
+    },
+    "frame": 120,
+    "t": 4,
+    "until": 7,
+    "frames": 8
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "intro-third",
+    "message": "\"a minute built mostly from clip 4\" has a contrast of 1.53:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.53,
+     "min": 1.32,
+     "textColor": "#899dbb",
+     "background": "#6c807d",
+     "textPixels": 275,
+     "needs": 4.5
+    },
+    "frame": 210,
+    "t": 7,
+    "until": 7,
+    "frames": 7
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "grows",
+    "message": "\"GROWS\" has a contrast of 1.01:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.01,
+     "min": 1,
+     "textColor": "#ecab44",
+     "background": "#49dac9",
+     "textPixels": 83625,
+     "needs": 4.5
+    },
+    "frame": 435,
+    "t": 14.5,
+    "until": 17.5,
+    "frames": 18
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "baked",
+    "message": "\"the 3D orb, as frames: reused for free\" has a contrast of 1.58:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.58,
+     "min": 1.48,
+     "textColor": "#879ebf",
+     "background": "#4a7db8",
+     "textPixels": 206,
+     "needs": 4.5
+    },
+    "frame": 720,
+    "t": 24,
+    "until": 26.5,
+    "frames": 13
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "baked",
+    "message": "\"Baked once\" has a contrast of 1.36:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.36,
+     "min": 1.13,
+     "textColor": "#ebf2fb",
+     "background": "#ffca50",
+     "textPixels": 5234,
+     "needs": 4.5
+    },
+    "frame": 750,
+    "t": 25,
+    "until": 26,
+    "frames": 11
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"ASSETS FROM CLIP 1\" has a contrast of 3.74:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.74,
+     "min": 3.42,
+     "textColor": "#c5caf7",
+     "background": "#4950e8",
+     "textPixels": 2092,
+     "needs": 4.5
+    },
+    "frame": 900,
+    "t": 30,
+    "until": 34.5,
+    "frames": 9
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"NEW IN CLIP 4\" has a contrast of 3.23:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.23,
+     "min": 2.99,
+     "textColor": "#c5cef6",
+     "background": "#4e66e0",
+     "textPixels": 421,
+     "needs": 4.5
+    },
+    "frame": 1155,
+    "t": 38.5,
+    "until": 39.5,
+    "frames": 13
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"NEW IN CLIP 5\" has a contrast of 3.15:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.15,
+     "min": 2.9,
+     "textColor": "#c3d0ef",
+     "background": "#4470c9",
+     "textPixels": 415,
+     "needs": 4.5
+    },
+    "frame": 1155,
+    "t": 38.5,
+    "until": 39.5,
+    "frames": 11
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "letters-photo",
+    "message": "\"REUSE\" has a contrast of 1.04:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.04,
+     "min": 1,
+     "textColor": "#193440",
+     "background": "#292a6d",
+     "textPixels": 31764,
+     "needs": 4.5
+    },
+    "frame": 1215,
+    "t": 40.5,
+    "until": 49.5,
+    "frames": 19
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "reuse-line",
+    "message": "\"An uploaded photo, through 3D letters\" has a contrast of 2.47:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.47,
+     "min": 2.21,
+     "textColor": "#5cdee6",
+     "background": "#4c7ce8",
+     "textPixels": 4099,
+     "needs": 4.5
+    },
+    "frame": 1260,
+    "t": 42,
+    "until": 48.5,
+    "frames": 15
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "end",
+    "message": "\"Fablecut\" has a contrast of 3.22:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.22,
+     "min": 2.92,
+     "textColor": "#ecf3fd",
+     "background": "#5a84e8",
+     "textPixels": 3629,
+     "needs": 4.5
+    },
+    "frame": 1620,
+    "t": 54,
+    "until": 55,
+    "frames": 7
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "end",
+    "message": "\"Every clip makes the next one cheaper\" has a contrast of 1.24:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.24,
+     "min": 1.14,
+     "textColor": "#8a9fc0",
+     "background": "#6088f8",
+     "textPixels": 4796,
+     "needs": 4.5
+    },
+    "frame": 1620,
+    "t": 54,
+    "until": 59,
+    "frames": 16
+   },
+   {
+    "check": "last-frame",
+    "severity": "error",
+    "item": null,
+    "message": "The last frame is held for 0.1 s; it should hold for at least 2 s.",
+    "numbers": {
+     "held": 0.1,
+     "needs": 2,
+     "lastChange": 59.87
+    },
+    "frame": 1799,
+    "t": 59.97,
+    "until": 59.97,
+    "frames": 1
+   }
+  ]
+ },
+ {
+  "clip": "clip-6-what-the-library-holds",
+  "format": "square",
+  "frames": 181,
+  "seconds": 21.06,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 12,
+   "contrast": 11,
+   "hold": 2,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 1
+  },
+  "issues": [
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "opener",
+    "message": "\"WHAT\" is on screen for about 0.5 s; 1 word need 1.33 s (words / 3 + 1).",
+    "numbers": {
+     "held": 0.5,
+     "needs": 1.33,
+     "words": 1
+    },
+    "frame": 15,
+    "t": 0.5,
+    "until": 0.5,
+    "frames": 1
+   },
+   {
+    "check": "hold",
+    "severity": "error",
+    "item": "opener",
+    "message": "\"THE LIBRARY\" is on screen for about 1 s; 2 words need 1.67 s (words / 3 + 1).",
+    "numbers": {
+     "held": 1,
+     "needs": 1.67,
+     "words": 2
+    },
+    "frame": 30,
+    "t": 1,
+    "until": 1,
+    "frames": 1
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "opener",
+    "message": "\"HOLDS\" has a contrast of 1.03:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.03,
+     "min": 1,
+     "textColor": "#fdb347",
+     "background": "#59d8ca",
+     "textPixels": 124634,
+     "needs": 4.5
+    },
+    "frame": 60,
+    "t": 2,
+    "until": 6.5,
+    "frames": 10
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "third",
+    "message": "\"Clip 6 · square\" has a contrast of 1.13:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.13,
+     "min": 1.13,
+     "textColor": "#e8f5fd",
+     "background": "#3effed",
+     "textPixels": 127,
+     "needs": 4.5
+    },
+    "frame": 135,
+    "t": 4.5,
+    "until": 8,
+    "frames": 10
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "third",
+    "message": "\"ninety seconds, nothing wri\" has a contrast of 1:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1,
+     "min": 1,
+     "textColor": "#8aa1bf",
+     "background": "#2db2a2",
+     "textPixels": 167,
+     "needs": 4.5
+    },
+    "frame": 135,
+    "t": 4.5,
+    "until": 8,
+    "frames": 9
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"1233\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 330,
+    "t": 11,
+    "until": 11,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"353\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 330,
+    "t": 11,
+    "until": 11,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"1286\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 345,
+    "t": 11.5,
+    "until": 11.5,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"567\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 345,
+    "t": 11.5,
+    "until": 11.5,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"175\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 345,
+    "t": 11.5,
+    "until": 11.5,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"1288\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 360,
+    "t": 12,
+    "until": 23.5,
+    "frames": 24
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"577\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 360,
+    "t": 12,
+    "until": 23.5,
+    "frames": 24
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"205\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 360,
+    "t": 12,
+    "until": 12,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"228\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 360,
+    "t": 12,
+    "until": 12,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"206\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 375,
+    "t": 12.5,
+    "until": 23.5,
+    "frames": 23
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"241\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 375,
+    "t": 12.5,
+    "until": 12.5,
+    "frames": 1
+   },
+   {
+    "check": "size",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"242\" is 22.62 px on screen (2.1% of the frame's short side), under the floor of 2.5%.",
+    "numbers": {
+     "screenPx": 22.62,
+     "screenPct": 2.1,
+     "floorPct": 2.5
+    },
+    "frame": 390,
+    "t": 13,
+    "until": 23.5,
+    "frames": 22
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"New lines of asset code, per clip\" has a contrast of 4.2:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 4.2,
+     "min": 3.6,
+     "textColor": "#ebf1fb",
+     "background": "#5572b9",
+     "textPixels": 3661,
+     "needs": 4.5
+    },
+    "frame": 420,
+    "t": 14,
+    "until": 14.5,
+    "frames": 5
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "chart",
+    "message": "\"lines written\" has a contrast of 3.45:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.45,
+     "min": 3.05,
+     "textColor": "#869bba",
+     "background": "#2a4962",
+     "textPixels": 1234,
+     "needs": 4.5
+    },
+    "frame": 630,
+    "t": 21,
+    "until": 23.5,
+    "frames": 14
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "orb-line",
+    "message": "\"Baked in clip 5, reused here\" has a contrast of 2.54:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 2.54,
+     "min": 2.18,
+     "textColor": "#f8b14a",
+     "background": "#3c75cb",
+     "textPixels": 4351,
+     "needs": 4.5
+    },
+    "frame": 1065,
+    "t": 35.5,
+    "until": 37.5,
+    "frames": 25
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "compound",
+    "message": "\"COMPOUND\" has a contrast of 1.02:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.02,
+     "min": 1,
+     "textColor": "#cc923a",
+     "background": "#4ecbbc",
+     "textPixels": 76524,
+     "needs": 4.5
+    },
+    "frame": 1200,
+    "t": 40,
+    "until": 53.5,
+    "frames": 28
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"SECONDS LONG\" has a contrast of 3.05:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.05,
+     "min": 2.66,
+     "textColor": "#c0d1ea",
+     "background": "#3f78b5",
+     "textPixels": 1934,
+     "needs": 4.5
+    },
+    "frame": 1995,
+    "t": 66.5,
+    "until": 67,
+    "frames": 6
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "numbers",
+    "message": "\"CLIPS TO DRAW ON\" has a contrast of 3.02:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.02,
+     "min": 2.75,
+     "textColor": "#bcd0f0",
+     "background": "#3573d5",
+     "textPixels": 1063,
+     "needs": 4.5
+    },
+    "frame": 1995,
+    "t": 66.5,
+    "until": 67,
+    "frames": 3
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "end",
+    "message": "\"The library compounds\" has a contrast of 1.82:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 1.82,
+     "min": 1.49,
+     "textColor": "#8ba0bf",
+     "background": "#3572c0",
+     "textPixels": 3358,
+     "needs": 4.5
+    },
+    "frame": 2520,
+    "t": 84,
+    "until": 89,
+    "frames": 16
+   },
+   {
+    "check": "contrast",
+    "severity": "error",
+    "item": "end",
+    "message": "\"Fablecut\" has a contrast of 3.27:1 against the worst pixels behind it (needs 4.5:1).",
+    "numbers": {
+     "ratio": 3.27,
+     "min": 2.89,
+     "textColor": "#ecf3fd",
+     "background": "#5083ee",
+     "textPixels": 3697,
+     "needs": 4.5
+    },
+    "frame": 2550,
+    "t": 85,
+    "until": 89,
+    "frames": 17
+   },
+   {
+    "check": "last-frame",
+    "severity": "error",
+    "item": null,
+    "message": "The last frame is held for 0.07 s; it should hold for at least 2 s.",
+    "numbers": {
+     "held": 0.07,
+     "needs": 2,
+     "lastChange": 89.9
+    },
+    "frame": 2699,
+    "t": 89.97,
+    "until": 89.97,
+    "frames": 1
+   }
+  ]
+ },
+ {
+  "clip": "clip-7-a-video-that-checks-itself",
+  "format": "horizontal",
+  "frames": 125,
+  "seconds": 1.42,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 0,
+   "hold": 0,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 0
+  },
+  "issues": []
+ },
+ {
+  "clip": "clip-7-a-video-that-checks-itself",
+  "format": "vertical",
+  "frames": 125,
+  "seconds": 1.39,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 0,
+   "hold": 0,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 0
+  },
+  "issues": []
+ },
+ {
+  "clip": "clip-8-cuvinte-pe-ritm",
+  "format": "vertical",
+  "frames": 78,
+  "seconds": 0.87,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 0,
+   "hold": 0,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 0
+  },
+  "issues": []
+ }
+]

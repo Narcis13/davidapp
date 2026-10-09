@@ -1,0 +1,106 @@
+{
+ "machine": "Intel(R) Core(TM) i9-14900KF × 32",
+ "node": "v24.19.0",
+ "warm": {
+  "clip-1-every-frame": {
+   "size": "1080×1920",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    6.45,
+    6.46
+   ],
+   "median": 6.46,
+   "framesPerSecond": 148.6,
+   "mixSeconds": 0,
+   "reportSeconds": 2.23,
+   "loudnessSeconds": 0,
+   "checkClipSeconds": 1.29,
+   "checkClipFrames": 65
+  },
+  "clip-2-compounding": {
+   "size": "1920×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    8.27,
+    8.24
+   ],
+   "median": 8.27,
+   "framesPerSecond": 116.1,
+   "mixSeconds": 0,
+   "reportSeconds": 1.37,
+   "loudnessSeconds": 0,
+   "checkClipSeconds": 1.7,
+   "checkClipFrames": 65
+  },
+  "clip-3-release-notes": {
+   "size": "1080×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    5,
+    5.01
+   ],
+   "median": 5.01,
+   "framesPerSecond": 191.6,
+   "mixSeconds": 0,
+   "reportSeconds": 1.39,
+   "loudnessSeconds": 0,
+   "checkClipSeconds": 1.07,
+   "checkClipFrames": 65
+  },
+  "clip-7-a-video-that-checks-itself": {
+   "size": "1920×1080",
+   "seconds": 62,
+   "frames": 1860,
+   "runs": [
+    10.04,
+    10.09
+   ],
+   "median": 10.09,
+   "framesPerSecond": 184.3,
+   "mixSeconds": 0,
+   "reportSeconds": 1.96,
+   "loudnessSeconds": 0,
+   "checkClipSeconds": 1.37,
+   "checkClipFrames": 125
+  },
+  "clip-8-cuvinte-pe-ritm": {
+   "size": "1080×1920",
+   "seconds": 38.4,
+   "frames": 1152,
+   "runs": [
+    6.34,
+    6.34
+   ],
+   "median": 6.34,
+   "framesPerSecond": 181.7,
+   "mixSeconds": 0,
+   "reportSeconds": 1.88,
+   "loudnessSeconds": 1.76,
+   "checkClipSeconds": 0.87,
+   "checkClipFrames": 78
+  }
+ },
+ "coldMix": {
+  "clip-1-every-frame": {
+   "renderSeconds": 6.37,
+   "mixSeconds": 0.42,
+   "reportSeconds": 2.07,
+   "loudnessSeconds": 0
+  },
+  "clip-7-a-video-that-checks-itself": {
+   "renderSeconds": 10.05,
+   "mixSeconds": 1.42,
+   "reportSeconds": 1.94,
+   "loudnessSeconds": 0
+  },
+  "clip-8-cuvinte-pe-ritm": {
+   "renderSeconds": 6.32,
+   "mixSeconds": 0.85,
+   "reportSeconds": 1.91,
+   "loudnessSeconds": 1.74
+  }
+ }
+}
