@@ -175,6 +175,10 @@ function autoRanges(words, link, bc, opt) {
       if (best[i] === Infinity) continue;
       const dur = Math.max(0.001, words[units[j - 1].b].end - words[units[i].a].start);
       let c = best[i] + PAGE_COST + lay.cost + (j < U ? brk[j - 1] : 0);
+      // a page is on screen until the next one starts: one shorter than minDuration (fast speech) is nearly always
+      // the wrong cut, so it costs far more than a long line or a weak break
+      const shown = (j < U ? words[units[j].a].start : Infinity) - words[units[i].a].start;
+      if (shown < opt.minDuration) c += 10 + (40 * (opt.minDuration - shown)) / opt.minDuration;
       for (let k = i; k < j - 1; k++) if (sentence[k]) c += SENTENCE_INSIDE;
       if (dur < 1.2) c += (1.2 - dur) * 2.5;
       if (dur > 5) c += (dur - 5) * 1.5;

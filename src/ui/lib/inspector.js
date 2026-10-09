@@ -1,13 +1,16 @@
 // The clip editor's inspector sections for a visual item: transform and opacity with keyframe
 // toggles and per-format override markers, the keyframe list with easing, parameters (numeric and
-// colour ones can be keyframed), and attachments (motions, effects, transition, mask). Plus the
+// colour ones can be keyframed), and attachments (motions, effects, transition, mask); for an audio
+// item its gain automation and ducking; for a marker or an anchored item its words; and the clip's
+// loudness, captions and platforms. Plus the
 // layout model the editor and the on-canvas handles share: where an edit is written (the base, an
 // override for one format, or a keyframe at the playhead) and what a field shows at a time.
 
-import { BLEND_MODES, MASK_MODES, MOTION_PHASES } from '/core/composition.js';
+import { AUDIO_EASINGS, BLEND_MODES, DUCK_SOURCES, MARKER_TYPES, MASK_MODES, MOTION_PHASES } from '/core/composition.js';
+import { PLATFORMS } from '/core/platforms.js';
 import { TRANSFORM_DEFAULTS, boxToTransform, forFormat, sampleItem, spaceRect } from '/core/transform.js';
 import { createParamControls } from '/ui/lib/params.js';
-import { clamp, clone, fill, fmtTime, h, icon, nextId, splitRef } from '/ui/lib/util.js';
+import { clamp, clone, fill, fmtTime, h, icon, nextId, plural, s, splitRef } from '/ui/lib/util.js';
 
 export const EASES = ['linear', 'hold', 'inQuad', 'outQuad', 'inOutQuad', 'inCubic', 'outCubic', 'inOutCubic', 'outQuart', 'outQuint', 'inExpo', 'outExpo', 'inOutExpo', 'inBack', 'outBack', 'outElastic', 'outBounce'];
 const TF_KEYS = ['x', 'y', 'width', 'height', 'scale', 'scaleX', 'scaleY', 'rotation', 'anchorX', 'anchorY'];
@@ -444,4 +447,350 @@ export function attachmentsSection(env) {
     h('h3', 'Mask'),
     h('div.att-ctl', h('label.grow', 'Asset', maskSel), h('label', 'Mode', maskMode)),
     item.mask ? paramsOf(item.mask, 'mask:0') : null);
+}
+
+// ── audio items, markers, anchors and the clip's own settings (v3) ────────────────────────────
+
+const round1 = (v) => Math.round(v * 10) / 10;
+const trim2 = (v) => String(Math.round(v * 100) / 100);
+
+/** A labelled switch (a checkbox with role switch); onChange gets the new state. */
+export function switchField(label, testid, checked, onChange, { hint, disabled = false } = {}) {
+  const id = nextId('sw');
+  const input = h('input', { type: 'checkbox', id, checked: !!checked, disabled, 'data-testid': testid, role: 'switch' });
+  input.addEventListener('change', () => onChange(input.checked));
+  return { input, el: h('div.field.inline', h('label', { for: id }, label), h('label.switch', input, h('span.switch-track', { 'aria-hidden': 'true' })), hint ? h('p.hint', hint) : null) };
+}
+
+/** A labelled number box: `apply(v, final)` runs on every valid input (clamped); the box shows the clamped value when it is left. */
+export function numberField(label, testid, value, { min, max, step, unit, disabled = false, integer = false }, apply) {
+  const id = nextId('nf');
+  const fix = (v) => { const x = clamp(v, min ?? -Infinity, max ?? Infinity); return integer ? Math.round(x) : round3(x); };
+  const input = h('input.num', { type: 'number', id, min, max, step, value: String(value), disabled, 'data-testid': testid, inputMode: 'decimal' });
+  input.addEventListener('input', () => {
+    const v = Number(input.value);
+    if (input.value.trim() === '' || !Number.isFinite(v)) return;
+    apply(fix(v), false);
+  });
+  input.addEventListener('change', () => {
+    const v = Number(input.value);
+    if (input.value.trim() === '' || !Number.isFinite(v)) { input.value = String(value); return; }
+    value = fix(v);
+    input.value = String(value);
+    apply(value, true);
+  });
+  return { input, el: h('div.field', h('label', { for: id }, label, unit ? h('span.unit', unit) : null), input) };
+}
+
+/** Narration words as select options: "12 · the · 0:05.63" (with the item when there is more than one narration). */
+function wordOptions(words, skipItem) {
+  const list = words.filter((w) => w.item !== skipItem);
+  const many = new Set(list.map((w) => w.item)).size > 1;
+  return list.map((w) => h('option', { value: w.key }, `${w.i} · ${w.text}${w.missing ? ' (not in the take)' : ''} · ${fmtTime(w.start)}${many ? ` · ${w.item}` : ''}`));
+}
+
+// the mixer's gain curves (src/render/mix.js, formula for formula: the preview mix is made from the same table)
+const AUDIO_CURVES = {
+  linear: (x) => x,
+  hold: (x) => (x < 1 ? 0 : 1),
+  smooth: (x) => x * x * (3 - 2 * x),
+  inSine: (x) => 1 - Math.cos((x * Math.PI) / 2),
+  outSine: (x) => Math.sin((x * Math.PI) / 2),
+  inOutSine: (x) => (1 - Math.cos(Math.PI * x)) / 2,
+  inQuad: (x) => x * x,
+  outQuad: (x) => 1 - (1 - x) * (1 - x),
+  inOutQuad: (x) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2),
+  inCubic: (x) => x * x * x,
+  outCubic: (x) => 1 - (1 - x) ** 3,
+  inOutCubic: (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2),
+};
+
+/** Gain in dB of keys [{ t, v, ease? }] at item time t: the first value before the first key, the last after the last. */
+export function volumeAt(keys, t) {
+  if (!keys.length) return 0;
+  const sorted = [...keys].sort((a, b) => a.t - b.t);
+  if (t <= sorted[0].t) return sorted[0].v;
+  const last = sorted[sorted.length - 1];
+  if (t >= last.t) return last.v;
+  let i = 0;
+  while (sorted[i + 1].t <= t) i++;
+  const a = sorted[i], b = sorted[i + 1];
+  return a.v + (b.v - a.v) * (AUDIO_CURVES[a.ease ?? 'linear'] ?? AUDIO_CURVES.linear)((t - a.t) / (b.t - a.t));
+}
+
+/**
+ * Gain automation and ducking of an audio item (its plain gain field stays with the timing fields).
+ * @param {{ item: any, tracks: { id: string, name?: string, role?: string }[], lt: () => number, t: () => number,
+ *   commit: (key: string, fn: (item: any) => void, o?: { inspector?: string, burst?: boolean }) => void }} env
+ *   tracks: the clip's other audio tracks (what this item can duck under).
+ */
+export function audioSection(env) {
+  const { item } = env;
+  const keys = () => item.keyframes?.volume ?? [];
+  const span = () => [item.offset ?? 0, (item.offset ?? 0) + item.duration];
+  const quiet = { inspector: 'none', burst: true };
+
+  // ── gain automation
+  const rows = h('ul.vol-keys');
+  const curve = s('svg', { class: 'vol-curve', viewBox: '0 0 300 96', role: 'img', 'aria-label': 'Gain in dB across the item', 'data-testid': 'volume-curve' });
+  const addBtn = h('button.btn.small', { type: 'button', 'data-testid': 'volume-add', title: 'Add a gain key at the playhead' }, icon('plus', 14), 'Add key');
+  addBtn.addEventListener('click', () => {
+    const lt = env.lt();
+    if (keys().some((k) => near(k.t, lt))) return;
+    const v = round1(volumeAt(keys(), lt));
+    env.commit(`vol-add:${item.id}`, (it) => {
+      it.keyframes ??= {};
+      (it.keyframes.volume ??= []).push({ t: round3(lt), v });
+      it.keyframes.volume.sort((a, b) => a.t - b.t);
+    });
+    drawKeys();
+  });
+
+  function drawCurve() {
+    const [t0, t1] = span();
+    const W = 300, H = 96, L = 30, R = 8, T = 8, B = 18;
+    const ks = keys();
+    const lo = Math.max(-90, Math.min(-24, ...ks.map((k) => k.v - 3))), hi = Math.min(24, Math.max(6, ...ks.map((k) => k.v + 3)));
+    const x = (t) => L + ((t - t0) / (t1 - t0)) * (W - L - R);
+    const y = (db) => T + ((hi - db) / (hi - lo)) * (H - T - B);
+    const d = [];
+    for (let i = 0; i <= 120; i++) { const t = t0 + ((t1 - t0) * i) / 120; d.push(`${i ? 'L' : 'M'}${x(t).toFixed(1)} ${y(volumeAt(ks, t)).toFixed(1)}`); }
+    const ticks = [hi, 0, lo].filter((v, i, a) => a.indexOf(v) === i);
+    const at = clamp(env.lt(), t0, t1);
+    fill(curve,
+      s('rect', { class: 'vc-bg', x: L, y: T, width: W - L - R, height: H - T - B }),
+      ticks.map((db) => [s('line', { class: db === 0 ? 'vc-zero' : 'vc-grid', x1: L, x2: W - R, y1: y(db), y2: y(db) }), s('text', { class: 'vc-label', x: L - 4, y: y(db) + 3.5, 'text-anchor': 'end' }, `${Math.round(db)}`)]),
+      s('text', { class: 'vc-label', x: L, y: H - 4 }, fmtTime(t0).replace(/\.00$/, '')),
+      s('text', { class: 'vc-label', x: W - R, y: H - 4, 'text-anchor': 'end' }, fmtTime(t1).replace(/\.00$/, '')),
+      s('path', { class: 'vc-line', d: d.join('') }),
+      ks.filter((k) => k.t >= t0 && k.t <= t1).map((k) => s('circle', { class: 'vc-key', cx: x(k.t), cy: y(k.v), r: 3.5 })),
+      inside(item, env.t()) ? s('line', { class: 'vc-head', 'data-testid': 'volume-playhead', x1: x(at), x2: x(at), y1: T, y2: H - B }) : null);
+  }
+
+  function drawKeys() {
+    const ks = keys();
+    fill(rows, ks.length ? ks.map((k, i) => {
+      const t = h('input.num', { type: 'number', min: 0, step: 0.05, value: String(round3(k.t)), 'data-testid': 'volume-key-t', 'aria-label': `Key ${i + 1}: time in seconds into the asset`, inputMode: 'decimal' });
+      const db = h('input.num', { type: 'number', min: -90, max: 24, step: 0.5, value: String(round1(k.v)), 'data-testid': 'volume-key-db', 'aria-label': `Key ${i + 1}: gain in dB`, inputMode: 'decimal' });
+      const names = AUDIO_EASINGS.includes(k.ease ?? 'linear') ? AUDIO_EASINGS : [...AUDIO_EASINGS, k.ease];
+      const ease = h('select.small', { 'data-testid': 'volume-key-ease', 'aria-label': `Key ${i + 1}: easing to the next key`, disabled: i === ks.length - 1 }, names.map((e) => h('option', { value: e }, e)));
+      ease.value = k.ease ?? 'linear';
+      const del = h('button.icon-btn.small', { type: 'button', 'data-testid': 'volume-key-remove', 'aria-label': `Remove key ${i + 1} (${fmtTime(k.t)})` }, icon('close', 14));
+      const key = (fn) => (it) => { const at = it.keyframes?.volume?.[i]; if (at) fn(at); };
+      const read = (input, lo, hi) => { const v = Number(input.value); return input.value.trim() === '' || !Number.isFinite(v) ? null : clamp(v, lo, hi); };
+      t.addEventListener('input', () => { const v = read(t, 0, span()[1]); if (v !== null) { env.commit(`vol-t:${item.id}:${i}`, key((at) => { at.t = v; }), quiet); drawCurve(); } });
+      // the order of the keys follows their times once the box is left
+      t.addEventListener('change', () => { env.commit(`vol-sort:${item.id}`, (it) => { it.keyframes?.volume?.sort((a, b) => a.t - b.t); }, quiet); drawKeys(); });
+      db.addEventListener('input', () => { const v = read(db, -90, 24); if (v !== null) { env.commit(`vol-v:${item.id}:${i}`, key((at) => { at.v = v; }), quiet); drawCurve(); } });
+      db.addEventListener('change', drawKeys);
+      ease.addEventListener('change', () => { env.commit(`vol-ease:${item.id}:${i}`, key((at) => { if (ease.value === 'linear') delete at.ease; else at.ease = ease.value; })); drawCurve(); });
+      del.addEventListener('click', () => {
+        env.commit(`vol-del:${item.id}`, (it) => {
+          it.keyframes.volume.splice(i, 1);
+          if (!it.keyframes.volume.length) delete it.keyframes.volume;
+          if (!Object.keys(it.keyframes).length) delete it.keyframes;
+        });
+        drawKeys();
+      });
+      return h('li', { 'data-testid': 'volume-key', 'data-index': String(i) }, t, db, ease, del);
+    }) : h('li.muted.vol-empty', 'No gain keys. The item plays at its gain; add a key to shape the volume over time.'));
+    drawCurve();
+    syncAdd();
+  }
+
+  function syncAdd() { addBtn.disabled = !inside(item, env.t()) || keys().some((k) => near(k.t, env.lt())); }
+
+  const automation = h('div.audio-auto', { 'data-testid': 'audio-automation' },
+    h('div.panel-head', h('h3', 'Volume over time'), addBtn),
+    curve,
+    keys().length ? h('div.vol-head', { 'aria-hidden': 'true' }, h('span', 'Time (s)'), h('span', 'dB'), h('span', 'Then')) : null,
+    rows);
+
+  // ── ducking
+  const duckEl = h('div.audio-duck', { 'data-testid': 'audio-duck' });
+  const setDuck = (patch, o = quiet) => env.commit(`duck:${item.id}:${Object.keys(patch).join()}`, (it) => { if (it.duck) it.duck = { ...it.duck, ...patch }; }, o);
+  function drawDuck() {
+    const d = item.duck;
+    const on = switchField('Duck under the narration', 'duck-on', !!d, (v) => {
+      env.commit(`duck-on:${item.id}`, (it) => { if (v) it.duck = { by: 12, attack: 0.12, release: 0.4, hold: 0.25, source: 'words' }; else delete it.duck; }, { inspector: 'none' });
+      drawDuck();
+    });
+    if (!d) { fill(duckEl, on.el, h('p.hint', 'The item gets quieter while the narration speaks, and comes back after.')); return; }
+    const num = (label, testid, key, o) => numberField(label, testid, d[key], o, (v) => setDuck({ [key]: v }));
+    const sourceId = nextId('ds');
+    const source = h('select', { 'data-testid': 'duck-source', id: sourceId }, DUCK_SOURCES.map((x) => h('option', { value: x }, x === 'words' ? 'words (the narration)' : 'envelope (the track level)')));
+    source.value = d.source;
+    source.addEventListener('change', () => { setDuck({ source: source.value }, { inspector: 'none' }); drawDuck(); });
+    const threshold = d.source === 'envelope' ? numberField('Level that counts as speech', 'duck-threshold', d.threshold ?? -40, { min: -90, max: 0, step: 1, unit: 'dBFS' }, (v) => setDuck({ threshold: v })) : null;
+    const checks = env.tracks.map((tr) => {
+      const box = h('input', { type: 'checkbox', checked: d.under?.includes(tr.id) ?? false, 'data-testid': 'duck-under-track', 'data-track': tr.id });
+      box.addEventListener('change', () => {
+        const next = env.tracks.map((x) => x.id).filter((id) => (id === tr.id ? box.checked : item.duck?.under?.includes(id)));
+        env.commit(`duck-under:${item.id}`, (it) => { if (!it.duck) return; if (next.length) it.duck.under = next; else delete it.duck.under; }, { inspector: 'none' });
+      });
+      return h('label.check', box, h('span', tr.name ?? tr.id, tr.role ? h('span.muted', ` · ${tr.role}`) : null));
+    });
+    fill(duckEl,
+      on.el,
+      h('div.field-grid',
+        num('Drops by', 'duck-by', 'by', { min: 0, max: 60, step: 1, unit: 'dB' }).el,
+        num('Hold', 'duck-hold', 'hold', { min: 0, max: 2, step: 0.05, unit: 's' }).el,
+        num('Attack', 'duck-attack', 'attack', { min: 0, max: 2, step: 0.01, unit: 's' }).el,
+        num('Release', 'duck-release', 'release', { min: 0, max: 5, step: 0.05, unit: 's' }).el),
+      h('div.field', h('label', { for: sourceId }, 'Speech is found from'), source),
+      threshold?.el,
+      h('div.field', h('span.field-label', { id: `${sourceId}-under` }, 'Ducks under'),
+        checks.length ? h('div.checks', { role: 'group', 'aria-labelledby': `${sourceId}-under`, 'data-testid': 'duck-under' }, checks) : h('p.hint', { 'data-testid': 'duck-under' }, 'There is no other audio track.'),
+        h('p.hint', 'Nothing checked: the narration tracks.')));
+  }
+
+  drawKeys();
+  drawDuck();
+  return {
+    el: h('div.audio-section', automation, h('h3', 'Ducking'), duckEl),
+    sync() { drawCurve(); syncAdd(); },
+  };
+}
+
+/**
+ * Start an item on a narration word.
+ * @param {{ item: any, words: any[], report?: any, fps: number, duration: number, commit: (key: string, fn: (item: any) => void, o?: object) => void }} env
+ */
+export function anchorSection(env) {
+  const { item } = env;
+  const a = item.anchor;
+  const words = env.words.filter((w) => w.item !== item.id);
+  const id = nextId('an');
+  const pick = h('select', { id, 'data-testid': 'anchor-word', disabled: !words.length }, h('option', { value: '' }, a ? 'Move to another word' : words.length ? 'Not on a word' : 'No narration words'), wordOptions(words, item.id));
+  pick.value = '';
+  pick.addEventListener('change', () => {
+    const w = words.find((x) => x.key === pick.value);
+    if (!w) return;
+    env.commit(`anchor:${item.id}`, (it) => {
+      it.anchor = { ...it.anchor, item: w.item, word: w.i };
+      it.start = round3(Math.max(0, w.start + (it.anchor.offset ?? 0)));
+      if (it.start + it.duration > env.duration) it.duration = round3(Math.max(1 / env.fps, env.duration - it.start));
+    }, { inspector: 'redraw' });
+  });
+  let info = null;
+  if (a) {
+    // the report is the studio's last measurement: after a new word is picked, the words list is ahead of it
+    const local = env.words.find((w) => w.item === a.item && w.i === a.word);
+    const r = env.report && env.report.word?.i === a.word ? env.report : local ? { word: local, wordTime: (a.edge === 'end' ? local.end : local.start) + (a.offset ?? 0) } : env.report;
+    const word = r?.word ?? local;
+    if (r?.error) info = h('p.notice.error', { 'data-testid': 'anchor-info' }, r.error);
+    else {
+      // how far the item sits from its word in the draft (the studio puts it back on the word when the clip is saved)
+      const delta = r ? Math.round((item.start - r.wordTime) * env.fps * 100) / 100 : null;
+      info = h('p', { 'data-testid': 'anchor-info' },
+        `Starts on word "${word?.text ?? a.word}" (${a.item}, word ${a.word})${word?.missing ? ', which is not in the take' : ''}`,
+        delta === null ? null : `, Δ ${trim2(delta)} ${Math.abs(delta) === 1 ? 'frame' : 'frames'}`,
+        delta !== null && Math.abs(delta) > 0.5 ? h('span.hint', ' Saving puts it back on the word. Detach to keep this start.') : null);
+    }
+  }
+  const detach = a ? h('button.btn.small', { type: 'button', 'data-testid': 'anchor-detach' }, 'Detach') : null;
+  detach?.addEventListener('click', () => env.commit(`anchor-off:${item.id}`, (it) => { delete it.anchor; }, { inspector: 'redraw' }));
+  return { el: h('div.anchor', { 'data-testid': 'anchor-section' }, h('h3', 'Start on a word'), info, h('div.field', h('label', { for: id }, 'Narration word'), h('div.row.nowrap', h('div.grow', pick), detach))) };
+}
+
+/**
+ * The marker the inspector shows.
+ * @param {{ marker: any, words: any[], duration: number, commit: (key: string, fn: (marker: any) => void, o?: object) => void,
+ *   seek: (t: number) => void, remove: () => void }} env
+ */
+export function markerSection(env) {
+  const m = env.marker;
+  const type = m.type ?? 'note';
+  const quiet = { inspector: 'none', burst: true };
+  const typeId = nextId('mk');
+  const sel = h('select', { id: typeId, 'data-testid': 'marker-type' }, MARKER_TYPES.map((x) => h('option', { value: x, disabled: x === 'word' && !m.anchor && !env.words.length }, x)));
+  sel.value = type;
+  sel.addEventListener('change', () => {
+    const next = sel.value;
+    env.commit('marker-type', (mk) => {
+      if (next === 'note') delete mk.type; else mk.type = next;
+      if (next === 'hold') mk.duration ??= 1; else delete mk.duration;
+      if (next === 'word' && !mk.anchor) {
+        // a word marker needs a word: the one nearest to where the marker is
+        const w = env.words.reduce((best, x) => (!best || Math.abs(x.start - mk.t) < Math.abs(best.start - mk.t) ? x : best), null);
+        if (w) { mk.anchor = { item: w.item, word: w.i }; mk.t = round3(w.start); }
+      } else if (next !== 'word') delete mk.anchor;
+    }, { inspector: 'redraw' });
+  });
+  const labelId = nextId('mk');
+  const label = h('input', { type: 'text', id: labelId, value: m.label ?? '', 'data-testid': 'marker-label', autocomplete: 'off', maxLength: 80 });
+  label.addEventListener('input', () => env.commit('marker-label', (mk) => { mk.label = label.value; }, quiet));
+  const t = numberField('Time', 'marker-t', round3(m.t), { min: 0, max: env.duration, step: 0.05, unit: 's', disabled: !!m.anchor }, (v) => env.commit('marker-t', (mk) => { mk.t = v; }, quiet));
+  const dur = type === 'hold' ? numberField('Hold for', 'marker-duration', m.duration ?? 1, { min: 0.05, max: env.duration, step: 0.05, unit: 's' }, (v) => env.commit('marker-duration', (mk) => { mk.duration = v; }, quiet)) : null;
+
+  let anchor = null;
+  if (m.anchor) {
+    const w = env.words.find((x) => x.item === m.anchor.item && x.i === m.anchor.word);
+    const pickId = nextId('mk');
+    const pick = h('select', { id: pickId, 'data-testid': 'marker-word' }, wordOptions(env.words, null));
+    pick.value = `${m.anchor.item}:${m.anchor.word}`;
+    pick.addEventListener('change', () => {
+      const x = env.words.find((y) => y.key === pick.value);
+      if (x) env.commit('marker-word', (mk) => { mk.anchor = { ...mk.anchor, item: x.item, word: x.i }; mk.t = round3(Math.max(0, x.start + (mk.anchor.offset ?? 0))); }, { inspector: 'redraw' });
+    });
+    anchor = h('div.field',
+      h('p', { 'data-testid': 'marker-anchor' }, `on word "${w?.text ?? m.anchor.word}"`, h('span.muted', ` (${m.anchor.item}, word ${m.anchor.word})`)),
+      h('label', { for: pickId }, 'Move to another word'), pick);
+  }
+
+  const goto = h('button.btn.small', { type: 'button', 'data-testid': 'marker-goto' }, 'Go to marker');
+  goto.addEventListener('click', () => env.seek(m.t));
+  const del = h('button.btn.small.danger', { type: 'button', 'data-testid': 'marker-delete' }, icon('trash', 14), 'Delete marker');
+  del.addEventListener('click', env.remove);
+
+  return {
+    el: h('div.marker-editor', { 'data-testid': 'marker-editor' },
+      h('div.field', h('label', { for: typeId }, 'Type'), sel),
+      h('div.field', h('label', { for: labelId }, 'Label'), label),
+      h('div.field-grid', t.el, dur?.el),
+      anchor,
+      h('div.row', goto, del)),
+  };
+}
+
+// ── the clip's own settings: loudness, captions, platforms ────────────────────────────────────
+
+/** @param {{ comp: () => any, edit: (key: string, fn: (comp: any) => void, o?: { inspector?: string, burst?: boolean }) => void }} env */
+export function loudnessSection(env) {
+  const l = env.comp().loudness;
+  const set = (patch) => env.edit('loudness', (c) => { if (c.loudness) c.loudness = { ...c.loudness, ...patch }; }, { inspector: 'none', burst: true });
+  const on = switchField('Normalise to a target', 'loudness-on', !!l, (v) => env.edit('loudness-on', (c) => { if (v) c.loudness = { target: -14, truePeak: -1 }; else delete c.loudness; }, { inspector: 'redraw' }), { hint: 'The mix is measured and brought to the target when the clip is rendered.' });
+  const target = numberField('Target', 'loudness-target', l?.target ?? -14, { min: -40, max: -5, step: 0.5, unit: 'LUFS', disabled: !l }, (v) => set({ target: v }));
+  const peak = numberField('True peak at most', 'loudness-peak', l?.truePeak ?? -1, { min: -9, max: 0, step: 0.5, unit: 'dBTP', disabled: !l }, (v) => set({ truePeak: v }));
+  return { el: h('div.clip-loudness', { 'data-testid': 'clip-loudness' }, on.el, h('div.field-grid', target.el, peak.el)) };
+}
+
+/** @param {{ comp: () => any, pages: any[] | null, edit: Function }} env */
+export function captionsSection(env) {
+  const comp = env.comp();
+  const c = comp.captions;
+  const set = (patch) => env.edit('captions', (x) => { if (x.captions) x.captions = { ...x.captions, ...patch }; }, { inspector: 'none', burst: true });
+  const on = switchField('Captions from the narration', 'captions-on', !!c, (v) => env.edit('captions-on', (x) => { if (v) x.captions = {}; else delete x.captions; }, { inspector: 'redraw' }));
+  const burn = switchField('Burn into the video', 'captions-burn', c ? c.burnIn !== false : true, (v) => env.edit('captions-burn', (x) => { if (!x.captions) return; if (v) delete x.captions.burnIn; else x.captions.burnIn = false; }, { inspector: 'redraw' }),
+    { disabled: !c, hint: c && c.burnIn === false ? 'File only: the captions go to the subtitle files and are not drawn on the picture.' : undefined });
+  const chars = numberField('Characters in a line, at most', 'captions-chars', c?.maxChars ?? (comp.format === 'horizontal' ? 32 : 20), { min: 8, max: 80, step: 1, integer: true, disabled: !c }, (v) => set({ maxChars: v }));
+  return { el: h('div.clip-captions', { 'data-testid': 'clip-captions' }, on.el, burn.el, chars.el,
+    c ? h('p.hint', { 'data-testid': 'captions-pages' }, env.pages?.length ? `${plural(env.pages.length, 'caption page')} from the narration.` : 'No narration words yet: add a narration to get caption pages.') : null) };
+}
+
+/** @param {{ comp: () => any, edit: Function }} env */
+export function platformsSection(env) {
+  const comp = env.comp();
+  const chosen = comp.platforms ?? [];
+  const boxes = Object.entries(PLATFORMS).map(([id, p]) => {
+    const box = h('input', { type: 'checkbox', checked: chosen.includes(id), 'data-testid': 'clip-platform', 'data-platform': id });
+    box.addEventListener('change', () => env.edit('platforms', (c) => {
+      const next = Object.keys(PLATFORMS).filter((x) => (x === id ? box.checked : (c.platforms ?? []).includes(x)));
+      if (next.length) c.platforms = next; else { delete c.platforms; delete c.safe; }
+    }, { inspector: 'redraw' }));
+    return h('label.check', box, h('span', p.name));
+  });
+  const safe = switchField('Keep assets inside the platforms\' safe zone', 'safe-platform', comp.safe === 'platform', (v) => env.edit('safe', (c) => { if (v && c.platforms?.length) c.safe = 'platform'; else delete c.safe; }, { inspector: 'redraw' }),
+    { disabled: !chosen.length, hint: chosen.length ? 'Assets read the tightest edge of the chosen platforms as f.safe.' : 'Choose a platform first.' });
+  return { el: h('div.clip-platforms-box', h('div.checks', { role: 'group', 'aria-label': 'Platforms the clip is for', 'data-testid': 'clip-platforms' }, boxes), safe.el) };
 }

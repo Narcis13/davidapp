@@ -225,7 +225,8 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
    * Lay out text. Options: font, weight, italic, size, lineHeight (multiple of size), letterSpacing (em),
    * maxWidth, maxHeight, maxLines, align (left|center|right), wrap (word|none), fit (shrink size until the
    * block fits maxWidth × maxHeight), minSize, markup (*emphasis*), emFont, emWeight, emItalic,
-   * transform (upper|lower).
+   * transform (upper|lower), floor (the smallest on-screen size, % of the frame's short side), role ('ticker': text
+   * that scrolls past and is not meant to be read in full; check_clip does not hold it to reading time).
    * @param {any} ctx @param {string} text @param {any} [opts]
    */
   function layout(ctx, text, opts = {}) {
@@ -278,7 +279,7 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
     }
     L.text = str;
     // what the layout report needs about every word and glyph (not enumerable: assets see the same objects as before)
-    const meta = { block: blockId(key), size: L.size, ascent: L.ascent, descent: L.descent, floor };
+    const meta = { block: blockId(key), size: L.size, ascent: L.ascent, descent: L.descent, floor, role: o.role };
     for (const list of [L.words, L.glyphs]) for (const item of list) Object.defineProperty(item, 'layoutMeta', { value: meta });
     // layouts are shared between frames and assets through the cache, so nobody may change one
     for (const list of [L.lines, L.words, L.glyphs]) { for (const item of list) Object.freeze(item); Object.freeze(list); }
@@ -321,7 +322,7 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
     const meta = part.layoutMeta ?? {};
     const style = stroke ? ctx.strokeStyle : ctx.fillStyle;
     inspect.record({
-      kind: 'text', text: part.text ?? part.ch, glyph: part.ch !== undefined || undefined, word: part.ch !== undefined ? part.word : part.index, font: part.font, family: familyOf(part.font), size: meta.size ?? null, floor: meta.floor ?? 0, block: meta.block ?? null,
+      kind: 'text', text: part.text ?? part.ch, glyph: part.ch !== undefined || undefined, word: part.ch !== undefined ? part.word : part.index, font: part.font, family: familyOf(part.font), size: meta.size ?? null, floor: meta.floor ?? 0, block: meta.block ?? null, role: meta.role,
       ink: [x0, y0, x1, y1], line: [x + part.x, y + part.top, x + part.x + part.width, y + part.top + part.height],
       matrix: ctx.getTransform(), canvas: ctx.canvas, fill: typeof style === 'string' ? style : 'gradient', alpha: ctx.globalAlpha, stroke,
     });

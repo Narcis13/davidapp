@@ -1,8 +1,10 @@
 // The clip editor's timeline: a ruler with beat ticks, one row per track (front-most visual track
 // at the top, audio at the bottom) with its controls, items as blocks that can be selected (Shift
 // or ⌘ adds), dragged in time and to another track, trimmed at their edges, keyframe markers and
-// audio waveforms, and a playhead. Moves snap to the playhead, beats and other items' edges. It
-// scrolls inside its own container, so a long clip never widens the page.
+// audio waveforms, narration words on the audio items that have them, anchor badges, a lane of
+// markers under the ruler (flags that can be dragged), and a playhead. Moves snap to the playhead,
+// beats and other items' edges. It scrolls inside its own container, so a long clip never widens
+// the page.
 
 import { clamp, fmtTime, h, s, splitRef } from '/ui/lib/util.js';
 import { drawWaveform } from '/ui/lib/waveform.js';
@@ -22,6 +24,7 @@ const GLYPH = {
   solo: '<circle cx="10" cy="10" r="6.5"/><path d="M12 7.6c-.5-.6-1.200-.9-2-.9-1.100 0-2 .6-2 1.500 0 2 4 1 4 3.100 0 .9-.9 1.600-2.100 1.600-.9 0-1.700-.4-2.200-1"/>',
   mute: '<path d="M4 8v4h3l4 3V5L7 8zM14 8l4 4M18 8l-4 4"/>',
   trash: '<path d="M4 6h12M8 6V4h4v2M6 6l.7 10h6.600L14 6"/>',
+  anchor: '<circle cx="10" cy="4.500" r="1.800"/><path d="M10 6.300V16.500M6 9.500h8M4 12.500c.5 2.500 3 4 6 4s5.500-1.500 6-4"/>',
 };
 const glyph = (name) => { const el = s('svg', { viewBox: '0 0 20 20', width: 16, height: 16, class: 'icon', 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }); el.innerHTML = GLYPH[name]; return el; };
 
@@ -37,18 +40,25 @@ const glyph = (name) => { const el = s('svg', { viewBox: '0 0 20 20', width: 16,
  *   onAddTrack?: (type: string) => void,
  *   onDeleteTrack?: (trackId: string) => void,
  *   keyframesOf?: (item: any) => { prop: string, t: number }[],
+ *   onSelectMarker?: (index: number) => void,
+ *   onMoveMarker?: (index: number, t: number, done: boolean) => void,
  * }} o
  */
-export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange, onMoveItem = () => {}, onTrack = () => {}, onReorderTracks = () => {}, onAddTrack = () => {}, onDeleteTrack = () => {}, keyframesOf = () => [] }) {
+export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange, onMoveItem = () => {}, onTrack = () => {}, onReorderTracks = () => {}, onAddTrack = () => {}, onDeleteTrack = () => {}, keyframesOf = () => [], onSelectMarker = () => {}, onMoveMarker = () => {} }) {
   let comp = null, beats = [], pps = 40, time = 0, fitted = false, peaks = null;
-  let selected = new Set(), primary = null, selectedTrack = null;
-  let itemEls = new Map();
+  let selected = new Set(), primary = null, selectedTrack = null, selectedMarker = null;
+  let itemEls = new Map(), markerEls = [];
+  let words = [], wordBase = new Map(), anchors = new Map();
 
   const ruler = h('div.tl-ruler', { 'data-testid': 'ruler' });
   const playhead = h('div.tl-playhead', { 'data-testid': 'playhead' });
   const snapLine = h('div.tl-snap', { 'data-testid': 'time-snap', hidden: true });
   const rows = h('div.tl-rows');
-  const inner = h('div.tl-inner', h('div.tl-row.tl-ruler-row', h('div.tl-head', h('span.muted', 'Tracks')), ruler), rows, playhead, snapLine);
+  const markerLane = h('div.tl-lane.tl-marker-lane', { 'data-testid': 'marker-lane', role: 'group', 'aria-label': 'Markers' });
+  const inner = h('div.tl-inner',
+    h('div.tl-row.tl-ruler-row', h('div.tl-head', h('span.muted', 'Tracks')), ruler),
+    h('div.tl-row.tl-marker-row', h('div.tl-head', h('span.muted', 'Markers')), markerLane),
+    rows, playhead, snapLine);
   const el = h('div.timeline', { 'data-testid': 'timeline', tabIndex: 0, role: 'group', 'aria-label': 'Timeline' }, inner);
 
   const zoom = h('input', { type: 'range', min: 4, max: 240, step: 1, value: '40', 'data-testid': 'zoom', 'aria-label': 'Timeline zoom' });
@@ -92,10 +102,23 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     node.style.left = `${item.start * pps}px`;
     node.style.width = `${Math.max(2, item.duration * pps)}px`;
     for (const k of node.querySelectorAll('.tl-kf')) k.style.left = `${(Number(k.dataset.t) - (item.offset ?? 0)) * pps}px`;
+    for (const w of node.querySelectorAll('.tl-word')) {
+      const width = Math.max(3, Number(w.dataset.len) * pps);
+      w.style.left = `${Number(w.dataset.rel) * pps}px`;
+      w.style.width = `${width}px`;
+      w.classList.toggle('tiny', width < 24);
+    }
     const wave = node.querySelector('canvas.tl-wave');
     if (wave && peaks) requestAnimationFrame(() => { if (wave.isConnected) drawWaveform(wave, peaks, item.start, item.start + item.duration); });
   }
 
+  /** A marker's flag sits on its time; a hold also shows how long it lasts. */
+  function placeMarker(node, m) {
+    node.style.left = `${m.t * pps - 12}px`;
+    const bar = node.querySelector('.tl-mk-bar');
+    if (bar) bar.style.width = `${Math.max(2, (m.duration ?? 0) * pps)}px`;
+  }
+  function placeMarkers() { for (const [i, node] of markerEls.entries()) if (comp.markers?.[i]) placeMarker(node, comp.markers[i]); }
   function movePlayhead() { playhead.style.transform = `translateX(${time * pps}px)`; }
 
   function layout() {
@@ -103,6 +126,7 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     inner.style.setProperty('--lanes', `${lanesWidth()}px`);
     drawRuler();
     for (const { item } of items()) { const node = itemEls.get(item.id); if (node) place(node, item); }
+    placeMarkers();
     movePlayhead();
   }
 
@@ -167,10 +191,13 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
       }
       for (const item of track.items) {
         const kfs = track.type === 'audio' ? [] : keyframesOf(item);
+        const spoken = track.type === 'audio' ? words.filter((w) => w.item === item.id) : [];
         const node = h(`div.tl-item.${track.type}`, { 'data-testid': 'item', 'data-id': item.id, 'data-asset': item.asset, 'data-track': track.id, tabIndex: 0, role: 'button', 'aria-label': `${splitRef(item.asset).slug}, starts at ${fmtTime(item.start)}`, title: `${item.asset} · ${item.id}` },
           track.type === 'audio' ? h('canvas.tl-wave', { 'data-testid': 'waveform', 'aria-hidden': 'true', width: 1, height: 1 }) : null,
           h('span.tl-handle.l', { 'data-edge': 'l' }),
+          item.anchor ? h('i.tl-anchor', { 'data-testid': 'item-anchor', title: anchorTitle(item), 'aria-label': anchorTitle(item) }, glyph('anchor')) : null,
           h('span.tl-label', item.label ?? splitRef(item.asset).slug),
+          spoken.map((w) => wordBlock(w, item)),
           kfs.map((k) => {
             const m = h('i.tl-kf', { 'data-testid': 'keyframe', 'data-prop': k.prop, 'data-t': String(k.t), title: `${k.prop} at ${fmtTime(k.t)}` });
             m.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); onSeek(clamp(item.start + k.t - (item.offset ?? 0), 0, comp.duration)); });
@@ -178,6 +205,8 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
           }),
           h('span.tl-handle.r', { 'data-edge': 'r' }));
         node.style.setProperty('--sub', String(sub.get(item.id) ?? 0));
+        // the words sit in a strip under the name: give the block room when it is alone in its row
+        if (spoken.length && ends.length === 1) node.classList.add('has-words');
         if (track.locked) node.classList.add('locked');
         place(node, item);
         node.addEventListener('pointerdown', (e) => startDrag(e, item, node, track));
@@ -190,8 +219,54 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
       const flags = ['locked', 'hidden', 'solo', 'muted'].filter((k) => track[k]);
       rows.append(h(`div.tl-row${flags.map((f) => `.is-${f}`).join('')}`, { 'data-track': track.id, style: { '--subs': String(Math.max(1, ends.length)) } }, trackHead(track, group.indexOf(track), group), lane));
     }
+    drawMarkers();
     mark();
     layout();
+  }
+
+  const anchorTitle = (item) => {
+    const a = anchors.get(item.id);
+    return a?.word ? `Starts on the word "${a.word.text}"` : 'Starts on a narration word';
+  };
+
+  /** One narration word: a block at its time (its place is set by place()); a click moves the playhead to it. */
+  function wordBlock(w, item) {
+    const rel = w.start - (wordBase.get(item.id) ?? item.start);
+    const b = h(`span.tl-word${w.missing ? '.missing' : ''}`, { 'data-testid': 'tl-word', 'data-key': w.key, 'data-i': String(w.i), 'data-rel': String(rel), 'data-len': String(Math.max(0, w.end - w.start)), tabIndex: 0, role: 'button', 'aria-label': `Word ${w.text}, ${fmtTime(w.start)}${w.missing ? ', not in the take' : ''}`, title: `${w.text} · ${fmtTime(w.start)}${w.missing ? ' (not in the take)' : ''}` }, h('span.tl-word-text', w.text));
+    const go = () => onSeek(clamp(item.start + rel, 0, comp.duration));
+    // the pointer goes to the word, not to the item behind it (no drag, no selection)
+    b.addEventListener('pointerdown', (e) => e.stopPropagation());
+    b.addEventListener('click', (e) => { e.stopPropagation(); go(); });
+    b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); go(); } });
+    return b;
+  }
+
+  function drawMarkers() {
+    markerLane.replaceChildren();
+    markerEls = [];
+    if (!comp) return;
+    for (const [i, m] of (comp.markers ?? []).entries()) {
+      const type = m.type ?? 'note';
+      const name = m.label || type;
+      const node = h(`div.tl-marker.mk-${type}`, { 'data-testid': 'marker', 'data-index': String(i), 'data-type': type, 'data-t': String(m.t), tabIndex: 0, role: 'button', 'aria-label': `${type} marker ${m.label ? `"${m.label}" ` : ''}at ${fmtTime(m.t)}`, title: `${type}: ${name} · ${fmtTime(m.t)}${m.duration ? ` for ${m.duration} s` : ''}` },
+        m.type === 'hold' && m.duration ? h('span.tl-mk-bar') : null,
+        h('span.tl-mk-pole'),
+        h('span.tl-mk-flag', name));
+      if (m.anchor) node.dataset.anchored = 'true';
+      node.addEventListener('pointerdown', (e) => startMarkerDrag(e, i, node));
+      node.addEventListener('click', (e) => { e.stopPropagation(); onSelectMarker(i); });
+      node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSelectMarker(i); } });
+      markerEls.push(node);
+      markerLane.append(node);
+    }
+    markMarkers();
+  }
+
+  function markMarkers() {
+    for (const [i, node] of markerEls.entries()) {
+      node.classList.toggle('selected', i === selectedMarker);
+      node.setAttribute('aria-pressed', String(i === selectedMarker));
+    }
   }
 
   function mark() {
@@ -222,9 +297,10 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
   }
 
   /** Times an edge can snap to: the playhead, beats, other items' edges, the clip's ends. */
-  function snapTargets(exclude) {
+  function snapTargets(exclude, skipMarker = -1) {
     const out = [0, comp.duration, time, ...beats];
     for (const { item } of items()) if (!exclude.has(item.id)) out.push(item.start, item.start + item.duration);
+    for (const [i, m] of (comp.markers ?? []).entries()) if (i !== skipMarker) out.push(m.t);
     return out;
   }
   function snapTo(values, targets, thr) {
@@ -318,6 +394,45 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     window.addEventListener('pointercancel', up);
   }
 
+  /** Drag a marker along the ruler. Word markers sit on their word and do not move; touch drags only a selected marker. */
+  function startMarkerDrag(e, index, node) {
+    if (e.button !== undefined && e.button > 0) return;
+    const m = comp.markers?.[index];
+    if (!m || m.anchor) return;
+    if (e.pointerType === 'touch' && selectedMarker !== index) return;
+    const x0 = e.clientX, t0 = m.t;
+    const targets = snapTargets(new Set(), index);
+    let moved = false, last = e;
+    e.preventDefault();
+    node.focus({ preventScroll: true });
+    try { node.setPointerCapture(e.pointerId); } catch { /* synthetic pointers cannot be captured */ }
+    const apply = (ev, done) => {
+      if (!moved && Math.abs(ev.clientX - x0) < 3) { if (done) finish(); return; }
+      if (!moved && onBegin(`marker:${index}:${performance.now()}`) === false) { finish(); return; }
+      moved = true;
+      const dt = (ev.clientX - x0) / pps;
+      const sn = snapTo([t0 + dt], targets, ev.altKey ? -1 : SNAP_PX / pps);
+      m.t = round(clamp(sn ? t0 + dt + sn.d : grid(t0 + dt), 0, comp.duration));
+      showSnap(done ? null : sn?.at ?? null);
+      node.classList.add('dragging');
+      placeMarker(node, m);
+      onMoveMarker(index, m.t, done);
+      if (done) finish();
+    };
+    const move = (ev) => { last = ev; apply(ev, false); };
+    const up = (ev) => apply(ev.type === 'pointercancel' ? last : ev, true);
+    const finish = () => {
+      node.classList.remove('dragging');
+      showSnap(null);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }
+
   /** New display position of a track within its group (visual or audio). */
   function reorder(id, group, index) {
     const ids = group.map((t) => t.id);
@@ -385,17 +500,35 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
   zoom.addEventListener('input', () => { pps = Number(zoom.value); layout(); });
   fitBtn.addEventListener('click', fit);
 
+  function setMeta({ words: w, anchors: a, base }) {
+    if (w) {
+      words = w;
+      wordBase = new Map();
+      for (const track of (base ?? comp).tracks) for (const item of track.items) wordBase.set(item.id, item.start);
+    }
+    if (a) anchors = new Map(a.filter((x) => x.kind === 'item').map((x) => [x.id, x]));
+  }
+
   const resize = new ResizeObserver(() => { if (comp && !fitted) fit(); });
   resize.observe(el);
 
   return {
     el, toolbar,
-    /** A new composition (after load, save, bundle, add or delete): rebuild the rows. */
+    /**
+     * A new composition (after load, save, bundle, add or delete): rebuild the rows. With `words` (the narration's words
+     * in clip time) and `anchors` (the anchor report), those are taken too; `base` is the composition they were made
+     * for, so a narration moved since then carries its words along.
+     */
     setData(next) {
       comp = next.composition; beats = next.beats ?? [];
+      if (next.words || next.anchors) setMeta(next);
       build();
       if (!fitted) fit();
     },
+    /** The words and anchor report changed (not the draft): rebuild the rows. */
+    setMeta(next) { setMeta(next); build(); },
+    /** The index of the marker the inspector shows, or null. */
+    setSelectedMarker(i) { selectedMarker = i ?? null; markMarkers(); },
     /** Something changed in the draft (timing, keyframes, flags): rebuild the rows. */
     refresh() { build(); },
     /** Audio peaks of the clip's mix ({ peaks, rate }) for the waveforms. */

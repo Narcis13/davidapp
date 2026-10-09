@@ -525,7 +525,7 @@ export function createRuntime(host) {
       const approximate = assetCanvases.has(r.canvas) ? 'offscreen' : inTransition ? 'transition' : null;
       out.push({
         item: cur?.item ?? null, track: cur?.track ?? null, mask: cur?.mask ? true : undefined, kind: r.kind, text: r.text, glyph: r.glyph, word: r.word, font: r.font, family: r.family,
-        size: r.size, screenSize: r.size === null ? null : r.size * scale, floor: r.floor, block: r.block, fill: r.fill, alpha: r.alpha * (cur?.opacity ?? 1), stroke: r.stroke || undefined,
+        size: r.size, screenSize: r.size === null ? null : r.size * scale, floor: r.floor, block: r.block, role: r.role, fill: r.fill, alpha: r.alpha * (cur?.opacity ?? 1), stroke: r.stroke || undefined,
         box: aabb(quad), quad, line: aabb(quadOf(r.line)), approximate: approximate ?? undefined,
       });
     };
@@ -645,7 +645,7 @@ export function createRuntime(host) {
   function clipSafe(comp) {
     if (comp.safe !== 'platform' || !comp.platforms?.length) return safeZone(comp.width, comp.height);
     const key = `${comp.platforms.join(',')}|${comp.width}x${comp.height}`;
-    if (!safes.has(key)) { const p = platformSafe(comp.platforms, comp.width, comp.height); safes.set(key, { top: p.top, right: p.right, bottom: p.bottom, left: p.left, x: p.x, y: p.y, width: p.width, height: p.height }); }
+    if (!safes.has(key)) { const p = platformSafe(comp.platforms, comp.width, comp.height, { matching: true }); safes.set(key, { top: p.top, right: p.right, bottom: p.bottom, left: p.left, x: p.x, y: p.y, width: p.width, height: p.height }); }
     return safes.get(key);
   }
 

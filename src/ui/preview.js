@@ -5,6 +5,7 @@
 //   await pv.showAsset({ ref, bundle, params, duration, width, height });   // asset playground
 //   await pv.showClip({ composition, bundle, audioUrl });                   // clip editor
 //   pv.setParams(p)  pv.setComposition(c)  pv.seek(t)  pv.play()  pv.pause()  pv.toggle()  pv.destroy()
+//   pv.setRecord(true)   // clip frames also report the measured text (frame pixels) through onTexts(texts, frame)
 
 const WATCHDOG_MS = 5000;
 let fontsPromise = null;
@@ -12,10 +13,11 @@ const loadFonts = () => (fontsPromise ??= fetch('/api/status').then((r) => r.jso
 
 export class Preview {
   /** @param {HTMLCanvasElement} canvas */
-  constructor(canvas, { onTime = () => {}, onError = () => {}, onState = () => {} } = {}) {
+  constructor(canvas, { onTime = () => {}, onError = () => {}, onState = () => {}, onTexts = () => {} } = {}) {
     this.canvas = canvas;
     this.out = canvas.getContext('bitmaprenderer');
-    this.onTime = onTime; this.onError = onError; this.onState = onState;
+    this.onTime = onTime; this.onError = onError; this.onState = onState; this.onTexts = onTexts;
+    this.record = false;
     this.worker = null; this.pending = new Map(); this.nextId = 1;
     this.mode = null; this.view = null; this.loaded = null;
     this.time = 0; this.playing = false; this.inflight = false; this.dirty = false;
@@ -93,6 +95,13 @@ export class Preview {
     return this.draw();
   }
 
+  /** Ask for the measured text of every clip frame (for the editor's text overlay); off clears it. */
+  setRecord(on) {
+    if (!!on === this.record) return;
+    this.record = !!on;
+    if (!this.record) this.onTexts([], 0); else this.request();
+  }
+
   setParams(params) { if (this.mode === 'asset') { this.view.params = params; this.request(); } }
   setView(patch) { Object.assign(this.view, patch); this.time = Math.min(this.time, this.duration); this.request(); }
   /** A draft composition that uses the same asset versions as the loaded bundle. */
@@ -117,12 +126,13 @@ export class Preview {
       const v = this.view;
       const frame = Math.min(Math.round(t * this.fps), Math.max(0, Math.round(this.duration * this.fps) - 1));
       const r = this.mode === 'clip'
-        ? await this.send({ op: 'clipFrame', frame, composition: v.composition })
+        ? await this.send({ op: 'clipFrame', frame, composition: v.composition, record: this.record })
         : await this.send({ op: 'assetFrame', ref: v.ref, params: v.params, t: Math.min(t, Math.max(0, v.duration - 1 / v.fps)), duration: v.duration, width: v.width, height: v.height, fps: v.fps, seed: v.seed, background: v.background });
       if (this.destroyed) return;
       if (this.canvas.width !== r.bitmap.width || this.canvas.height !== r.bitmap.height) { this.canvas.width = r.bitmap.width; this.canvas.height = r.bitmap.height; }
       this.out.transferFromImageBitmap(r.bitmap);
       this.canvas.dataset.frame = String(frame);
+      if (this.record && this.mode === 'clip') this.onTexts(r.texts ?? [], frame);
       if (this.error) { this.error = null; this.onError(null); }
     } catch (e) {
       this.error = e.message;

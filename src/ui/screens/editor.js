@@ -1,7 +1,9 @@
 // Clip editor: the preview with on-canvas handles and a format switcher, a timeline with track
 // controls, keyframe markers and waveforms, a layers view, an inspector (timing, layout with
 // keyframes and per-format overrides, parameters, attachments), undo and redo, clipboard, split,
-// saving layers as one asset, the agent panel, and save / render / remix.
+// saving layers as one asset, the agent panel, and save / render / remix. Since iteration 3: the
+// narration's words and the markers on the timeline, items that start on a word, gain automation
+// and ducking, the clip's loudness, captions and platforms, the issues panel, and overlays on the preview.
 // Edits go to a local draft composition that the preview draws live; changes to the set of assets
 // are pinned and bundled by the server first.
 
@@ -11,13 +13,16 @@ import { api, getStatus, renderQueue } from '/ui/lib/api.js';
 import { confirmDialog, openDialog } from '/ui/lib/dialog.js';
 import { createCanvasHandles } from '/ui/lib/canvas-handles.js';
 import { createHistory } from '/ui/lib/history.js';
-import { attachmentsSection, itemTime, keyMarks, keyframesSection, paramsSection, prune, sampled, setProp, transformSection } from '/ui/lib/inspector.js';
+import { anchorSection, attachmentsSection, audioSection, captionsSection, itemTime, keyMarks, keyframesSection, loudnessSection, markerSection, paramsSection, platformsSection, prune, sampled, setProp, transformSection } from '/ui/lib/inspector.js';
+import { mountIssues } from '/ui/lib/issues.js';
 import { live as liveEvents } from '/ui/lib/live.js';
+import { createOverlays } from '/ui/lib/overlays.js';
 import { pickAsset } from '/ui/lib/picker.js';
 import { createStage } from '/ui/lib/stage.js';
 import { createTimeline } from '/ui/lib/timeline.js';
 import { loadPeaks } from '/ui/lib/waveform.js';
-import { assetHref, clamp, clone, errorBlock, fill, fmtDuration, fmtTime, h, icon, nextId, notice, plural, splitRef } from '/ui/lib/util.js';
+import { MARKER_TYPES } from '/core/composition.js';
+import { assetHref, clamp, clone, debounce, errorBlock, fill, fmtDuration, fmtTime, h, icon, nextId, notice, plural, splitRef } from '/ui/lib/util.js';
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,63}$/;
 const RELATION = { created: 'created here', reused: 'reused', 'new-version': 'new version', library: 'library' };
@@ -31,12 +36,13 @@ const SHORTCUTS = [
   ['Space', 'Play or pause'],
   ['← / →', 'One frame back or forward'],
   ['S', 'Split the selected items at the playhead'],
+  ['M', 'Add a note marker at the playhead'],
   [`${MOD}Z`, 'Undo'],
   [isMac ? '⇧⌘Z' : 'Ctrl+Shift+Z or Ctrl+Y', 'Redo'],
   [`${MOD}C`, 'Copy the selected items'],
   [`${MOD}V`, 'Paste at the playhead'],
   [`${MOD}D`, 'Duplicate the selected items'],
-  ['Delete or Backspace', 'Delete the selected items'],
+  ['Delete or Backspace', 'Delete the selected items or marker'],
   ['Shift or ⌘ click', 'Add an item to the selection'],
   ['Escape', 'Clear the selection'],
   ['Arrow keys on the preview', 'Nudge the selected layer one pixel (Shift: ten)'],
@@ -68,6 +74,10 @@ function refsOf(comp) {
   }
   return refs;
 }
+const byTime = (a, b) => a.t - b.t;
+const audioItems = (comp) => comp.tracks.some((t) => t.type === 'audio' && t.items.length);
+/** What the mix depends on: when this changes, the preview's audio is made again. */
+const audioSig = (c) => JSON.stringify([c.loudness, c.duration, c.tracks.filter((t) => t.type === 'audio').map((t) => [t.id, t.role, t.hidden, t.muted, t.solo, t.items])]);
 const needsEasing = (comp) => !comp.easing && /"ease":"(?!linear"|hold")/.test(JSON.stringify(comp.tracks));
 
 export async function mount(view, ctx) {
@@ -85,6 +95,10 @@ export async function mount(view, ctx) {
 
   let draft = clone(clip.composition);
   let bundle = clip.bundle, beats = clip.beats, info = clip.assets;
+  // what the studio measured about the draft: the narration's words (clip time), caption pages, anchors, zones in frame pixels
+  let words = clip.words ?? [], captionPages = clip.captions ?? null, anchors = clip.anchors ?? [], zones = clip.zones ?? null;
+  let selMarker = null;
+  const resolved = new Map();   // anchored item id → where the studio last put it (so a word that moves takes the item along)
   let bundled = refsOf(draft);
   let fmt = draft.format;
   let sel = { ids: [], primary: null, track: null };
@@ -133,11 +147,13 @@ export async function mount(view, ctx) {
   const frameLabel = h('div.frame-label', { hidden: true, 'data-testid': 'proposal-label' }, 'Proposal');
 
   const position = h('span.timecode', { 'data-testid': 'tl-position' });
+  const audioStatus = h('span.badge.warn', { hidden: true, role: 'status', 'data-testid': 'audio-status' }, 'Mixing audio');
   const showPosition = (t) => { position.textContent = `frame ${Math.round(t * draft.fps)} of ${Math.round(draft.duration * draft.fps)} · ${draft.fps} fps`; };
 
   let rafSync = 0, lastStored = 0;
   const stage = createStage({
     guides: true, compact: true,
+    onState(playing) { if (!playing) applyAudio(); },
     onTime(t) {
       timeline.setTime(t, stage.pv.playing);
       showPosition(t);
@@ -169,6 +185,21 @@ export async function mount(view, ctx) {
       live();
       drawInspector();
     },
+    onSelectMarker(i) { selectMarker(i); },
+    onMoveMarker(i, t, done) {
+      if (selMarker !== i) selectMarker(i);
+      live({ timeline: false, inspector: 'none' });
+      const m = draft.markers[i];
+      const box = inspector.querySelector('[data-testid=marker-t]');
+      if (box && m && document.activeElement !== box) box.value = String(m.t);
+      if (done) {
+        history.seal();
+        draft.markers.sort(byTime);
+        selMarker = draft.markers.indexOf(m);
+        timeline.refresh();
+        timeline.setSelectedMarker(selMarker);
+      }
+    },
     onTrack(trackId, patch) {
       if (busy) return;
       edit(`track:${trackId}:${Object.keys(patch).join()}`, (c) => {
@@ -176,7 +207,6 @@ export async function mount(view, ctx) {
         if (!t) return;
         for (const [k, v] of Object.entries(patch)) { if (k === 'name') t.name = v; else if (v) t[k] = true; else delete t[k]; }
       }, { inspector: 'redraw' });
-      if ('muted' in patch || ('solo' in patch && draft.tracks.find((t) => t.id === trackId)?.type === 'audio')) msg.show('Mute and solo on audio tracks are heard in the preview after saving.', 'info');
     },
     onReorderTracks(ids) {
       edit('tracks-order', (c) => { c.tracks = ids.map((id) => c.tracks.find((t) => t.id === id)).filter(Boolean); });
@@ -211,6 +241,15 @@ export async function mount(view, ctx) {
   /** The composition as the preview draws it: the draft in the format being laid out. */
   const viewOf = (comp) => (fmt === comp.format || !status.formats[fmt] ? comp : { ...comp, format: fmt, width: formatSize(fmt).width, height: formatSize(fmt).height });
   const viewSize = () => { const v = viewOf(draft); return { width: v.width, height: v.height }; };
+  const seekTo = (t) => { stage.pv.pause(); stage.pv.seek(clamp(t, 0, draft.duration)); };
+
+  // overlays are drawn in an SVG layer over the canvas, never into its pixels; the text boxes need the worker to measure
+  const overlays = createOverlays({ host: stage.frame, size: viewSize, safeMode: () => draft.safe, onText: (on) => stage.pv.setRecord(on) });
+  stage.pv.onTexts = (texts) => overlays.setTexts(texts);
+  overlays.setZones(zones);
+  ctx.onCleanup(() => overlays.destroy());
+
+  const issues = mountIssues({ slug, getComposition: () => draft, onSeek: seekTo, onPick(id) { if (id && findItem(id)) select([id], id); } });
 
   // ── on-canvas handles ────────────────────────────────────────────────────────────────────
   /** Visual items drawn at the playhead, front to back. */
@@ -265,6 +304,9 @@ export async function mount(view, ctx) {
   /** The draft changed and the loaded bundle can draw it: show it everywhere. */
   function live({ timeline: tl = true, handles: hd = true, inspector: insp = 'sync' } = {}) {
     setDirty(true);
+    issues.markStale();
+    refreshMeta();
+    if (audioSig(draft) !== lastAudioSig) { lastAudioSig = audioSig(draft); refreshAudio(); }
     if (!showProposal) stage.pv.setComposition(viewOf(draft));
     if (tl) timeline.refresh();
     if (hd) handles.redraw();
@@ -315,10 +357,12 @@ export async function mount(view, ctx) {
     const ids = sel.ids.filter((id) => findItem(id));
     sel = { ids, primary: ids.includes(sel.primary) ? sel.primary : ids[ids.length - 1] ?? null, track: draft.tracks.some((t) => t.id === sel.track) ? sel.track : null };
     timeline.setSelected(sel.ids, sel.primary, sel.track);
+    if (selMarker !== null && !draft.markers?.[selMarker]) { selMarker = null; timeline.setSelectedMarker(null); }
     updateTools();
   }
 
   function select(ids, primary, trackId, from) {
+    if (selMarker !== null) { selMarker = null; timeline.setSelectedMarker(null); }
     sel = { ids: [...ids], primary, track: trackId === undefined ? (primary ? findItem(primary)?.track.id ?? sel.track : sel.track) : trackId };
     if (from !== 'timeline') timeline.setSelected(sel.ids, sel.primary, sel.track);
     handles.redraw();
@@ -353,6 +397,8 @@ export async function mount(view, ctx) {
     drawFormat();
     const v = viewSize();
     stage.setSize(v.width, v.height);
+    overlays.redraw();
+    refreshMeta();
     if (showProposal && proposal) await showProposalView();
     else stage.pv.setComposition(viewOf(draft));
     timeline.refresh();
@@ -363,23 +409,116 @@ export async function mount(view, ctx) {
   async function showClip() {
     const v = viewSize();
     stage.setSize(v.width, v.height);
+    overlays.redraw();
     stage.setDuration(draft.duration, draft.fps);
-    const hasAudio = clip.composition.tracks.some((t) => t.type === 'audio' && t.items.length);
-    const audioUrl = hasAudio ? `/api/clips/${slug}/audio.wav?r=${clip.revision}` : null;
+    // the saved clip's mix; edits to the draft make a new one (refreshAudio)
+    audioToken++;
+    if (pendingAudio) URL.revokeObjectURL(pendingAudio);
+    pendingAudio = undefined;
+    freeDraftAudio();
+    lastAudioSig = audioSig(draft);
+    audioUrl = audioItems(clip.composition) ? `/api/clips/${slug}/audio.wav?r=${clip.revision}` : null;
     await stage.show((pv) => pv.showClip({ composition: viewOf(draft), bundle, audioUrl }));
     timeline.setTime(stage.pv.time);
     handles.redraw();
     if (audioUrl) loadPeaks(audioUrl).then((p) => { if (ctx.alive() && p) timeline.setPeaks(p); });
+    else timeline.setPeaks(null);
+  }
+
+  // ── the audio follows the draft ──────────────────────────────────────────────────────────
+  let audioUrl = null, lastAudioSig = '', audioToken = 0, draftAudio = null, pendingAudio;
+  function freeDraftAudio() { if (draftAudio) { URL.revokeObjectURL(draftAudio); draftAudio = null; } }
+  /** Use a new mix for the preview: after the pause when it is playing (a swap would jump). */
+  function applyAudio() {
+    if (pendingAudio === undefined || stage.pv.playing) return;
+    const url = pendingAudio;
+    pendingAudio = undefined;
+    const previous = draftAudio;
+    stage.pv.setAudio(url);
+    audioUrl = url;
+    draftAudio = url;
+    if (previous) URL.revokeObjectURL(previous);
+    if (url) loadPeaks(url).then((p) => { if (ctx.alive() && url === audioUrl) timeline.setPeaks(p); });
+    else timeline.setPeaks(null);
+  }
+  /** The mix of the draft, made by the studio (the same mixer the render uses). */
+  const refreshAudio = debounce(async () => {
+    if (showProposal) return;
+    const token = ++audioToken;
+    audioStatus.hidden = false;
+    try {
+      const url = audioItems(draft) ? URL.createObjectURL(await api.blob(`/api/clips/${slug}/audio`, { composition: draft })) : null;
+      if (token !== audioToken || !ctx.alive()) { if (url) URL.revokeObjectURL(url); return; }
+      if (pendingAudio) URL.revokeObjectURL(pendingAudio);
+      pendingAudio = url;
+      applyAudio();
+    } catch (e) {
+      if (token === audioToken) msg.show(`The audio of the draft could not be mixed: ${e.message}`, 'info');
+    } finally {
+      if (token === audioToken) audioStatus.hidden = true;
+    }
+  }, 700);
+  ctx.onCleanup(() => { audioToken++; refreshAudio.cancel(); refreshMeta.cancel(); if (pendingAudio) URL.revokeObjectURL(pendingAudio); freeDraftAudio(); });
+
+  // ── what the studio measures about the draft: words, caption pages, anchors, zones ───────
+  let metaToken = 0;
+  const refreshMeta = debounce(async () => {
+    if (busy || showProposal) return;
+    const token = ++metaToken;
+    try {
+      const r = await api.post(`/api/clips/${slug}/bundle`, { composition: viewOf(draft) });
+      if (ctx.alive() && token === metaToken && !busy) applyMeta(r);
+    } catch { /* the draft may not be valid yet: keep what is shown */ }
+  }, 600);
+
+  /** Anchored starts the studio resolved: an item that sat on its word follows it when the word moves; a marker on a word always does. */
+  function follow(pinned) {
+    let moved = false;
+    for (const track of pinned.tracks) for (const p of track.items) {
+      if (!p.anchor) { resolved.delete(p.id); continue; }
+      const f = findItem(p.id);
+      const was = resolved.get(p.id);
+      if (f?.item.anchor && was !== undefined && Math.abs(f.item.start - was) < 1e-3 && Math.abs(p.start - was) > 1e-3) { f.item.start = p.start; f.item.duration = p.duration; moved = true; }
+      resolved.set(p.id, p.start);
+    }
+    for (const m of draft.markers ?? []) {
+      if (!m.anchor) continue;
+      const p = pinned.markers?.find((x) => JSON.stringify(x.anchor) === JSON.stringify(m.anchor) && x.label === m.label);
+      if (p && Math.abs(p.t - m.t) > 1e-3) { m.t = p.t; moved = true; }
+    }
+    if (moved) {
+      const m = selMarker === null ? null : draft.markers[selMarker];
+      draft.markers?.sort(byTime);
+      if (m) selMarker = draft.markers.indexOf(m);
+    }
+    return moved;
+  }
+
+  function applyMeta(r) {
+    const same = JSON.stringify(r.words) === JSON.stringify(words);
+    words = r.words ?? []; captionPages = r.captions ?? null; anchors = r.anchors ?? []; zones = r.zones ?? null;
+    overlays.setZones(zones);
+    const moved = follow(r.composition);
+    timeline.setMeta({ words, anchors, base: r.composition });
+    timeline.setSelectedMarker(selMarker);
+    if (moved && !showProposal) { stage.pv.setComposition(viewOf(draft)); handles.redraw(); drawLayers(); }
+    // the captions the preview draws come from the bundle: a narration that changed needs the new one
+    if (!same && !showProposal) { bundle = r.bundle; stage.pv.showClip({ composition: viewOf(draft), bundle, audioUrl }); }
+    if (!inspector.contains(document.activeElement)) drawInspector();
   }
 
   /** Take a pinned composition, its bundle and asset facts from the server. */
   function adopt(r) {
     draft = clone(r.composition);
     bundle = r.bundle; beats = r.beats; info = r.assets;
+    words = r.words ?? []; captionPages = r.captions ?? null; anchors = r.anchors ?? []; zones = r.zones ?? null;
+    overlays.setZones(zones);
+    resolved.clear();
+    for (const track of draft.tracks) for (const item of track.items) if (item.anchor) resolved.set(item.id, item.start);
     bundled = refsOf(draft);
     if (!FORMAT_NAMES.includes(fmt)) fmt = draft.format;
     selectionStillThere();
-    timeline.setData({ composition: draft, beats });
+    timeline.setData({ composition: draft, beats, words, anchors });
   }
 
   /** The set of assets changed: have the server pin and bundle `next`, then show it. */
@@ -478,6 +617,61 @@ export async function mount(view, ctx) {
   function remember() {
     lastStored = performance.now();
     try { localStorage.setItem(OPEN_CLIP_KEY, JSON.stringify({ slug, at: round(time()) })); } catch { /* storage may be unavailable */ }
+  }
+
+  // ── markers ──────────────────────────────────────────────────────────────────────────────
+  const markerType = h('select.small', { 'data-testid': 'add-marker-type', 'aria-label': 'Type of the new marker' }, MARKER_TYPES.map((t) => h('option', { value: t }, t)));
+  markerType.value = 'note';
+  const markerBtn = h('button.btn.small.ed-tool', { type: 'button', 'data-testid': 'add-marker', title: 'Add a marker at the playhead (M)' }, icon('plus', 14), h('span.ed-tool-label', 'Add marker'));
+
+  function selectMarker(i) {
+    selMarker = i;
+    sel = { ids: [], primary: null, track: sel.track };
+    timeline.setSelected([], null, sel.track);
+    timeline.setSelectedMarker(i);
+    handles.redraw();
+    drawLayers();
+    drawInspector();
+    updateTools();
+  }
+
+  function addMarker(type = 'note') {
+    if (busy || showProposal) return;
+    let made = null;
+    if (type === 'word' && !words.length) { msg.show('There are no narration words to put a word marker on.', 'info'); return; }
+    edit('marker-add', (c) => {
+      made = { t: round(clamp(time(), 0, c.duration)), label: '' };
+      if (type !== 'note') made.type = type;
+      if (type === 'hold') made.duration = 1;
+      if (type === 'word') {
+        // on the word nearest to the playhead
+        const w = words.reduce((best, x) => (!best || Math.abs(x.start - made.t) < Math.abs(best.start - made.t) ? x : best), null);
+        made.anchor = { item: w.item, word: w.i };
+        made.t = round(w.start);
+      }
+      (c.markers ??= []).push(made);
+      c.markers.sort(byTime);
+    }, { inspector: 'none' });
+    if (made && draft.markers?.includes(made)) selectMarker(draft.markers.indexOf(made));
+  }
+  markerBtn.addEventListener('click', () => addMarker(markerType.value));
+
+  /** An edit of the marker the inspector shows (the list stays sorted by time). */
+  function commitMarker(key, fn, o = {}) {
+    edit(key, (c) => {
+      const m = c.markers?.[selMarker];
+      if (!m) return;
+      fn(m);
+      c.markers.sort(byTime);
+      selMarker = c.markers.indexOf(m);
+    }, o);
+    timeline.setSelectedMarker(selMarker);
+  }
+
+  function removeMarker() {
+    if (selMarker === null || busy) return;
+    edit('marker-del', (c) => { c.markers.splice(selMarker, 1); if (!c.markers.length) delete c.markers; }, { inspector: 'none' });
+    select([], null, sel.track);
   }
 
   // ── toolbar actions ──────────────────────────────────────────────────────────────────────
@@ -658,10 +852,11 @@ export async function mount(view, ctx) {
     else if (mod && k === 'v') { if (clipboard.length) { e.preventDefault(); paste(); } }
     else if (mod && k === 'd') { e.preventDefault(); duplicate(); }
     else if (mod || e.altKey) return;
-    else if (e.key === 'Delete' || e.key === 'Backspace') { if (sel.ids.length) { e.preventDefault(); removeSelected(); } }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { if (sel.ids.length) { e.preventDefault(); removeSelected(); } else if (selMarker !== null) { e.preventDefault(); removeMarker(); } }
     else if (k === 's') { e.preventDefault(); split(); }
+    else if (k === 'm') { e.preventDefault(); addMarker('note'); }
     else if (e.key === '?') { e.preventDefault(); shortcutsSheet(); }
-    else if (e.key === 'Escape' && sel.ids.length) { select([], null, sel.track); }
+    else if (e.key === 'Escape' && (sel.ids.length || selMarker !== null)) { select([], null, sel.track); }
   };
   document.addEventListener('keydown', onKey);
   ctx.onCleanup(() => document.removeEventListener('keydown', onKey));
@@ -872,7 +1067,18 @@ export async function mount(view, ctx) {
       h('p.muted', { 'data-testid': 'inspector-empty' }, draft.tracks.some((t) => t.items.length) ? 'Select an item on the timeline or on the preview to edit it.' : 'This clip is empty. Use "Add item" to place an asset at the playhead.'),
       h('h3', 'Clip'),
       duration.el,
-      h('div.field', h('label', { for: bgId }, 'Background colour'), bg));
+      h('div.field', h('label', { for: bgId }, 'Background colour'), bg),
+      h('h3', 'Loudness'), loudnessSection({ comp: () => draft, edit }).el,
+      h('h3', 'Captions'), captionsSection({ comp: () => draft, pages: captionPages, edit }).el,
+      h('h3', 'Platforms'), platformsSection({ comp: () => draft, edit }).el);
+  }
+
+  function drawMarker() {
+    timing = null; sections = [];
+    const m = draft.markers[selMarker];
+    fill(inspector,
+      h('div.panel-head', h('h2', 'Inspector'), h('span.ref', { 'data-testid': 'selected-id' }, `marker ${selMarker + 1} of ${draft.markers.length}`)),
+      markerSection({ marker: m, words, duration: draft.duration, commit: commitMarker, seek: seekTo, remove: removeMarker }).el);
   }
 
   function drawMulti() {
@@ -919,6 +1125,7 @@ export async function mount(view, ctx) {
 
   function drawInspector() {
     overrideState = null;
+    if (selMarker !== null && draft.markers?.[selMarker]) { drawMarker(); return; }
     if (sel.ids.length > 1) { drawMulti(); return; }
     const found = sel.primary ? findItem(sel.primary) : null;
     if (!found) { drawClipSettings(); return; }
@@ -944,12 +1151,14 @@ export async function mount(view, ctx) {
     const fadeOut = numField('Fade out', 'item-fadeout', item.fadeOut ?? 0, { min: 0, max: 10, step: 0.05 }, (v) => optional('fadeOut', v, 0));
     const gain = audio ? numField('Gain', 'item-gain', item.gain ?? 1, { min: 0, max: 4, step: 0.05, slider: true }, (v) => commit(`gain:${item.id}`, (it) => { it.gain = v; }, { inspector: 'none', burst: true })) : null;
 
-    const env = { item, fmt, own: draft.format, size: viewSize(), lt: () => itemTime(item, time()), t: time, commit, seek: (t) => { stage.pv.pause(); stage.pv.seek(clamp(t, 0, draft.duration)); }, hasEasing: !!draft.easing };
+    const env = { item, fmt, own: draft.format, size: viewSize(), lt: () => itemTime(item, time()), t: time, commit, seek: seekTo, hasEasing: !!draft.easing };
     sections = [];
     const tf = audio ? null : transformSection(env);
     const kfs = audio ? null : keyframesSection(env);
     const params = paramsSection({ ...env, schema: a.schema, fonts, visual: !audio });
-    for (const s of [tf, kfs, params]) if (s) sections.push(s);
+    const mix = audio ? audioSection({ ...env, tracks: draft.tracks.filter((t) => t.type === 'audio' && t.id !== track.id).map((t) => ({ id: t.id, name: t.name, role: t.role })) }) : null;
+    const onWord = anchorSection({ item, words, report: anchors.find((x) => x.kind === 'item' && x.id === item.id), fps: draft.fps, duration: draft.duration, commit });
+    for (const s of [tf, kfs, params, mix]) if (s) sections.push(s);
 
     const structural = hasRefParams(a.schema);
     const resetBtn = h('button.btn.small', { type: 'button', 'data-testid': 'reset-params' }, 'Reset');
@@ -978,6 +1187,8 @@ export async function mount(view, ctx) {
       h('div.field-grid', start.el, duration.el, fadeIn.el, fadeOut.el),
       item.offset !== undefined ? h('p.hint', { 'data-testid': 'item-offset' }, `Starts ${fmtTime(item.offset)} into the asset${item.assetDuration ? ` (of ${fmtTime(item.assetDuration)})` : ''}.`) : null,
       gain?.el,
+      onWord.el,
+      mix?.el,
       tf ? [
         h('div.panel-head', h('h3', 'Layout ', h('span.muted', `· ${FORMAT_LABEL[fmt] ?? 'Custom'}${fmt !== draft.format ? ' (override)' : ''}`)), reset),
         tf.el,
@@ -1029,6 +1240,7 @@ export async function mount(view, ctx) {
     const p = proposal;
     const comp = viewOf(p.composition);
     stage.setSize(comp.width, comp.height);
+    overlays.redraw();
     stage.setDuration(comp.duration, comp.fps);
     await stage.show((pv) => pv.showClip({ composition: comp, bundle: p.bundle, audioUrl: null }));
   }
@@ -1076,22 +1288,24 @@ export async function mount(view, ctx) {
       h('div.ed-main',
         h('section.panel.stage-panel',
           h('div.fmt-bar', fmtLabel, h('div.fmt-switch', { role: 'group', 'aria-label': 'Format to lay out' }, fmtBtns)),
+          overlays.bar,
           proposalBar,
           stage.el),
         h('section.panel.timeline-panel',
-          h('div.panel-head', h('div.row', h('h2', 'Timeline'), position), h('div.row', addBtn, timeline.toolbar)),
-          h('div.ed-toolbar', { role: 'toolbar', 'aria-label': 'Edit' }, undoBtn, redoBtn, splitBtn, copyBtn, pasteBtn, dupBtn, assetBtn, keysBtn),
+          h('div.panel-head', h('div.row', h('h2', 'Timeline'), position, audioStatus), h('div.row', addBtn, timeline.toolbar)),
+          h('div.ed-toolbar', { role: 'toolbar', 'aria-label': 'Edit' }, undoBtn, redoBtn, splitBtn, copyBtn, pasteBtn, dupBtn, assetBtn, h('span.ed-marker-add', markerType, markerBtn), keysBtn),
           timeline.el,
           h('p.hint', `Drag an item to move it (also to another track), drag its edges to trim. Moves snap to the playhead, beats and other items; hold Alt to move freely. ${plural(beats.length, 'beat')} detected in the audio.`)),
         layersPanel),
-      h('aside.ed-side', agentBox, inspector, assetsPanel)));
+      h('aside.ed-side', agentBox, inspector, issues.el, assetsPanel)));
 
   drawMeta();
   drawFormat();
   drawAssets();
   drawInspector();
   updateTools();
-  timeline.setData({ composition: draft, beats });
+  timeline.setData({ composition: draft, beats, words, anchors });
+  for (const track of draft.tracks) for (const item of track.items) if (item.anchor) resolved.set(item.id, item.start);
   showPosition(0);
   remember();
   await showClip();

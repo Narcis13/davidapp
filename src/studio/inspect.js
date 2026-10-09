@@ -22,7 +22,7 @@ const inset = (w, h, k) => rect(w * k, h * k, w * (1 - 2 * k), h * (1 - 2 * k));
 export function zonesOf(comp) {
   const { width: w, height: h } = comp;
   const format = safeZone(w, h);
-  const platform = comp.platforms?.length ? platformSafe(comp.platforms, w, h) : null;
+  const platform = comp.platforms?.length ? platformSafe(comp.platforms, w, h, { matching: true }) : null;
   const tight = platform ?? format;
   return {
     frame: rect(0, 0, w, h),

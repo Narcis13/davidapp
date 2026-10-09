@@ -72,7 +72,7 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
         for (const t of texts) if (t.family) allTexts.push(t);
         for (const blk of blocks) {
           const key = `${blk.item}|${blk.block}`;
-          const s = seen.get(key) ?? { first: f, last: f, words: 0, text: blk.text, item: blk.item, caption: blk.caption };
+          const s = seen.get(key) ?? { first: f, last: f, words: 0, text: blk.text, item: blk.item, caption: blk.caption, ticker: blk.role === 'ticker' };
           s.last = f; s.words = Math.max(s.words, words(blk.text)); if (words(blk.text) >= s.words) s.text = blk.text;
           seen.set(key, s);
           const label = `"${blk.text.length > 40 ? `${blk.text.slice(0, 37)}…` : blk.text}"`;
@@ -99,8 +99,8 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
       }
       // held long enough to read: words / 3 + 1 seconds (captions follow the speech and have their own rules)
       if (want('hold')) for (const [key, s] of seen) {
-        // captions, and numbers that count up (a new text every frame), are not held to it
-        if (s.caption || /^[\d\s.,:%+\-–×x$€£#/]*$/.test(s.text)) continue;
+        // captions, tickers (text that scrolls past, f.lib.text role 'ticker') and numbers that count up are not held to it
+        if (s.caption || s.ticker || /^[\d\s.,:%+\-–×x$€£#/]*$/.test(s.text)) continue;
         const held = (s.last - s.first + every) / fps, needs = s.words / 3 + 1;
         const visibleWholeRange = s.first > a && s.last < b;
         if (visibleWholeRange && held + 1e-6 < needs) issue('hold', key, s.first, { severity: 'error', item: s.item, message: `"${s.text.slice(0, 40)}" is on screen for about ${r2(held)} s; ${s.words} word${s.words === 1 ? '' : 's'} need ${r2(needs)} s (words / 3 + 1).`, numbers: { held: r2(held), needs: r2(needs), words: s.words } });
@@ -163,7 +163,7 @@ function groupBlocks(texts) {
   for (const t of texts) {
     const key = `${t.item}|${t.kind}|${t.block ?? t.text}|${t.mask ? 'm' : ''}`;
     let b = map.get(key);
-    if (!b) map.set(key, (b = { item: t.item, track: t.track, block: t.block ?? t.text, parts: [], x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity, screenSize: t.screenSize, floor: t.floor, alpha: t.alpha, contrast: null, approximate: t.approximate }));
+    if (!b) map.set(key, (b = { item: t.item, track: t.track, block: t.block ?? t.text, parts: [], x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity, screenSize: t.screenSize, floor: t.floor, alpha: t.alpha, contrast: null, approximate: t.approximate, role: t.role }));
     b.parts.push(t);
     b.x0 = Math.min(b.x0, t.box.x); b.y0 = Math.min(b.y0, t.box.y); b.x1 = Math.max(b.x1, t.box.x + t.box.width); b.y1 = Math.max(b.y1, t.box.y + t.box.height);
     if (t.screenSize !== null && (b.screenSize === null || t.screenSize < b.screenSize)) b.screenSize = t.screenSize;

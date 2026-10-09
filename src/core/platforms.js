@@ -300,22 +300,27 @@ function checkSize(width, height) {
  * Insets of the named profiles scaled to a frame of width x height (fractions of each profile's reference size),
  * tightest edge winning across profiles and against the format's own safe zone (engine.js safeZone). A profile made
  * for other formats still applies by its fractions, with a warning. Ties go to the first named profile, then to the format.
+ * With { matching: true } only the profiles made for this frame's shape apply (a clip that names youtube and shorts gets
+ * youtube's zones in its horizontal render and shorts' in its vertical one); when none is made for it, all of them do.
  * @param {string | string[]} ids
  * @param {number} width
  * @param {number} height
+ * @param {{ matching?: boolean }} [options]
  * @returns {{ top: number, right: number, bottom: number, left: number, x: number, y: number, width: number, height: number,
  *   platforms: string[], from: Record<'top' | 'right' | 'bottom' | 'left', string>, warnings: string[] }}
  */
-export function platformSafe(ids, width, height) {
+export function platformSafe(ids, width, height, { matching = false } = {}) {
   checkSize(width, height);
   const list = Array.isArray(ids) ? ids : [ids];
   const warnings = [];
-  const profiles = list.map((id) => {
+  const named = list.map((id) => {
     const p = Object.hasOwn(PLATFORMS, id) ? PLATFORMS[id] : null;
     if (!p) throw new Error(`Unknown platform ${JSON.stringify(id)}: expected one of ${Object.keys(PLATFORMS).join(', ')}`);
     return p;
   });
   const shape = orientationOf(width, height);
+  const fitting = named.filter((p) => p.formats.includes(shape));
+  const profiles = matching && fitting.length ? fitting : named;
   for (const p of profiles) {
     if (!p.formats.includes(shape)) {
       warnings.push(`${p.id} is made for ${p.formats.join(' / ')} frames; applied by its fractions to a ${shape} ${width}x${height} frame`);

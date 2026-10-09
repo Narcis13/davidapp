@@ -8,7 +8,7 @@ import { ENGINE_VERSION, FORMATS } from '../core/engine.js';
 import { ROOT } from '../render/host.js';
 import { StudioError } from '../studio/studio.js';
 import { sideBySide, createCanvas, loadImage } from '../render/host.js';
-import { checkTranscript } from '../core/words.js';
+import { checkTranscript, checkTranscripts } from '../core/words.js';
 import { drawOverlays, OVERLAYS } from '../render/overlays.js';
 import { json } from '../db/db.js';
 
@@ -397,7 +397,8 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         script: z.string().describe('The text it was meant to say'),
         timings: z.any().optional().describe('Word timings in any supported shape (an object or array, or a JSON string); or give timings_path'),
         timings_path: z.string().optional().describe('Or a JSON file with the timings'),
-        unit: z.enum(['s', 'ms']).optional(), transcript: z.any().optional().describe('Plain text, or timed words'), language: z.string().optional(),
+        unit: z.enum(['s', 'ms']).optional(), transcript: z.any().optional().describe('Plain text, or timed words'),
+        transcripts: z.array(z.any()).optional().describe('Several independent transcripts (two recognisers): a word is wrong only when all of them say so'), language: z.string().optional(),
         voice: z.record(z.string(), z.any()).optional().describe('Who or what spoke it, and its licence: { name, model, license, source }'),
         license: z.string().optional(), description: z.string().optional(), title: z.string().optional(), tags: z.array(z.string()).optional(), take: z.string().optional(), for_clip: z.string().optional(), author: AUTHOR,
       },
@@ -406,7 +407,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         if (timings === undefined || timings === null) throw new StudioError('Give timings (the word timings) or timings_path (a JSON file of them)');
         if (typeof timings === 'string') { try { timings = JSON.parse(timings); } catch { throw new StudioError('timings: not valid JSON'); } }
         if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64 (with ext)');
-        const r = await studio.audio.addNarration({ slug: a.name, path: a.path, data: a.data_base64 ? Buffer.from(a.data_base64, 'base64') : undefined, ext: a.ext, script: a.script, timings, unit: a.unit, transcript: a.transcript, language: a.language, voice: a.voice, license: a.license, description: a.description, title: a.title, tags: a.tags, take: a.take, forClip: a.for_clip, author: who(a.author) });
+        const r = await studio.audio.addNarration({ slug: a.name, path: a.path, data: a.data_base64 ? Buffer.from(a.data_base64, 'base64') : undefined, ext: a.ext, script: a.script, timings, unit: a.unit, transcript: a.transcript, transcripts: a.transcripts, language: a.language, voice: a.voice, license: a.license, description: a.description, title: a.title, tags: a.tags, take: a.take, forClip: a.for_clip, author: who(a.author) });
         return { json: { added: r.asset.ref, duration: r.asset.duration, words: r.words, stats: r.stats, source: r.source, transcript: r.transcript, warnings: r.warnings } };
       },
     },
@@ -414,15 +415,16 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       name: 'check_transcript',
       title: 'Check a take against its script',
       description: 'Compare a transcript of a take (from any speech-to-text tool: plain text or timed words) with the script it was meant to say, after normalising case, punctuation and numerals ("14" = "fourteen", "2026" = "twenty twenty-six"): names every slip (a different word), drop (a script word not said) and insertion (a word not in the script), with the script word\'s index. Give a narration (its script is used) or the script itself.',
-      input: { narration: REF.optional(), script: z.string().optional(), transcript: z.any(), language: z.string().optional() },
+      input: { narration: REF.optional(), script: z.string().optional(), transcript: z.any().optional(), transcripts: z.array(z.any()).optional().describe('Several independent transcripts: a word is wrong only when all of them say so (what only some heard differently is listed as disputed)'), language: z.string().optional() },
       readOnly: true,
       run: (a) => {
         let script = a.script;
         if (!script && a.narration) script = json(library.requireVersion(a.narration).meta, {}).narration?.script;
         if (!script) throw new StudioError(a.narration ? `${a.narration} is not a narration (it has no script)` : 'Give narration or script');
-        let transcript = a.transcript;
-        if (typeof transcript === 'string' && /^\s*[[{]/.test(transcript)) { try { transcript = JSON.parse(transcript); } catch { /* plain text */ } }
-        return { json: checkTranscript(script, transcript, { language: a.language }) };
+        const parse = (x) => { if (typeof x === 'string' && /^\s*[[{]/.test(x)) { try { return JSON.parse(x); } catch { /* plain text */ } } return x; };
+        if (a.transcripts?.length) return { json: checkTranscripts(script, a.transcripts.map(parse), { language: a.language }) };
+        if (a.transcript === undefined) throw new StudioError('Give transcript (or transcripts)');
+        return { json: checkTranscript(script, parse(a.transcript), { language: a.language }) };
       },
     },
     {

@@ -15,7 +15,7 @@ import { measureLoudness, loudnessOver } from '../render/loudness.js';
 import { encodeWav } from '../render/wav.js';
 import { ffmpegPath, run } from '../render/ffmpeg.js';
 import { json } from '../db/db.js';
-import { importWords, alignWords, checkTranscript } from '../core/words.js';
+import { importWords, alignWords, checkTranscript, checkTranscripts } from '../core/words.js';
 import { StudioError, SLUG_RE } from './library.js';
 
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
@@ -267,11 +267,12 @@ export function createAudio(ctx, library, clips) {
    * aligner returned (a word list, character alignment, whisper.cpp JSON: see core/words.js importWords); they are aligned
    * to the script, so word i is the script's word i in every take. The same name again makes a new version: a new take
    * of the same script, which keeps everything anchored to its words. transcript (optional): a speech-to-text transcript
-   * of the take, checked against the script (case, punctuation and numerals do not count).
-   * @param {{ slug: string, path?: string, data?: Buffer, ext?: string, script: string, timings: any, unit?: 's'|'ms', transcript?: any, language?: string,
+   * of the take, checked against the script (case, punctuation and numerals do not count); transcripts: several independent
+   * ones, where a word is wrong only when all of them say so.
+   * @param {{ slug: string, path?: string, data?: Buffer, ext?: string, script: string, timings: any, unit?: 's'|'ms', transcript?: any, transcripts?: any[], language?: string,
    *   voice?: any, license?: string, description?: string, title?: string, tags?: string[], take?: string, forClip?: string, author: string }} o
    */
-  async function addNarration({ slug, path, data, ext, script, timings, unit, transcript, language = 'en', voice, license, description, title, tags, take, forClip, author }) {
+  async function addNarration({ slug, path, data, ext, script, timings, unit, transcript, transcripts, language = 'en', voice, license, description, title, tags, take, forClip, author }) {
     if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name: use lowercase letters, digits and dashes`);
     if (typeof script !== 'string' || !script.trim()) throw new StudioError('script: the text the narration was meant to say');
     let imported;
@@ -283,9 +284,10 @@ export function createAudio(ctx, library, clips) {
     if (previous && previous.script.trim() !== script.trim()) warnings.push(`The script differs from version ${library.versionRow(slug).version}'s: words anchored by index may now point at other words.`);
     if (aligned.stats.missing) warnings.push(`${aligned.stats.missing} script word${aligned.stats.missing === 1 ? ' was' : 's were'} not found in the timings; their times are interpolated (missing: true).`);
     if (aligned.stats.extra) warnings.push(`${aligned.stats.extra} word${aligned.stats.extra === 1 ? '' : 's'} in the timings are not in the script (kept as extra).`);
-    const check = transcript !== undefined && transcript !== null ? checkTranscript(script, transcript, { language }) : checkTranscript(script, imported.words, { language });
+    const given = transcripts?.length ? 'transcripts' : transcript !== undefined && transcript !== null ? 'transcript' : 'timings';
+    const check = given === 'transcripts' ? checkTranscripts(script, transcripts, { language }) : checkTranscript(script, given === 'transcript' ? transcript : imported.words, { language });
     const narration = { script, language, words: aligned.words, extra: aligned.extra, stats: aligned.stats, source: imported.source, take: take ?? null, voice: voice ?? null,
-      transcript: { from: transcript !== undefined && transcript !== null ? 'transcript' : 'timings', ok: check.ok, slips: check.slips, drops: check.drops, insertions: check.insertions } };
+      transcript: { from: given, ok: check.ok, slips: check.slips, drops: check.drops, insertions: check.insertions, disputed: check.disputed } };
     const r = await library.addFileAsset({
       slug, type: 'sound', path, data, ext, author, forClip, license, title,
       description: description ?? `Narration: "${script.trim().slice(0, 120)}${script.trim().length > 120 ? '…' : ''}" with the time of every word.`,

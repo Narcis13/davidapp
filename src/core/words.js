@@ -569,3 +569,29 @@ export function checkTranscript(script, transcript, { language = 'en' } = {}) {
     counts: { script: sw.length, heard: heard.length, matched, slips: slips.length, drops: drops.length, insertions: insertions.length },
   };
 }
+
+/**
+ * The transcript check over several independent transcripts of the same take (two speech-to-text models, or a
+ * person and a model): a word counts as a slip, a drop or an insertion only when every transcript says so, since
+ * one recogniser mishearing a word ("eye" as "I", a dropped "a") is not the reader's slip. Same result shape as
+ * checkTranscript, plus `each` (every transcript's own result) and `disputed` (what only some of them heard wrong).
+ * @param {string} script @param {any[]} transcripts @param {{ language?: string }} [o]
+ */
+export function checkTranscripts(script, transcripts, o = {}) {
+  if (!Array.isArray(transcripts) || !transcripts.length) throw new Error('checkTranscripts needs a list of transcripts');
+  const each = transcripts.map((t) => checkTranscript(script, t, o));
+  if (each.length === 1) return { ...each[0], each, disputed: [] };
+  const keyOf = { slips: (x) => `${x.i}`, drops: (x) => `${x.i}`, insertions: (x) => `${x.after}|${normalizeText(x.heard, o).join(' ')}` };
+  const out = {}, disputed = [];
+  for (const kind of ['slips', 'drops', 'insertions']) {
+    const all = each.map((r) => new Set(r[kind].map(keyOf[kind])));
+    out[kind] = each[0][kind].filter((x) => all.every((s) => s.has(keyOf[kind](x))));
+    for (const [n, r] of each.entries()) for (const x of r[kind]) if (!all.every((s) => s.has(keyOf[kind](x)))) disputed.push({ kind: kind.slice(0, -1), transcript: n, ...x });
+  }
+  return {
+    ok: !out.slips.length && !out.drops.length && !out.insertions.length,
+    slips: out.slips, drops: out.drops, insertions: out.insertions,
+    counts: { script: each[0].counts.script, transcripts: each.length, slips: out.slips.length, drops: out.drops.length, insertions: out.insertions.length, disputed: disputed.length },
+    each, disputed,
+  };
+}

@@ -3,6 +3,7 @@
 
 import { api } from '/ui/lib/api.js';
 import { live } from '/ui/lib/live.js';
+import { downloadLinks, hasReport, loudnessSummary, NO_REPORT, problemsList, reportPanel } from '/ui/screens/renders.js';
 import { assetHref, debounce, empty, errorBlock, fill, fmtBytes, fmtDate, fmtDuration, h, icon, plural, trim } from '/ui/lib/util.js';
 
 const durationOf = (r) => r.stats?.probe?.duration ?? (r.framesTotal && r.stats?.probe?.video?.fps ? r.framesTotal / r.stats.probe.video.fps : null);
@@ -23,6 +24,15 @@ function card(r) {
         h('span', fmtDate(r.finishedAt)))));
 }
 
+function reportSection(r) {
+  const s = r.stats ?? {};
+  return h('section.panel.report-section', { 'data-testid': 'render-report-section' },
+    h('h2', 'Report'),
+    hasReport(r)
+      ? [h('div.render-quality', loudnessSummary(s), problemsList(s.problems)), reportPanel(r, { problems: false })]
+      : h('p.muted', { 'data-testid': 'render-no-report' }, NO_REPORT));
+}
+
 function detail(r) {
   const groups = new Map();
   for (const a of r.assets ?? []) {
@@ -39,11 +49,14 @@ function detail(r) {
         h('div.title-row', h('h1', r.clipTitle), h('span.ref', `render #${r.id}`), h('span.badge', r.format)),
         h('p.sub', `${r.width}×${r.height} · ${durationOf(r) ? fmtDuration(durationOf(r)) : ''} · revision ${r.clipRevision} of `, h('a', { href: `/clips/${r.clip}` }, r.clip), ` · finished ${fmtDate(r.finishedAt)}`))),
     h('div.gallery-layout',
-      h('section.panel.player-panel',
-        h('video', { controls: true, autoplay: true, playsInline: true, preload: 'auto', src: `/media/${r.output}`, poster: r.poster ? `/media/${r.poster}` : undefined, 'data-testid': 'player', style: { '--ar': String(r.width / r.height) } }),
-        h('div.row.downloads',
-          h('a.btn', { href: `/media/${r.output}`, download: name, 'data-testid': 'download-mp4' }, icon('download', 16), `Download MP4${probe.size ? ` · ${fmtBytes(probe.size)}` : ''}`),
-          r.srt ? h('a.btn', { href: `/media/${r.srt}`, download: r.srt.split('/').pop(), 'data-testid': 'download-srt' }, icon('download', 16), 'Download captions (SRT)') : null)),
+      h('div.gallery-main',
+        h('section.panel.player-panel',
+          h('video', { controls: true, autoplay: true, playsInline: true, preload: 'auto', src: `/media/${r.output}`, poster: r.poster ? `/media/${r.poster}` : undefined, 'data-testid': 'player', style: { '--ar': String(r.width / r.height) } }),
+          h('div.row.downloads',
+            h('a.btn', { href: `/media/${r.output}`, download: name, 'data-testid': 'download-mp4' }, icon('download', 16), `Download MP4${probe.size ? ` · ${fmtBytes(probe.size)}` : ''}`),
+            r.srt ? h('a.btn', { href: `/media/${r.srt}`, download: r.srt.split('/').pop(), 'data-testid': 'download-srt' }, icon('download', 16), 'Download captions (SRT)') : null,
+            downloadLinks(r, ['vtt', 'words', 'report']))),
+        reportSection(r)),
       h('aside.gallery-side',
         h('section.panel',
           h('h2', 'Render'),
