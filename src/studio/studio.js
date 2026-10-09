@@ -2,7 +2,7 @@
 // them. The HTTP server, the MCP server, the CLI and the tests all go through this.
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { openDb, json } from '../db/db.js';
@@ -51,6 +51,8 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   library.seedFonts();
   if (runner) renders.startRunner();
   const framesDir = join(dataDir, 'frames');
+  const FRAMES_KEPT = 400;
+  let framesWritten = 0;
   mkdirSync(framesDir, { recursive: true });
 
   function sizeOf({ format, width, height }, formats) {
@@ -136,7 +138,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     if (!composition && !clip) throw new StudioError('Give clip (a saved clip) or composition (a draft)');
     let comp = composition ? clips.prepare(composition).composition : clips.getClip(clip).composition;
     if (format && format !== comp.format) {
-      if (!FORMATS[format]) throw new StudioError(`Unknown format "${format}"; use ${Object.keys(FORMATS).join(', ')}`);
+      if (typeof format !== 'string' || !Object.hasOwn(FORMATS, format)) throw new StudioError(`Unknown format "${format}"; use ${Object.keys(FORMATS).join(', ')}`);
       comp = reformat(comp, format);
     }
     return comp;
@@ -251,6 +253,13 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   function saveFrame(name, png) {
     const file = join(framesDir, `${name.replace(/[^a-z0-9@._-]+/gi, '_')}.png`);
     writeFileSync(file, png);
+    // bounded: the oldest stills go once there are more than FRAMES_KEPT
+    if (++framesWritten % 50 === 0) {
+      try {
+        const all = readdirSync(framesDir).filter((f) => f.endsWith('.png')).map((f) => ({ f, at: statSync(join(framesDir, f)).mtimeMs })).sort((x, y) => y.at - x.at);
+        for (const { f } of all.slice(FRAMES_KEPT)) rmSync(join(framesDir, f), { force: true });
+      } catch { /* another process pruned first */ }
+    }
     return file;
   }
 

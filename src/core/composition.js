@@ -16,6 +16,7 @@
 
 import { FORMATS, MAX_CLIP_SECONDS, REF_RE, formatOf } from './engine.js';
 import { isColor } from './schema.js';
+import { PLATFORMS } from './platforms.js';
 import { FORMAT_NAMES, boxToTransform, checkAnchor, checkKeyframes, checkTransform } from './transform.js';
 
 export const TRACK_TYPES = ['visual', 'text', 'audio'];
@@ -322,6 +323,7 @@ export function normalizeComposition(input) {
   if (input.captions !== undefined && input.captions !== null) captions = normalizeCaptions(input.captions, err);
   if (input.platforms !== undefined) {
     if (!Array.isArray(input.platforms) || !input.platforms.every((p) => typeof p === 'string' && /^[a-z0-9-]+$/.test(p))) err('platforms', 'platforms is a list of platform profile ids such as ["reels", "tiktok"]');
+    else if (input.platforms.some((p) => !Object.hasOwn(PLATFORMS, p))) err('platforms', `unknown platform ${input.platforms.filter((p) => !Object.hasOwn(PLATFORMS, p)).map((p) => `"${p}"`).join(', ')}: the profiles are ${Object.keys(PLATFORMS).join(', ')}`);
     else if (input.platforms.length) platforms = [...new Set(input.platforms)];
   }
   if (input.safe !== undefined) {

@@ -159,6 +159,8 @@ export function createClips(ctx, library) {
     if (!found) return `no item "${a.item}" to anchor to`;
     const n = narrationOf(library.versionRow(found.item.asset));
     if (!n) return `item "${a.item}" is not a narration (${found.item.asset} has no words)`;
+    // a narration that is itself anchored would move with every save (to itself) or depend on the order of tracks (a chain)
+    if (found.item.anchor) return `narration item "${a.item}" is anchored itself; anchor to a narration whose start is set directly`;
     const w = n.words[a.word];
     if (!w) return `narration item "${a.item}" has words 0–${n.words.length - 1}; there is no word ${a.word}`;
     const at = (a.edge === 'end' ? w.end : w.start) + found.item.start - (found.item.offset ?? 0);

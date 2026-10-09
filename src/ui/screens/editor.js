@@ -495,7 +495,9 @@ export async function mount(view, ctx) {
   }
 
   function applyMeta(r) {
-    const same = JSON.stringify(r.words) === JSON.stringify(words);
+    // the bundle's captions and lane depend on the viewed format too (line length, platform zones), not only on the words
+    const sig = (b, w) => JSON.stringify([w ?? [], b?.captions ?? null, b?.lane ?? null]);
+    const same = sig(r.bundle, r.words) === sig(bundle, words);
     words = r.words ?? []; captionPages = r.captions ?? null; anchors = r.anchors ?? []; zones = r.zones ?? null;
     overlays.setZones(zones);
     const moved = follow(r.composition);

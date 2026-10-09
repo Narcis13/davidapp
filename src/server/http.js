@@ -238,7 +238,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     }],
     // v3: what the studio measures about a clip: its issues (check_clip, stills as URLs), a frame's text layout, the mix
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/check$/, async ({ params, data }) => {
-      const r = await studio.checks.checkClip({ clip: data.composition ? undefined : params[0], composition: data.composition, format: data.format, from: data.from, to: data.to, step: data.step, only: data.only });
+      const r = await studio.checks.checkClip({ clip: data.composition ? undefined : params[0], name: params[0], composition: data.composition, format: data.format, from: data.from, to: data.to, step: data.step, only: data.only });
       return { ...r, clip: params[0], issues: r.issues.map((i) => ({ ...i, still: i.still ? `/media/frames/${basename(i.still)}` : null })) };
     }],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/layout$/, async ({ params, data }) => studio.inspect.layoutReport({ clip: data.composition ? undefined : params[0], composition: data.composition, format: data.format, t: data.t ?? 0 })],

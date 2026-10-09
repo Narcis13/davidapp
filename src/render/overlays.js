@@ -37,9 +37,8 @@ export async function drawOverlays(png, { width, zones, texts = [], show = OVERL
   const rect = (r, color, dash = []) => { g.save(); g.strokeStyle = color; g.lineWidth = line; g.setLineDash(dash.map((d) => d * line)); g.strokeRect(...R(r)); g.restore(); };
   if (show.includes('grid')) {
     g.save();
-    g.strokeStyle = COLORS.grid; g.lineWidth = line;
+    g.strokeStyle = COLORS.grid; g.lineWidth = line; g.globalAlpha = 0.5;
     for (let i = 1; i < 10; i++) {
-      g.globalAlpha = i % 10 === 0 ? 1 : 0.5;
       g.beginPath(); g.moveTo((img.width * i) / 10, 0); g.lineTo((img.width * i) / 10, img.height); g.moveTo(0, (img.height * i) / 10); g.lineTo(img.width, (img.height * i) / 10); g.stroke();
     }
     g.globalAlpha = 1; g.lineWidth = line * 2;

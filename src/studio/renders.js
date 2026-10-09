@@ -3,8 +3,8 @@
 // the results (MP4, poster, SRT, ffprobe facts, sampled frame hashes) are all rows and files.
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { toSrt, reformat } from '../core/composition.js';
 import { renderVideo, replaceAudio } from '../render/video.js';
@@ -140,6 +140,8 @@ export function createRenders(ctx, library, clips, sound) {
     };
     // the heartbeat runs for the whole job: audio synthesis and worker start-up report no progress
     const pulse = setInterval(() => { try { beat(); } catch { /* the database was busy; the next beat will do */ } }, 2000);
+    // a cancel is also honoured between the passes after the frames (report, loudness correction, sheets)
+    const halt = () => { if (abort.signal.aborted) throw Object.assign(new Error('Render cancelled'), { cancelled: true }); };
     try {
       const prep0 = performance.now();
       const { bundle, audio } = await clips.bundleFor(comp);
@@ -175,17 +177,20 @@ export function createRenders(ctx, library, clips, sound) {
       // the report, from the encoded file: probe facts, loudness (EBU R128), black, freezes, jumps, flashes, silences, narration
       const report0 = performance.now();
       const reportOpts = { fps: comp.fps, duration: comp.duration, width: comp.width, height: comp.height, markers: (comp.markers ?? []).map((m) => ({ ...m, type: m.type ?? 'note' })), narration: narrationOf(bundle.words) };
+      halt();
       let report = await analyseFile(outPath, reportOpts);
       let loudnessSeconds = 0;
       const loud = { measured: report.loudness, master: await sound.masterInfo(comp) };
       if (comp.loudness) {
         // AAC moves the peaks a little: a file that misses the target is corrected (at most twice) with a fixed gain, and the
-        // limiter if it must, each time from the mix that was just encoded and against the overshoot that encoding showed
+        // limiter if it must, each time from the mix that was just encoded and against the overshoot that encoding showed.
+        // A silent mix has no integrated loudness: there is nothing to correct.
         const l0 = performance.now();
-        const misses = (m) => Math.abs(comp.loudness.target - m.integrated) > 0.5 || m.truePeak > comp.loudness.truePeak;
+        const misses = (m) => typeof m.integrated === 'number' && Number.isFinite(m.integrated) && (Math.abs(comp.loudness.target - m.integrated) > 0.5 || m.truePeak > comp.loudness.truePeak);
         let base2 = mixPath;
         const notes = [];
         for (let round = 0; round < 2 && misses(report.loudness); round++) {
+          halt();
           const fixed = await sound.correctedMix(base2, comp.loudness, report.loudness);
           await replaceAudio(outPath, fixed.path);
           notes.push(fixed.note);
@@ -201,6 +206,7 @@ export function createRenders(ctx, library, clips, sound) {
       writeFileSync(join(dataDir, `${base}.report.json`), JSON.stringify(report, null, 1));
       files.report = `${base}.report.json`;
       files.sheets = [];
+      halt();
       for (const [i, s] of (await encodedSheets(outPath, { fps: comp.fps, duration: comp.duration, markers: reportOpts.markers })).entries()) {
         writeFileSync(join(dataDir, `${base}.sheet-${i + 1}.png`), s.png);
         files.sheets.push(`${base}.sheet-${i + 1}.png`);
@@ -229,7 +235,9 @@ export function createRenders(ctx, library, clips, sound) {
       });
       if (!done.changes) for (const f of [`${base}.mp4`, `${base}.png`, `${base}.srt`, ...Object.values(files).flat()]) rmSync(join(dataDir, f), { force: true });
     } catch (e) {
-      rmSync(outPath, { force: true });
+      // everything this job wrote: the MP4, poster, subtitles, words, report, sheets and any half-made audio swap
+      const prefix = `${basename(base)}.`;
+      try { for (const f of readdirSync(dirname(outPath))) if (f.startsWith(prefix)) rmSync(join(dirname(outPath), f), { force: true }); } catch { rmSync(outPath, { force: true }); }
       // stopping the runner puts its job back in the queue; a cancel or a failure ends it
       const cancelled = e.cancelled || abort.signal.aborted;
       if (cancelled && stopping) q(`UPDATE renders SET status = 'queued', runner = NULL, progress = 0, frames_done = 0 WHERE ${mine} AND cancel_requested = 0`).run(row.id, runnerId);

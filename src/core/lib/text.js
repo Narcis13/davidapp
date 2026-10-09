@@ -304,6 +304,7 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
     if (!k) {
       const m = ctx.measureText(str);
       k = { left: m.actualBoundingBoxLeft ?? 0, right: m.actualBoundingBoxRight ?? m.width, ascent: m.actualBoundingBoxAscent ?? 0, descent: m.actualBoundingBoxDescent ?? 0 };
+      if (widths.size > 20000) widths.clear();
       widths.set(key, k);
     }
     return k;

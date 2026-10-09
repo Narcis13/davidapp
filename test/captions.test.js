@@ -304,7 +304,7 @@ test('structure edits: split, merge, move a break, move a page start', () => {
   assert.deepEqual(movePageStart(s, w, 1, 'v:3'), [{ start: 'v:0', lines: ['v:2'] }, { start: 'v:3', lines: ['v:6'] }]);
   assert.deepEqual(movePageStart(s, w, 1, 'v:6'), [{ start: 'v:0', lines: ['v:2'] }, { start: 'v:6', lines: [] }]);
   assert.deepEqual(movePageStart([{ start: 'v:0', lines: ['v:2', 'v:3'] }, { start: 'v:4' }], w, 1, 'v:3'), [{ start: 'v:0', lines: ['v:2'] }, { start: 'v:3' }]);
-  assert.deepEqual(movePageStart(s, w, 0, 'v:1'), [{ start: 'v:1', lines: ['v:2'] }, { start: 'v:4', lines: ['v:6'] }]);
+  assert.throws(() => movePageStart(s, w, 0, 'v:1'), /first page cannot start later/);
   assert.throws(() => movePageStart(s, w, 1, 'v:0'), /without words/);
   assert.throws(() => movePageStart(s, w, 0, 'v:5'), /not inside page 1/);
   assert.throws(() => movePageStart(s, w, 1, 'nope'), /not a word/);
@@ -391,6 +391,10 @@ test('toSrt and toVtt: exact text, and a round trip through parseSrt and parseVt
   const expected = pages.map((p) => ({ start: p.start, end: p.end, text: p.text }));
   assert.deepEqual(parseSrt(srt), expected);
   assert.deepEqual(parseVtt(vtt), expected);
+  // cue text is escaped where WebVTT would read markup, and parses back to the words
+  const amp = [{ start: 0, end: 1, lines: [[{ text: "R&D" }, { text: "<3" }, { text: "-->" }]] }];
+  assert.match(toVtt(amp), /R&amp;D &lt;3 --&gt;/);
+  assert.equal(parseVtt(toVtt(amp))[0].text, "R&D <3 -->");
   const script = w.map((x) => x.text).join(' ');
   assert.equal(parseSrt(srt).map((c) => c.text.replace(/\n/g, ' ')).join(' '), script);
   assert.equal(parseVtt(vtt).map((c) => c.text.replace(/\n/g, ' ')).join(' '), script);

@@ -6,7 +6,7 @@
 // 0.95 as the studio always did. Stems are the same mix restricted to some tracks.
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SAMPLE_RATE } from '../core/engine.js';
 import { itemsOf } from '../core/composition.js';
@@ -23,6 +23,8 @@ const r2 = (v) => (v === null || v === undefined || !Number.isFinite(v) ? v : Ma
 /** Without a loudness target, sample peaks are held at 0.95, as the FFmpeg graph (alimiter) did before. */
 const SAFETY_CEILING_DB = 20 * Math.log10(0.95);
 const CACHE_BYTES = 1.5e9;
+// decoded sources kept in memory: 10 minutes of 48 kHz audio in all (two float channels, about 230 MB)
+const DECODED_SAMPLES = SAMPLE_RATE * 60 * 10;
 
 /** The narration a sound asset carries, or null: { script, words: [{ i, text, start, end, missing? }], … }. */
 export const narrationOf = (row) => (row?.type === 'sound' ? json(row.meta, {}).narration ?? null : null);
@@ -81,19 +83,22 @@ export function createAudio(ctx, library, clips) {
     for (let i = 0; i < n; i++) { left[i] = all[i * 2]; right[i] = all[i * 2 + 1]; }
     const out = { left, right };
     decoded.set(key, out);
-    while (decoded.size > 8) decoded.delete(decoded.keys().next().value);
+    // bounded by samples, not count (the newest one always stays): a few long music files must not hold gigabytes
+    let held = 0;
+    for (const d of decoded.values()) held += d.left.length;
+    while (decoded.size > 1 && held > DECODED_SAMPLES) { const [k, d] = decoded.entries().next().value; decoded.delete(k); held -= d.left.length; }
     return out;
   }
 
   /** Track id of every audio item, and the tracks that hold narrations. */
   function layout(comp) {
-    const trackOf = new Map(), narrationTracks = new Set(), narrationItems = new Set();
+    const trackOf = new Map(), narrationTracks = new Set();
     for (const { track, item } of itemsOf(comp)) {
       if (track.type !== 'audio') continue;
       trackOf.set(item.id, track);
-      if (track.role === 'narration' || narrationOf(library.versionRow(item.asset))) { narrationTracks.add(track.id); if (narrationOf(library.versionRow(item.asset))) narrationItems.add(item.id); }
+      if (track.role === 'narration' || narrationOf(library.versionRow(item.asset))) narrationTracks.add(track.id);
     }
-    return { trackOf, narrationTracks, narrationItems };
+    return { trackOf, narrationTracks };
   }
 
   /**
@@ -112,8 +117,10 @@ export function createAudio(ctx, library, clips) {
       return { ...a, track: trackOf.get(a.id)?.id, volume: item?.keyframes?.volume, duck: item?.duck };
     });
     for (const t of tracks ?? []) if (!comp.tracks.some((x) => x.id === t && x.type === 'audio')) throw new StudioError(`No audio track "${t}" in this clip (audio tracks: ${comp.tracks.filter((x) => x.type === 'audio').map((x) => x.id).join(', ') || 'none'})`, 'not_found');
+    // the narration tracks decide what ducking follows by default, so they are part of the key
     const key = sha1(JSON.stringify([2, comp.duration, inputs.map(({ path, start, duration, offset, gain, fadeIn, fadeOut, volume, duck, track }) => [path, start, duration, offset, gain, fadeIn, fadeOut, volume, duck, track]),
-      inputs.some((i) => i.duck) ? words.map((w) => [w.item, w.start, w.end]) : null, comp.loudness ?? null, tracks ?? null]));
+      inputs.some((i) => i.duck) ? words.map((w) => [w.item, w.start, w.end]) : null, comp.loudness ?? null, tracks ?? null,
+      inputs.some((i) => i.duck) ? [...narrationTracks].sort() : null]));
     return { inputs, words, narrationTracks, key, beats: audio.beats };
   }
 
@@ -184,7 +191,12 @@ export function createAudio(ctx, library, clips) {
   async function mixFile(comp, { tracks } = {}) {
     const p = await plan(comp, { tracks });
     const file = join(dir, `${tracks ? 'stem' : 'mix'}-${p.key}.wav`);
-    if (existsSync(file) && existsSync(file.replace(/\.wav$/, '.json'))) return file;
+    if (existsSync(file) && existsSync(file.replace(/\.wav$/, '.json'))) {
+      // a hit counts as a use, so the prune removes the least recently used mixes first
+      const t = new Date();
+      try { utimesSync(file, t, t); } catch { /* read-only or just pruned: it is made again next time */ }
+      return file;
+    }
     let job = jobs.get(file);
     if (!job) {
       job = (async () => {
@@ -193,7 +205,7 @@ export function createAudio(ctx, library, clips) {
         writeFileSync(tmp, encodeWav(m.left, m.right, SAMPLE_RATE));
         renameSync(tmp, file);
         writeFileSync(file.replace(/\.wav$/, '.json'), JSON.stringify({ master: m.master, loudness: summary(measureLoudness(m.left, m.right, SAMPLE_RATE)), tracks: tracks ?? null }));
-        prune(dir, /^(mix|stem)-[0-9a-f]+(\.fix-[0-9a-f]+)?\.(wav|json)$/, CACHE_BYTES);
+        prune(dir, /^(mix|stem)-[0-9a-f]+((\.fix-[0-9a-f]+)*\.(wav|json)|\.\d+\.\d+\.tmp)$/, CACHE_BYTES);
         return file;
       })().finally(() => jobs.delete(file));
       jobs.set(file, job);
@@ -212,7 +224,8 @@ export function createAudio(ctx, library, clips) {
     for (const [name, tracks] of Object.entries(g)) {
       if (!Array.isArray(tracks) || !tracks.length) throw new StudioError(`stem "${name}": give a list of audio track ids`);
       const path = await mixFile(comp, { tracks });
-      const m = await mix(comp, { tracks });
+      // measured from the WAV that was written (decoded once), not mixed a second time
+      const m = await decode(path);
       out.push({ name, tracks, path, loudness: summary(measureLoudness(m.left, m.right, SAMPLE_RATE)), silences: silences(m.left, m.right, SAMPLE_RATE, { threshold: silence, minDuration: minSilence }).slice(0, 50), clipping: clipping(m.left, m.right, SAMPLE_RATE) });
     }
     return out;
@@ -253,10 +266,11 @@ export function createAudio(ctx, library, clips) {
     const { left, right } = await decode(mixPath);
     const gainDb = target.target - measured.integrated;
     // the encoder raised the peaks by about (file − this mix): aim under the ceiling by that much, and a little more
-    const overshoot = Math.max(0, measured.truePeak - (truePeak(left, right, SAMPLE_RATE) + gainDb));
+    const mixPeak = truePeak(left, right, SAMPLE_RATE);
+    const overshoot = Math.max(0, measured.truePeak - mixPeak);
     const ceiling = target.truePeak - overshoot - 0.3;
     let src = { left, right }, limitDb = null;
-    if (measured.truePeak + gainDb > ceiling) { limitDb = ceiling - gainDb; src = limit(left, right, { ceilingDb: limitDb }); }
+    if (mixPeak + gainDb > ceiling) { limitDb = ceiling - gainDb; src = limit(left, right, { ceilingDb: limitDb }); }
     const out = applyGainDb(src.left, src.right, gainDb);
     const path = mixPath.replace(/\.wav$/, `.fix-${sha1(JSON.stringify([target, measured])).slice(0, 10)}.wav`);
     writeFileSync(path, encodeWav(out.left, out.right, SAMPLE_RATE));

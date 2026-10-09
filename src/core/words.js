@@ -390,7 +390,8 @@ function nw(a, b, slope = 0.4) {
   let ha = a.length, hb = b.length;
   while (ha > lo && hb > lo && a[ha - 1] === b[hb - 1]) { ha--; hb--; }
   const n = ha - lo, m = hb - lo;
-  if (n * m > 4e7) throw new Error(`the script and the take differ over too many words to align (${n} x ${m})`);
+  // about 3,000 words a side (20 minutes of speech) at most: the alignment runs on the studio's main thread
+  if (n * m > 1e7) throw new Error(`the script and the take differ over too many words to align (${n} x ${m}); split the narration into parts`);
   const ops = [];
   for (let k = 0; k < lo; k++) ops.push([k, k]);
   const w = m + 1;

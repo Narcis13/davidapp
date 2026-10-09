@@ -17,10 +17,14 @@ const hex = (r, g, b) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0'
  * → { ratio (at the worst `percentile` of the background), min, textColor, background (the worst pixel), textPixels } or null
  * when the text changed too few pixels to judge (hidden, off-frame, fully transparent).
  */
-export function boxContrast(a, b, w, h, box, { percentile = 0.05 } = {}) {
+export function boxContrast(a, b, w, h, box, { percentile = 0.05, fill = null } = {}) {
   const x0 = Math.max(0, Math.floor(box.x)), y0 = Math.max(0, Math.floor(box.y));
   const x1 = Math.min(w, Math.ceil(box.x + box.width)), y1 = Math.min(h, Math.ceil(box.y + box.height));
   if (x1 <= x0 || y1 <= y0) return null;
+  // text so close to its background that it hardly changes the frame is the worst case, not "too little to judge":
+  // with an opaque solid fill recorded, its colour stands in for the pixels it did not change
+  const solid = parseColor(fill);
+  const byFill = () => solid ? worstAgainst(b, w, x0, y0, x1, y1, luminance(solid[0], solid[1], solid[2]), percentile, hex(solid[0], solid[1], solid[2]), 0) : null;
   // the text's own pixels: where it changed the frame most (the core of the glyphs, not their antialiased edges)
   let maxDiff = 0;
   const diffs = new Float32Array((x1 - x0) * (y1 - y0));
@@ -30,7 +34,7 @@ export function boxContrast(a, b, w, h, box, { percentile = 0.05 } = {}) {
     diffs[k] = d;
     if (d > maxDiff) maxDiff = d;
   }
-  if (maxDiff < 24) return null;
+  if (maxDiff < 24) return byFill();
   const cut = maxDiff * 0.6;
   const textL = [];
   let tr = 0, tg = 0, tb = 0;
@@ -46,13 +50,17 @@ export function boxContrast(a, b, w, h, box, { percentile = 0.05 } = {}) {
     total++;
     if (diffs[k] >= cut) { textL.push(luminance(a[i], a[i + 1], a[i + 2])); tr += a[i]; tg += a[i + 1]; tb += a[i + 2]; }
   }
-  if (textL.length < 4) return null;
+  if (textL.length < 4) return byFill();
   textL.sort((p, q) => p - q);
   const tl = textL[Math.floor(textL.length / 2)];
   const n = textL.length;
-  // each background luminance's contrast with the text, worst first; the worst few pixels decide
+  return worstOf(counts, sample, binL, total, tl, percentile, b, hex(Math.round(tr / n), Math.round(tg / n), Math.round(tb / n)), n);
+}
+
+/** Each background luminance's contrast with the text (luminance tl), worst first; the worst few pixels decide. */
+function worstOf(counts, sample, binL, total, tl, percentile, b, textColor, textPixels) {
   const bins = [];
-  for (let k = 0; k < BINS; k++) if (counts[k]) bins.push([ratio(tl, binL[k]), k]);
+  for (let k = 0; k < counts.length; k++) if (counts[k]) bins.push([ratio(tl, binL[k]), k]);
   bins.sort((p, q) => p[0] - q[0]);
   const want = Math.floor(total * percentile);
   let seen = 0, worst = bins[bins.length - 1];
@@ -60,8 +68,36 @@ export function boxContrast(a, b, w, h, box, { percentile = 0.05 } = {}) {
   const wi = sample[worst[1]];
   return {
     ratio: Math.round(worst[0] * 100) / 100, min: Math.round(bins[0][0] * 100) / 100,
-    textColor: hex(Math.round(tr / n), Math.round(tg / n), Math.round(tb / n)), background: hex(b[wi], b[wi + 1], b[wi + 2]), textPixels: n,
+    textColor, background: hex(b[wi], b[wi + 1], b[wi + 2]), textPixels, ...(textPixels ? {} : { fromFill: true }),
   };
+}
+
+/** The background histogram of a box (frame without the text) against a known text luminance. */
+function worstAgainst(b, w, x0, y0, x1, y1, tl, percentile, textColor, textPixels) {
+  const BINS = 1024;
+  const counts = new Uint32Array(BINS), sample = new Int32Array(BINS).fill(-1), binL = new Float64Array(BINS);
+  let total = 0;
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const i = (y * w + x) * 4;
+    const l = luminance(b[i], b[i + 1], b[i + 2]);
+    const bin = Math.min(BINS - 1, Math.floor(l * BINS));
+    if (counts[bin]++ === 0) { sample[bin] = i; binL[bin] = l; }
+    total++;
+  }
+  return worstOf(counts, sample, binL, total, tl, percentile, b, textColor, textPixels);
+}
+
+/** A solid canvas colour ("#rgb", "#rrggbb", "rgb(…)" or "rgba(…)" with alpha ≥ 0.95) → [r, g, b], else null. */
+export function parseColor(s) {
+  if (typeof s !== 'string') return null;
+  let m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(s.trim());
+  if (m) {
+    const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
+    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  }
+  m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(s.trim());
+  if (m && (m[4] === undefined || Number(m[4]) >= 0.95)) return [1, 2, 3].map((i) => Math.min(255, Number(m[i])));
+  return null;
 }
 
 /** A small greyscale copy of an RGBA frame (cols wide), for comparing frames cheaply. */

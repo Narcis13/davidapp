@@ -423,6 +423,8 @@ export function movePageStart(structure, words, pageIndex, key) {
   const p = pages[pageIndex];
   if (pageIndex > 0 && k <= pages[pageIndex - 1].start) throw new Error(`${JSON.stringify(key)} would leave page ${pageIndex} without words; move it after that page's first word`);
   if (k >= end(pageIndex)) throw new Error(`${JSON.stringify(key)} is not inside page ${pageIndex + 1}; it would leave the page without words`);
+  // the first page has no page before it to take the words it would give up: they would be on no page at all
+  if (pageIndex === 0 && k > p.start) throw new Error(`the first page cannot start later than its first word ${JSON.stringify(words[p.start].key)}: the words before ${JSON.stringify(key)} would be on no page (split the page instead)`);
   if (pageIndex > 0) pages[pageIndex - 1].lines = pages[pageIndex - 1].lines?.filter((l) => l < k);
   p.lines = p.lines?.filter((l) => l > k);
   p.start = k;
@@ -453,9 +455,12 @@ export function toSrt(pages) {
  * @param {{ start: number, end: number, lines: { text: string }[][] }[]} pages
  */
 export function toVtt(pages) {
-  return `WEBVTT\n\n${pages.map((p) => `${stamp(p.start, '.')} --> ${stamp(p.end, '.')}\n${pageText(p)}\n\n`).join('')}`;
+  return `WEBVTT\n\n${pages.map((p) => `${stamp(p.start, '.')} --> ${stamp(p.end, '.')}\n${escapeVtt(pageText(p))}\n\n`).join('')}`;
 }
 const pageText = (p) => p.lines.map((l) => l.map((w) => w.text).join(' ')).join('\n');
+// in WebVTT cue text "&", "<" and ">" are markup ("R&D", "<3", "-->" must be escaped)
+const escapeVtt = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const unescapeVtt = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
 
 const TIME = String.raw`(?:(\d+):)?(\d{1,2}):(\d{2})[.,](\d{1,3})`;
 const TIMING = new RegExp(String.raw`^\s*${TIME}\s*-->\s*${TIME}`);
@@ -487,5 +492,5 @@ export function parseSrt(text) { return parseCues(text); }
  */
 export function parseVtt(text) {
   if (!/^\p{Cf}?WEBVTT/u.test(String(text))) throw new Error('not WebVTT: the text must start with WEBVTT');
-  return parseCues(text);
+  return parseCues(text).map((c) => ({ ...c, text: unescapeVtt(c.text) }));
 }

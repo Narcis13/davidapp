@@ -9,6 +9,7 @@ import { walkParams } from '../core/schema.js';
 import { platformSafe, captionLane } from '../core/platforms.js';
 import { coverageReport } from '../render/glyphs.js';
 import { json } from '../db/db.js';
+import { StudioError } from './library.js';
 
 const r1 = (v) => Math.round(v * 10) / 10;
 const rect = (x, y, width, height) => ({ x: r1(x), y: r1(y), width: r1(width), height: r1(height) });
@@ -94,6 +95,8 @@ export function createInspect(ctx, { clips, compositionOf }) {
    * @param {{ clip?: string, composition?: any, format?: string, t?: number, frame?: number }} o
    */
   async function layoutReport({ clip, composition, format, t = 0, frame }) {
+    if (typeof t !== 'number' || !Number.isFinite(t)) throw new StudioError('t must be a time in seconds');
+    if (frame !== undefined && !Number.isInteger(frame)) throw new StudioError('frame must be a whole frame number');
     const comp = await compositionOf({ clip, composition, format });
     const total = Math.round(comp.duration * comp.fps);
     const n = Math.max(0, Math.min(total - 1, frame ?? Math.round(t * comp.fps)));
@@ -101,14 +104,7 @@ export function createInspect(ctx, { clips, compositionOf }) {
     return { clip: clip ?? null, format: comp.format, width: comp.width, height: comp.height, frame: n, t: n / comp.fps, zones: zonesOf(comp), texts: blocksOf(texts, comp) };
   }
 
-  /** Glyph findings over sampled frames (see glyphFindings). */
-  async function glyphReport(comp, library, frames) {
-    const texts = [];
-    for (const f of frames) texts.push(...(await recordFrame(comp, f)).texts);
-    return glyphFindings(texts, comp, library);
-  }
-
-  return { layoutReport, recordFrame, glyphReport };
+  return { layoutReport, recordFrame };
 }
 
 /** Text-bearing string params of an item (every string, recursively, defaults included), to check against the fonts the item draws with. */

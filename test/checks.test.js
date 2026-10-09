@@ -117,3 +117,18 @@ test('render_clip_frame overlays: the guides and the measured boxes are drawn on
   const some = await call('render_clip_frame', { clip: 'bad', t: 3, overlays: ['lane'] });
   assert.deepEqual(some.overlays, ['lane']);
 });
+
+test('contrast: text nearly the colour of its background is measured from its recorded fill, not skipped', async () => {
+  const { boxContrast, parseColor } = await import('../src/render/contrast.js');
+  const w = 20, h = 10;
+  const frame = (v) => { const p = new Uint8Array(w * h * 4); for (let i = 0; i < p.length; i += 4) { p[i] = p[i + 1] = p[i + 2] = v; p[i + 3] = 255; } return p; };
+  const bg = frame(0x7a), withText = frame(0x7a);
+  for (let x = 5; x < 15; x++) { const i = (5 * w + x) * 4; withText[i] = withText[i + 1] = withText[i + 2] = 0x80; }
+  const box = { x: 2, y: 2, width: 16, height: 6 };
+  assert.equal(boxContrast(withText, bg, w, h, box), null, 'without a fill the change is too small to judge');
+  const r = boxContrast(withText, bg, w, h, box, { fill: '#808080' });
+  assert.ok(r && r.fromFill && r.ratio < 1.2, `measured from the fill: ${JSON.stringify(r)}`);
+  assert.equal(boxContrast(withText, bg, w, h, box, { fill: 'rgba(128, 128, 128, 0.5)' }), null, 'a translucent fill is not a solid colour');
+  assert.deepEqual(parseColor('#fff'), [255, 255, 255]);
+  assert.equal(parseColor('gradient'), null);
+});

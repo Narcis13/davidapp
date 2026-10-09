@@ -281,7 +281,7 @@ const handlers = {
       const b2 = bareSurface(comp.width, comp.height);
       state.rt.renderClipFrame(b2.getContext('2d', FRAME_CONTEXT), comp, msg.frame, { ...state.clip, suppressText: true });
       const b = new Uint8Array(b2.data());
-      for (const t of texts) t.contrast = boxContrast(a, b, comp.width, comp.height, t.box);
+      for (const t of texts) t.contrast = boxContrast(a, b, comp.width, comp.height, t.box, { fill: t.fill });
     }
     const thumb = thumbGray(a, comp.width, comp.height);
     return { result: { texts, thumb, std: grayStd(thumb) }, transfer: [thumb.buffer] };

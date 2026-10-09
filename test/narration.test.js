@@ -132,6 +132,10 @@ test('words reach assets as f.clip.words; anchors land within 2 frames of their 
   // anchors that point nowhere are refused with the reason
   await assert.rejects(studio.clips.editClip('voiced', [{ op: 'update_item', id: 'hit', patch: { anchor: { item: 'vo', word: 99 } } }]), /there is no word 99/);
   await assert.rejects(studio.clips.editClip('voiced', [{ op: 'update_item', id: 'hit', patch: { anchor: { item: 'lit', word: 1 } } }]), /not a narration/);
+  // a narration anchored to itself (or anchored at all) would move on every save
+  await assert.rejects(studio.clips.editClip('voiced', [{ op: 'update_item', id: 'vo', patch: { anchor: { item: 'vo', word: 1 } } }]), /anchored itself/);
+  // an unknown platform profile is a validation error that names the profiles
+  await assert.rejects(studio.clips.updateClip('voiced', { composition: { ...moved, platforms: ['instagram'] } }), /unknown platform "instagram".*reels/);
 });
 
 test('caption pages come from the words; the highlight follows the real word times; edits keep the words the source of times', async () => {

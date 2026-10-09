@@ -10,6 +10,7 @@ import { defaultWorkers } from '../render/video.js';
 import { grayDiff } from '../render/contrast.js';
 import { drawOverlays } from '../render/overlays.js';
 import { zonesOf, glyphFindings, textOf } from './inspect.js';
+import { StudioError } from './library.js';
 
 export const CHECKS = ['safe-zone', 'clipped', 'overlap', 'caption-lane', 'size', 'contrast', 'hold', 'captions', 'glyphs', 'first-frame', 'last-frame'];
 const DEFAULTS = { minTextSize: 2.5, contrast: 4.5, step: 0.5, lastHold: 2, overlapShare: 0.04 };
@@ -26,15 +27,18 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
    * Check a clip (or a time range of it). o: { clip | composition, format, from, to, step (seconds between sampled frames, default
    * 0.5), stills (default true), only: [check names] } → { clip, format, frames, seconds, issues: [{ check, severity, item, t, frame, until?,
    * message, numbers, still? }], counts }.
-   * @param {{ clip?: string, composition?: any, format?: string, from?: number, to?: number, step?: number, stills?: boolean, only?: string[] }} o
+   * @param {{ clip?: string, composition?: any, format?: string, from?: number, to?: number, step?: number, stills?: boolean, only?: string[], name?: string }} o (name: what a draft's stills are called, e.g. the clip it was edited from)
    */
-  async function checkClip({ clip, composition, format, from = 0, to, step, stills = true, only }) {
+  async function checkClip({ clip, composition, format, from = 0, to, step, stills = true, only, name }) {
     const t0 = performance.now();
+    for (const [k, v] of Object.entries({ from, to, step })) if (v !== undefined && v !== null && (typeof v !== 'number' || !Number.isFinite(v) || v < 0)) throw new StudioError(`${k} must be a number of seconds ≥ 0`);
+    if (step !== undefined && step !== null && step < 0.04) throw new StudioError('step is the time between sampled frames: at least 0.04 s');
+    if (only !== undefined && (!Array.isArray(only) || !only.every((c) => CHECKS.includes(c)))) throw new StudioError(`only lists checks by name: ${CHECKS.join(', ')}`);
     const comp = await compositionOf({ clip, composition, format });
     const opt = { ...DEFAULTS, ...(comp.checks ?? {}) };
     const fps = comp.fps, total = Math.round(comp.duration * fps);
     const end = Math.min(comp.duration, to ?? comp.duration);
-    const a = Math.max(0, Math.min(total - 1, Math.round(from * fps))), b = Math.max(a, Math.min(total - 1, Math.round(end * fps) - (end >= comp.duration ? 1 : 0)));
+    const a = Math.max(0, Math.min(total - 1, Math.round(from * fps))), b = Math.max(a, Math.min(total - 1, Math.round(end * fps) - 1));
     const every = Math.max(1, Math.round((step ?? opt.step) * fps));
     const frames = new Set();
     for (let f = a; f <= b; f += every) frames.add(f);
@@ -65,8 +69,12 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
     const allTexts = [];
     const seen = new Map();
     try {
-      const measured = await Promise.all([...frames].sort((x, y) => x - y).map((f) => pool.run('inspectFrame', { frame: f, contrast: want('contrast') }, { bundle, timeout: 120000 }).then((r) => ({ f, ...r }))));
-      for (const { f, texts, std } of measured) {
+      // a frame whose text cannot fit at its size floor throws (TextFloorError): that is an issue at that time, not a failed check
+      const floorError = (e) => /^TextFloorError\b/.test(String(e?.assetStack ?? ''));
+      const measured = await Promise.all([...frames].sort((x, y) => x - y).map((f) => pool.run('inspectFrame', { frame: f, contrast: want('contrast') }, { bundle, timeout: 120000 })
+        .then((r) => ({ f, ...r }), (e) => { if (!floorError(e)) throw e; return { f, floorError: e.message, texts: [], std: 99 }; })));
+      for (const { f, texts, std, floorError: fe } of measured) {
+        if (fe && want('size')) issue('size', `floor|${fe}`, f, { severity: 'error', item: null, message: `Text does not fit at its size floor: ${fe}`, numbers: {} });
         if (f === 0 && want('first-frame') && std < 2) issue('first-frame', 'f0', 0, { severity: 'error', item: null, message: 'The first frame is empty: a single flat colour (it is the thumbnail many feeds show).', numbers: { spread: r2(std) } });
         const blocks = groupBlocks(texts).map((x) => ({ ...x, caption: captionItems.has(x.item), screenPct: x.screenSize === null ? null : Math.round((x.screenSize / Math.min(comp.width, comp.height)) * 1000) / 10 }));
         for (const t of texts) if (t.family) allTexts.push(t);
@@ -108,12 +116,12 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
       // the last frame holds for at least 2 s (a feed loops; a viewer needs a moment on the end card)
       if (want('last-frame') && b === total - 1) {
         const back = Math.min(total - 1, Math.round((opt.lastHold + 0.5) * fps));
-        const tail = await Promise.all(Array.from({ length: back + 1 }, (_, i) => total - 1 - i).map((f) => pool.run('inspectFrame', { frame: f, contrast: false }, { bundle, timeout: 120000 }).then((r) => ({ f, thumb: r.thumb }))));
+        const tail = await Promise.all(Array.from({ length: back + 1 }, (_, i) => total - 1 - i).map((f) => pool.run('inspectFrame', { frame: f, contrast: false }, { bundle, timeout: 120000 }).then((r) => ({ f, thumb: r.thumb }), (e) => { if (!floorError(e)) throw e; return { f, thumb: null }; })));
         const last = tail[0].thumb;
         let changed = null;
-        for (const x of tail) if (grayDiff(x.thumb, last) > 1.5) { changed = x.f; break; }
+        for (const x of tail) if (x.thumb && last && grayDiff(x.thumb, last) > 1.5) { changed = x.f; break; }
         const held = changed === null ? back / fps : (total - 1 - changed) / fps;
-        if (held < opt.lastHold) issue('last-frame', 'last', total - 1, { severity: 'error', item: null, message: `The last frame is held for ${r2(held)} s; it should hold for at least ${opt.lastHold} s.`, numbers: { held: r2(held), needs: opt.lastHold, lastChange: changed === null ? null : r2(changed / fps) } });
+        if (last && held < opt.lastHold) issue('last-frame', 'last', total - 1, { severity: 'error', item: null, message: `The last frame is held for ${r2(held)} s; it should hold for at least ${opt.lastHold} s.`, numbers: { held: r2(held), needs: opt.lastHold, lastChange: changed === null ? null : r2(changed / fps) } });
       }
     } finally {
       await pool.destroy();
@@ -139,9 +147,13 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
       const cache = new Map();
       for (const [n, it] of issues.slice(0, 40).entries()) {
         let png = cache.get(it.frame);
-        if (!png) { png = (await clipFrame({ composition: comp, frame: it.frame, maxSize: 960 })).png; cache.set(it.frame, png); }
+        if (!png) {
+          // a frame that cannot be drawn (text that does not fit at its floor) has no still
+          try { png = (await clipFrame({ composition: comp, frame: it.frame, maxSize: 960 })).png; } catch { continue; }
+          cache.set(it.frame, png);
+        }
         const shot = await drawOverlays(png, { width: comp.width, height: comp.height, zones, show: ['safe', 'platform', 'lane'], highlight: it.box ? { box: it.box, label: it.check } : [] });
-        it.still = saveFrame(`check-${clip ?? 'draft'}${format ? `-${format}` : ''}-${String(n + 1).padStart(2, '0')}-${it.check}`, shot);
+        it.still = saveFrame(`check-${clip ?? name ?? 'draft'}${format ? `-${format}` : ''}-${String(n + 1).padStart(2, '0')}-${it.check}`, shot);
       }
     }
     for (const it of issues) { delete it.worse; }
