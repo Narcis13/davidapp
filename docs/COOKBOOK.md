@@ -80,6 +80,52 @@ request: claim it again and propose again.
 `composition.theme: 'theme-ember'` (a value asset) is read by every asset as `f.theme`. Write new
 assets to default to it (`f.theme?.accent ?? p.color`), and a whole clip changes brand with one line.
 
+## A voice, its words, captions
+
+1. Get the take (a voice service, a local model, a recording) and its word times (the service's word list or
+   character alignment, or whisper.cpp: `whisper-cli -m ggml-small.en.bin -f take-16k.wav -ojf`). Then
+   `add_narration { name, path, script, timings | timings_path, transcripts: [two transcripts], voice: { name, license } }`.
+   It aligns the timings to the script (word *i* is the script's word *i*), and the transcript check names slips,
+   drops and insertions after normalising case, punctuation and numerals; with two independent transcripts a word
+   is wrong only when both say so. `check_transcript` runs the same check alone.
+2. Put it on an audio track with `role: 'narration'`. Every asset now reads `f.clip.words` in clip time.
+3. Pin visuals to words with `anchor: { item, word, offset }` on an item, a keyframe or a marker; `anchor_report`
+   shows how far each is from its word. A new take: `add_narration` with the same name, then
+   `repin_clip { only: ['<narration>'] }`: everything anchored follows.
+4. Captions: `composition.captions: {}` and a `text-captions@2` item on a track with `role: 'captions'`.
+   `caption_pages` shows the pages and any rule they break; `edit_clip` with `caption_split { at }`,
+   `caption_merge { page }`, `caption_break { page, at }`, `caption_move { page, at }`, `caption_auto` changes the
+   structure (times stay the words'). `burnIn: false` keeps them in the SRT/VTT files only.
+
+## The mix
+
+- Gain automation: `keyframes: { volume: [{ t, v (dB), ease }] }` on an audio item. Ducking under the voice:
+  `duck: { by: 18, attack: 0.15, release: 0.45, source: 'words' }` on the music.
+- `loudness: { target: -14, truePeak: -1 }` on the clip: the render reaches it with one gain, limits the peaks
+  first only when it must, measures the encoded file (FFmpeg ebur128) and corrects it once more if AAC moved it.
+- `audio_report` before rendering: the master stage, loudness, the music's distance under the voice (LU) where it
+  speaks, silences, clipping. `export_stems { groups: { voice: ['voice'], music: ['music'] } }` for WAV stems.
+
+## Checks before and after a render
+
+- `check_clip` (a clip, a range, a draft, or the clip in another format): every issue with its item, time,
+  numbers and a still. Fix them before rendering: text on a solid plate passes contrast, the safe zone is
+  `title-safe ∩ f.safe ∩ the platform zone`, the caption lane is for captions only, and the end holds still
+  for 2 s. `layout_report` and `render_clip_frame { overlays: true }` show the measured boxes and the zones.
+- `platforms: ['youtube', 'shorts']` applies YouTube's zones to the horizontal render and Shorts' to the
+  vertical one; `safe: 'platform'` makes `f.safe` follow them.
+- After `start_render`, `render_report { id, sheets: true }`: the MP4's facts, loudness, black frames, freezes
+  (mark intended stills with a `hold` marker), brightness jumps (fine on a `cut` marker), flashes, silences,
+  where the narration sits, and frame sheets from the encoded file. The studio shows the same per render.
+- Markers have types: `cut`, `hold`, `beat`, `word`, `note` (`edit_clip` `add_marker`, `update_marker`, `remove_marker`).
+
+## Keep assets/ and the library in step
+
+`npm run sync-assets` pushes `assets/` into the library and never undoes a change made in the studio: when
+the library's newest version did not come from the files (an accepted proposal, a playground save) it stops
+and names the conflict. `npm run sync-assets -- --pull <name>` writes the library's version into `assets/`;
+`--force` syncs the file anyway.
+
 ## Measure
 
 `compounding_report` lists, per clip, the MCP calls, new lines of asset code, the reuse share and

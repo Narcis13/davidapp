@@ -36,7 +36,7 @@ asset({
 ```
 
 `asset()` takes only these keys: `kind`, `title`, `description`, `tags`, `duration`, `formats`,
-`params`, `uses`, `render`, `preview`. `uses` is a list (`['easing', 'lower-third@2']`) or a map of
+`params`, `uses`, `render`, `preview`, `floor` (the default size floor of its text, see `f.lib.text`). `uses` is a list (`['easing', 'lower-third@2']`) or a map of
 aliases (`{ base: 'lower-third@2' }`).
 
 ## The rules
@@ -62,7 +62,10 @@ aliases (`{ base: 'lower-third@2' }`).
 | `f.width`, `f.height`, `f.vmin`, `f.vmax`, `f.aspect`, `f.format` | The box this asset draws in. `vmin` is 1% of the shorter side. |
 | `f.safe` | `{ x, y, width, height, top, right, bottom, left }`: the area clear of platform UI. Keep text inside it. |
 | `f.rng`, `f.seed` | Seeded random: `f.rng()`, `.range(a, b)`, `.int(a, b)`, `.pick(list)`, `.bool(p)`, `.gauss()`, `.shuffle(list)`, `.fork(key)`. The sequence restarts every frame, so the n-th call always returns the same number. `f.seed` is the number it starts from (different for every item). |
-| `f.clip` | `{ t, frame, duration, fps, width, height, format, beats, markers }`: the clip around this asset. `beats` are seconds found in the clip's audio. |
+| `f.clip` | `{ t, frame, duration, fps, width, height, format, beats, markers }`: the clip around this asset. `beats` are seconds found in the clip's audio; `markers` are `{ t, type (cut, hold, beat, word, note; none = note), label, duration? }`. When the clip has them, also `words`, `captions` and `lane` (below). |
+| `f.clip.words` | The narration's words in clip time, sorted: `[{ key: "<item>:<i>", item, i, text, start, end, missing? }]`. `i` is the word's index in the narration's script, the same in every take. Draw on a word: `f.clip.words.find((w) => f.clip.t >= w.start && f.clip.t < w.end)`. |
+| `f.clip.captions` | The caption pages the studio built from the words (when `composition.captions` is set): `[{ index, start, end, text, lines: [[word, …], …] }]`, each word `{ key, text, start, end }`. `text-captions@2` draws them. |
+| `f.clip.lane` | The caption lane in frame pixels `{ x, y, width, height }`: a band at the bottom of the tightest safe zone (the format's, or the clip's platform profile for this format). Captions go there and nothing else does. |
 | `f.theme` | The value of the clip's theme asset (`composition.theme`), or `null` when the clip has none (and in the playground). Default to it: `f.theme?.accent ?? p.color`. |
 | `f.use(name, params, opts)` | Compose another asset. Visual: draws it; opts `{ x, y, width, height, at, duration, t, hold, alpha, key, ctx }`. Value: returns its value. |
 | `f.image(name)` | A loaded image asset for `ctx.drawImage` (has `width`, `height`). |
@@ -88,6 +91,23 @@ aliases (`{ base: 'lower-third@2' }`).
   `emWeight`, `emItalic`, `transform`. Every line, word and glyph has `x`, `y` (baseline), `top`, `width`,
   `height`, `index`; words and glyphs also have `em`, `line` and `pos` (typing position). Emoji are single
   glyphs. Draw with `fill(ctx, L, x, y, { color, emColor })`, `fillLine`, `fillWord`, `fillGlyph`, `strokeWord`.
+  - **`floor`** (opt-in): the smallest on-screen size, as a percentage of the *frame's* short side (not `f.vmin`,
+    which is the item's box), converted through the context's current transform. `fit` stops there; a text that
+    still overflows, truncates or breaks a word at the floor throws a `TextFloorError` ("text … cannot be drawn at
+    its size floor (3% of the frame's short side, 32.4 px on screen): it needs more than 2 lines"): the validator
+    rejects the asset and the render fails with the item and the time. No ellipsis. An asset can declare a default
+    for all its layouts: `asset({ floor: 2.6, … })`. Without a floor nothing changes.
+  - **`role: 'ticker'`**: text that scrolls past and is not meant to be read in full (a word ribbon, a news ticker).
+    `check_clip` does not hold it to reading time (it still checks size, contrast and safe zones).
+  - **Measured:** everything drawn through these functions is recorded (when the studio asks): its ink box in frame
+    pixels after the item's transform, keyframes and motions, its font, size in the asset and on screen, colour,
+    opacity and item. That is the layout report, the text overlay and what `check_clip` measures. Text drawn with
+    raw `ctx.fillText` is not measured: draw text through `f.lib.text`. 3D block letters (`f.lib.solid.text`) are
+    measured too.
+  - **Fonts:** every bundled family covers Latin and Latin Extended (ă, â, î, ș, ț and the rest): the extended
+    glyphs come from the family's own `<Family> Ext` file, which the font string names right after the family.
+    The studio flags characters no bundled font has (they would fall back to a system font) when an asset is
+    validated and when a clip is saved.
 - **beat**: `at(t, beats)`, `pulse(t, beats, decay)`, `count(t, beats)`.
 - **noise**: `noise(seed)(x, y, z)` and `fbm(seed, octaves)(x, y, z)` in −1..1.
 - **audio** (for `kind: 'audio'`): `buffer(seconds)`, `tone({ freq, dur, wave, gain, decay })`,
@@ -418,14 +438,61 @@ fields below is drawn exactly as before they existed, so old clips keep their pi
 - **`composition.theme`**: the reference of a value asset; every asset in the clip reads its value
   as `f.theme`.
 
+### Narration, words, captions and the mix (iteration 3)
+
+```js
+{
+  loudness: { target: -14, truePeak: -1 },          // or true; the render reaches it with one gain (limiting first only if it must)
+  platforms: ['youtube', 'shorts'], safe: 'platform', // zones per format (tightest edge wins); f.safe follows them, opt-in
+  captions: { maxLines: 2, maxChars: 32, lead: 2, minDuration: 0.8, closeGap: 0.3, burnIn: true, pages: [{ start: 'vo:0', lines: ['vo:6'] }] },
+  checks: { minTextSize: 2.5, contrast: 4.5 },       // thresholds for check_clip
+  markers: [{ t: 4.8, type: 'cut', label: 'bar 3' }, { t: 0, type: 'word', anchor: { item: 'vo', word: 67 } }, { t: 58, type: 'hold', duration: 4 }],
+  tracks: [
+    { id: 'caps', type: 'text', role: 'captions', items: [{ id: 'cap', asset: 'text-captions', start: 0, duration: 62 }] },
+    { id: 'titles', type: 'text', items: [{ id: 'hit', asset: 'title-plate', start: 0, duration: 5, anchor: { item: 'vo', word: 67, offset: -0.1 },
+      keyframes: { 'params.progress': [{ t: 0, v: 0 }, { t: 0, v: 1, anchor: { item: 'vo', word: 70 } }] } }] },
+    { id: 'voice', type: 'audio', role: 'narration', items: [{ id: 'vo', asset: 'clip-7-voice', start: 1, duration: 61 }] },
+    { id: 'music', type: 'audio', role: 'music', items: [{ id: 'bed', asset: 'music-loop', start: 0, duration: 62, gain: 0.5,
+      keyframes: { volume: [{ t: 0, v: -12 }, { t: 1.2, v: 0, ease: 'outCubic' }] },
+      duck: { by: 18, attack: 0.15, release: 0.45, hold: 0.25, source: 'words' } }] },
+  ],
+}
+```
+
+- **A narration** is a sound asset with words (`add_narration`): its script, and every script word's time,
+  imported from a word list, character alignment or whisper.cpp JSON and aligned to the script. A new take
+  is a new version of the same asset; word *i* is the same word in every take.
+- **`anchor: { item, word, edge: start|end, offset }`** on an item (its start), a keyframe (its `t`) or a
+  marker (its `t`): the studio sets the time from the narration item's word whenever the clip is saved, so
+  a new take (after `repin_clip`) keeps every visual on its word. `anchor_report` gives each distance in frames.
+- **Markers** are `{ t, type, label, duration? }`: `cut` (a scene change: brightness jumps there are fine,
+  sheets show the middle of every cut), `hold` (`duration` seconds where a still picture is intended), `beat`,
+  `word` (with an anchor), `note`. A marker in the old shape `{ t, label }` is a note.
+- **Audio items**: `gain` (linear) × `keyframes.volume` (dB, eased with `linear`, `hold`, `smooth`,
+  `in/out/inOut` × `Sine/Quad/Cubic`) × fades × `duck` (down `by` dB while the narration speaks — its words,
+  or with `source: 'envelope'` the sound of the `under` tracks above `threshold` dBFS — reaching the full dip
+  `attack` seconds *before* each stretch and coming back over `release`). The mix is made in the studio and
+  is the same WAV in the preview and the render.
+- **`captions`**: pages built from the words by the rules (at most `maxLines` lines of about `maxChars`
+  characters — 32 in 16:9, 20 otherwise —, breaks at phrases, numbers with their units and names kept whole,
+  a page on its first word or up to `lead` frames before, at least `minDuration`, gaps under `closeGap` closed).
+  `pages` (optional) fixes the structure as word keys `"<item>:<i>"`; times always come from the words. A track
+  with `role: 'captions'` is not drawn when `burnIn: false` (file only). Every render writes SRT, WebVTT and the
+  words as JSON.
+
 ## Conventions
 
-- Captions: an asset with a `cues` parameter (`[{ start, end, text }]`, seconds relative to the item)
-  is exported to SRT alongside the MP4.
+- Captions: with `composition.captions`, the pages built from the narration's words are exported (SRT, VTT);
+  otherwise an asset with a `cues` parameter (`[{ start, end, text }]`, seconds relative to the item) is
+  exported to SRT alongside the MP4. `text-captions@2` draws word-timed pages in the caption lane.
+- Text that must be read sits on something solid (a plate, a pill): `check_clip` measures contrast against
+  the worst pixels behind each text box, so a busy background behind bare text fails. Keep it out of the
+  caption lane, inside the safe zone, at least `checks.minTextSize` (2.5 %) of the short side, and on screen
+  for words / 3 + 1 seconds.
 - A theme is a `value` asset returning `{ bg, bgAlt, surface, ink, muted, accent, accent2, accent3,
   fonts, motion }` (see `theme-ember`, `theme-tide`). Scenes take it as a parameter of type `asset`,
   or read the clip's as `f.theme`.
 - The library names assets by family (names weigh most in search and `suggest_assets`):
   `motion-*`, `trans-*`, `fx-*`, `mask-*`, `*-3d`, `text-*`, `bg-*`, `theme-*`.
 - Fonts bundled with the studio (all OFL): Inter (400/600/800), Space Grotesk (400/700), JetBrains Mono
-  (400/700), Anton (400), Playfair Display (700/900, 700 italic). Emoji fall back to the system emoji font.
+  (400/700), Anton (400), Playfair Display (700/900, 700 italic), each with its Latin Extended file. Emoji fall back to the system emoji font.

@@ -13,7 +13,7 @@ Claude Code answers with a proposal, and you compare it with what is there and a
 
 ## The showcase
 
-Six clips, made in order through the MCP server. Each one grew the library and the next one reused it.
+Eight clips, made in order through the MCP server. Each one grew the library and the next one reused it.
 
 Clips 1 to 3, each 32 seconds:
 
@@ -43,6 +43,23 @@ of code and reuse are read from the library. `scripts/reports-v2.mjs` writes the
 | 4 · Direct the studio | 30 s | 40 | 242 | 60 % | 371 s |
 | 5 · A library in 3D | 60 s | 20 | 123 | 64 % | 255 s |
 | 6 · What the library holds | 90 s | 7 | 0 | 100 % | 76 s |
+
+Clips 7 and 8 are finished videos, made through the gates of a motion process (brief, script, style frames,
+transitions, animatic, final; the gate messages are in [work/](work/README.md)) and checked by the studio
+itself: `check_clip` on every frame sampled, the mix measured, the encoded file measured.
+
+| | clip | format | what it adds | what it reuses |
+|---|---|---|---|---|
+| [![clip 7](docs/showcase/v3/sheets/clip-7-poster.png)](https://github.com/Narcis13/davidapp/releases/download/showcase-v3/clip-7-a-video-that-checks-itself.mp4) | [**A video that checks itself**](https://github.com/Narcis13/davidapp/releases/download/showcase-v3/clip-7-a-video-that-checks-itself.mp4) | horizontal 1920×1080, 62 s, voiced, captions burned in; the same composition [vertical](https://github.com/Narcis13/davidapp/releases/download/showcase-v3/clip-7-a-video-that-checks-itself-vertical.mp4) | a narration (Kokoro-82M, word times from whisper.cpp), 5 assets (title-plate, word-strip, duck-meter, check-list, end-card), text-captions v2; 31 visuals and markers anchored to their words | the background, particles, drift, music and theme from earlier clips |
+| [![clip 8](docs/showcase/v3/sheets/clip-8-poster.png)](https://github.com/Narcis13/davidapp/releases/download/showcase-v3/clip-8-cuvinte-pe-ritm.mp4) | [**Cuvinte pe ritm**](https://github.com/Narcis13/davidapp/releases/download/showcase-v3/clip-8-cuvinte-pe-ritm.mp4) | vertical 1080×1920, 38.4 s, for Reels, in Romanian, cut on the music's bars | nothing: no new asset code | everything clip 7 made, the beat bars from clip 1 |
+
+| clip | length | MCP calls | new lines of asset code | timeline items reusing existing assets | build time |
+|---|---|---|---|---|---|
+| 7 · A video that checks itself | 62 s | 49 | 908 | 20 % | 906 s |
+| 8 · Cuvinte pe ritm | 38.4 s | 16 | 0 | 100 % | 151 s |
+
+Both measure −14 LUFS (±0.2) with a true peak under −1 dBTP on the encoded file; in clip 7 the music sits
+16.8 LU under the voice where it speaks. Evidence: [docs/showcase/v3](docs/showcase/v3/INDEX.md).
 
 The MP4s are attached to the [`showcase-v1`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v1)
 and [`showcase-v2`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v2) releases (videos
@@ -381,6 +398,39 @@ What makes the next clip cheaper than the last:
   by `npm run showcase` replays the calls in seconds, so the table under "The showcase" takes its
   calls and build times from the journals of the live build (`scripts/reports-v2.mjs`).
 
+## Finished videos, checked by the studio
+
+What a voiced, captioned motion-graphics video needs, inside the studio (iteration 3):
+
+- **Narrations.** A voice plus its script and the time of every word (`add_narration`), imported from what
+  voice services and aligners return (word lists, ElevenLabs character alignment, whisper.cpp JSON) and aligned
+  to the script, so word *i* is the same word in every take. Every asset reads the words as `f.clip.words`.
+  A **transcript check** names slips, drops and insertions against the script (case, punctuation and numerals
+  do not count; with two independent transcripts a word is wrong only when both say so).
+- **Word anchors.** An item's start, a keyframe or a marker pinned to a word lands on it and stays there when the
+  take changes (`anchor_report` gives the distance in frames).
+- **Captions from the words.** Pages built by the rules (two lines, ~32 or 20 characters, phrase breaks, numbers
+  with their units, names whole, on the first word or up to 2 frames early, at least 0.8 s), adjustable over MCP
+  and in the composition; `text-captions@2` lights each word at its real time in the caption lane; every render
+  writes SRT, WebVTT and the words as JSON; burned in or file only.
+- **A real mix.** Gain automation in dB, ducking under the narration (from its words or its envelope), a loudness
+  target reached with one gain (limiting the peaks first only when it must, and saying so), EBU R128 measured on
+  every render, stems, and a report of how far the music sits under the voice, silences and clipping. The preview
+  plays the same WAV the render encodes.
+- **Text that cannot fail silently.** Size floors (a text that cannot fit at its floor is an error, never an
+  ellipsis), a layout report of every text in frame pixels, glyph coverage from the fonts' own tables, Latin
+  Extended in every bundled family, overlays (grid, title-safe, action-safe, platform zones, caption lane, text
+  boxes) in the editor and in `render_clip_frame`, platform profiles (YouTube, Shorts, Reels, TikTok, a generic
+  feed; sources in `src/core/platforms.js`) and **`check_clip`**: text outside its safe zone or cut by the frame,
+  overlapping text, text in the caption lane, under its size floor, under 4.5:1 contrast against the worst pixels
+  behind it, held too briefly, caption rule breaks, missing glyphs, an empty first frame, a last frame held under
+  2 s, each with its item, time, numbers and a still. The editor lists them and jumps to each.
+- **The render report**, from the encoded file: the MP4's facts, loudness, black frames, freezes (outside hold
+  markers), brightness jumps (outside cut markers), flashing, silences, where the narration sits, and frame sheets
+  with the times drawn in. Typed markers (cut, hold, beat, word, note) on the timeline feed the checks.
+- **Inspection** in another format and from an unsaved draft (`render_clip_frame`, `frame_hashes`, sheets).
+- **`sync-assets` never undoes a studio change**: it stops on a conflict and can `--pull` the library's version.
+
 ## How it works
 
 ```
@@ -432,5 +482,9 @@ Fonts are bundled under the SIL Open Font License 1.1 (Inter, Space Grotesk, Jet
 Playfair Display); their licenses are in [fonts/licenses](fonts/licenses). All showcase graphics
 are drawn by code in this repository and all audio is synthesized by its audio assets; the
 pictures uploaded in clips 4 and 5 are made by [showcase/uploads/make.mjs](showcase/uploads/make.mjs)
-and the SVG logo is handwritten. There is no third-party media. Emoji fall back to the operating
-system's emoji font.
+and the SVG logo is handwritten. Emoji fall back to the operating system's emoji font.
+
+Clip 7's narration was generated locally with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)
+(voice `af_heart`, Apache-2.0, through kokoro-js, Apache-2.0) and timed with whisper.cpp (MIT, Whisper weights
+MIT); the voice file and its word timings are in [showcase/voice](showcase/voice) and the licences in
+[docs/showcase/v3/LICENSES.md](docs/showcase/v3/LICENSES.md). The models are not in the repository.

@@ -104,7 +104,7 @@
 .badge.rel-reused { color: var(--ok); border-color: rgba(124, 245, 192, 0.45); }
 .badge.rel-new-version { color: var(--accent-2); border-color: rgba(255, 92, 138, 0.5); }
 
-.tl-toolbar { display: flex; align-items: center; gap: var(--s2); }
+.tl-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
 .tl-zoom { display: flex; align-items: center; gap: var(--s2); color: var(--muted); font-size: 12.5px; font-weight: 600; }
 .tl-zoom input { width: 120px; }
 .timeline { position: relative; --head: 128px; --row: 38px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-2); overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
