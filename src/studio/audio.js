@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { SAMPLE_RATE } from '../core/engine.js';
 import { itemsOf } from '../core/composition.js';
 import { mixInputs, duckCurve, wordRegions, envelopeRegions, limit, reachTarget, applyGainDb, silences, clipping } from '../render/mix.js';
-import { measureLoudness, loudnessOver } from '../render/loudness.js';
+import { measureLoudness, loudnessOver, truePeak } from '../render/loudness.js';
 import { encodeWav } from '../render/wav.js';
 import { ffmpegPath, run } from '../render/ffmpeg.js';
 import { json } from '../db/db.js';
@@ -252,13 +252,16 @@ export function createAudio(ctx, library, clips) {
   async function correctedMix(mixPath, target, measured) {
     const { left, right } = await decode(mixPath);
     const gainDb = target.target - measured.integrated;
-    const ceiling = target.truePeak - 0.3;
+    // the encoder raised the peaks by about (file − this mix): aim under the ceiling by that much, and a little more
+    const overshoot = Math.max(0, measured.truePeak - (truePeak(left, right, SAMPLE_RATE) + gainDb));
+    const ceiling = target.truePeak - overshoot - 0.3;
     let src = { left, right }, limitDb = null;
     if (measured.truePeak + gainDb > ceiling) { limitDb = ceiling - gainDb; src = limit(left, right, { ceilingDb: limitDb }); }
     const out = applyGainDb(src.left, src.right, gainDb);
     const path = mixPath.replace(/\.wav$/, `.fix-${sha1(JSON.stringify([target, measured])).slice(0, 10)}.wav`);
     writeFileSync(path, encodeWav(out.left, out.right, SAMPLE_RATE));
-    const note = `The encoded file measured ${r2(measured.integrated)} LUFS and ${r2(measured.truePeak)} dBTP; its audio was corrected by ${gainDb >= 0 ? '+' : ''}${r2(gainDb)} dB${limitDb !== null ? ` after limiting the peaks to ${r2(limitDb)} dBTP` : ''} and encoded again.`;
+    const n = (v, sign = false) => `${v < 0 ? '−' : sign ? '+' : ''}${Math.abs(r2(v))}`;
+    const note = `The encoded file measured ${n(measured.integrated)} LUFS and ${n(measured.truePeak)} dBTP; its audio was corrected by ${n(gainDb, true)} dB${limitDb !== null ? ` after limiting the peaks to ${n(limitDb)} dBTP` : ''} and encoded again.`;
     return { path, gainDb: r2(gainDb), limitDb: r2(limitDb), note };
   }
 

@@ -179,16 +179,21 @@ export function createRenders(ctx, library, clips, sound) {
       let loudnessSeconds = 0;
       const loud = { measured: report.loudness, master: await sound.masterInfo(comp) };
       if (comp.loudness) {
-        // AAC moves the peaks a little: a file that misses the target is corrected once with a fixed gain (and the limiter if it must)
+        // AAC moves the peaks a little: a file that misses the target is corrected (at most twice) with a fixed gain, and the
+        // limiter if it must, each time from the mix that was just encoded and against the overshoot that encoding showed
         const l0 = performance.now();
-        const off = comp.loudness.target - report.loudness.integrated;
-        if (Math.abs(off) > 0.5 || report.loudness.truePeak > comp.loudness.truePeak) {
-          const fixed = await sound.correctedMix(mixPath, comp.loudness, report.loudness);
+        const misses = (m) => Math.abs(comp.loudness.target - m.integrated) > 0.5 || m.truePeak > comp.loudness.truePeak;
+        let base2 = mixPath;
+        const notes = [];
+        for (let round = 0; round < 2 && misses(report.loudness); round++) {
+          const fixed = await sound.correctedMix(base2, comp.loudness, report.loudness);
           await replaceAudio(outPath, fixed.path);
-          loud.correction = fixed.note;
+          notes.push(fixed.note);
+          base2 = fixed.path;
           report = await analyseFile(outPath, reportOpts);
           loud.measured = report.loudness;
         }
+        if (notes.length) loud.correction = notes.join(' ');
         loud.target = comp.loudness;
         loud.met = Math.abs(comp.loudness.target - report.loudness.integrated) <= 1 && report.loudness.truePeak <= comp.loudness.truePeak;
         loudnessSeconds = (performance.now() - l0) / 1000;

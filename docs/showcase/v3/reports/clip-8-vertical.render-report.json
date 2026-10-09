@@ -1,0 +1,103 @@
+{
+ "render": 9,
+ "clip": "clip-8-cuvinte-pe-ritm",
+ "format": "vertical",
+ "loudness": {
+  "measured": {
+   "integrated": -14.2,
+   "range": 0.6,
+   "truePeak": -1.5
+  },
+  "master": {
+   "mode": "target",
+   "target": -14,
+   "truePeak": -1,
+   "before": {
+    "integrated": -17.51,
+    "range": 0.71,
+    "truePeak": -3.26,
+    "samplePeak": -3.35
+   },
+   "after": {
+    "integrated": -14.04,
+    "range": 0.66,
+    "truePeak": -1.51,
+    "samplePeak": -1.51
+   },
+   "gainDb": 3.67,
+   "limited": true,
+   "limitDb": -5.18,
+   "note": "The peaks were limited to −5.2 dBTP first: one gain alone would have put the true peak at +0.3 dBTP. Then +3.7 dB reached −14.0 LUFS."
+  },
+  "correction": "The encoded file measured −14.1 LUFS and −0.7 dBTP; its audio was corrected by +0.1 dB after limiting the peaks to −2.11 dBTP and encoded again.",
+  "target": {
+   "target": -14,
+   "truePeak": -1
+  },
+  "met": true
+ },
+ "timings": {
+  "render": 6.05,
+  "mix": 0,
+  "report": 1.93,
+  "loudness": 1.73
+ },
+ "report": {
+  "probe": {
+   "duration": 38.4,
+   "size": 11337348,
+   "video": {
+    "codec": "h264",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "pixFmt": "yuv420p",
+    "frames": 1152
+   },
+   "audio": {
+    "codec": "aac",
+    "sampleRate": 48000,
+    "channels": 2
+   },
+   "color": {
+    "primaries": "bt709",
+    "transfer": "bt709",
+    "space": "bt709",
+    "range": "tv"
+   },
+   "faststart": true,
+   "frames": 1152
+  },
+  "loudness": {
+   "integrated": -14.2,
+   "range": 0.6,
+   "truePeak": -1.5
+  },
+  "black": [],
+  "freezes": [
+   {
+    "start": 32.4,
+    "end": 38.4,
+    "duration": 6,
+    "excused": "hold"
+   }
+  ],
+  "jumps": [],
+  "flashes": {
+   "maxPerSecond": 0,
+   "failing": []
+  },
+  "silences": [],
+  "narration": [],
+  "problems": []
+ },
+ "files": {
+  "srt": null,
+  "vtt": null,
+  "words": null,
+  "sheets": [
+   "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\C--newme-davidapp\\7b8e9dcc-3198-491a-b273-e0641c534d54\\scratchpad\\show-data\\renders\\clip-8-cuvinte-pe-ritm-r9.sheet-1.png",
+   "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\C--newme-davidapp\\7b8e9dcc-3198-491a-b273-e0641c534d54\\scratchpad\\show-data\\renders\\clip-8-cuvinte-pe-ritm-r9.sheet-2.png"
+  ]
+ }
+}
