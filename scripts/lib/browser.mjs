@@ -2,7 +2,7 @@
 // keys, typed text and files dragged in from outside (all trusted events, as a person's would be),
 // screenshots, and the frames of a workflow written as a GIF. Console errors and warnings, uncaught
 // exceptions, failed requests and HTTP statuses >= 400 are collected in `problems`.
-// Used by scripts/workflows-v2.mjs.
+// Used by scripts/workflows-v2.mjs, workflows-v3.mjs and record-studio.mjs (which also uses `send` and `onEvent`).
 
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -17,15 +17,16 @@ const KEYS = { Enter: 13, Escape: 27, Tab: 9, Delete: 46, Backspace: 8, ArrowLef
 const mods = (list = []) => list.reduce((m, k) => m | MOD[k], 0);
 
 /**
- * @param {{ width?: number, height?: number, mobile?: boolean, expected?: (problem: string) => boolean }} [o]
+ * @param {{ width?: number, height?: number, mobile?: boolean, scale?: number, chromeArgs?: string[], expected?: (problem: string) => boolean }} [o]
  *   expected: problems the workflow causes on purpose (a refused request shown in the UI)
+ *   scale: device scale factor (default 1, or 3 on a phone); chromeArgs: extra Chrome flags
  */
-export async function openSession({ width = 1440, height = 900, mobile = false, expected = () => false } = {}) {
+export async function openSession({ width = 1440, height = 900, mobile = false, scale, chromeArgs = [], expected = () => false } = {}) {
   const bin = chromePath();
   if (!bin) throw new Error('Chrome not found; set CHROME=/path/to/chrome');
   const port = 9300 + Math.floor(Math.random() * 600);
   const dir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), 'workflow-chrome-'));
-  const chrome = spawn(bin, ['--headless=new', '--disable-gpu', '--hide-scrollbars', `--window-size=${width},${height}`, `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, 'about:blank'], { stdio: 'ignore' });
+  const chrome = spawn(bin, ['--headless=new', '--disable-gpu', '--hide-scrollbars', `--window-size=${width},${height}`, `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, ...chromeArgs, 'about:blank'], { stdio: 'ignore' });
   let target;
   for (let i = 0; i < 200 && !target; i++) {
     await sleep(150);
@@ -38,11 +39,13 @@ export async function openSession({ width = 1440, height = 900, mobile = false, 
   const waiting = new Map();
   const problems = [];
   const urls = new Map();
+  const listeners = new Set();
   const report = (p) => { if (!expected(p)) problems.push(p); };
   ws.addEventListener('message', (m) => {
     const msg = JSON.parse(m.data);
     if (msg.id && waiting.has(msg.id)) { waiting.get(msg.id)(msg); waiting.delete(msg.id); return; }
     const p = msg.params;
+    for (const fn of listeners) fn(msg.method, p);
     if (msg.method === 'Runtime.exceptionThrown') report(`exception: ${p.exceptionDetails.exception?.description ?? p.exceptionDetails.text}`);
     if (msg.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(p.type)) report(`console.${p.type}: ${p.args.map((a) => a.value ?? a.description).join(' ')}`);
     if (msg.method === 'Log.entryAdded' && ['error', 'warning'].includes(p.entry.level)) report(`log.${p.entry.level}: ${p.entry.text} ${p.entry.url ?? ''}`);
@@ -57,7 +60,7 @@ export async function openSession({ width = 1440, height = 900, mobile = false, 
     ws.send(JSON.stringify({ id: n, method, params }));
   });
   for (const d of ['Runtime', 'Page', 'Network', 'Log']) await send(`${d}.enable`);
-  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 3 : 1, mobile });
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: scale ?? (mobile ? 3 : 1), mobile });
   if (mobile) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
 
   const frames = [];
@@ -111,6 +114,10 @@ export async function openSession({ width = 1440, height = 900, mobile = false, 
 
   return {
     problems,
+    /** Raw CDP: `send('Page.startScreencast', {…})` → the result. */
+    send,
+    /** Listen to every CDP event as `fn(method, params)`; returns the function that stops listening. */
+    onEvent(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     evaluate, waitFor, rect, sleep,
     async goto(url, ready) {
       await send('Page.navigate', { url });
