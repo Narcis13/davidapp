@@ -9,6 +9,7 @@
 import { AUDIO_EASINGS, BLEND_MODES, DUCK_SOURCES, MARKER_TYPES, MASK_MODES, MOTION_PHASES } from '/core/composition.js';
 import { PLATFORMS } from '/core/platforms.js';
 import { TRANSFORM_DEFAULTS, boxToTransform, forFormat, sampleItem, spaceRect } from '/core/transform.js';
+import { factsOf, frameOfSecond } from '/ui/lib/footage.js';
 import { createParamControls } from '/ui/lib/params.js';
 import { clamp, clone, fill, fmtTime, h, icon, nextId, plural, s, splitRef } from '/ui/lib/util.js';
 
@@ -793,4 +794,78 @@ export function platformsSection(env) {
   const safe = switchField('Keep assets inside the platforms\' safe zone', 'safe-platform', comp.safe === 'platform', (v) => env.edit('safe', (c) => { if (v && c.platforms?.length) c.safe = 'platform'; else delete c.safe; }, { inspector: 'redraw' }),
     { disabled: !chosen.length, hint: chosen.length ? 'Assets read the tightest edge of the chosen platforms as f.safe.' : 'Choose a platform first.' });
   return { el: h('div.clip-platforms-box', h('div.checks', { role: 'group', 'aria-label': 'Platforms the clip is for', 'data-testid': 'clip-platforms' }, boxes), safe.el) };
+}
+
+// ── footage items (v4) ────────────────────────────────────────────────────────────────────────
+
+/**
+ * What a footage layer takes: how the picture fits, which part of the file it plays (in and out, seconds, with the frame
+ * each lands on), speed, loop and hold, the file's facts, and its sound.
+ * @param {{ item: any, asset: any, fps: number, commit: (key: string, fn: (item: any) => void, o?: object) => void,
+ *   sound: { track?: string } | null, addSound: (() => void) | null }} env
+ */
+export function footageSection(env) {
+  const { item, asset } = env;
+  const meta = asset.meta;
+  const quiet = { inspector: 'none', burst: true };
+  const params = () => item.params ?? {};
+  const put = (key, value, def) => (it) => { it.params = { ...it.params }; if (value === def) delete it.params[key]; else it.params[key] = value; };
+  const frameLabel = (t) => `frame ${frameOfSecond(meta, t)}`;
+  const one = 1 / Math.max(1, meta.fps || 30);
+
+  const fitId = nextId('ft');
+  const fit = h('select', { id: fitId, 'data-testid': 'footage-fit' }, ['contain', 'cover', 'fill'].map((x) => h('option', { value: x }, x)));
+  fit.value = params().fit ?? 'contain';
+  fit.addEventListener('change', () => env.commit('footage-fit', put('fit', fit.value, 'contain'), { inspector: 'none' }));
+
+  const inF = numberField('In', 'footage-in', params().in ?? 0, { min: 0, max: round3(meta.duration - one), step: 0.04, unit: 's' }, (v) => env.commit(`footage-in:${item.id}`, put('in', v, 0), quiet));
+  const outF = numberField('Out', 'footage-out', params().out ?? 0, { min: 0, max: meta.duration, step: 0.04, unit: 's' }, (v) => env.commit(`footage-out:${item.id}`, put('out', v >= meta.duration - 1e-3 ? 0 : v, 0), quiet));
+  const speedF = numberField('Speed', 'footage-speed', params().speed ?? 1, { min: 0.05, max: 16, step: 0.05, unit: '×' }, (v) => env.commit(`footage-speed:${item.id}`, put('speed', v, 1), quiet));
+  const loop = switchField('Loop', 'footage-loop', !!params().loop, (v) => env.commit(`footage-loop:${item.id}`, put('loop', v, false), { inspector: 'none' }), { hint: 'Plays the trimmed range again when it ends. Off: the last frame holds.' });
+  const holding = (params().hold ?? -1) >= 0;
+  const holdF = numberField('Frozen at', 'footage-hold', holding ? params().hold : 0, { min: 0, max: meta.duration, step: 0.04, unit: 's', disabled: !holding }, (v) => env.commit(`footage-hold:${item.id}`, put('hold', v, -1), quiet));
+  const hold = switchField('Freeze on one frame', 'footage-hold-on', holding, (v) => {
+    env.commit(`footage-hold-on:${item.id}`, put('hold', v ? Math.max(0, Math.min(meta.duration, params().in ?? 0)) : -1, -1), { inspector: 'none' });
+    holdF.input.disabled = !v;
+    syncValues(true);
+  });
+  // the frame each time lands on, next to its box
+  const mark = (f, label) => { const s = h('span.frame-ix', { 'data-testid': label }); f.el.querySelector('label').after(s); return s; };
+  const inFrame = mark(inF, 'footage-in-frame'), outFrame = mark(outF, 'footage-out-frame'), holdFrame = mark(holdF, 'footage-hold-frame');
+
+  function syncValues(force = false) {
+    const p = params();
+    const typing = (el) => !force && document.activeElement === el;
+    if (!typing(inF.input)) inF.input.value = String(p.in ?? 0);
+    if (!typing(outF.input)) outF.input.value = String(p.out ?? 0);
+    if (!typing(speedF.input)) speedF.input.value = String(p.speed ?? 1);
+    const hl = (p.hold ?? -1) >= 0;
+    if (!typing(holdF.input)) holdF.input.value = String(hl ? p.hold : 0);
+    holdF.input.disabled = !hl;
+    hold.input.checked = hl;
+    loop.input.checked = !!p.loop;
+    fit.value = p.fit ?? 'contain';
+    inFrame.textContent = frameLabel(p.in ?? 0);
+    outFrame.textContent = p.out ? frameLabel(p.out) : `end · frame ${meta.frames}`;
+    holdFrame.textContent = hl ? frameLabel(p.hold) : 'off';
+  }
+  syncValues(true);
+
+  const facts = h('dl.facts', { 'data-testid': 'footage-facts' }, factsOf(asset).map(([k, v]) => [h('dt', k), h('dd', v)]));
+  const sound = !meta.audio ? h('p.hint', 'This file has no sound.')
+    : env.sound ? h('p.hint', { 'data-testid': 'footage-sound-note' }, `Its sound plays from the ${env.sound.track ?? 'audio'} track.`)
+      : h('div.field', h('button.btn.small', { type: 'button', 'data-testid': 'footage-add-sound', onclick: () => env.addSound?.() }, 'Play its sound'), h('p.hint', 'Adds this file on an audio track, from the same point. Speed does not change the sound.'));
+  return {
+    el: h('div.footage-section', { 'data-testid': 'footage-section' },
+      h('h3', 'Footage'),
+      h('div.field', h('label', { for: fitId }, 'Fit'), fit),
+      h('div.field-grid', inF.el, outF.el),
+      h('p.hint', 'Out 0 plays to the end of the file. Dragging the edges of the item on the timeline sets in and out.'),
+      h('div.field-grid', speedF.el, hold.el),
+      holdF.el,
+      loop.el,
+      sound,
+      h('details.footage-facts', h('summary', 'The file'), facts)),
+    sync() { syncValues(); },
+  };
 }

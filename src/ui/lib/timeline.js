@@ -4,9 +4,14 @@
 // audio waveforms, narration words on the audio items that have them, anchor badges, a lane of
 // markers under the ruler (flags that can be dragged), and a playhead. Moves snap to the playhead,
 // beats and other items' edges. It scrolls inside its own container, so a long clip never widens
-// the page.
+// the page. Since iteration 4: footage items show a filmstrip of the frames they play (and the file's
+// own waveform on an audio track), and their edges trim the file (`params.in` / `out`, the picture
+// stays put); the caption pages are a lane under the narration: drag a page's start edge to another
+// word, click a word to start a new page there, select pages to merge them.
 
-import { clamp, fmtTime, h, s, splitRef } from '/ui/lib/util.js';
+import { footageIndex } from '/core/footage.js';
+import { frameUrl, trimIn, trimOut } from '/ui/lib/footage.js';
+import { clamp, clone, fmtTime, h, s, splitRef } from '/ui/lib/util.js';
 import { drawWaveform } from '/ui/lib/waveform.js';
 
 const GRID = 0.05;
@@ -42,13 +47,19 @@ const glyph = (name) => { const el = s('svg', { viewBox: '0 0 20 20', width: 16,
  *   keyframesOf?: (item: any) => { prop: string, t: number }[],
  *   onSelectMarker?: (index: number) => void,
  *   onMoveMarker?: (index: number, t: number, done: boolean) => void,
+ *   footageOf?: (item: any, kind: string) => { meta: any, ref: string, wave?: string } | null,
+ *   onCaptionSelect?: (pages: number[]) => void,
+ *   onCaptionMove?: (page: number, key: string) => void,
+ *   onCaptionSplit?: (key: string) => void,
  * }} o
  */
-export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange, onMoveItem = () => {}, onTrack = () => {}, onReorderTracks = () => {}, onAddTrack = () => {}, onDeleteTrack = () => {}, keyframesOf = () => [], onSelectMarker = () => {}, onMoveMarker = () => {} }) {
+export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange, onMoveItem = () => {}, onTrack = () => {}, onReorderTracks = () => {}, onAddTrack = () => {}, onDeleteTrack = () => {}, keyframesOf = () => [], onSelectMarker = () => {}, onMoveMarker = () => {}, footageOf = () => null, onCaptionSelect = () => {}, onCaptionMove = () => {}, onCaptionSplit = () => {} }) {
   let comp = null, beats = [], pps = 40, time = 0, fitted = false, peaks = null;
   let selected = new Set(), primary = null, selectedTrack = null, selectedMarker = null;
   let itemEls = new Map(), markerEls = [];
   let words = [], wordBase = new Map(), anchors = new Map();
+  // caption pages (the studio's, built from the words): the lane, and the pages selected in it
+  let captions = [], capSel = new Set(), capEls = [];
 
   const ruler = h('div.tl-ruler', { 'data-testid': 'ruler' });
   const playhead = h('div.tl-playhead', { 'data-testid': 'playhead' });
@@ -110,6 +121,36 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     }
     const wave = node.querySelector('canvas.tl-wave');
     if (wave && peaks) requestAnimationFrame(() => { if (wave.isConnected) drawWaveform(wave, peaks, item.start, item.start + item.duration); });
+    if (node.dataset.footage) placeFootage(node, item);
+  }
+
+  /** The file's own picture and sound under a footage item: a few frames it plays, the stretch of its waveform it covers. */
+  function placeFootage(node, item) {
+    const f = footageOf(item, node.dataset.footage);
+    if (!f) return;
+    const width = Math.max(2, item.duration * pps);
+    const strip = node.querySelector('.tl-strip');
+    if (strip && !node.classList.contains('dragging')) {
+      // a few cells (at most 12), each showing the frame at the middle of its stretch; the browser loads them as they scroll into view
+      const aspect = f.meta.width / f.meta.height;
+      const n = clamp(Math.round(width / Math.max(24, Math.min(120, 34 * aspect))), 1, 12);
+      const params = item.params ?? {};
+      const urls = Array.from({ length: n }, (_, i) => frameUrl(f.ref, footageIndex(f.meta, params, (item.offset ?? 0) + ((i + 0.5) / n) * item.duration)));
+      const have = [...strip.children];
+      if (have.length !== n) strip.replaceChildren(...urls.map(() => h('img', { alt: '', loading: 'lazy', decoding: 'async', draggable: false })));
+      for (const [i, img] of [...strip.children].entries()) if (img.getAttribute('src') !== urls[i]) img.setAttribute('src', urls[i]);
+    }
+    const wave = node.querySelector('.tl-fwave');
+    if (wave && f.wave) {
+      // the part of the file this item plays, drawn from the picture of the whole file's waveform
+      const D = f.meta.duration;
+      const span = Math.max(1e-3, Math.min(D, item.duration * (node.dataset.footage === 'audio' ? 1 : item.params?.speed ?? 1)));
+      const from = node.dataset.footage === 'audio' ? item.offset ?? 0 : Math.min(D - span, Math.max(0, item.params?.in ?? 0));
+      const full = (D / span) * width;
+      wave.style.backgroundImage = `url("${f.wave}")`;
+      wave.style.backgroundSize = `${full}px 100%`;
+      wave.style.backgroundPosition = `${-(from / D) * full}px 0`;
+    }
   }
 
   /** A marker's flag sits on its time; a hold also shows how long it lasts. */
@@ -126,6 +167,7 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     inner.style.setProperty('--lanes', `${lanesWidth()}px`);
     drawRuler();
     for (const { item } of items()) { const node = itemEls.get(item.id); if (node) place(node, item); }
+    for (const node of capEls) placeCaption(node);
     placeMarkers();
     movePlayhead();
   }
@@ -177,6 +219,9 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     if (!comp.tracks.length) rows.append(h('div.tl-row', h('div.tl-head'), h('div.tl-lane.tl-empty', h('span.muted', 'No tracks yet. Add an item to start.'))));
     const shown = order();
     const visual = shown.filter((t) => visualType(t.type)), audio = shown.filter((t) => !visualType(t.type));
+    // the caption lane goes under the track that carries the narration words
+    const narration = captions.length ? shown.find((t) => t.items.some((i) => words.some((w) => w.item === i.id)))?.id ?? shown[shown.length - 1]?.id : null;
+    capEls = [];
     for (const track of shown) {
       const group = visualType(track.type) ? visual : audio;
       const lane = h('div.tl-lane', { 'data-track': track.id });
@@ -192,8 +237,12 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
       for (const item of track.items) {
         const kfs = track.type === 'audio' ? [] : keyframesOf(item);
         const spoken = track.type === 'audio' ? words.filter((w) => w.item === item.id) : [];
-        const node = h(`div.tl-item.${track.type}`, { 'data-testid': 'item', 'data-id': item.id, 'data-asset': item.asset, 'data-track': track.id, tabIndex: 0, role: 'button', 'aria-label': `${splitRef(item.asset).slug}, starts at ${fmtTime(item.start)}`, title: `${item.asset} · ${item.id}` },
-          track.type === 'audio' ? h('canvas.tl-wave', { 'data-testid': 'waveform', 'aria-hidden': 'true', width: 1, height: 1 }) : null,
+        const foot = footageOf(item, track.type === 'audio' ? 'audio' : 'visual');
+        const node = h(`div.tl-item.${track.type}${foot ? '.footage' : ''}`, { 'data-testid': 'item', 'data-id': item.id, 'data-asset': item.asset, 'data-track': track.id, 'data-footage': foot ? (track.type === 'audio' ? 'audio' : 'visual') : null, tabIndex: 0, role: 'button', 'aria-label': `${splitRef(item.asset).slug}, starts at ${fmtTime(item.start)}`, title: `${item.asset} · ${item.id}` },
+          // the mix's waveform, or for footage the file's own
+          track.type === 'audio' && !foot ? h('canvas.tl-wave', { 'data-testid': 'waveform', 'aria-hidden': 'true', width: 1, height: 1 }) : null,
+          foot && track.type !== 'audio' ? h('div.tl-strip', { 'data-testid': 'filmstrip', 'aria-hidden': 'true' }) : null,
+          foot?.wave ? h('div.tl-fwave', { 'data-testid': 'footage-wave', 'aria-hidden': 'true' }) : null,
           h('span.tl-handle.l', { 'data-edge': 'l' }),
           item.anchor ? h('i.tl-anchor', { 'data-testid': 'item-anchor', title: anchorTitle(item), 'aria-label': anchorTitle(item) }, glyph('anchor')) : null,
           h('span.tl-label', item.label ?? splitRef(item.asset).slug),
@@ -218,6 +267,7 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
       lane.addEventListener('click', () => select([], null, track.id));
       const flags = ['locked', 'hidden', 'solo', 'muted'].filter((k) => track[k]);
       rows.append(h(`div.tl-row${flags.map((f) => `.is-${f}`).join('')}`, { 'data-track': track.id, style: { '--subs': String(Math.max(1, ends.length)) } }, trackHead(track, group.indexOf(track), group), lane));
+      if (track.id === narration) rows.append(captionRow());
     }
     drawMarkers();
     mark();
@@ -239,6 +289,120 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     b.addEventListener('click', (e) => { e.stopPropagation(); go(); });
     b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); go(); } });
     return b;
+  }
+
+  // ── caption pages ────────────────────────────────────────────────────────────────────────
+  const capWords = () => captions.flatMap((p) => p.lines.flat());
+
+  /** A page and its words sit at their times (the chips inside a page are placed from the page's start). */
+  function placeCaption(node) {
+    const start = Number(node.dataset.start), end = Number(node.dataset.end);
+    node.style.left = `${start * pps}px`;
+    node.style.width = `${Math.max(6, (end - start) * pps)}px`;
+    for (const w of node.querySelectorAll('.tl-cap-word')) {
+      const width = Math.max(3, Number(w.dataset.len) * pps);
+      w.style.left = `${Number(w.dataset.rel) * pps}px`;
+      w.style.width = `${width}px`;
+      w.classList.toggle('tiny', width < 18);
+    }
+  }
+
+  function markCaptions() {
+    for (const node of capEls) {
+      const on = capSel.has(Number(node.dataset.index));
+      node.classList.toggle('selected', on);
+      node.setAttribute('aria-pressed', String(on));
+    }
+  }
+
+  /** Click a page: select it; Shift, ⌘ or Ctrl adds or removes it. */
+  function clickCaption(index, e) {
+    const next = e.shiftKey || e.metaKey || e.ctrlKey ? new Set(capSel) : new Set();
+    if (next.has(index) && (e.shiftKey || e.metaKey || e.ctrlKey)) next.delete(index); else next.add(index);
+    capSel = next;
+    markCaptions();
+    onCaptionSelect([...capSel].sort((a, b) => a - b));
+  }
+
+  /**
+   * The row of caption pages under the narration: a block per page (its first line, its words as chips at their times).
+   * The page's left edge is the break before it: dragging it to another word moves the break (to a word boundary).
+   */
+  function captionRow() {
+    const lane = h('div.tl-lane.tl-cap-lane', { 'data-testid': 'caption-lane', role: 'group', 'aria-label': 'Caption pages' });
+    const all = capWords();
+    for (const p of captions) {
+      const text = p.text.replace(/\n/g, ' ');
+      const chips = p.lines.flat().map((w, k) => {
+        const first = k === 0;
+        const chip = h('span.tl-cap-word', { 'data-testid': 'caption-word', 'data-key': w.key, 'data-rel': String(w.start - p.start), 'data-len': String(Math.max(0, w.end - w.start)), tabIndex: 0, role: 'button',
+          'aria-label': first ? `${w.text}, the first word of page ${p.index + 1}` : `Start a new page at ${w.text}`, title: first ? `${w.text} · starts page ${p.index + 1}` : `Click to start a new page at "${w.text}"` }, h('span.tl-word-text', w.text));
+        if (first) chip.classList.add('first');
+        // a click on a word is its own action; the pointer does not reach the page behind it
+        chip.addEventListener('pointerdown', (e) => e.stopPropagation());
+        const go = (e) => { e.stopPropagation(); if (first) clickCaption(p.index, e); else onCaptionSplit(w.key); };
+        chip.addEventListener('click', go);
+        chip.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } });
+        return chip;
+      });
+      const node = h('div.tl-cap', { 'data-testid': 'caption-page', 'data-index': String(p.index), 'data-start': String(p.start), 'data-end': String(p.end), 'data-key': p.keys.start, tabIndex: 0, role: 'button', 'aria-pressed': 'false',
+        'aria-label': `Caption page ${p.index + 1}: ${text}`, title: `Page ${p.index + 1} · ${fmtTime(p.start)} to ${fmtTime(p.end)}\n${p.text}` },
+      p.index > 0 ? h('span.tl-cap-edge', { 'data-testid': 'caption-edge', 'data-page': String(p.index), title: 'Drag to move the break to another word' }) : null,
+      h('span.tl-cap-head', h('b', String(p.index + 1)), h('span.tl-cap-text', text)),
+      chips);
+      node.addEventListener('click', (e) => { e.stopPropagation(); clickCaption(p.index, e); });
+      node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickCaption(p.index, e); } });
+      node.querySelector('.tl-cap-edge')?.addEventListener('pointerdown', (e) => startCaptionDrag(e, p, node, lane, all));
+      capEls.push(node);
+      placeCaption(node);
+      lane.append(node);
+    }
+    lane.addEventListener('click', () => { if (capSel.size) { capSel = new Set(); markCaptions(); onCaptionSelect([]); } });
+    const head = h('div.tl-head', { 'data-lane': 'captions' }, h('div.tl-head-top', h('b.tl-cap-title', 'Caption pages')), h('div.tl-flags', h('span.tl-type', `${captions.length} ${captions.length === 1 ? 'page' : 'pages'}`)));
+    const row = h('div.tl-row.tl-cap-row', { 'data-lane': 'captions' }, head, lane);
+    queueMicrotask(markCaptions);
+    return row;
+  }
+
+  /** Drag a page's start edge: it jumps from word to word (never to a time between them) and lets go on the word it is over. */
+  function startCaptionDrag(e, p, node, lane, all) {
+    if (e.button !== undefined && e.button > 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const at = (key) => all.findIndex((w) => w.key === key);
+    const prev = captions[p.index - 1], next = captions[p.index + 1];
+    // the words this page may start on: after the previous page's first word, up to its own last word
+    const from = at(prev.keys.start) + 1, to = (next ? at(next.keys.start) : all.length) - 1;
+    const choices = all.slice(from, to + 1);
+    const left = () => lane.getBoundingClientRect().left;
+    let target = all[at(p.keys.start)], moved = false, last = e;
+    try { e.target.setPointerCapture(e.pointerId); } catch { /* synthetic pointers cannot be captured */ }
+    const hover = (on = true) => { for (const c of lane.querySelectorAll('.tl-cap-word.target')) c.classList.remove('target'); if (on) lane.querySelector(`.tl-cap-word[data-key="${CSS.escape(target.key)}"]`)?.classList.add('target'); };
+    const apply = (ev) => {
+      const t = (ev.clientX - left()) / pps;
+      let best = choices[0];
+      for (const w of choices) if (Math.abs(w.start - t) < Math.abs(best.start - t)) best = w;
+      if (!moved && Math.abs(ev.clientX - e.clientX) < 3) return;
+      moved = true;
+      target = best;
+      node.classList.add('dragging');
+      showSnap(target.start);
+      hover();
+    };
+    const move = (ev) => { last = ev; apply(ev); };
+    const up = (ev) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      apply(ev.type === 'pointercancel' ? last : ev);
+      node.classList.remove('dragging');
+      showSnap(null);
+      hover(false);
+      if (moved && target.key !== p.keys.start) onCaptionMove(p.index, target.key);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   }
 
   function drawMarkers() {
@@ -335,6 +499,9 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     if (e.pointerType === 'touch' && !selected.has(item.id)) return;
     const edge = e.target instanceof Element ? e.target.dataset.edge ?? null : null;
     const x0 = e.clientX, start0 = item.start, dur0 = item.duration;
+    // footage: an edge trims the file, so the picture (and sound) stay where they are on the timeline
+    const foot = edge ? footageOf(item, track.type === 'audio' ? 'audio' : 'visual') : null;
+    const item0 = { start: start0, duration: dur0, offset: item.offset, params: clone(item.params) };
     const targets = snapTargets(new Set([item.id]));
     let moved = false, drop = null, last = e;
     e.preventDefault();
@@ -363,6 +530,19 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
         const sn = snapTo([start0 + dt, start0 + dur0 + dt], targets, thr);
         start = clamp(sn ? start0 + dt + sn.d : grid(start0 + dt), 0, Math.max(0, comp.duration - dur0));
         if (sn) snapped = sn.at;
+      }
+      if (foot && track.type !== 'audio') {
+        const r = edge === 'l' ? trimIn(item0, start, foot.meta) : trimOut(item0, duration, foot.meta);
+        if (edge === 'l') { start = r.start; duration = r.duration; } else duration = r.duration;
+        item.params = r.params;
+      } else if (foot && edge === 'l') {
+        // the sound of footage: the item starts further into the file by as much as its start moved
+        const offset = Math.max(0, (item0.offset ?? 0) + (start - start0));
+        start = start0 + (offset - (item0.offset ?? 0));
+        duration = start0 + dur0 - start;
+        if (offset) item.offset = round(offset); else delete item.offset;
+      } else if (foot && edge === 'r') {
+        duration = Math.min(duration, Math.max(MIN_ITEM, foot.meta.duration - (item0.offset ?? 0)));
       }
       showSnap(done ? null : snapped);
       item.start = round(start); item.duration = round(duration);
@@ -500,7 +680,8 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
   zoom.addEventListener('input', () => { pps = Number(zoom.value); layout(); });
   fitBtn.addEventListener('click', fit);
 
-  function setMeta({ words: w, anchors: a, base }) {
+  function setMeta({ words: w, anchors: a, base, captions: c }) {
+    if (c !== undefined) { captions = c ?? []; capSel = new Set([...capSel].filter((i) => i < captions.length)); }
     if (w) {
       words = w;
       wordBase = new Map();
@@ -521,12 +702,16 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
      */
     setData(next) {
       comp = next.composition; beats = next.beats ?? [];
-      if (next.words || next.anchors) setMeta(next);
+      if (next.words || next.anchors || next.captions !== undefined) setMeta(next);
       build();
       if (!fitted) fit();
     },
     /** The words and anchor report changed (not the draft): rebuild the rows. */
     setMeta(next) { setMeta(next); build(); },
+    /** The caption pages selected in the lane (their indices). */
+    /** The caption pages of the draft (rebuilt by the studio's rules), drawn at the next refresh. */
+    setCaptions(pages) { captions = pages ?? []; },
+    setCaptionSelection(list) { capSel = new Set(list); markCaptions(); },
     /** The index of the marker the inspector shows, or null. */
     setSelectedMarker(i) { selectedMarker = i ?? null; markMarkers(); },
     /** Something changed in the draft (timing, keyframes, flags): rebuild the rows. */
