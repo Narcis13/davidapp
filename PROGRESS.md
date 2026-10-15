@@ -58,7 +58,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 1. [x] **Render options** (D10): merged `b580ca4` (agent)
 2. [x] **Font assets** (D9): merged `64aee60` (agent); the font drop in the studio comes with the UI
 3. [x] **Logos as given** (D14): merged `4feddd2` (agent; 16 tests; Chrome pixel diff of the Fablecut logo: mean ≤ 0.15 levels, 99.8 % within 32; old models draw unchanged)
-4. [ ] **Speech tools** (D7, D23)
+4. [x] **Speech tools** (D7, D23): merged (agent; 21 tests; real run: a word-by-word Kokoro take aligned 69/69 starts within 2 frames, natural speech sentence edges 26/26; 3 voice samples; clip 7 take 0 slips)
 5. [ ] **Footage** and the screen-recording script (D2–D6): core `6224168` (lead), recorder `18d4f98` (agent), parity case `a799588`; disk report and the UI still to do
 6. [ ] **Provenance and credits** (D12)
 7. [ ] **Repo and library** (D11)
@@ -70,6 +70,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Decisions
 
+- **Word times: whisper DTW anchors refined at pauses (speech agent).** whisper's own token times put only 42 % of word starts within 2 frames on a take with known times (up to 1 s off at sentence edges), short of the 95 % required. The studio now runs whisper with DTW token times (`-dtw <preset> -nfa`), takes one reliable time inside each word, and places each word boundary on the quiet stretch (≥ 40 ms) between two words, or between the anchors when there is none. Measured: 69/69 starts within 2 frames on the known-times take (its gaps help; said in the report), 26/26 sentence-edge words of natural speech against Kokoro's own sentence offsets. Inner words of continuous speech have no independent reference.
 - **The machine.** As in iteration 3: the brief describes macOS 15.5 on an Intel i5 with 5.5 GB free; this session runs on the Windows 11 PC (i9-14900KF, 32 threads, 1.7 TB free, Node 24.19, FFmpeg 9.0.2). Baselines (hashes, speed) are taken here from a worktree of `0ea078c` sharing this checkout's `node_modules`. Caches are still bounded as the brief asks, and disk use is measured, as if the disk were small.
 
 - **Footage: a shared decoder per process, frames from the server for the preview (D5).** Weighed:
