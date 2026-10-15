@@ -12,6 +12,7 @@ import { checkTranscript, checkTranscripts } from '../core/words.js';
 import { drawOverlays, OVERLAYS } from '../render/overlays.js';
 import { json } from '../db/db.js';
 import { moreTools } from './more/index.js';
+import { provenanceInput, fromArgs } from './more/provenance.js';
 
 const FORMAT = z.enum(['vertical', 'horizontal', 'square']);
 const REF = z.string().describe('Asset reference: "name" (latest version) or "name@3" (pinned)');
@@ -86,7 +87,8 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       run: () => {
         const fn = library.search({ type: 'function', limit: 200 });
         const stats = { engine: ENGINE_VERSION, formats: FORMATS, assets: library.search({ limit: 1 }).total, functionAssets: fn.total, clips: clips.listClips().map((c) => c.slug), fonts: library.fontFamilies(), tags: library.allTags().slice(0, 40).map((t) => `${t.tag} (${t.n})`) };
-        return { text: `${readFileSync(join(ROOT, 'docs', 'ASSET_CONTRACT.md'), 'utf8')}\n\n${readFileSync(join(ROOT, 'docs', 'COOKBOOK.md'), 'utf8')}\n\n## Workflow\n\nBuilding a clip:\n1. create_clip (empty) so new assets can record which clip they were made for (for_clip).\n2. suggest_assets with the brief first, then search_assets and get_asset (examples, notes). Reuse what exists; make a preset (create_preset), a precomp (save_precomp), new defaults (save_defaults), a new version (update_asset) or a fork (fork_asset) before writing anything new.\n3. validate_asset to see a filmstrip of a draft; create_asset when it looks right. Leave what you learn with add_asset_note.\n4. update_clip / edit_clip to place and lay out assets; render_clip_frame (sheet: true; format: another shape; overlays: true for the zones and measured text) to look at the result.\n5. check_clip (and audio_report for the mix, anchor_report for word anchors) and fix every issue before rendering.\n6. start_render (format: the same composition in another format), then get_render until it is done, then render_report (the encoded file measured: loudness, black frames, freezes, flashes, silences, sheets).\n\nA voiced video: add_narration (the take, its script and word timings; two transcripts for the transcript check), an audio track with role narration, anchors on its words (anchor: { item, word }), captions (composition.captions + text-captions@2 on a track with role captions), ducking on the music (duck), loudness: { target: -14, truePeak: -1 }.\n\nWorking the studio's request queue (the user asks in the studio, you answer with a proposal):\n1. list_requests shows what is open; claim_request { id } takes one (no id: the oldest open one; wait_seconds: wait for one to arrive).\n2. The claim returns the thread, the scope (the asset's source, schema and the params on screen; or the clip's composition, the selected items and the playhead) and frames. It holds for 15 minutes; reply_request renews it.\n3. Answer with one proposal and a one-sentence summary: propose_asset_version, propose_new_asset or propose_clip_edit (edit_clip operations). It is validated now and saved only when the user accepts it in the studio. reply_request asks a question; complete_request closes the request when nothing should change.\n4. Stop after the proposal. A reply, or a rejection with a reason, reopens the request: claim it again and propose again (the new proposal replaces the pending one).\n\nTool families, and when to use them:\n- Find: suggest_assets (start here), search_assets, get_asset, list_clips, get_clip, list_clip_assets.\n- Write assets: validate_asset, create_asset, update_asset, fork_asset. Cheaper: create_preset, save_defaults, save_precomp.\n- Describe and organise: set_asset_metadata (no new version), organize_assets (tags, favourite, featured, collections), add_asset_note, diff_versions.\n- Files: upload_image; list_undescribed then describe_asset for every upload still waiting; add_file_asset; bake_asset (one frame, or a sound); bake_sequence (an expensive visual such as 3D, once, into frames).\n- Clips: create_clip, update_clip, edit_clip (timeline, layers, transforms, keyframes, per-format overrides), remix_clip, repin_clip.\n- Look and check: render_asset_frame, render_clip_frame (format, composition, overlays), frame_hashes, layout_report, check_clip.\n- Voice and sound: add_narration, check_transcript, caption_pages, anchor_report, audio_report, export_stems.\n- Render: start_render, get_render, list_renders, cancel_render, render_report.\n- Requests: list_requests, claim_request, get_request, reply_request, propose_asset_version, propose_new_asset, propose_clip_edit, complete_request.\n- Measure: compounding_report, reuse_report.\n\n## Library now\n\n${JSON.stringify(stats, null, 1)}` };
+        return { text: `${readFileSync(join(ROOT, 'docs', 'ASSET_CONTRACT.md'), 'utf8')}\n\n${readFileSync(join(ROOT, 'docs', 'COOKBOOK.md'), 'utf8')}\n\n## Workflow\n\nBuilding a clip:\n1. create_clip (empty) so new assets can record which clip they were made for (for_clip).\n2. suggest_assets with the brief first, then search_assets and get_asset (examples, notes). Reuse what exists; make a preset (create_preset), a precomp (save_precomp), new defaults (save_defaults), a new version (update_asset) or a fork (fork_asset) before writing anything new.\n3. validate_asset to see a filmstrip of a draft; create_asset when it looks right. Leave what you learn with add_asset_note.\n4. update_clip / edit_clip to place and lay out assets; render_clip_frame (sheet: true; format: another shape; overlays: true for the zones and measured text) to look at the result.\n5. check_clip (and audio_report for the mix, anchor_report for word anchors) and fix every issue before rendering.\n6. start_render (format: the same composition in another format), then get_render until it is done, then render_report (the encoded file measured: loudness, black frames, freezes, flashes, silences, sheets).\n7. export_clip { clip } writes the finished clip and its closure to the repo (a dry_run says what would change); a clip edited in the studio is written back the same way. import_clip { folder, verify: true } rebuilds it in another library and checks the frame hashes; files without a licence or that may not be redistributed stay out of git, and an import names each one it cannot find (pass files: [folders]).\n\nA voiced video: add_narration (the take, its script and word timings; two transcripts for the transcript check), an audio track with role narration, anchors on its words (anchor: { item, word }), captions (composition.captions + text-captions@2 on a track with role captions), ducking on the music (duck), loudness: { target: -14, truePeak: -1 }.\n\nWorking the studio's request queue (the user asks in the studio, you answer with a proposal):\n1. list_requests shows what is open; claim_request { id } takes one (no id: the oldest open one; wait_seconds: wait for one to arrive).\n2. The claim returns the thread, the scope (the asset's source, schema and the params on screen; or the clip's composition, the selected items and the playhead) and frames. It holds for 15 minutes; reply_request renews it.\n3. Answer with one proposal and a one-sentence summary: propose_asset_version, propose_new_asset or propose_clip_edit (edit_clip operations). It is validated now and saved only when the user accepts it in the studio. reply_request asks a question; complete_request closes the request when nothing should change.\n4. Stop after the proposal. A reply, or a rejection with a reason, reopens the request: claim it again and propose again (the new proposal replaces the pending one).\n\nTool families, and when to use them:\n- Find: suggest_assets (start here), search_assets, get_asset, list_clips, get_clip, list_clip_assets.\n- Write assets: validate_asset, create_asset, update_asset, fork_asset. Cheaper: create_preset, save_defaults, save_precomp.\n- Describe and organise: set_asset_metadata (no new version), organize_assets (tags, favourite, featured, collections), add_asset_note, diff_versions.\n- Files: upload_image; list_undescribed then describe_asset for every upload still waiting; add_file_asset; bake_asset (one frame, or a sound); bake_sequence (an expensive visual such as 3D, once, into frames).\n- Clips: create_clip, update_clip, edit_clip (timeline, layers, transforms, keyframes, per-format overrides), remix_clip, repin_clip.\n- Look and check: render_asset_frame, render_clip_frame (format, composition, overlays), frame_hashes, layout_report, check_clip.\n- Voice and sound: speech_status (what voice and transcription tools are set up), voice_samples (one line in several voices, to choose), generate_narration (script + voice → the narration with its words, in one call), transcribe, add_narration (align: true times a recording), check_transcript (transcribe: true), caption_pages, anchor_report, audio_report, export_stems.\n- Render: start_render, get_render, list_renders, cancel_render, render_report.\n- Requests: list_requests, claim_request, get_request, reply_request, propose_asset_version, propose_new_asset, propose_clip_edit, complete_request.\n- Repo: export_clip (a clip to clips/<clip>/clip.json with everything it pins, at its version numbers, in the repo's library/ store), import_clip (that folder into any library, even an empty one: same refs, same frames).
+- Measure: compounding_report, reuse_report.\n\n## Library now\n\n${JSON.stringify(stats, null, 1)}` };
       },
     },
     {
@@ -184,18 +186,21 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'add_file_asset',
       title: 'Add an image or sound file',
-      description: 'Add an image (png, jpg, webp, svg) or sound (wav, mp3, m4a, ogg) from a local file as a library asset. Only add media you made or that is properly licensed; say which in `license`.',
+      description: 'Add an image (png, jpg, webp, svg) or sound (wav, mp3, m4a, ogg) from a local file as a library asset. Only add media you made or that is properly licensed; say which in `license` (with creator, credit, source_url … as far as you know them: they become the clip\'s credits). What you do not say is recorded as unknown, and a final render (start_render { final: true }) refuses an asset with no licence or marked placeholder: true. Fix it later with set_asset_metadata { provenance }.',
       input: {
         name: z.string(),
         type: z.enum(['image', 'sound']),
         path: z.string().describe('Absolute path of the file'),
         description: z.string(),
         tags: z.array(z.string()).optional(),
-        license: z.string().optional().describe('e.g. "original", "CC0"'),
+        ...provenanceInput(z),
         for_clip: z.string().optional(),
         author: AUTHOR,
       },
-      run: async (a) => ({ json: { added: compactAsset((await library.addFileAsset({ slug: a.name, type: a.type, path: a.path, description: a.description, tags: a.tags ?? [], license: a.license, forClip: a.for_clip, author: who(a.author) })).asset) } }),
+      run: async (a) => {
+        const r = await library.addFileAsset({ slug: a.name, type: a.type, path: a.path, description: a.description, tags: a.tags ?? [], provenance: fromArgs(a), forClip: a.for_clip, author: who(a.author) });
+        return { json: { added: compactAsset(r.asset), provenance: r.asset.provenance } };
+      },
     },
     {
       name: 'bake_asset',
@@ -404,27 +409,40 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         script: z.string().describe('The text it was meant to say'),
         timings: z.any().optional().describe('Word timings in any supported shape (an object or array, or a JSON string); or give timings_path'),
         timings_path: z.string().optional().describe('Or a JSON file with the timings'),
+        align: z.boolean().optional().describe('No timings: the studio transcribes the take (whisper.cpp, see speech_status) and aligns it to the script; with two models configured both become the transcripts of the check'),
         unit: z.enum(['s', 'ms']).optional(), transcript: z.any().optional().describe('Plain text, or timed words'),
         transcripts: z.array(z.any()).optional().describe('Several independent transcripts (two recognisers): a word is wrong only when all of them say so'), language: z.string().optional(),
-        voice: z.record(z.string(), z.any()).optional().describe('Who or what spoke it, and its licence: { name, model, license, source }'),
-        license: z.string().optional(), description: z.string().optional(), title: z.string().optional(), tags: z.array(z.string()).optional(), take: z.string().optional(), for_clip: z.string().optional(), author: AUTHOR,
+        voice: z.record(z.string(), z.any()).optional().describe('Who or what spoke it, and its licence: { name, model, license, source }. A voice with a model is recorded as AI-generated unless ai_generated says otherwise.'),
+        ...provenanceInput(z),
+        license: z.string().optional().describe('Licence of the recording (default "original": made for this studio); the voice\'s own licence goes in voice.license'),
+        description: z.string().optional(), title: z.string().optional(), tags: z.array(z.string()).optional(), take: z.string().optional(), for_clip: z.string().optional(), author: AUTHOR,
       },
       run: async (a) => {
         let timings = a.timings_path ? readFileSync(a.timings_path, 'utf8') : a.timings;
-        if (timings === undefined || timings === null) throw new StudioError('Give timings (the word timings) or timings_path (a JSON file of them)');
-        if (typeof timings === 'string') { try { timings = JSON.parse(timings); } catch { throw new StudioError('timings: not valid JSON'); } }
+        const hasTimings = timings !== undefined && timings !== null;
+        if (!hasTimings && !a.align) throw new StudioError('Give timings (the word timings) or timings_path (a JSON file of them), or align: true to have the studio time the words');
         if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64 (with ext)');
-        const r = await studio.audio.addNarration({ slug: a.name, path: a.path, data: a.data_base64 ? Buffer.from(a.data_base64, 'base64') : undefined, ext: a.ext, script: a.script, timings, unit: a.unit, transcript: a.transcript, transcripts: a.transcripts, language: a.language, voice: a.voice, license: a.license, description: a.description, title: a.title, tags: a.tags, take: a.take, forClip: a.for_clip, author: who(a.author) });
-        return { json: { added: r.asset.ref, duration: r.asset.duration, words: r.words, stats: r.stats, source: r.source, transcript: r.transcript, warnings: r.warnings } };
+        const data = a.data_base64 ? Buffer.from(a.data_base64, 'base64') : undefined;
+        let transcripts = a.transcripts, aligned;
+        if (hasTimings) {
+          if (typeof timings === 'string') { try { timings = JSON.parse(timings); } catch { throw new StudioError('timings: not valid JSON'); } }
+        } else {
+          aligned = await studio.speech.timingsFor({ path: a.path, data, ext: a.ext, language: a.language });
+          timings = aligned.words;
+          if (a.transcript === undefined) transcripts ??= aligned.transcripts;
+        }
+        const r = await studio.audio.addNarration({ slug: a.name, path: a.path, data, ext: a.ext, script: a.script, timings, unit: a.unit, transcript: a.transcript, transcripts, language: a.language, voice: a.voice, provenance: fromArgs(a), description: a.description, title: a.title, tags: a.tags, take: a.take, forClip: a.for_clip, author: who(a.author) });
+        return { json: { added: r.asset.ref, duration: r.asset.duration, words: r.words, stats: r.stats, source: r.source, transcript: r.transcript, warnings: r.warnings, aligned: aligned ? { models: aligned.models, seconds: aligned.seconds } : undefined } };
       },
     },
     {
       name: 'check_transcript',
       title: 'Check a take against its script',
-      description: 'Compare a transcript of a take (from any speech-to-text tool: plain text or timed words) with the script it was meant to say, after normalising case, punctuation and numerals ("14" = "fourteen", "2026" = "twenty twenty-six"): names every slip (a different word), drop (a script word not said) and insertion (a word not in the script), with the script word\'s index. Give a narration (its script is used) or the script itself.',
-      input: { narration: REF.optional(), script: z.string().optional(), transcript: z.any().optional(), transcripts: z.array(z.any()).optional().describe('Several independent transcripts: a word is wrong only when all of them say so (what only some heard differently is listed as disputed)'), language: z.string().optional() },
+      description: 'Compare a transcript of a take (from any speech-to-text tool: plain text or timed words) with the script it was meant to say, after normalising case, punctuation and numerals ("14" = "fourteen", "2026" = "twenty twenty-six"): names every slip (a different word), drop (a script word not said) and insertion (a word not in the script), with the script word\'s index. Give a narration (its script is used) or the script itself. transcribe: true makes the transcripts here with whisper.cpp (every configured model, so two models give the consensus check); the audio is the narration, or path.',
+      input: { narration: REF.optional(), transcribe: z.boolean().optional().describe('Transcribe the take with the studio\'s whisper.cpp instead of giving transcripts'), path: z.string().optional().describe('With transcribe and script: the audio file'), script: z.string().optional(), transcript: z.any().optional(), transcripts: z.array(z.any()).optional().describe('Several independent transcripts: a word is wrong only when all of them say so (what only some heard differently is listed as disputed)'), language: z.string().optional() },
       readOnly: true,
-      run: (a) => {
+      run: async (a) => {
+        if (a.transcribe) return { json: await studio.speech.checkTake({ narration: a.narration, path: a.path, script: a.script, language: a.language }) };
         let script = a.script;
         if (!script && a.narration) script = json(library.requireVersion(a.narration).meta, {}).narration?.script;
         if (!script) throw new StudioError(a.narration ? `${a.narration} is not a narration (it has no script)` : 'Give narration or script');
@@ -509,7 +527,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'start_render',
       title: 'Render a clip to MP4',
-      description: 'Queue a render of the clip to H.264/AAC MP4. Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long. Options: format renders the same composition in another shape (each item\'s overrides for that format apply); formats: ["horizontal","vertical","square"] (1–3, instead of format) queues one render per format in this one call, with the same options, and returns { batch, renders } (batch = the first render\'s id); draft: true (or { scale }) makes an animatic: the frames are drawn at full size, so a draft shows exactly the final frames and its sampled frame hashes equal a full render\'s, then scaled to 2/3, 1/2 or 1/3 (the largest that gives whole, even pixel sizes; 1920x1080 gives 1280x720) and encoded fast, to a file named ...-draft.mp4; workers: how many worker threads draw frames, 1–16 (default: by CPU count; the pixels do not depend on it); poster_at: the poster frame at this time in seconds (default: 40 % of the clip). The options are stored with the render (get_render).',
+      description: 'Queue a render of the clip to H.264/AAC MP4. Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long. Options: format renders the same composition in another shape (each item\'s overrides for that format apply); formats: ["horizontal","vertical","square"] (1–3, instead of format) queues one render per format in this one call, with the same options, and returns { batch, renders } (batch = the first render\'s id); draft: true (or { scale }) makes an animatic: the frames are drawn at full size, so a draft shows exactly the final frames and its sampled frame hashes equal a full render\'s, then scaled to 2/3, 1/2 or 1/3 (the largest that gives whole, even pixel sizes; 1920x1080 gives 1280x720) and encoded fast, to a file named ...-draft.mp4; workers: how many worker threads draw frames, 1–16 (default: by CPU count; the pixels do not depend on it); poster_at: the poster frame at this time in seconds (default: 40 % of the clip); final: true is the render to publish: every pinned asset is checked first and a placeholder (flag or tag) or a file with no licence refuses the render, naming each (check_provenance lists them without rendering), and the credits are written next to the MP4 (<name>.credits.md, stats.files.credits; clip_credits shows them); drafts and normal renders are not checked, and final cannot be combined with draft. The options are stored with the render (get_render).',
       input: {
         clip: z.string(),
         format: FORMAT.optional().describe('Render the same composition in another format; each item\'s overrides for that format apply'),
@@ -517,11 +535,12 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         draft: z.union([z.boolean(), z.object({ scale: z.number().gt(0).lt(1).describe('For example 0.5; must give whole, even pixel sizes') }).strict()]).optional().describe('A fast, smaller render for review: true, or { scale }'),
         workers: z.number().int().min(1).max(16).optional().describe('Worker threads that draw frames, 1–16'),
         poster_at: z.number().min(0).optional().describe('Seconds: the time of the poster frame (0 up to the clip\'s duration)'),
+        final: z.boolean().optional().describe('The render to publish: refused while a placeholder or an unlicensed file is in the clip; writes the credits file. Not with draft.'),
         wait_seconds: z.number().min(0).max(900).optional().describe('Wait here for up to this long (for several formats: for all of them)'),
       },
       run: async (a) => {
         if (a.format && a.formats) throw new StudioError('Give format or formats, not both');
-        const options = { draft: a.draft || undefined, workers: a.workers, poster: a.poster_at };
+        const options = { draft: a.draft || undefined, workers: a.workers, poster: a.poster_at, final: a.final || undefined };
         const wait = (r) => (a.wait_seconds ? renders.wait(r.id, a.wait_seconds * 1000) : r);
         if (!a.formats) return { json: compactRender(await wait(renders.enqueue({ clip: a.clip, format: a.format, requestedBy: defaultAuthor, options }))) };
         const b = renders.enqueueBatch({ clip: a.clip, formats: a.formats, requestedBy: defaultAuthor, options });
@@ -589,10 +608,18 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     },
     {
       name: 'set_asset_metadata',
-      title: 'Edit an asset\'s title, description or tags',
-      description: 'Change how an asset is named, described and tagged in the library, without a new code version (it applies to every version and to search). null resets a field to what the source declares. Describing an upload takes it off the needs-description list.',
-      input: { name: z.string(), title: z.string().nullable().optional(), description: z.string().nullable().optional(), tags: z.array(z.string()).nullable().optional(), author: AUTHOR },
-      run: (a) => { const r = library.setMetadata({ slug: a.name, title: a.title, description: a.description, tags: a.tags, author: who(a.author) }); return { json: { updated: r.ref, title: r.title, description: r.description, tags: r.tags, declared: r.declared } }; },
+      title: 'Edit an asset\'s title, description, tags or provenance',
+      description: 'Change how an asset is named, described and tagged in the library, without a new code version (it applies to every version and to search). null resets a field to what the source declares. Describing an upload takes it off the needs-description list. provenance: a partial update of where a file asset (image, sound, footage, font, sequence) came from, kept on one version (version: default the latest) without making a new one, and recorded (by, at): { license, licenseUrl, sourceUrl, creator, credit, date (ISO), aiGenerated, contentId, restrictions, placeholder, redistributable }; null clears a text field. Use it to set the licence of an upload, or to clear placeholder when the real file is in.',
+      input: {
+        name: z.string(), title: z.string().nullable().optional(), description: z.string().nullable().optional(), tags: z.array(z.string()).nullable().optional(),
+        provenance: z.record(z.string(), z.any()).optional().describe('Fields to change, e.g. { license: "CC-BY-4.0", creator: "Jane Doe", sourceUrl: "https://…", credit: "Photo: Jane Doe / Unsplash", placeholder: false }'),
+        version: z.number().int().min(1).optional().describe('With provenance: which version (default the latest)'),
+        author: AUTHOR,
+      },
+      run: (a) => {
+        const r = library.setMetadata({ slug: a.name, title: a.title, description: a.description, tags: a.tags, provenance: a.provenance, version: a.version, author: who(a.author) });
+        return { json: { updated: r.ref, title: r.title, description: r.description, tags: r.tags, declared: r.declared, ...(a.provenance ? { provenance: r.provenance, provenanceEdit: r.meta.provenanceEdit } : {}) } };
+      },
     },
     {
       name: 'diff_versions',
@@ -616,13 +643,13 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'upload_image',
       title: 'Upload an image or SVG',
-      description: 'Add a PNG, JPEG, WebP or SVG file as an image asset, the same way a drag-and-drop in the studio does: the type is read from the bytes, a file already in the library is not added twice (duplicate: true), an SVG is sanitised (scripts, event handlers, external references and foreignObject are dropped; a DOCTYPE rejects it) and rasterised, and the size, a dominant palette and a thumbnail are extracted. It then waits on the needs-description list.',
-      input: { path: z.string().optional().describe('Absolute path of the file'), data_base64: z.string().optional().describe('Or the file\'s bytes, base64'), name: z.string().describe('File name, e.g. "skyline.jpg"'), for_clip: z.string().optional(), author: AUTHOR },
+      description: 'Add a PNG, JPEG, WebP or SVG file as an image asset, the same way a drag-and-drop in the studio does: the type is read from the bytes, a file already in the library is not added twice (duplicate: true), an SVG is sanitised (scripts, event handlers, external references and foreignObject are dropped; a DOCTYPE rejects it; a <style> sheet with simple rules is applied to the shapes, and gradients are kept) and rasterised, and its svg { kept, dropped: [{ what, why }] } says what of the file could not be kept; the size, a dominant palette and a thumbnail are extracted. It then waits on the needs-description list. Say where it came from (license, creator, credit, source_url …): what you leave out is recorded as unknown, and a final render refuses an image with no licence.',
+      input: { path: z.string().optional().describe('Absolute path of the file'), data_base64: z.string().optional().describe('Or the file\'s bytes, base64'), name: z.string().describe('File name, e.g. "skyline.jpg"'), ...provenanceInput(z), for_clip: z.string().optional(), author: AUTHOR },
       run: async (a) => {
         if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64');
         const data = a.path ? readFileSync(a.path) : Buffer.from(a.data_base64, 'base64');
-        const r = await studio.uploads.upload({ name: a.name, data, author: who(a.author), forClip: a.for_clip });
-        return { json: { asset: r.asset.ref, duplicate: r.duplicate, removedFromSvg: r.removed, width: r.asset.meta.width, height: r.asset.meta.height, palette: r.asset.meta.palette, needsDescription: r.asset.needsDescription }, images: [{ png: readFileSync(join(studio.dataDir, r.asset.thumb)), path: join(studio.dataDir, r.asset.thumb) }] };
+        const r = await studio.uploads.upload({ name: a.name, data, author: who(a.author), forClip: a.for_clip, provenance: fromArgs(a) });
+        return { json: { asset: r.asset.ref, duplicate: r.duplicate, provenance: r.asset.provenance, removedFromSvg: r.removed, svg: r.svg, width: r.asset.meta.width, height: r.asset.meta.height, palette: r.asset.meta.palette, needsDescription: r.asset.needsDescription }, images: [{ png: readFileSync(join(studio.dataDir, r.asset.thumb)), path: join(studio.dataDir, r.asset.thumb) }] };
       },
     },
     {

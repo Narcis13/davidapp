@@ -1,0 +1,112 @@
+{
+  "criterion": "mean abs diff <= 2 levels per channel and >= 99 % of pixels within 32 levels",
+  "size": 768,
+  "results": [
+    {
+      "file": "fablecut-logo.svg",
+      "size": 768,
+      "background": "#d9d9d9",
+      "pass": true,
+      "model": {
+        "mean": [
+          0.0613,
+          0.1438,
+          0.0508
+        ],
+        "within8": 0.9954,
+        "within32": 0.9982
+      },
+      "raster": {
+        "mean": [
+          0.0844,
+          0.2198,
+          0.0739
+        ],
+        "within8": 0.9911,
+        "within32": 0.999
+      },
+      "svg": {
+        "kept": [
+          "style sheet: 4 of 4 rules applied to elements",
+          "linear gradient #SVGID_1_ (3 stops)",
+          "radial gradient #SVGID_2_ (3 stops)",
+          "linear gradient #SVGID_3_ (2 stops)",
+          "12 paths in the vector model"
+        ],
+        "dropped": []
+      }
+    },
+    {
+      "file": "illustrator.svg",
+      "size": 768,
+      "background": "#d9d9d9",
+      "pass": true,
+      "model": {
+        "mean": [
+          0.0836,
+          0.0866,
+          0.1096
+        ],
+        "within8": 0.9979,
+        "within32": 0.9999
+      },
+      "raster": {
+        "mean": [
+          0.6702,
+          0.8353,
+          0.8371
+        ],
+        "within8": 0.9691,
+        "within32": 0.9864
+      },
+      "svg": {
+        "kept": [
+          "style sheet: 6 of 6 rules applied to elements",
+          "linear gradient #SVGID_1_ (3 stops)",
+          "radial gradient #SVGID_2_ (2 stops)",
+          "linear gradient #SVGID_3_ (2 stops)",
+          "6 paths in the vector model"
+        ],
+        "dropped": [
+          {
+            "what": "style property \"enable-background\" on <svg>",
+            "why": "removed by the sanitiser"
+          }
+        ]
+      }
+    },
+    {
+      "file": "gradient-href.svg",
+      "size": 768,
+      "background": "#d9d9d9",
+      "pass": true,
+      "model": {
+        "mean": [
+          0.2479,
+          0.2953,
+          0.3073
+        ],
+        "within8": 0.9951,
+        "within32": 0.997
+      },
+      "raster": {
+        "mean": [
+          0.9093,
+          0.9579,
+          1.2866
+        ],
+        "within8": 0.968,
+        "within32": 0.983
+      },
+      "svg": {
+        "kept": [
+          "linear gradient #sky (3 stops)",
+          "linear gradient #wide (3 stops)",
+          "radial gradient #glow (3 stops)",
+          "3 paths in the vector model"
+        ],
+        "dropped": []
+      }
+    }
+  ]
+}

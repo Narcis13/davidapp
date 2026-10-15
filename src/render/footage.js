@@ -317,7 +317,8 @@ export function createFootageService({ cacheBytes = envMB('STUDIO_FOOTAGE_CACHE_
   }
 
   const stats = () => ({ cacheBytes: cache.bytes, cacheLimit: cache.limit, frames: cache.map.size, readers: readers.size });
-  function close() { for (const r of readers.values()) r.close(); readers.clear(); cache.clear(); }
+  /** Stop every decoder and drop the cache; resolves once the decoders have exited (their files are free). */
+  async function close() { const all = [...readers.values()]; readers.clear(); cache.clear(); await Promise.all(all.map((r) => r.close())); }
   return { frame, frameAtTime, release, stats, close };
 }
 

@@ -8,7 +8,7 @@
 //   status(slug, { root })            what an export would write, and whether the folder is up to date (a dry run)
 //   importClip(folder, { files, replace, verify })   create every version of the closure with its exact number, then the clip
 //
-// Files that may not be redistributed (meta.provenance.redistributable === false) and files over 50 MB stay out of git:
+// Files that may not be redistributed (provenance redistributable: false, which an unknown licence is) and files over 50 MB stay out of git:
 // the export lists them by SHA-256 with their licence and source, and an import finds them in the folders it is given.
 // Baked frame sequences are exported as their recipe and baked again on import (baking is deterministic). The bundled
 // fonts (fonts/) are listed, never copied: every checkout has them.
@@ -21,6 +21,7 @@ import { walkParams } from '../core/schema.js';
 import { ROOT, loadImage } from '../render/host.js';
 import { footageService, sha256File } from '../render/footage.js';
 import { json, now, transaction } from '../db/db.js';
+import { isUnknownLicense, provenanceOf } from './provenance.js';
 import { SLUG_RE, StudioError, footageStills, imageThumbPng, renameRetry, tempOf } from './library.js';
 
 /** Files larger than this stay out of git (listed by SHA-256, like the ones that may not be redistributed). */
@@ -124,12 +125,6 @@ export function createExchange(ctx, { library, clips, fonts }, { rebake }) {
     return materialOf({ type: row.type, kind: row.kind, deps: json(row.deps, {}), source: row.type === 'function' ? sha256(row.source ?? '') : null, main, extras, meta: json(row.meta, {}) });
   }
 
-  /** The licence, source and creator a file's provenance gives (meta.provenance, else the older meta.license). */
-  function provenanceOf(meta) {
-    const p = meta.provenance ?? {};
-    return { license: p.license ?? meta.license ?? null, sourceUrl: p.sourceUrl ?? meta.source ?? meta.sourceUrl ?? null, creator: p.creator ?? meta.creator ?? null, redistributable: p.redistributable !== false };
-  }
-
   /** The export record of one version: everything needed to create it again (files over `limit` bytes are not for git). */
   async function recordOf(row, limit = MAX_REPO_FILE) {
     const ref = makeRef(row.slug, row.version);
@@ -140,10 +135,11 @@ export function createExchange(ctx, { library, clips, fonts }, { rebake }) {
       if (!existsSync(f.abs)) throw new StudioError(`${ref}: its file ${f.rel} is missing from the data dir`, 'not_found');
       items.push({ role: f.role, suffix: f.suffix, sha256: await fileSha(f.abs), bytes: statSync(f.abs).size });
     }
-    const prov = provenanceOf(meta);
+    // the provenance reader also understands rows from before provenance existed; an unknown licence is not redistributable
+    const prov = provenanceOf(row) ?? { license: null, sourceUrl: null, creator: null, redistributable: true };
     const big = items.find((i) => i.bytes > limit);
     const store = !prov.redistributable || big ? 'external' : 'repo';
-    const why = store === 'repo' ? undefined : !prov.redistributable ? 'may not be redistributed' : `larger than ${limit / 1e6} MB`;
+    const why = store === 'repo' ? undefined : !prov.redistributable ? (isUnknownLicense(prov.license) ? 'licence unknown' : 'not redistributable') : `larger than ${limit / 1e6} MB`;
     const isFn = row.type === 'function';
     const edit = row.meta_by ? { title: row.meta_title ?? undefined, description: row.meta_description ?? undefined, tags: row.meta_tags ? json(row.meta_tags, []) : undefined, uses: row.meta_uses ? json(row.meta_uses, []) : undefined, by: row.meta_by, at: row.meta_at } : undefined;
     const clean = isFn ? undefined : structuredClone(meta);

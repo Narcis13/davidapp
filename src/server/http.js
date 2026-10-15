@@ -14,11 +14,12 @@ import { MAX_UPLOAD } from '../studio/uploads.js';
 import { json as parseJson } from '../db/db.js';
 import { zonesOf } from '../studio/inspect.js';
 import { moreRoutes } from './routes/index.js';
+import { fromQuery } from '../studio/provenance.js';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
-  '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf', '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf', '.ico': 'image/x-icon',
 };
 const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501, too_large: 413 };
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
@@ -197,7 +198,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       const r = await library.createPreset({ base: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, params: data.params, title: data.title, description: data.description, tags: data.tags, author: data.author ?? author });
       return { asset: r.asset, warnings: r.warnings };
     }],
-    ['PUT', /^\/api\/assets\/([a-z0-9-]+)\/metadata$/, ({ params, data }) => library.setMetadata({ slug: params[0], title: data.title, description: data.description, tags: data.tags, author: data.author ?? author })],
+    ['PUT', /^\/api\/assets\/([a-z0-9-]+)\/metadata$/, ({ params, data }) => library.setMetadata({ slug: params[0], title: data.title, description: data.description, tags: data.tags, provenance: data.provenance, version: data.version, author: data.author ?? author })],
     ['GET', /^\/api\/assets\/([a-z0-9-]+)\/diff$/, ({ params, query }) => library.diffVersions(params[0], int(query.get('a'), 1, 1, 1e6), int(query.get('b'), 1, 1, 1e6))],
     ['POST', /^\/api\/assets\/([a-z0-9-]+)\/bake$/, async ({ params, data }) => {
       const r = await studio.bakeSequence({ ref: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, params: data.params, format: data.format, width: data.width, height: data.height, fps: data.fps, duration: data.duration, title: data.title, description: data.description, tags: data.tags, author: data.author ?? author });
@@ -258,10 +259,11 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     }],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/layout$/, async ({ params, data }) => studio.inspect.layoutReport({ clip: data.composition ? undefined : params[0], composition: data.composition, format: data.format, t: data.t ?? 0 })],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/audio-report$/, async ({ params, data }) => studio.audio.report(await studio.compositionOf({ clip: data.composition ? undefined : params[0], composition: data.composition }), { silence: data.silence, minSilence: data.minSilence })],
-    // body (all optional): { format | formats: [1–3 formats] (→ { batch, renders }), draft: true | { scale }, workers: 1–16, posterAt: seconds }
+    // body (all optional): { format | formats: [1–3 formats] (→ { batch, renders }), draft: true | { scale }, workers: 1–16, posterAt: seconds,
+    // final: true (refused while the clip holds a placeholder or an unlicensed file; writes the credits) }
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/render$/, ({ params, data }) => {
       if (data.format !== undefined && data.formats !== undefined) throw new StudioError('Give format or formats, not both');
-      const options = { draft: data.draft || undefined, workers: data.workers, poster: data.posterAt };
+      const options = { draft: data.draft || undefined, workers: data.workers, poster: data.posterAt, final: data.final || undefined };
       return data.formats !== undefined
         ? renders.enqueueBatch({ clip: params[0], formats: data.formats, requestedBy: author, options })
         : renders.enqueue({ clip: params[0], requestedBy: author, format: data.format, options });
@@ -365,8 +367,9 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     const type = String(req.headers['content-type'] ?? '').toLowerCase();
     if (!/^image\/(png|jpeg|webp|svg\+xml)\b/.test(type)) throw new StudioError('Upload one PNG, JPEG, WebP or SVG file as the request body, with its image/* Content-Type', 'unsupported');
     const chunks = await read(req, MAX_UPLOAD, `The file is larger than ${MAX_UPLOAD / 1e6} MB`);
-    const r = await uploads.upload({ name: url.searchParams.get('name') || 'upload', data: Buffer.concat(chunks), author: url.searchParams.get('author') || author, forClip: url.searchParams.get('clip') || undefined });
-    return { asset: r.asset, duplicate: r.duplicate, removed: r.removed };
+    // where it came from: ?license=&license_url=&source_url=&creator=&credit=&date=&ai_generated=&content_id=&restrictions=&placeholder=&redistributable=
+    const r = await uploads.upload({ name: url.searchParams.get('name') || 'upload', data: Buffer.concat(chunks), author: url.searchParams.get('author') || author, forClip: url.searchParams.get('clip') || undefined, provenance: fromQuery(url.searchParams) });
+    return { asset: r.asset, duplicate: r.duplicate, removed: r.removed, svg: r.svg };
   }
 
   async function handle(req, res) {

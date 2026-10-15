@@ -1,0 +1,35 @@
+{
+ "script": "The studio can read this line aloud, time every word, and check what it said against what was written.",
+ "added": "speech-check-voice@1",
+ "duration": 6.325,
+ "words": 19,
+ "stats": {
+  "matched": 19,
+  "substituted": 0,
+  "missing": 0,
+  "extra": 0
+ },
+ "voice": {
+  "engine": "kokoro",
+  "id": "af_heart",
+  "speed": 1
+ },
+ "timedBy": "ggml-small.en.bin",
+ "models": [
+  "ggml-small.en.bin",
+  "ggml-base.en.bin"
+ ],
+ "seconds": {
+  "voice": 3.758,
+  "transcription": 3.16
+ },
+ "transcript": {
+  "from": "transcripts",
+  "ok": true,
+  "slips": [],
+  "drops": [],
+  "insertions": [],
+  "disputed": []
+ },
+ "warnings": []
+}

@@ -12,6 +12,7 @@ import { createCanvas, fontManifest } from '../render/host.js';
 import { parseFont, summarizeCoverage } from '../render/glyphs.js';
 import { json, now, transaction } from '../db/db.js';
 import { SLUG_RE, StudioError, renameRetry, tempOf } from './library.js';
+import { buildProvenance } from './provenance.js';
 
 export const MAX_FONT_BYTES = 25e6;
 const MAX_LICENSE_FILE = 200_000;
@@ -60,9 +61,9 @@ export function createFonts(ctx, library) {
   /**
    * Add a font file to the library, or a new version of the font asset `name`.
    * The file is given as `path` or as `data` (bytes). The family, weight and style are read from the file unless given.
-   * @param {{ name: string, path?: string, data?: Buffer, originalName?: string, license: string, licenseFile?: string, family?: string, weight?: number, style?: string, title?: string, description?: string, tags?: string[], source?: string, author: string, note?: string }} o
+   * @param {{ name: string, path?: string, data?: Buffer, originalName?: string, license: string, licenseFile?: string, family?: string, weight?: number, style?: string, title?: string, description?: string, tags?: string[], source?: string, provenance?: any, author: string, note?: string }} o
    */
-  async function addFont({ name, path, data, originalName, license, licenseFile, family, weight, style, title, description, tags = [], source, author, note }) {
+  async function addFont({ name, path, data, originalName, license, licenseFile, family, weight, style, title, description, tags = [], source, provenance, author, note }) {
     if (!SLUG_RE.test(name ?? '')) throw new StudioError(`"${name}" is not a valid asset name: use lowercase letters, digits and dashes (2–64 characters), e.g. "acme-sans" or "acme-sans-bold"`);
     if (!author) throw new StudioError('author is required');
     if (!Array.isArray(tags) || !tags.every((t) => /^[a-z0-9][a-z0-9-]*$/.test(t))) throw new StudioError('tags must be lowercase-kebab strings');
@@ -100,6 +101,8 @@ export function createFonts(ctx, library) {
       licenseText = readFileSync(licenseFile);
     }
     if (source !== undefined && (typeof source !== 'string' || source.length > 300)) throw new StudioError('source is where the font came from (a URL or a few words, at most 300 characters)');
+    // provenance: the licence above, a source that is a URL as the source URL, and whatever else was said (creator, credit, date …)
+    const prov = buildProvenance({ ...(typeof source === 'string' && /^https?:\/\/\S+$/i.test(source.trim()) ? { sourceUrl: source.trim() } : {}), ...(provenance ?? {}), license: lic });
 
     // family, weight, style: what the file says, unless overridden
     let fam = (family ?? info.family ?? '').trim();
@@ -143,7 +146,7 @@ export function createFonts(ctx, library) {
       if (licTmp) writeFileSync(licTmp, licenseText);
       writeFileSync(thumbTmp, specimen(fileTmp, sha256, { family: fam, weight: w, style: st, license: lic, covers: coverage.romanian }));
       const meta = {
-        family: fam, weight: w, style: st, license: lic, ...(licFile ? { licenseFile: licFile } : {}), ...(source ? { source } : {}),
+        family: fam, weight: w, style: st, license: lic, provenance: prov, ...(licFile ? { licenseFile: licFile } : {}), ...(source ? { source } : {}),
         coverage, uploaded: true, bytes: bytes.length, sha256, format: info.format, subfamily: info.subfamily, fullName: info.fullName,
         glyphs: info.glyphs, unitsPerEm: info.unitsPerEm, ...(info.variable ? { variable: true } : {}),
         originalName: label, ...(info.licenseText ? { embeddedLicense: info.licenseText.slice(0, 500) } : {}), ...(info.copyright ? { copyright: info.copyright.slice(0, 300) } : {}),

@@ -15,6 +15,7 @@ import { probeFootage, footageService, sha256File, soundPeaks, FootageError } fr
 import { json, now, transaction } from '../db/db.js';
 import { presetSource, rewriteDefaults } from './generate.js';
 import { diffLines, unified } from '../core/diff.js';
+import { buildProvenance, parseProvenance, applyPatch, provenanceOf } from './provenance.js';
 import { resolveParams } from '../core/schema.js';
 
 export class StudioError extends Error {
@@ -243,6 +244,7 @@ export function createLibrary(ctx) {
       uses: json(row.uses, {}),
       deps: json(row.deps, {}),
       meta: json(row.meta, {}),
+      provenance: provenanceOf(row),
       note: row.note,
       engine: row.engine,
       madeForClip: clipSlug(row.clip_id),
@@ -726,9 +728,11 @@ export function createLibrary(ctx) {
    * Edit an asset's title, description or tags without a new code version. The edit applies to
    * every version and to search; null for a field goes back to what the source declares.
    * uses: suggested uses (short phrases), for images the agent describes.
-   * @param {{ slug: string, title?: string | null, description?: string | null, tags?: string[] | null, uses?: string[] | null, author: string, keepFlag?: boolean }} o
+   * provenance: a partial update of a file version's provenance (version: which one; default the latest); it is kept in
+   * that version's meta, so it makes no new version, and the edit is recorded (provenanceEdit: by, at).
+   * @param {{ slug: string, title?: string | null, description?: string | null, tags?: string[] | null, uses?: string[] | null, provenance?: any, version?: number, author: string, keepFlag?: boolean }} o
    */
-  function setMetadata({ slug, title, description, tags, uses, author, keepFlag = false }) {
+  function setMetadata({ slug, title, description, tags, uses, provenance, version, author, keepFlag = false }) {
     if (!author) throw new StudioError('author is required');
     const a = q('SELECT * FROM assets WHERE slug = ?').get(slug);
     if (!a) throw new StudioError(`No asset named "${slug}" in the library.`, 'not_found');
@@ -749,14 +753,27 @@ export function createLibrary(ctx) {
       if (uses !== null && (!Array.isArray(uses) || uses.length > 12 || !uses.every((u) => typeof u === 'string' && u.trim() && u.length <= 160))) throw new StudioError('uses is a list of up to 12 short phrases (how the asset could be used)');
       sets.push('meta_uses = ?'); args.push(uses === null ? null : JSON.stringify(uses.map((u) => u.trim())));
     }
-    if (!sets.length) throw new StudioError('Give a title, description, tags or uses to change');
+    let prov = null;
+    if (provenance !== undefined) {
+      const row = requireVersion(version === undefined ? slug : makeRef(slug, version));
+      if (row.type === 'function') throw new StudioError(`${makeRef(row.slug, row.version)} is a function asset: code written in the studio is original and carries no provenance. Provenance is for images, sounds, footage, fonts and sequences.`);
+      if (row.type === 'font' && !isUploaded(row)) throw new StudioError(`${row.slug} is a font bundled with the studio; its licence is kept with the font file (fonts/).`);
+      const patch = parseProvenance(provenance);
+      prov = { row, meta: applyPatch(json(row.meta, {}), provenanceOf(row), patch, author) };
+    } else if (version !== undefined) throw new StudioError('version applies to provenance only (title, description and tags apply to every version)');
+    if (!sets.length && !prov) throw new StudioError('Give a title, description, tags, uses or provenance to change');
     // describing an upload is what takes it off the "needs description" list
     if (!keepFlag && description) sets.push('needs_description = 0');
     transaction(db, () => {
-      q(`UPDATE assets SET ${sets.join(', ')}, meta_by = ?, meta_at = ? WHERE id = ?`).run(...args, author, now(), a.id);
-      reindexLatest(a.id);
+      if (sets.length) {
+        q(`UPDATE assets SET ${sets.join(', ')}, meta_by = ?, meta_at = ? WHERE id = ?`).run(...args, author, now(), a.id);
+        reindexLatest(a.id);
+      }
+      // the version's meta column may change (the immutability trigger guards the source, file and deps, not this)
+      if (prov) q('UPDATE asset_versions SET meta = ? WHERE id = ?').run(JSON.stringify(prov.meta), prov.row.version_id);
       ctx.events?.emit('asset', slug, 'metadata', { author });
     });
+    if (prov) return getAsset(makeRef(slug, prov.row.version), { includeSource: false });
     return getAsset(slug, { includeSource: false });
   }
 
@@ -839,8 +856,8 @@ export function createLibrary(ctx) {
    * derivedFrom: a ref this file was baked from (kept as lineage).
    * @param {any} o
    */
-  /** @param {{ slug: string, type: string, path?: string, data?: Buffer, ext?: string, description: string, tags?: string[], title?: string, author: string, forClip?: string, note?: string, license?: string, derivedFrom?: string, meta?: any, needsDescription?: boolean, sidecar?: { ext: string, data: Buffer } }} o */
-  async function addFileAsset({ slug, type, path, data, ext, description, tags = [], title, author, forClip, note, license, derivedFrom, meta = {}, needsDescription = false, sidecar }) {
+  /** @param {{ slug: string, type: string, path?: string, data?: Buffer, ext?: string, description: string, tags?: string[], title?: string, author: string, forClip?: string, note?: string, license?: string, provenance?: any, derivedFrom?: string, meta?: any, needsDescription?: boolean, sidecar?: { ext: string, data: Buffer } }} o */
+  async function addFileAsset({ slug, type, path, data, ext, description, tags = [], title, author, forClip, note, license, provenance, derivedFrom, meta = {}, needsDescription = false, sidecar }) {
     if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name`);
     if (!['image', 'sound'].includes(type)) throw new StudioError('type must be image or sound');
     if (!author) throw new StudioError('author is required');
@@ -856,6 +873,8 @@ export function createLibrary(ctx) {
     const clip = forClip ? clipBySlug(forClip) : null;
     if (forClip && !clip) throw new StudioError(`for_clip: no clip named "${forClip}"`, 'not_found');
     const from = derivedFrom ? requireVersion(derivedFrom) : null;
+    // provenance: what the caller said; a file made from an asset is original, any other file with no licence given is unknown
+    const prov = buildProvenance({ ...(meta.provenance ?? {}), ...(license !== undefined ? { license } : meta.license !== undefined ? { license: meta.license } : {}), ...(provenance ?? {}) }, { defaultLicense: from ? 'original' : null, derivedFrom: from ? makeRef(from.slug, from.version) : null });
     const version = (existing?.latest_version ?? 0) + 1;
     const file = `files/${slug}@${version}${e}`;
     // a header can declare far more pixels than the file has bytes: checked before anything decodes it
@@ -868,7 +887,7 @@ export function createLibrary(ctx) {
     const sideTmp = side ? join(dataDir, tempOf(side)) : null;
     if (side) { meta = { ...meta, sidecar: side }; writeFileSync(sideTmp, sidecar.data); }
     try {
-    const info = { ...meta, license: license ?? meta.license ?? 'original', bytes: bytes.length };
+    const info = { ...meta, license: prov.license, provenance: prov, bytes: bytes.length };
     let thumb = null, duration = null;
     if (type === 'image') {
       const img = await loadImage(fileTmp);
@@ -919,6 +938,8 @@ export function createLibrary(ctx) {
     const clip = forClip ? clipBySlug(forClip) : null;
     if (forClip && !clip) throw new StudioError(`for_clip: no clip named "${forClip}"`, 'not_found');
     const from = derivedFrom ? requireVersion(derivedFrom) : null;
+    // baked from the studio's own assets: original, and it remembers what from
+    meta = { ...meta, license: 'original', provenance: buildProvenance(null, { defaultLicense: 'original', derivedFrom: from ? makeRef(from.slug, from.version) : null }) };
     const version = (existing?.latest_version ?? 0) + 1;
     const file = `files/${slug}@${version}`;
     const thumb = `thumbs/${slug}@${version}.png`;
@@ -959,9 +980,9 @@ export function createLibrary(ctx) {
    * read now: size, rate, rotation, colour, audio, and the frame table (the whole file is decoded once). A thumbnail, an
    * 8-frame filmstrip and, when it has sound, a waveform image are made from it. An existing slug gets a new version.
    * move: the file is moved in instead of copied (an upload already written to a temp file).
-   * @param {{ slug: string, path: string, description: string, tags?: string[], title?: string, author: string, forClip?: string, note?: string, license?: string, meta?: any, move?: boolean }} o
+   * @param {{ slug: string, path: string, description: string, tags?: string[], title?: string, author: string, forClip?: string, note?: string, license?: string, provenance?: any, meta?: any, move?: boolean }} o
    */
-  async function addFootage({ slug, path, description, tags = [], title, author, forClip, note, license, meta = {}, move = false }) {
+  async function addFootage({ slug, path, description, tags = [], title, author, forClip, note, license, provenance, meta = {}, move = false }) {
     if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name: use lowercase letters, digits and dashes (2–64 characters)`);
     if (!author) throw new StudioError('author is required');
     if (typeof description !== 'string' || description.trim().length < 12) throw new StudioError('description is required: what the footage shows, and where it came from');
@@ -973,6 +994,7 @@ export function createLibrary(ctx) {
     if (existing && existing.type !== 'video') throw new StudioError(`"${slug}" already exists as a ${existing.type} asset`, 'conflict');
     const clip = forClip ? clipBySlug(forClip) : null;
     if (forClip && !clip) throw new StudioError(`for_clip: no clip named "${forClip}"`, 'not_found');
+    const prov = buildProvenance({ ...(meta.provenance ?? {}), ...(license !== undefined ? { license } : meta.license !== undefined ? { license: meta.license } : {}), ...(provenance ?? {}) });
     const version = (existing?.latest_version ?? 0) + 1;
     const file = `files/${slug}@${version}${e}`;
     const fileTmp = join(dataDir, tempOf(file));
@@ -986,7 +1008,7 @@ export function createLibrary(ctx) {
       // the stills are made: the decoder lets go of the temp file before it is renamed
       await footageService().release(fileTmp);
       const sha256 = await sha256File(fileTmp);
-      const info = { ...meta, ...probed, license: license ?? meta.license ?? 'original', bytes: statSync(fileTmp).size, sha256, strip: { file: strip, frames: 8 }, wave: hasWave ? { file: wave } : undefined };
+      const info = { ...meta, ...probed, license: prov.license, provenance: prov, bytes: statSync(fileTmp).size, sha256, strip: { file: strip, frames: 8 }, wave: hasWave ? { file: wave } : undefined };
       const at = now();
       const prev = existing ? versionRow(slug) : null;
       transaction(db, () => {

@@ -59,7 +59,9 @@ try {
     const t0 = Date.now();
     const r = await original.exchange.exportClip(slug, { root: repo });
     exported.set(slug, r);
-    say(`export ${slug}: ${r.closure} refs in the closure (${r.versions} versions, ${r.external.length} files left out of git), ${r.check.frames} frame hashes, ${r.wrote.length} files written, ${sec(Date.now() - t0)}`);
+    const why = {};
+    for (const x of r.external) why[x.why] = (why[x.why] ?? 0) + 1;
+    say(`export ${slug}: ${r.closure} refs in the closure (${r.versions} versions, ${r.external.length} files left out of git${r.external.length ? `: ${Object.entries(why).map(([k, n]) => `${n} ${k}`).join(', ')}` : ''}), ${r.check.frames} frame hashes, ${r.wrote.length} files written, ${sec(Date.now() - t0)}`);
   }
   say(`  the store: ${mb(bytesOf(join(repo, 'library')))} in library/, ${mb(bytesOf(join(repo, 'clips')))} in clips/`);
   say();

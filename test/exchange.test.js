@@ -100,19 +100,19 @@ before(async () => {
   await studio.clips.savePrecomp({ clip: 'exch-src', items: ['pc1', 'pc2'], slug: 'pair-card', author: AUTHOR });
   // an image upload (with an uploaded SVG's sidecar next to it), and one that may not be redistributed
   const png = (color) => { const c = createCanvas(48, 32); const g = c.getContext('2d'); g.fillStyle = color; g.fillRect(0, 0, 48, 32); g.fillStyle = '#ffffff'; g.fillRect(4, 4, 20, 8); return c.toBuffer('image/png'); };
-  await lib.addFileAsset({ slug: 'exch-logo', type: 'image', data: png('#aa2255'), ext: '.png', description: 'A small test logo made of two rectangles.', tags: ['logo'], author: AUTHOR, forClip, sidecar: { ext: '.svg', data: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="32"><rect width="48" height="32" fill="#aa2255"/></svg>') } });
+  await lib.addFileAsset({ slug: 'exch-logo', type: 'image', data: png('#aa2255'), ext: '.png', description: 'A small test logo made of two rectangles.', tags: ['logo'], author: AUTHOR, forClip, license: 'original', sidecar: { ext: '.svg', data: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="32"><rect width="48" height="32" fill="#aa2255"/></svg>') } });
   secretPng = png('#2255aa');
-  await lib.addFileAsset({ slug: 'exch-secret', type: 'image', data: secretPng, ext: '.png', description: 'A licensed picture that may not be redistributed.', tags: ['photo'], author: AUTHOR, license: 'CC-BY-4.0', meta: { provenance: { license: 'CC-BY-4.0', sourceUrl: 'https://example.com/photos/secret', creator: 'A. Photographer', redistributable: false } } });
+  await lib.addFileAsset({ slug: 'exch-secret', type: 'image', data: secretPng, ext: '.png', description: 'A licensed picture that may not be redistributed.', tags: ['photo'], author: AUTHOR, provenance: { license: 'CC-BY-4.0', sourceUrl: 'https://example.com/photos/secret', creator: 'A. Photographer', redistributable: false } });
   // a narration: a recording, its script and its word times
   const SR = 48000, left = new Float32Array(SR * 2);
   for (const [a, b] of TIMES) for (let i = Math.round(a * SR); i < Math.round(b * SR); i++) left[i] = 0.2 * Math.sin((2 * Math.PI * 200 * i) / SR);
   writeFileSync(join(work, 'voice.wav'), encodeWav(left, left, SR));
-  await studio.audio.addNarration({ slug: 'exch-vo', path: join(work, 'voice.wav'), script: WORDS.join(' '), timings: WORDS.map((text, i) => ({ text, start: TIMES[i][0], end: TIMES[i][1] })), author: AUTHOR, forClip, voice: { name: 'test tone', license: 'original' } });
+  await studio.audio.addNarration({ slug: 'exch-vo', path: join(work, 'voice.wav'), script: WORDS.join(' '), timings: WORDS.map((text, i) => ({ text, start: TIMES[i][0], end: TIMES[i][1] })), author: AUTHOR, forClip, license: 'original', voice: { name: 'test tone', license: 'original' } });
   // footage: FFmpeg's test pattern with a tone
   footagePath = join(work, 'testsrc.mp4');
   const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=160x90:rate=10', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000', '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', footagePath]);
   assert.equal(r.code, 0, r.stderr);
-  await lib.addFootage({ slug: 'exch-footage', path: footagePath, description: 'One second of testsrc2 with a 440 Hz tone, made by FFmpeg.', author: AUTHOR, forClip });
+  await lib.addFootage({ slug: 'exch-footage', path: footagePath, description: 'One second of testsrc2 with a 440 Hz tone, made by FFmpeg.', author: AUTHOR, forClip, license: 'original' });
   // an uploaded font
   await studio.fonts.addFont({ name: 'fixture-blocks', path: join(here, 'fixtures', 'fonts', 'fixture-blocks-regular.ttf'), license: 'CC0-1.0', author: AUTHOR });
   // a baked sequence of foo@2
@@ -314,7 +314,7 @@ test('an import into a library with a different foo@2 stops before writing anyth
   assert.equal(C.library.search({ query: 'exch-logo' }).total, 0);
   // the same foo@2, and an asset of another type under a name the export uses
   const D = emptyLibrary();
-  await D.library.addFileAsset({ slug: 'foo', type: 'image', data: secretPng, ext: '.png', description: 'An image where the export has a function.', author: AUTHOR });
+  await D.library.addFileAsset({ slug: 'foo', type: 'image', data: secretPng, ext: '.png', description: 'An image where the export has a function.', author: AUTHOR, license: 'original' });
   await refused(D.exchange.importClip(clipFolder), /"foo" as a image asset/);
 });
 
@@ -346,6 +346,38 @@ test('an external file that is missing is named; the import succeeds when files 
   toClean.push(wrong);
   writeFileSync(join(wrong, `${f.sha256}.png`), Buffer.alloc(secretPng.length, 2));
   await refused(F.exchange.importClip(join(root, 'clips', 'exch-ext'), { files: [wrong] }), /is not in the repo/);
+});
+
+test('an upload with no licence is external ("licence unknown"); provenance, edited or not, comes back unchanged', async () => {
+  const png = (() => { const c = createCanvas(40, 30); const g = c.getContext('2d'); g.fillStyle = '#44aa66'; g.fillRect(0, 0, 40, 30); return c.toBuffer('image/png'); })();
+  await A.studio.library.addFileAsset({ slug: 'exch-nolicence', type: 'image', data: png, ext: '.png', description: 'A picture nobody said the licence of.', author: AUTHOR });
+  assert.equal(A.studio.library.getAsset('exch-nolicence').meta.provenance.redistributable, false);
+  // provenance is mutable metadata of the version: an edit must travel with it
+  A.studio.library.setMetadata({ slug: 'exch-nolicence', provenance: { creator: 'Unknown painter', credit: 'Picture: unknown' }, author: AUTHOR });
+  await A.studio.clips.createClip({ slug: 'exch-nolicence-clip', title: 'No licence', author: AUTHOR, composition: { width: 320, height: 180, fps: 10, duration: 1, tracks: [{ id: 'v', type: 'visual', items: [{ id: 'pic', asset: 'exch-nolicence', start: 0, duration: 1 }] }] } });
+  const own = tmp('exchange-nolicence-');
+  toClean.push(own);
+  const r = await A.studio.exchange.exportClip('exch-nolicence-clip', { root: own });
+  assert.equal(r.external.length, 1);
+  assert.deepEqual([r.external[0].store, r.external[0].why, r.external[0].license], ['external', 'licence unknown', null]);
+  assert.ok(!existsSync(join(own, 'library', 'files', `${r.external[0].sha256}.png`)));
+  const rec = JSON.parse(readFileSync(join(own, 'library', 'versions', 'exch-nolicence@1.json'), 'utf8'));
+  assert.deepEqual(rec.meta.provenance, A.studio.library.getAsset('exch-nolicence').meta.provenance, 'provenance is in the record as it is');
+  assert.equal(rec.files.why, 'licence unknown');
+  // the import names it, and with the file it brings the provenance back as it was, edit and all
+  const E = emptyLibrary();
+  await refused(E.exchange.importClip(join(own, 'clips', 'exch-nolicence-clip')), /exch-nolicence@1[\s\S]*licence unknown/);
+  const stash = tmp('exchange-nolicence-files-');
+  toClean.push(stash);
+  writeFileSync(join(stash, 'x.png'), png);
+  await E.exchange.importClip(join(own, 'clips', 'exch-nolicence-clip'), { files: [stash] });
+  const back = E.library.getAsset('exch-nolicence').meta, was = A.studio.library.getAsset('exch-nolicence').meta;
+  assert.deepEqual(back.provenance, was.provenance);
+  assert.deepEqual(back.provenanceEdit, was.provenanceEdit);
+  assert.equal(back.provenance.creator, 'Unknown painter');
+  // the provenance of the other fixtures survives too (a licence given, a source, a creator)
+  const secret = JSON.parse(readFileSync(join(root, 'library', 'versions', 'exch-secret@1.json'), 'utf8'));
+  assert.deepEqual(secret.meta.provenance, A.studio.library.getAsset('exch-secret').meta.provenance);
 });
 
 test('files over the size limit stay out of the store (listed by SHA-256, like the ones that may not be redistributed)', async () => {

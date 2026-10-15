@@ -1,0 +1,38 @@
+{
+ "engine": "kokoro",
+ "line": "Every frame is a function of time.",
+ "speed": 1,
+ "samples": [
+  {
+   "voice": "af_heart",
+   "label": "Heart (female, en-us)",
+   "language": "en-us",
+   "gender": "female",
+   "grade": "A",
+   "path": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\fablecut-speech\\data\\speech\\samples\\e346888e79-af_heart.wav",
+   "seconds": 2.45,
+   "cached": false
+  },
+  {
+   "voice": "bf_emma",
+   "label": "Emma (female, en-gb)",
+   "language": "en-gb",
+   "gender": "female",
+   "grade": "B-",
+   "path": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\fablecut-speech\\data\\speech\\samples\\66a590f356-bf_emma.wav",
+   "seconds": 2.75,
+   "cached": false
+  },
+  {
+   "voice": "am_fenrir",
+   "label": "Fenrir (male, en-us)",
+   "language": "en-us",
+   "gender": "male",
+   "grade": "C+",
+   "path": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\fablecut-speech\\data\\speech\\samples\\84a5ec8442-am_fenrir.wav",
+   "seconds": 2.35,
+   "cached": false
+  }
+ ],
+ "note": "The WAV files are in the data directory; this report keeps their names, durations and voices."
+}

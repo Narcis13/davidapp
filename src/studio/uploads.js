@@ -12,7 +12,8 @@ import { basename, extname } from 'node:path';
 import { createCanvas, loadImage } from '../render/host.js';
 import { json } from '../db/db.js';
 import { StudioError, SLUG_RE, checkImageSize } from './library.js';
-import { sanitizeSvg, vectorModel, useExpansion, USE_BUDGET, SvgError } from './svg.js';
+import { parseProvenance } from './provenance.js';
+import { sanitizeSvg, vectorModel, useExpansion, drop, USE_BUDGET, SvgError } from './svg.js';
 
 export const MAX_UPLOAD = 25_000_000;
 
@@ -88,21 +89,26 @@ export function createUploads(ctx, library) {
   }
 
   /**
-   * Add one uploaded file → { asset, duplicate, removed (what the SVG sanitiser dropped) }.
-   * @param {{ name: string, data: Buffer, author: string, forClip?: string, slug?: string }} o
+   * Add one uploaded file → { asset, duplicate, removed (what the SVG sanitiser dropped), svg (an SVG: { kept, dropped: [{ what, why }] }, else null) }.
+   * provenance: what the uploader says about the file (licence, creator, source …); what is not said is recorded as unknown.
+   * @param {{ name: string, data: Buffer, author: string, forClip?: string, slug?: string, provenance?: any }} o
    */
-  async function upload({ name, data, author, forClip, slug: wanted }) {
+  async function upload({ name, data, author, forClip, slug: wanted, provenance }) {
     if (!Buffer.isBuffer(data) || !data.length) throw new StudioError('The file is empty');
     if (data.length > MAX_UPLOAD) throw new StudioError(`The file is ${data.length} bytes; uploads are at most ${MAX_UPLOAD}`);
+    if (provenance !== undefined) parseProvenance(provenance);
     const type = sniff(data);
     if (!type) throw new StudioError(`"${name}" is not a PNG, JPEG, WebP or SVG file`, 'unsupported');
     const hash = createHash('sha256').update(data).digest('hex');
     const dup = db.prepare("SELECT a.slug, v.version FROM assets a JOIN asset_versions v ON v.asset_id = a.id WHERE a.type = 'image' AND json_extract(v.meta, '$.hash') = ? ORDER BY v.id LIMIT 1").get(hash);
-    if (dup) return { asset: library.getAsset(`${dup.slug}@${dup.version}`, { includeSource: false }), duplicate: true, removed: [] };
-    let raster = data, ext = type.ext, removed = [], vector = null, sidecar, natural = null;
+    if (dup) {
+      const asset = library.getAsset(`${dup.slug}@${dup.version}`, { includeSource: false });
+      return { asset, duplicate: true, removed: [], svg: asset.meta.svg ?? null };
+    }
+    let raster = data, ext = type.ext, removed = [], vector = null, sidecar, natural = null, svgReport = null;
     if (type.kind === 'svg') {
       let clean;
-      try { clean = sanitizeSvg(data.toString('utf8')); } catch (e) {
+      try { clean = sanitizeSvg(data.toString('utf8'), { styles: true }); } catch (e) {
         if (e instanceof SvgError) throw new StudioError(`The SVG was rejected: ${e.message}`, 'rejected');
         throw e;
       }
@@ -110,7 +116,8 @@ export function createUploads(ctx, library) {
       // the rasteriser expands every <use> as well, so a document that multiplies itself is refused before it gets there
       const added = useExpansion(clean.tree);
       if (added.nodes > USE_BUDGET.nodes || added.commands > USE_BUDGET.commands) throw new StudioError(`The SVG was rejected: its <use> references repeat too much of the drawing (more than ${USE_BUDGET.nodes} extra elements or ${USE_BUDGET.commands} path commands once expanded)`, 'rejected');
-      vector = vectorModel(clean.tree);
+      vector = vectorModel(clean.tree, { gradients: true, report: clean.report });
+      svgReport = clean.report;
       natural = { width: vector.width, height: vector.height };
       const img = await loadImage(Buffer.from(clean.svg)).catch(() => { throw new StudioError('The SVG could not be drawn after sanitising', 'rejected'); });
       // rasterised once, big enough to scale down cleanly in any clip
@@ -120,20 +127,20 @@ export function createUploads(ctx, library) {
       raster = c.toBuffer('image/png');
       ext = '.png';
       sidecar = { ext: '.svg', data: Buffer.from(clean.svg) };
-      if (vector.over || vector.paths.length > 4000 || JSON.stringify(vector).length > 1_500_000) vector = null;
+      if (vector.over || vector.paths.length > 4000 || JSON.stringify(vector).length > 1_500_000) { drop(svgReport, 'vector model', 'too large for f.svg(); only the image is kept'); vector = null; }
     } else checkImageSize(data, `"${name}"`);
     const img = await loadImage(raster).catch(() => { throw new StudioError(`"${name}" could not be decoded as an image`, 'rejected'); });
     const slug = wanted ?? uniqueSlug(name);
     const colours = palette(img);
     const kindName = { png: 'PNG', jpeg: 'JPEG', webp: 'WebP', svg: 'SVG' }[type.kind];
     const r = await library.addFileAsset({
-      slug, type: 'image', data: raster, ext, author, forClip, license: 'uploaded by the user',
+      slug, type: 'image', data: raster, ext, author, forClip, provenance,
       title: titleOf(name), tags: ['upload', type.kind === 'svg' ? 'svg' : 'photo'],
       description: `An uploaded ${kindName} image, "${basename(name)}" (${natural ? `${natural.width}×${natural.height}` : `${img.width}×${img.height}`}), waiting for a description.`,
-      meta: { hash, originalName: basename(name), format: type.kind, palette: colours, natural, sanitized: type.kind === 'svg' ? { removed } : undefined, vector },
+      meta: { hash, originalName: basename(name), format: type.kind, palette: colours, natural, sanitized: type.kind === 'svg' ? { removed } : undefined, svg: svgReport ?? undefined, vector },
       needsDescription: true, sidecar,
     });
-    return { asset: r.asset, duplicate: false, removed };
+    return { asset: r.asset, duplicate: false, removed, svg: svgReport };
   }
 
   /** Uploads waiting for a description, oldest first. */

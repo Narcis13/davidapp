@@ -14,7 +14,7 @@ and that prompt revised so no workaround is left. Brief: `ITERATION_4_PROMPT.md`
 Started 2026-10-15 on branch `main` at `de5d370`, on the Windows 11 PC (i9-14900KF), as iteration 3 was,
 not the macOS Intel machine the brief describes (see `.claude/goal-loop/project.md`).
 
-**Next:** baseline finishing (worktree `$SP/base` at `0ea078c`); then the foundation commit (schema v3, tool/route hooks) and wave 1 agents.
+**Next:** merge the running agents as they finish (logos, speech, provenance, exchange, kit-ui, kit-marketing, ui); then the second UI agent (provenance fields, render options, write to repo, speech), the revised motion prompt, and clips 9 and 10.
 
 ## Contract (Done means)
 
@@ -54,15 +54,15 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Milestones
 
-0. [ ] **Baseline and foundation**: project.md (committed on its own), hashes of clips 1–8 + history-of-ai and speed of clips 1–3 from a worktree of `0ea078c`; contract; schema v3 and extension hooks (D1, D22)
-1. [ ] **Render options** (D10)
-2. [ ] **Font assets** (D9)
-3. [ ] **Logos as given** (D14)
-4. [ ] **Speech tools** (D7, D23)
-5. [ ] **Footage** and the screen-recording script (D2–D6)
-6. [ ] **Provenance and credits** (D12)
+0. [x] **Baseline and foundation**: project.md (committed on its own), hashes of clips 1–8 + history-of-ai and speed of clips 1–3 from a worktree of `0ea078c`; contract; schema v3 and extension hooks (D1, D22)
+1. [x] **Render options** (D10): merged `b580ca4` (agent)
+2. [x] **Font assets** (D9): merged `64aee60` (agent); the font drop in the studio comes with the UI
+3. [x] **Logos as given** (D14): merged `4feddd2` (agent; 16 tests; Chrome pixel diff of the Fablecut logo: mean ≤ 0.15 levels, 99.8 % within 32; old models draw unchanged)
+4. [x] **Speech tools** (D7, D23): merged (agent; 21 tests; real run: a word-by-word Kokoro take aligned 69/69 starts within 2 frames, natural speech sentence edges 26/26; 3 voice samples; clip 7 take 0 slips)
+5. [ ] **Footage** and the screen-recording script (D2–D6): core `6224168` (lead), recorder `18d4f98` (agent), parity case `a799588`; disk report and the UI still to do
+6. [x] **Provenance and credits** (D12): merged (agent; 14 tests; final renders refuse placeholders and unlicensed files; clip_credits, check_provenance)
 7. [ ] **Repo and library** (D11)
-8. [ ] **The kit** (D13)
+8. [ ] **The kit** (D13): marketing half merged (agent; 13 tests: kit-plate, kit-chart-line, kit-chart-donut, kit-steps, kit-icon with 155 Lucide icons (ISC, vendor/lucide), end-card@3 drawing exactly like @2 by default); UI half running
 9. [ ] **Studio UI**: footage on the timeline, caption editor, font upload, provenance fields, kit; workflows + GIFs (D8, D16)
 10. [ ] **Clips 9 and 10** through the motion prompt (D17–D19)
 11. [ ] **Rebuild through exports**, prompt revision, docs (D20, D21)
@@ -70,6 +70,8 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Decisions
 
+- **Word times: whisper DTW anchors refined at pauses (speech agent).** whisper's own token times put only 42 % of word starts within 2 frames on a take with known times (up to 1 s off at sentence edges), short of the 95 % required. The studio now runs whisper with DTW token times (`-dtw <preset> -nfa`), takes one reliable time inside each word, and places each word boundary on the quiet stretch (≥ 40 ms) between two words, or between the anchors when there is none. Measured: 69/69 starts within 2 frames on the known-times take (its gaps help; said in the report), 26/26 sentence-edge words of natural speech against Kokoro's own sentence offsets. Inner words of continuous speech have no independent reference.
+- **Provenance: unknown unless said (provenance agent).** A file asset added without a licence records it as unknown (uploads used to say "uploaded by the user", footage defaulted to "original"); only a final render (`final: true`) checks, so old journals, drafts and review renders are unaffected. Clips 9 and 10 pass `license: "original"` for the studio's own recordings. Narrations default to original and a voice with a model is flagged AI-generated.
 - **The machine.** As in iteration 3: the brief describes macOS 15.5 on an Intel i5 with 5.5 GB free; this session runs on the Windows 11 PC (i9-14900KF, 32 threads, 1.7 TB free, Node 24.19, FFmpeg 9.0.2). Baselines (hashes, speed) are taken here from a worktree of `0ea078c` sharing this checkout's `node_modules`. Caches are still bounded as the brief asks, and disk use is measured, as if the disk were small.
 
 - **Footage: a shared decoder per process, frames from the server for the preview (D5).** Weighed:
@@ -83,7 +85,10 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Clip concepts (decided before each build starts; not part of the measured build)
 
-(written before clips 9 and 10 start)
+(written 2026-10-15, before clips 9 and 10 start; the gates may change them)
+
+- **Clip 9, "Your first clip"** (onboarding, 16:9 + a vertical render, ~55 s, voiced, captions burned in, YouTube and the studio's README). Takeaway: *find, tune, place, render: a clip in four steps, all inside the studio.* Arc (onboarding): the result first (a finished render playing in the studio's gallery), then four steps, one action each, each a screen recording of the real studio (`scripts/record-studio.mjs`) in `kit-ui-frame`, with `kit-cursor` from the recording's sidecar, `kit-spotlight` on the element it touches and `kit-camera` zooming until the UI text meets the size floor: (1) search the library, (2) change a parameter in the playground, (3) place and trim an item on the timeline, (4) render and read the report; then a recap (`kit-steps` ticking) and the next step (an end card). Voice: Kokoro `af_heart` made in the studio (`generate_narration`), music the studio synthesizes, ducked under the voice. Reuses clip 7's theme, captions, end card and music.
+- **Clip 10, "Every clip makes the next one easier"** (marketing, 1:1 primary + 9:16, ~30 s, voiced). Takeaway: *in Fablecut every video leaves reusable pieces, so the next one costs less.* Arc (marketing): the outcome first, the product doing it (a recording from clip 9 in a browser frame, icons), proof with real numbers from this repo's `compounding_report` (a line chart of new lines of asset code per clip, which falls as clips reuse), and the call to action on the last frame: the Fablecut logo as given (`brand/fablecut-logo.svg`, internal style sheet + gradients), "Make your first clip", `github.com/Narcis13/davidapp`. Reuses clip 9's kit and recordings and clip 7/8's pieces.
 
 ## Blocked
 
@@ -91,5 +96,6 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Log
 
+- 2026-10-15: Wave 1. Render options merged (agent; 12 tests: drafts at 2/3 with the final's frame hashes, workers 1 vs 3 identical, three formats in one request, poster time, isolate only/except). Footage built by the lead (7 tests: the frame rule, probing, seek = in-order frames on H.264 with B-frames / MKV with a start offset / VP9 / rotated, a clip drawing the exact source frame, two worker counts identical, its sound in the mix, footage in an image param, errors, MCP). The screen recorder merged (agent: two committed recordings, 449 KB and 340 KB, with sidecars). Fonts merged (agent; 21 tests; conflicts with footage in library/frame-worker/preview-worker/http resolved by keeping both). Gates: 334 tests pass. Parity: footage at 25 fps in a 10 fps clip, 1:1 and transformed, mean 0.25 levels, >64: 0.05 % (limit 1.5 / 1.0). `scripts/prompt-tools.mjs` checks a prompt against the live tool list: the prompt as it stands names 25 tools and 19 workarounds (`reports/prompt-tools-before.txt`). Wave 2 started: provenance, exchange, kit-ui, kit-marketing, ui (captions, footage, uploads); logos and speech still running.
 - 2026-10-15: M0 baseline from the worktree `$SP/base` (`0ea078c`, node_modules linked), data in the scratchpad: `npm run showcase` built clips 1–8 (12 min), `clips/history-of-ai/compose.mjs --render`, `scripts/hashes.mjs` → 1,663 dense frames + 162 render samples (`docs/showcase/v4/reports/baseline-hashes.json`); clips 1–6 and history-of-ai identical to iteration 3's baseline. Speed (`--runs 5`, medians 6.83 / 9.14 / 5.67 s) was measured while the wave-1 agents had started, so it is noisy (`baseline-speed-start.json`); the final comparison re-measures the base worktree interleaved with the final code on a quiet machine, as iteration 3 did. Foundation committed (`161cbf9`): schema v3, module hooks. Wave 1 agents started in worktrees: render options, fonts, logos, speech, recording; footage by the lead on main.
 - 2026-10-15: project.md checked against this PC (same as iteration 3; CLI 2.1.299) and committed on its own (`aba3fd8`). Iteration 3's record archived to `docs/progress/2026-10-09-fablecut-iteration-3.md`. `scripts/hashes.mjs` now covers clips 7 and 8 by default.

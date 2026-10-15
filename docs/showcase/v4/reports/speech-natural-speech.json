@@ -1,0 +1,50 @@
+{
+ "script": "clips/clip-7-a-video-that-checks-itself/narration.txt",
+ "voice": "af_heart",
+ "sentences": 13,
+ "boundaries": 26,
+ "toleranceMs": 67,
+ "note": "Truth: Kokoro knows where each sentence lies in the file; the sound of the sentence starts and stops where its 5 ms RMS crosses 3 % of the loudest window. The first word of a sentence must start there and its last word end there. Inner words have no reference.",
+ "aligners": {
+  "ggml-small.en.bin": {
+   "whisperTokenTimes": {
+    "within2Frames": 5,
+    "of": 26,
+    "share": 0.192,
+    "medianAbsMs": 170,
+    "p95AbsMs": 780,
+    "maxAbsMs": 810,
+    "biasMs": 314
+   },
+   "onTheSound": {
+    "within2Frames": 26,
+    "of": 26,
+    "share": 1,
+    "medianAbsMs": 5,
+    "p95AbsMs": 30,
+    "maxAbsMs": 35,
+    "biasMs": 8
+   }
+  },
+  "ggml-base.en.bin": {
+   "whisperTokenTimes": {
+    "within2Frames": 9,
+    "of": 26,
+    "share": 0.346,
+    "medianAbsMs": 305,
+    "p95AbsMs": 755,
+    "maxAbsMs": 790,
+    "biasMs": 277
+   },
+   "onTheSound": {
+    "within2Frames": 26,
+    "of": 26,
+    "share": 1,
+    "medianAbsMs": 5,
+    "p95AbsMs": 30,
+    "maxAbsMs": 35,
+    "biasMs": 8
+   }
+  }
+ }
+}
