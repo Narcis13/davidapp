@@ -34,7 +34,7 @@ const EXTRA = {
   number: ['min', 'max', 'step', 'unit'],
   integer: ['min', 'max', 'step', 'unit'],
   boolean: [],
-  string: ['maxLength', 'placeholder'],
+  string: ['maxLength', 'placeholder', 'nullable'],
   text: ['maxLength', 'placeholder'],
   enum: ['options'],
   color: [],
@@ -129,6 +129,8 @@ function check(def, value, path, errors, opts) {
     case 'boolean':
       return typeof value === 'boolean' ? value : fail(`expected true or false, got ${describe(value)}`);
     case 'string': case 'text':
+      // nullable: a field that arrives as null in data copied from elsewhere (a recording sidecar's click without a selector)
+      if (value === null && def.nullable) return null;
       if (typeof value !== 'string') return fail(`expected a string, got ${describe(value)}`);
       if (def.maxLength !== undefined && value.length > def.maxLength) return fail(`longer than ${def.maxLength} characters`);
       return value;
