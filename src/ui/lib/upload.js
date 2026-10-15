@@ -2,11 +2,14 @@
 // file, nothing is encoded). Images go to /api/uploads; video files to /api/footage, streamed from disk
 // with a progress bar; font files to /api/fonts after a small form asks for the licence (the family, weight
 // and style the file says are shown first). A status row per file says how it went (uploading, reading,
-// done, duplicate, error) with the server's own message, which says what to do.
+// done, duplicate, error) with the server's own message, which says what to do. The Licence button sets the
+// licence and source of the images and video that follow; a file added without one is recorded as unknown
+// and its row says a final render will refuse it.
 
 import { openDialog } from '/ui/lib/dialog.js';
 import { getStatus } from '/ui/lib/api.js';
 import { readFontInfo, weightName } from '/ui/lib/font-info.js';
+import { UNKNOWN_NOTE, isUnknownLicense, provenanceFields, provenanceQuery, provenanceSummary } from '/ui/lib/provenance.js';
 import { fill, fmtBytes, h, icon, nextId, notice, plural } from '/ui/lib/util.js';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
@@ -37,10 +40,10 @@ async function readAnswer(status, text) {
 }
 
 /** One image → { asset, duplicate, removed }; throws with the server's message. */
-async function sendImage(file, type) {
+async function sendImage(file, type, prov) {
   let res;
   try {
-    res = await fetch(`/api/uploads?name=${encodeURIComponent(file.name)}`, { method: 'POST', headers: { 'content-type': type }, body: file });
+    res = await fetch(`/api/uploads?${new URLSearchParams({ name: file.name, ...Object.fromEntries(provenanceQuery(prov)) })}`, { method: 'POST', headers: { 'content-type': type }, body: file });
   } catch {
     throw new Error('The studio server is not reachable');
   }
@@ -48,10 +51,10 @@ async function sendImage(file, type) {
 }
 
 /** One video file, streamed as the request body, with the bytes sent so far reported (fetch cannot report them). → { asset } */
-function sendVideo(file, onProgress) {
+function sendVideo(file, onProgress, prov) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `/api/footage?name=${encodeURIComponent(file.name)}`);
+    xhr.open('POST', `/api/footage?${new URLSearchParams({ name: file.name, ...Object.fromEntries(provenanceQuery(prov)) })}`);
     xhr.setRequestHeader('content-type', file.type || 'application/octet-stream');
     xhr.upload.addEventListener('progress', (e) => { if (e.lengthComputable) onProgress(e.loaded, e.total); });
     xhr.upload.addEventListener('load', () => onProgress(file.size, file.size));
@@ -63,8 +66,8 @@ function sendVideo(file, onProgress) {
 }
 
 /** One font file with its licence → { asset, coverage }; throws with the server's message. */
-async function sendFont(file, { name, license }) {
-  const q = new URLSearchParams({ name, license, file: file.name });
+async function sendFont(file, { name, provenance }) {
+  const q = new URLSearchParams({ name, file: file.name, ...Object.fromEntries(provenanceQuery(provenance)) });
   let res;
   try {
     res = await fetch(`/api/fonts?${q}`, { method: 'POST', headers: { 'content-type': BY_EXT[extOf(file.name)] ?? 'application/octet-stream' }, body: file });
@@ -85,10 +88,8 @@ const slugOf = (name) => name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a
 function fontDialog(file, info) {
   const id = nextId('font');
   const name = h('input.mono', { type: 'text', id: `${id}-name`, value: slugOf(file.name), 'data-testid': 'font-name', autocomplete: 'off', spellcheck: false, autocapitalize: 'off', maxLength: 64 });
-  const license = h('input', { type: 'text', id: `${id}-license`, 'data-testid': 'font-license', placeholder: 'For example OFL-1.1, or "commercial, licensed to us"', autocomplete: 'off', maxLength: 200 });
-  const picks = LICENSES.map((l) => h('button.chip', { type: 'button', 'data-testid': 'font-license-pick', 'data-value': l, 'aria-pressed': 'false', onclick: () => { license.value = l; sync(); license.focus(); } }, l));
-  const sync = () => { for (const b of picks) { const on = b.dataset.value === license.value.trim(); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); } };
-  license.addEventListener('input', sync);
+  const prov = provenanceFields({ picks: LICENSES, required: true, compact: true, testids: { license: 'font-license', pick: 'font-license-pick' } });
+  const license = prov.license;
   const err = notice('font-error');
   const add = h('button.btn.primary', { type: 'submit', 'data-testid': 'font-add' }, 'Add font');
   const cancel = h('button.btn', { type: 'button', 'data-testid': 'font-cancel' }, 'Cancel');
@@ -100,8 +101,9 @@ function fontDialog(file, info) {
     h('p.muted', h('b', file.name), ` · ${fmtBytes(file.size)}`),
     h('div.field', h('span.field-label', 'What the file says'), facts),
     h('div.field', h('label', { for: `${id}-name` }, 'Name in the library'), name, h('p.hint', 'Lowercase letters, digits and dashes. Uploading the same name again makes a new version.')),
-    h('div.field', h('label', { for: `${id}-license` }, 'Licence'), h('div.chips', { role: 'group', 'aria-label': 'Common licences' }, picks), license,
-      info?.license ? h('p.hint', { 'data-testid': 'font-embedded-license' }, `The file says: ${info.license.slice(0, 160)}`) : h('p.hint', 'A font needs a licence: what it is licensed under. It is kept with the font.')),
+    prov.nodes[0],
+    info?.license ? h('p.hint', { 'data-testid': 'font-embedded-license' }, `The file says: ${info.license.slice(0, 160)}`) : h('p.hint', 'A font needs a licence: what it is licensed under. It is kept with the font.'),
+    prov.nodes.slice(1),
     err.el,
     h('div.dialog-foot.inline', cancel, add));
   const d = openDialog({ title: 'Add a font', body: form, testid: 'font-dialog' });
@@ -113,7 +115,7 @@ function fontDialog(file, info) {
     if (!license.value.trim()) { err.show('A licence is required: say what the font is licensed under (OFL-1.1, Apache-2.0, or your own words).'); license.focus(); return; }
     add.disabled = true; add.textContent = 'Adding';
     try {
-      d.close(await sendFont(file, { name: name.value.trim(), license: license.value.trim() }));
+      d.close(await sendFont(file, { name: name.value.trim(), provenance: prov.values() }));
     } catch (e2) {
       err.show(e2.message);
       add.disabled = false; add.textContent = 'Add font';
@@ -131,13 +133,47 @@ function fontDialog(file, info) {
 export function uploader({ target, onUploaded, onOpen }) {
   const input = h('input.visually-hidden', { type: 'file', multiple: true, accept: ACCEPT, 'data-testid': 'upload-input', tabindex: -1, 'aria-hidden': 'true' });
   const button = h('button.btn', { type: 'button', 'data-testid': 'upload-button', onclick: () => input.click() }, icon('plus', 16), 'Upload');
+  // what the next images and video are recorded with (null: nothing said, so unknown)
+  let prov = null;
+  const licenseButton = h('button.btn', { type: 'button', 'data-testid': 'upload-license', onclick: () => licenseDialog() });
+  const drawLicense = () => {
+    const said = provenanceSummary(prov);
+    licenseButton.classList.toggle('on', !!said);
+    licenseButton.title = said ? `Images and video are added as: ${said}` : 'Say what licence the next images and video are under';
+    fill(licenseButton, said ? `Licence: ${said}` : 'Licence');
+  };
+  /** The licence and source of the next uploads. */
+  function licenseDialog() {
+    const form = provenanceFields({ value: prov ?? {}, compact: true, hint: 'Applies to the images and video you add next, until you change it here. Fonts ask for theirs.' });
+    const save = h('button.btn.primary', { type: 'submit', 'data-testid': 'upload-license-save' }, 'Use for the next uploads');
+    const clearBtn = h('button.btn', { type: 'button', 'data-testid': 'upload-license-clear' }, 'Clear');
+    const cancel = h('button.btn', { type: 'button' }, 'Cancel');
+    const f = h('form.form.prov-form', { novalidate: true, 'data-testid': 'upload-license-form' },
+      h('p.notice.info', { 'data-testid': 'upload-license-note' }, `Without a licence, an image or a video is added with an unknown licence. ${UNKNOWN_NOTE}`),
+      form.nodes,
+      h('div.dialog-foot.inline', cancel, clearBtn, save));
+    const d = openDialog({ title: 'Licence and source of uploads', body: f, testid: 'upload-license-dialog' });
+    cancel.addEventListener('click', () => d.close());
+    clearBtn.addEventListener('click', () => { prov = null; drawLicense(); d.close(); });
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const v = form.values();
+      prov = Object.values(v).some((x) => x === true || (typeof x === 'string' && x)) ? v : null;
+      drawLicense();
+      d.close();
+    });
+    form.focus();
+  }
+  drawLicense();
+  /** How a row ends about the licence the file went in under. */
+  const licenseNote = () => (isUnknownLicense(prov?.license) ? 'Licence unknown: a final render will refuse it' : `Licence: ${prov.license}`);
   const rows = h('ul.upload-rows');
   const summary = h('span.upload-sum');
   const dismiss = h('button.icon-btn.small', { type: 'button', 'aria-label': 'Close the upload list', 'data-testid': 'upload-dismiss', onclick: () => { status.hidden = true; fill(rows); } }, icon('close', 16));
   const status = h('section.upload-status', { 'data-testid': 'upload-status', 'aria-label': 'Uploads', hidden: true },
     h('header.upload-head', summary, dismiss), rows);
   const dropZone = h('div.drop-zone', { 'data-testid': 'drop-zone', hidden: true, 'aria-hidden': 'true' },
-    h('div.drop-zone-inner', icon('download', 32), h('b', 'Drop images, video or fonts to add them to the library'), h('span', 'Images: PNG, JPEG, WebP or SVG up to 25 MB · video: MP4, MOV, WebM or MKV · fonts: TTF, OTF or WOFF2 (asks for the licence)')));
+    h('div.drop-zone-inner', icon('download', 32), h('b', 'Drop images, video or fonts to add them to the library'), h('span', 'Images: PNG, JPEG, WebP or SVG up to 25 MB · video: MP4, MOV, WebM or MKV · fonts: TTF, OTF or WOFF2 (asks for the licence). Images and video go in with the licence set under Licence, or with an unknown one.')));
 
   let pending = 0, done = 0, failed = 0;
   const count = () => { summary.textContent = pending ? `Uploading ${done + 1} of ${done + pending}` : `${plural(done - failed, 'file')} uploaded${failed ? `, ${failed} failed` : ''}`; };
@@ -181,19 +217,19 @@ export function uploader({ target, onUploaded, onOpen }) {
     if (kind === 'image') {
       if (file.size > MAX_IMAGE) throw new Error('Larger than 25 MB');
       const type = IMAGE_TYPES.includes(file.type) ? file.type : BY_EXT[extOf(file.name)];
-      const res = await sendImage(file, type);
+      const res = await sendImage(file, type, prov);
       const removed = res.removed ?? [];
       if (res.duplicate) r.set('duplicate', 'Already in the library', `as ${res.asset.slug}`);
-      else r.set('done', 'Added', removed.length ? `Removed from the SVG: ${removed.join(', ')}` : 'Needs a description');
+      else r.set('done', 'Added', [removed.length ? `Removed from the SVG: ${removed.join(', ')}` : 'Needs a description', licenseNote()].join(' · '));
       r.link(res.asset.slug);
       onUploaded?.(res.asset, !!res.duplicate);
     } else if (kind === 'video') {
       if (file.size > MAX_VIDEO) throw new Error('Larger than 2 GB');
       r.progress(0, file.size);
-      const res = await sendVideo(file, (sent, total) => r.progress(sent, total));
+      const res = await sendVideo(file, (sent, total) => r.progress(sent, total), prov);
       const m = res.asset.meta ?? {};
       const facts = [m.width ? `${m.width}×${m.height}` : null, m.fps ? `${Math.round(m.fps * 100) / 100} fps` : null, res.asset.duration ? `${Math.round(res.asset.duration * 100) / 100} s` : null, m.audio ? 'with sound' : 'no sound'].filter(Boolean).join(' · ');
-      r.set('done', res.asset.version > 1 ? `Added as version ${res.asset.version}` : 'Added', `${res.asset.slug}${facts ? ` · ${facts}` : ''}`);
+      r.set('done', res.asset.version > 1 ? `Added as version ${res.asset.version}` : 'Added', `${res.asset.slug}${facts ? ` · ${facts}` : ''} · ${licenseNote()}`);
       r.link(res.asset.slug);
       onUploaded?.(res.asset, false);
     } else if (kind === 'font') {
@@ -255,7 +291,7 @@ export function uploader({ target, onUploaded, onOpen }) {
   target.addEventListener('drop', onDrop);
 
   return {
-    button, input, status, dropZone, upload,
+    button, licenseButton, input, status, dropZone, upload,
     destroy() {
       target.removeEventListener('dragenter', onEnter);
       target.removeEventListener('dragover', onOver);

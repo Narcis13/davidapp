@@ -12,6 +12,10 @@ export default async function (r) {
 
   r.mark('render');
   await r.click('[data-testid=render-button]');
+  // the button opens the render panel: a normal render of the clip's own shape is its default
+  await r.waitFor('[data-testid=render-start]');
+  await r.pause(900);
+  await r.click('[data-testid=render-start]');
   await r.waitFor('[data-testid=render-row]');
   await r.pause(600);
 

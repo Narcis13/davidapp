@@ -60,11 +60,23 @@ export function problemsList(problems, ids = { count: 'render-problems', item: '
 }
 
 /** Download buttons for what a render wrote next to the MP4; `names` picks and orders them. */
-export function downloadLinks(r, names = ['srt', 'vtt', 'words', 'report']) {
+export function downloadLinks(r, names = ['srt', 'vtt', 'words', 'report', 'credits']) {
   const files = r.stats?.files ?? {};
-  const path = { srt: r.srt, vtt: files.vtt, words: files.words, report: files.report };
-  const label = { srt: 'Captions (SRT)', vtt: 'Captions (VTT)', words: 'Words (JSON)', report: 'Report (JSON)' };
+  const path = { srt: r.srt, vtt: files.vtt, words: files.words, report: files.report, credits: files.credits };
+  const label = { srt: 'Captions (SRT)', vtt: 'Captions (VTT)', words: 'Words (JSON)', report: 'Report (JSON)', credits: 'Credits (Markdown)' };
   return names.filter((n) => path[n]).map((n) => h('a.btn', { href: `/media/${path[n]}`, download: path[n].split('/').pop(), 'data-testid': `download-${n}` }, icon('download', 16), label[n]));
+}
+
+/**
+ * What kind of render this is, as badges: a draft (with its smaller size) or a final one (checked, with credits).
+ * A normal render has none.
+ */
+export function kindBadges(r) {
+  const d = r.stats?.draft ?? r.options?.draft;
+  return [
+    d ? h('span.badge.render-draft', { 'data-testid': 'render-kind', 'data-kind': 'draft', title: `A draft: ${d.width}×${d.height}, drawn fast to review the cut` }, `Draft ${d.width}×${d.height}`) : null,
+    r.options?.final ? h('span.badge.render-final', { 'data-testid': 'render-kind', 'data-kind': 'final', title: 'A final render: its sources were checked and the credits were written' }, 'Final') : null,
+  ].filter(Boolean);
 }
 
 // ── the render report ─────────────────────────────────────────────────────────────────────────
@@ -248,7 +260,7 @@ function createRow(r, onError) {
   });
   const el = h('li.render-row', { 'data-testid': 'render-row', 'data-id': r.id },
     h('div.render-main',
-      h('div.render-title', h('a', { href: `/clips/${r.clip}` }, r.clipTitle), h('span.ref', `#${r.id} · ${r.clip} · revision ${r.clipRevision}`)),
+      h('div.render-title', h('a', { href: `/clips/${r.clip}` }, r.clipTitle), h('span.badge', { 'data-testid': 'render-format' }, r.format), kindBadges(r), h('span.ref', `#${r.id} · ${r.clip} · revision ${r.clipRevision}`)),
       h('div.render-status', status, time)),
     h('div.render-progress', h('div.bar', { role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100 }, bar), frames),
     quality,
@@ -282,6 +294,7 @@ function createRow(r, onError) {
           s.workers ? plural(s.workers, 'worker') : null,
         ].filter(Boolean).join(' · ')),
         h('a.btn.small', { href: `/gallery/${r.id}`, 'data-testid': 'open-in-gallery' }, 'Open in gallery'),
+        s.files?.credits ? h('a.btn.small', { href: `/media/${s.files.credits}`, target: '_blank', rel: 'noopener', 'data-testid': 'render-credits' }, 'Credits') : null,
         hasReport(r) ? h('button.btn.small', { type: 'button', 'data-testid': 'render-report-open', onclick: () => openReport(r) }, 'View report') : h('span.muted', { 'data-testid': 'render-no-report' }, NO_REPORT));
     } else if (r.status === 'failed') {
       fill(detail, h('p.render-error', { 'data-testid': 'render-error' }, r.error ?? 'The render failed.'));
@@ -293,6 +306,21 @@ function createRow(r, onError) {
   }
   update(r);
   return { el, update };
+}
+
+/** The line above the renders of one request: "3 shapes · 2 of 3 done". */
+function batchHead() {
+  const text = h('span');
+  const el = h('li.render-batch-head', { 'data-testid': 'render-batch' }, icon('film', 16), text);
+  return {
+    el,
+    update(members) {
+      const done = members.filter((m) => m.status === 'done').length;
+      const bad = members.filter((m) => m.status === 'failed' || m.status === 'cancelled').length;
+      el.dataset.batch = String(members[0].options.batch);
+      fill(text, h('b', `One request, ${plural(members.length, 'shape')}`), ` · ${[...members].reverse().map((m) => m.format).join(', ')} ·${done} of ${members.length} done${bad ? `, ${bad} not` : ''}`);
+    },
+  };
 }
 
 export async function mount(view, ctx) {
@@ -321,6 +349,7 @@ export async function mount(view, ctx) {
   const list = h('ol.render-list', { 'data-testid': 'render-list' });
   const body = h('div', loading('Loading the queue'));
   const rows = new Map();
+  const batches = new Map();
   let first = true;
 
   fill(view,
@@ -339,19 +368,36 @@ export async function mount(view, ctx) {
     summary.textContent = renders.length ? `${plural(renders.length, 'render')}${active ? ` · ${active} in progress` : ''}` : '';
     if (!renders.length) {
       rows.clear();
+      batches.clear();
+      list.replaceChildren();
       fill(body, empty('Nothing rendered yet', clips.length ? 'Pick a clip above, or press Render in a clip editor.' : 'Create a clip first. Renders show up here with live progress.'));
       return;
     }
     if (body.firstElementChild !== list) fill(body, list);
-    const seen = new Set();
+    const seen = new Set(), seenBatches = new Set();
     let before = list.firstElementChild;
+    // the elements in order: a header before the rows of a batch (one request for several shapes), then each render
+    const place = (el) => { if (el !== before) list.insertBefore(el, before); else before = before.nextElementSibling; };
+    let lastBatch = null;
     for (const r of renders) {
+      const batch = r.options?.batch ?? null;
+      if (batch !== null && batch !== lastBatch) {
+        const members = renders.filter((x) => x.options?.batch === batch);
+        let head = batches.get(batch);
+        if (!head) { head = batchHead(); batches.set(batch, head); }
+        head.update(members);
+        seenBatches.add(batch);
+        place(head.el);
+      }
+      lastBatch = batch;
       seen.add(r.id);
       let row = rows.get(r.id);
       if (row) row.update(r);
       else { row = createRow(r, (text) => msg.show(text)); rows.set(r.id, row); }
-      if (row.el !== before) list.insertBefore(row.el, before); else before = before.nextElementSibling;
+      row.el.classList.toggle('in-batch', batch !== null);
+      place(row.el);
     }
     for (const [id, row] of rows) if (!seen.has(id)) { row.el.remove(); rows.delete(id); }
+    for (const [id, head] of batches) if (!seenBatches.has(id)) { head.el.remove(); batches.delete(id); }
   }));
 }

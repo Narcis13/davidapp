@@ -86,3 +86,22 @@ editor-captions-phone /clips/v3-demo                    phone --scroll
 editor-footage-phone  /clips/v4-footage                 phone --scroll
 asset-footage-phone   /assets/testsrc2-tone             phone --scroll
 asset-font-phone      /assets/fixture-blocks-regular    phone --scroll
+
+# iteration 4, second pass: provenance, credits, render options, the repo, the kit (data: as above plus `node scripts/workflows-v4.mjs provenance render kit`: the pictures v4-stock-photo and v4-sky-photo, the clips v4-credits and v4-repo and their renders)
+asset-provenance      /assets/v4-stock-photo            desktop --full
+asset-unknown-licence /assets/harbour-at-dusk           desktop --full
+editor-credits        /clips/v4-credits                 desktop --full
+editor-repo           /clips/v4-repo                    desktop --full
+render-panel          /clips/v4-repo                    desktop --js "document.querySelector('[data-testid=render-button]')?.click()"
+renders-batch         /renders                          desktop --full
+library-kit           "/?tag=kit"                       desktop
+library-licence       "/?q=v4"                          desktop
+asset-kit-callout     /assets/kit-callout               desktop --full
+asset-kit-donut       /assets/kit-chart-donut           desktop --full
+asset-provenance-phone /assets/v4-stock-photo           phone --scroll
+editor-credits-phone  /clips/v4-credits                 phone --scroll
+editor-repo-phone     /clips/v4-repo                    phone --scroll
+render-panel-phone    /clips/v4-repo                    phone --js "document.querySelector('[data-testid=render-button]')?.click()"
+renders-batch-phone   /renders                          phone --scroll
+library-kit-phone     "/?tag=kit"                       phone --scroll
+asset-kit-callout-phone /assets/kit-callout             phone --scroll
