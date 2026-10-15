@@ -9,7 +9,9 @@ import { clearAssetOptions, createParamControls, referencedAssets } from '/ui/li
 import { createStage } from '/ui/lib/stage.js';
 import { createCodeEditor } from '/ui/lib/code-editor.js';
 import { createDiffView, framePair } from '/ui/lib/diff-view.js';
-import { assetHref, assetIcon, clamp, errorBlock, fill, fmtBytes, fmtDate, fmtDuration, fmtTime, h, icon, nextId, notice, plural } from '/ui/lib/util.js';
+import { factsOf, frameOfSecond, frameUrl, secondOfFrame } from '/ui/lib/footage.js';
+import { weightName } from '/ui/lib/font-info.js';
+import { assetHref, assetIcon, clamp, errorBlock, fill, fmtBytes, fmtDate, fmtDuration, fmtTime, h, icon, nextId, notice, plural, trim } from '/ui/lib/util.js';
 
 const PREVIEW_FPS = 30;
 const PREVIEWED_KINDS = new Set(['visual', 'motion', 'transition', 'effect', 'value', 'audio']);
@@ -241,24 +243,151 @@ function sequenceView(a, ctx) {
   ];
 }
 
-/** Sound and font assets: the file itself. */
-async function mediaView(a, status) {
+/** Footage: a player-like view (the frames come from the server, as the preview gets them), the file's facts, filmstrip and waveform. */
+function footageView(a, ctx) {
+  const m = a.meta ?? {};
+  const frames = Math.max(1, m.frames ?? 1);
+  const secondOf = (i) => secondOfFrame(m, i);
+  const img = h('img', { alt: `${a.title}, frame 0`, 'data-testid': 'footage-frame', width: m.width, height: m.height, draggable: false });
+  const scrub = h('input.scrub', { type: 'range', min: 0, max: frames - 1, step: 1, value: '0', 'data-testid': 'footage-scrub', 'aria-label': 'Frame' });
+  const readout = h('span.timecode', { 'data-testid': 'footage-readout' });
+  const play = h('button.icon-btn.play', { type: 'button', 'data-testid': 'footage-play', 'aria-label': 'Play', 'data-playing': 'false' }, icon('play', 20));
+  const prev = h('button.btn.small', { type: 'button', 'data-testid': 'footage-prev', 'aria-label': 'Previous frame' }, '◀ Frame');
+  const next = h('button.btn.small', { type: 'button', 'data-testid': 'footage-next', 'aria-label': 'Next frame' }, 'Frame ▶');
+  const heads = [];
+  let frame = 0, raf = 0, startAt = 0, token = 0;
+
+  /** Show frame i: PNG when paused or scrubbing (exact), JPEG while it plays (fast); the picture swaps when the new one has arrived. */
+  function show(i, ext = 'png') {
+    frame = clamp(i, 0, frames - 1);
+    const mine = ++token;
+    const pic = new Image();
+    pic.onload = () => { if (mine === token) img.src = pic.src; };
+    pic.src = frameUrl(a.ref, frame, ext);
+    img.dataset.frame = String(frame);
+    img.alt = `${a.title}, frame ${frame}`;
+    scrub.value = String(frame);
+    readout.textContent = `frame ${frame} of ${frames} · ${fmtTime(secondOf(frame))}`;
+    for (const hd of heads) hd.style.left = `${(frame / Math.max(1, frames - 1)) * 100}%`;
+  }
+  const stop = () => {
+    const was = raf !== 0;
+    cancelAnimationFrame(raf); raf = 0;
+    fill(play, icon('play', 20)); play.setAttribute('aria-label', 'Play'); play.dataset.playing = 'false';
+    if (was) show(frame, 'png');
+  };
+  const tick = (now) => {
+    const t = ((now - startAt) / 1000) % Math.max(1e-3, m.duration);
+    const i = frameOfSecond(m, t);
+    if (i !== frame) {
+      show(i, 'jpg');
+      for (let k = 1; k <= 3; k++) new Image().src = frameUrl(a.ref, Math.min(frames - 1, i + k), 'jpg');
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  play.addEventListener('click', () => {
+    if (raf) { stop(); return; }
+    startAt = performance.now() - secondOf(frame) * 1000;
+    fill(play, icon('pause', 20)); play.setAttribute('aria-label', 'Pause'); play.dataset.playing = 'true';
+    raf = requestAnimationFrame(tick);
+  });
+  scrub.addEventListener('input', () => { stop(); show(Number(scrub.value)); });
+  prev.addEventListener('click', () => { stop(); show(frame - 1); });
+  next.addEventListener('click', () => { stop(); show(frame + 1); });
+  const keys = (e) => {
+    if (document.querySelector('dialog[open]') || (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) && e.target !== scrub)) return;
+    if (e.key === ' ') { e.preventDefault(); play.click(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); stop(); show(frame - 1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); stop(); show(frame + 1); }
+  };
+  document.addEventListener('keydown', keys);
+  ctx.onCleanup(() => { document.removeEventListener('keydown', keys); stop(); token++; });
+
+  /** A picture of the whole file (the filmstrip, the waveform): a click on it goes to that point of the file. */
+  const along = (src, testid, label) => {
+    const head = h('span.fp-head', { 'aria-hidden': 'true' });
+    heads.push(head);
+    const box = h('div.footage-along', { 'data-testid': testid, role: 'button', tabIndex: 0, 'aria-label': `${label}: click to go to that point` }, h('img', { src: `/media/${src}`, alt: '', draggable: false }), head);
+    const go = (x) => { const r = box.getBoundingClientRect(); stop(); show(frameOfSecond(m, clamp((x - r.left) / r.width, 0, 1) * m.duration)); };
+    box.addEventListener('click', (e) => go(e.clientX));
+    box.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const r = box.getBoundingClientRect(); go(r.left + (frame / Math.max(1, frames - 1)) * r.width); } });
+    return box;
+  };
+  const strip = m.strip?.file ? along(m.strip.file, 'footage-strip', 'Filmstrip') : null;
+  const wave = m.wave?.file ? along(m.wave.file, 'footage-waveform', 'Waveform of the sound') : null;
+  show(0);
+  return [
+    h('section.panel.footage-panel', { 'data-testid': 'footage' },
+      h('div.media-view.footage-stage', img),
+      h('div.transport', play, scrub, readout),
+      h('div.transport-extras', prev, next),
+      h('p.muted', `${m.width}×${m.height}, ${trim(m.fps, 3)} fps, ${frames} frames, ${fmtDuration(m.duration)}. The frames are decoded by the studio, the way the preview and the render get them.`)),
+    h('section.panel', { 'data-testid': 'footage-facts-panel' },
+      h('h2', 'The file'),
+      h('dl.facts', { 'data-testid': 'footage-facts' }, factsOf(a).map(([k, v]) => [h('dt', k), h('dd', v)]), m.license ? [h('dt', 'Licence'), h('dd', m.license)] : null),
+      strip ? [h('h3.footage-h', 'Filmstrip'), strip] : null,
+      wave ? [h('h3.footage-h', 'Sound'), wave, a.file ? h('audio', { controls: true, preload: 'none', src: `/media/${a.file}`, 'data-testid': 'asset-audio' }) : null] : null),
+  ];
+}
+
+/** A font: its specimen, weight and style, licence, coverage, and a line of the person's own text set in it. */
+async function fontView(a, status) {
+  const m = a.meta ?? {};
+  const uploaded = !!m.uploaded;
+  const bundled = status.fonts.find((f) => f.slug === a.slug);
+  const family = m.family ?? bundled?.family ?? a.title;
+  const alias = `specimen-${a.slug}-${a.version}`;
+  const faces = uploaded ? [{ url: `/media/${a.file}`, weight: m.weight, style: m.style }] : (bundled?.files ?? []).map((f) => ({ url: f.url, weight: f.weight, style: f.style }));
+  const loaded = [];
+  for (const f of faces) {
+    try { document.fonts.add(await new FontFace(alias, `url(${f.url})`, { weight: String(f.weight), style: f.style }).load()); loaded.push(f); } catch { /* the line is left out */ }
+  }
+  const set = (f) => ({ fontFamily: `"${alias}", sans-serif`, fontWeight: String(f.weight), fontStyle: f.style });
+  const base = loaded[loaded.length - 1];
+
+  const text = h('input', { type: 'text', id: 'font-try-text', value: 'Every frame is a function of time', 'data-testid': 'font-sample-input', maxLength: 200, autocomplete: 'off', spellcheck: false });
+  const size = h('input', { type: 'range', min: 16, max: 160, step: 2, value: '64', 'data-testid': 'font-sample-size', 'aria-label': 'Size' });
+  const sample = h('p.font-sample', { 'data-testid': 'font-sample', style: base ? { ...set(base), fontSize: '64px' } : null }, text.value);
+  const draw = () => { sample.textContent = text.value || ' '; sample.style.fontSize = `${size.value}px`; };
+  text.addEventListener('input', draw);
+  size.addEventListener('input', draw);
+
+  const c = m.coverage;
+  const yes = (v) => (v ? 'yes' : 'no');
+  const rows = [
+    ['Family', family],
+    ['Weight', uploaded ? `${m.weight} · ${weightName(m.weight)}` : [...new Set(faces.map((f) => f.weight))].join(', ')],
+    ['Style', uploaded ? m.style : [...new Set(faces.map((f) => f.style))].join(', ')],
+    ['Licence', m.license ?? bundled?.license],
+    m.format ? ['Format', `${m.format.toUpperCase()}${m.glyphs ? ` · ${m.glyphs} glyphs` : ''}${m.bytes ? ` · ${fmtBytes(m.bytes)}` : ''}`] : null,
+    m.source ? ['Source', m.source] : null,
+    m.originalName ? ['File', m.originalName] : null,
+    c ? ['Characters', String(c.codepoints)] : null,
+    c ? ['Latin Extended-A', yes(c.latinExtendedA)] : null,
+    c ? ['Romanian letters', c.romanian ? 'yes: ă â î ș ț' : 'no'] : null,
+  ].filter(Boolean);
+  return h('div.font-page', { 'data-testid': 'font-page' },
+    h('section.panel', { 'data-testid': 'font-specimen-panel' },
+      h('div.media-view.specimen', { 'data-testid': 'font-specimen' }, loaded.length
+        ? loaded.map((f) => h('div.specimen-line', h('span.muted', `${f.weight} ${f.style}`), h('p', { style: set(f) }, 'Every frame is a function 0123456789'), h('p.specimen-small', { style: set(f) }, 'Hamburgefonstiv ăâîșț ĂÂÎȘȚ')))
+        : a.thumb ? h('img', { src: `/media/${a.thumb}`, alt: a.title }) : h('span.thumb-icon', icon('font', 48)))),
+    h('section.panel', { 'data-testid': 'font-try' },
+      h('h2', 'Try your own text'),
+      h('div.field', h('label', { for: 'font-try-text' }, 'Text'), text),
+      h('label.inline-field', 'Size', size),
+      sample),
+    h('section.panel', { 'data-testid': 'font-facts' },
+      h('h2', 'The font'),
+      h('dl.facts', rows.map(([k, v]) => [h('dt', k), h('dd', v)])),
+      c?.blocks?.length ? [h('h3.footage-h', 'Blocks it covers'), h('div.chips', { 'data-testid': 'font-blocks' }, c.blocks.map((b) => h('span.chip', { title: `${b.covered} of ${b.total} characters of the block` }, `${b.name} `, h('span.n', `${b.covered}/${b.total}`))))] : null));
+}
+
+/** Sound assets: the file itself. */
+async function mediaView(a) {
   if (a.type === 'sound' && a.file) {
     return h('div.media-view',
       a.thumb ? h('img', { src: `/media/${a.thumb}`, alt: '' }) : h('span.thumb-icon', icon('sound', 48)),
       h('audio', { controls: true, src: `/media/${a.file}`, preload: 'metadata', 'data-testid': 'asset-audio' }));
-  }
-  if (a.type === 'font') {
-    const fam = status.fonts.find((f) => f.slug === a.slug);
-    const lines = [];
-    for (const f of fam?.files ?? []) {
-      const face = new FontFace(fam.family, `url(${f.url})`, { weight: String(f.weight), style: f.style });
-      try { document.fonts.add(await face.load()); } catch { continue; }
-      lines.push(h('div.specimen-line',
-        h('span.muted', `${f.weight} ${f.style}`),
-        h('p', { style: { fontFamily: `"${fam.family}", sans-serif`, fontWeight: String(f.weight), fontStyle: f.style } }, 'Every frame is a function 0123456789')));
-    }
-    return h('div.media-view.specimen', { 'data-testid': 'font-specimen' }, lines.length ? lines : a.thumb ? h('img', { src: `/media/${a.thumb}`, alt: a.title }) : h('span.thumb-icon', icon('font', 48)));
   }
   return h('div.media-view', a.thumb ? h('img', { src: `/media/${a.thumb}`, alt: a.title }) : h('span.thumb-icon', icon(assetIcon(a), 48)));
 }
@@ -747,7 +876,9 @@ export async function mount(view, ctx) {
   let main;
   if (a.type === 'image' && a.file) main = imageView(a);
   else if (a.type === 'sequence' && a.file) main = sequenceView(a, ctx);
-  else main = [h('section.panel', await mediaView(a, status))];
+  else if (a.type === 'video' && a.file) main = footageView(a, ctx);
+  else if (a.type === 'font') main = [await fontView(a, status)];
+  else main = [h('section.panel', await mediaView(a))];
   if (!ctx.alive()) return;
   const agentSlot = h('div.pg-agent', { 'data-testid': 'agent-slot' });
   mountAgent(agentSlot, { scope: 'asset', asset: a.slug, getContext: () => ({ version: a.version }), onAccepted: () => { if (ctx.alive()) ctx.navigate(`/assets/${a.slug}`, { force: true, replace: true }); } })

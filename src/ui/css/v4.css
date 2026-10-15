@@ -1,0 +1,90 @@
+/* iteration 4: footage on the timeline and in the library, caption pages, upload forms, the footage and font pages. */
+
+/* ── footage items on the timeline ─────────────────────────────────────────────────────── */
+.tl-item.footage { border-color: #5a78c8; background: #172036; }
+.tl-item.footage.audio { border-color: #3fae87; background: #123227; }
+.tl-strip { position: absolute; inset: 0; display: flex; overflow: hidden; pointer-events: none; }
+.tl-strip img { flex: 1 1 0; min-width: 0; height: 100%; object-fit: cover; opacity: 0.78; background: #0b0b10; }
+.tl-fwave { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; background-repeat: no-repeat; mix-blend-mode: screen; opacity: 0.9; pointer-events: none; }
+.tl-item.footage.audio .tl-fwave { top: 0; height: 100%; }
+.tl-item.footage:not(.audio) .tl-label { position: relative; padding: 2px 6px; margin-left: 10px; border-radius: 3px; background: rgba(11, 11, 16, 0.72); }
+.tl-item.footage.audio .tl-label { position: relative; z-index: 1; padding: 2px 6px; margin-left: 10px; border-radius: 3px; background: rgba(11, 11, 16, 0.6); }
+.tl-item.footage .tl-handle { z-index: 1; }
+.tl-item.footage .tl-handle:hover { background: rgba(255, 255, 255, 0.3); }
+
+/* ── caption pages on the timeline ─────────────────────────────────────────────────────── */
+.tl-row.tl-cap-row { background: rgba(124, 245, 192, 0.04); }
+.tl-cap-lane { overflow: hidden; }
+.tl-cap-title { font: 600 12px var(--font-ui); }
+.tl-cap { position: absolute; top: 4px; bottom: 4px; display: block; min-width: 6px; border: 1px solid #3a8f74; border-radius: 5px; background: rgba(21, 58, 46, 0.78); color: #cfffeb; cursor: pointer; overflow: hidden; touch-action: pan-x; user-select: none; }
+.tl-cap.selected { z-index: 2; border-color: var(--accent); background: rgba(69, 58, 22, 0.88); box-shadow: 0 0 0 1px var(--accent); }
+.tl-cap.dragging { opacity: 0.85; }
+.tl-cap:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.tl-cap-head { position: absolute; left: 10px; right: 4px; top: 0; display: flex; align-items: center; gap: 6px; height: 18px; font: 600 10.5px/18px var(--font-mono); white-space: nowrap; overflow: hidden; pointer-events: none; }
+.tl-cap-head b { flex: none; padding: 0 5px; border-radius: 8px; background: rgba(124, 245, 192, 0.3); font-weight: 700; }
+.tl-cap.selected .tl-cap-head b { background: var(--accent); color: var(--accent-ink); }
+.tl-cap-text { overflow: hidden; text-overflow: ellipsis; opacity: 0.85; }
+.tl-cap-edge { position: absolute; left: 0; top: 0; bottom: 0; z-index: 3; width: 9px; border-radius: 4px 0 0 4px; background: var(--accent); opacity: 0.55; cursor: ew-resize; touch-action: none; }
+.tl-cap-edge:hover, .tl-cap.dragging .tl-cap-edge { opacity: 1; }
+.tl-cap-word { position: absolute; bottom: 2px; display: flex; align-items: center; height: 22px; padding: 0 3px; border: 1px solid rgba(124, 245, 192, 0.5); border-radius: 3px; background: rgba(124, 245, 192, 0.16); color: #cfffeb; font: 500 10.5px/1 var(--font-mono); white-space: nowrap; overflow: hidden; cursor: cell; touch-action: pan-x; }
+.tl-cap-word:hover { background: rgba(255, 209, 102, 0.28); border-color: var(--accent); }
+.tl-cap-word.first { cursor: pointer; border-color: var(--accent); }
+.tl-cap-word.target { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tl-cap-word:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.tl-cap-word.tiny { padding: 0; }
+.tl-cap-word.tiny .tl-word-text { display: none; }
+.captions-panel .ed-toolbar { margin-bottom: var(--s2); }
+.captions-panel h3 { margin: var(--s3) 0 var(--s2); }
+.captions-panel .hint { margin-bottom: var(--s2); }
+pre.srt { max-height: 220px; margin: 0; padding: 10px 12px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-2); color: var(--text); font: 12px/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ── the footage section of the inspector ──────────────────────────────────────────────── */
+.footage-section { margin-bottom: var(--s3); }
+.footage-section h3 { margin: var(--s3) 0 var(--s2); }
+.frame-ix { margin-left: 6px; color: var(--faint); font: 400 11px var(--font-mono); }
+.footage-facts { margin-top: var(--s2); }
+.footage-facts summary { min-height: var(--ctl-sm); color: var(--muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.footage-facts .facts { margin-top: var(--s2); }
+
+@media (max-width: 720px) {
+  .tl-cap-word { height: 28px; }
+  .tl-cap-edge { width: 16px; }
+  .tl-cap-head { height: 22px; line-height: 22px; font-size: 11.5px; }
+  pre.srt { max-height: 180px; }
+}
+
+/* ── uploads: progress, the font form ──────────────────────────────────────────────────── */
+.upload-progress { grid-column: 1 / -1; display: block; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.upload-progress i { display: block; width: 0; height: 100%; background: var(--accent); transition: width 0.12s linear; }
+.upload-row[data-state='reading'] .upload-state, .upload-row[data-state='waiting'] .upload-state { color: var(--info); }
+.upload-row[data-state='reading'] .upload-progress i { background: var(--info); }
+.font-form .chips { margin-bottom: var(--s2); }
+.font-form .facts { margin: 0; }
+
+/* ── the footage page and the font page ────────────────────────────────────────────────── */
+.footage-stage { align-items: stretch; background: #000; border-radius: 6px; }
+.footage-stage img { width: 100%; max-height: min(62vh, 560px); object-fit: contain; border-radius: 0; background: #000; }
+.footage-panel .transport { margin-top: var(--s3); }
+.footage-panel .transport-extras { margin: var(--s2) 0; }
+.footage-h { margin: var(--s4) 0 var(--s2); }
+.footage-along { position: relative; display: block; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #000; cursor: pointer; }
+.footage-along img { display: block; width: 100%; height: auto; }
+.footage-along:focus-visible { outline: 2px solid var(--accent); }
+.fp-head { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
+.footage-facts-panel audio { width: 100%; margin-top: var(--s2); }
+.font-page { display: flex; flex-direction: column; gap: var(--s4); }
+.font-page .panel h2 { margin-bottom: var(--s3); }
+.font-sample { min-height: 1.4em; margin-top: var(--s3); overflow-wrap: anywhere; line-height: 1.2; }
+.specimen-small { font-size: 18px; color: var(--muted); }
+.inline-field { display: inline-flex; align-items: center; gap: var(--s2); color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.inline-field input[type='range'] { width: min(240px, 60vw); }
+
+@media (max-width: 720px) {
+  .footage-panel .transport-extras .btn { flex: 1; }
+}
+.footage-section > .hint { margin: var(--s2) 0 var(--s3); }
+@media (max-width: 720px) {
+  .footage-along { height: 48px; }
+  .footage-along img { height: 100%; object-fit: cover; }
+}
+.font-form > p.muted { margin-bottom: var(--s3); }

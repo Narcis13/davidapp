@@ -76,3 +76,13 @@ gallery-clip7-phone   /gallery/9                        phone --scroll
 # iteration 3 dev seed (run `node scripts/dev-seed-v3.mjs` on top: clip v3-demo)
 editor-v3             /clips/v3-demo                    desktop --full
 editor-v3-phone       /clips/v3-demo                    phone --scroll
+
+# iteration 4 UI (data: the showcase + dev-seed-v3 + `node scripts/workflows-v4.mjs`, which adds the footage testsrc2-tone, the font fixture-blocks-regular and the clip v4-footage)
+editor-captions       /clips/v3-demo                    desktop --full --js "document.querySelector('[data-testid=caption-lane]')?.scrollIntoView()"
+editor-footage        /clips/v4-footage                 desktop --full
+asset-footage         /assets/testsrc2-tone             desktop --full
+asset-font            /assets/fixture-blocks-regular    desktop --full
+editor-captions-phone /clips/v3-demo                    phone --scroll
+editor-footage-phone  /clips/v4-footage                 phone --scroll
+asset-footage-phone   /assets/testsrc2-tone             phone --scroll
+asset-font-phone      /assets/fixture-blocks-regular    phone --scroll

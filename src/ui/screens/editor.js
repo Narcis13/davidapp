@@ -13,7 +13,7 @@ import { api, getStatus, renderQueue } from '/ui/lib/api.js';
 import { confirmDialog, openDialog } from '/ui/lib/dialog.js';
 import { createCanvasHandles } from '/ui/lib/canvas-handles.js';
 import { createHistory } from '/ui/lib/history.js';
-import { anchorSection, attachmentsSection, audioSection, captionsSection, itemTime, keyMarks, keyframesSection, loudnessSection, markerSection, paramsSection, platformsSection, prune, sampled, setProp, transformSection } from '/ui/lib/inspector.js';
+import { anchorSection, attachmentsSection, audioSection, captionsSection, footageSection, itemTime, keyMarks, keyframesSection, loudnessSection, markerSection, paramsSection, platformsSection, prune, sampled, setProp, transformSection } from '/ui/lib/inspector.js';
 import { mountIssues } from '/ui/lib/issues.js';
 import { live as liveEvents } from '/ui/lib/live.js';
 import { createOverlays } from '/ui/lib/overlays.js';
@@ -22,6 +22,8 @@ import { createStage } from '/ui/lib/stage.js';
 import { createTimeline } from '/ui/lib/timeline.js';
 import { loadPeaks } from '/ui/lib/waveform.js';
 import { MARKER_TYPES } from '/core/composition.js';
+import { buildPages, mergePages, movePageStart, splitPage, structureOf, toSrt } from '/core/captions.js';
+import { footageAsset } from '/ui/lib/footage.js';
 import { assetHref, clamp, clone, debounce, errorBlock, fill, fmtDuration, fmtTime, h, icon, nextId, notice, plural, splitRef } from '/ui/lib/util.js';
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,63}$/;
@@ -37,6 +39,8 @@ const SHORTCUTS = [
   ['← / →', 'One frame back or forward'],
   ['S', 'Split the selected items at the playhead'],
   ['M', 'Add a note marker at the playhead'],
+  ['J', 'Merge the selected caption pages (two neighbours, or one with the next)'],
+  ['B', 'Break the caption page at the word under the playhead'],
   [`${MOD}Z`, 'Undo'],
   [isMac ? '⇧⌘Z' : 'Ctrl+Shift+Z or Ctrl+Y', 'Redo'],
   [`${MOD}C`, 'Copy the selected items'],
@@ -98,6 +102,9 @@ export async function mount(view, ctx) {
   // what the studio measured about the draft: the narration's words (clip time), caption pages, anchors, zones in frame pixels
   let words = clip.words ?? [], captionPages = clip.captions ?? null, anchors = clip.anchors ?? [], zones = clip.zones ?? null;
   let selMarker = null;
+  let capSel = [];   // the caption pages selected on the timeline (their indices)
+  // the facts of the footage items' files, by ref (fetched once): the frame table, the sound, the waveform picture
+  const footage = new Map();
   const resolved = new Map();   // anchored item id → where the studio last put it (so a word that moves takes the item along)
   let bundled = refsOf(draft);
   let fmt = draft.format;
@@ -227,6 +234,10 @@ export async function mount(view, ctx) {
       select(sel.ids.filter((id) => findItem(id)), null, null);
     },
     keyframesOf: (item) => keyMarks(item, fmt),
+    footageOf: (item, kind) => footageFor(item, kind),
+    onCaptionSelect(list) { setCapSel(list, false); },
+    onCaptionMove(page, key) { captionMove(page, key); },
+    onCaptionSplit(key) { captionSplitAt(key); },
   });
   ctx.onCleanup(() => timeline.destroy());
   ctx.setGuard(() => (dirty ? 'This clip has unsaved changes. Leave without saving?' : null));
@@ -308,7 +319,8 @@ export async function mount(view, ctx) {
     refreshMeta();
     if (audioSig(draft) !== lastAudioSig) { lastAudioSig = audioSig(draft); refreshAudio(); }
     if (!showProposal) stage.pv.setComposition(viewOf(draft));
-    if (tl) timeline.refresh();
+    const capsChanged = syncCaptions();
+    if (tl || capsChanged) timeline.refresh();
     if (hd) handles.redraw();
     if (insp === 'redraw') drawInspector(); else if (insp === 'sync') syncInspector();
     drawLayers();
@@ -341,6 +353,9 @@ export async function mount(view, ctx) {
 
   function needsBundle(comp) {
     for (const r of refsOf(comp)) if (!bundled.has(r) || !/@\d+$/.test(r)) return true;
+    // an uploaded font named for the first time: the studio pins its files in the composition and sends them with the bundle
+    const named = JSON.stringify(comp.tracks) + JSON.stringify(comp.effects ?? []);
+    if (status.fonts.some((f) => f.uploaded && named.includes(`"${f.family}"`) && !comp.fonts?.[f.family])) return true;
     return needsEasing(comp);
   }
 
@@ -462,14 +477,15 @@ export async function mount(view, ctx) {
 
   // ── what the studio measures about the draft: words, caption pages, anchors, zones ───────
   let metaToken = 0;
-  const refreshMeta = debounce(async () => {
+  async function measure() {
     if (busy || showProposal) return;
     const token = ++metaToken;
     try {
       const r = await api.post(`/api/clips/${slug}/bundle`, { composition: viewOf(draft) });
       if (ctx.alive() && token === metaToken && !busy) applyMeta(r);
     } catch { /* the draft may not be valid yet: keep what is shown */ }
-  }, 600);
+  }
+  const refreshMeta = debounce(measure, 600);
 
   /** Anchored starts the studio resolved: an item that sat on its word follows it when the word moves; a marker on a word always does. */
   function follow(pinned) {
@@ -501,7 +517,9 @@ export async function mount(view, ctx) {
     words = r.words ?? []; captionPages = r.captions ?? null; anchors = r.anchors ?? []; zones = r.zones ?? null;
     overlays.setZones(zones);
     const moved = follow(r.composition);
-    timeline.setMeta({ words, anchors, base: r.composition });
+    capSig = captionSig();
+    timeline.setMeta({ words, anchors, base: r.composition, captions: captionPages });
+    drawCaptions();
     timeline.setSelectedMarker(selMarker);
     if (moved && !showProposal) { stage.pv.setComposition(viewOf(draft)); handles.redraw(); drawLayers(); }
     // the captions the preview draws come from the bundle: a narration that changed needs the new one
@@ -515,12 +533,15 @@ export async function mount(view, ctx) {
     bundle = r.bundle; beats = r.beats; info = r.assets;
     words = r.words ?? []; captionPages = r.captions ?? null; anchors = r.anchors ?? []; zones = r.zones ?? null;
     overlays.setZones(zones);
+    capSig = captionSig();
     resolved.clear();
     for (const track of draft.tracks) for (const item of track.items) if (item.anchor) resolved.set(item.id, item.start);
     bundled = refsOf(draft);
     if (!FORMAT_NAMES.includes(fmt)) fmt = draft.format;
     selectionStillThere();
-    timeline.setData({ composition: draft, beats, words, anchors });
+    timeline.setData({ composition: draft, beats, words, anchors, captions: captionPages });
+    loadFootage();
+    drawCaptions();
   }
 
   /** The set of assets changed: have the server pin and bundle `next`, then show it. */
@@ -620,6 +641,168 @@ export async function mount(view, ctx) {
     lastStored = performance.now();
     try { localStorage.setItem(OPEN_CLIP_KEY, JSON.stringify({ slug, at: round(time()) })); } catch { /* storage may be unavailable */ }
   }
+
+  // ── footage ──────────────────────────────────────────────────────────────────────────────
+  const assetInfo = (ref) => (Array.isArray(info) ? info.find((a) => a.ref === ref) : info?.[ref]);
+  const isFootage = (ref) => assetInfo(ref)?.type === 'video';
+  const soundOf = (ref) => { const t = draft.tracks.find((x) => x.type === 'audio' && x.items.some((i) => i.asset === ref)); return t ? { track: t.name ?? t.id } : null; };
+
+  /** What the timeline draws a footage item from: the file's facts, and its waveform when its sound plays on an audio track. */
+  function footageFor(item, kind) {
+    const a = footage.get(item.asset);
+    if (!a) return null;
+    return { meta: a.meta, ref: item.asset, wave: (kind === 'audio' || soundOf(item.asset)) && a.meta.wave ? `/media/${a.meta.wave.file}` : undefined };
+  }
+
+  /** Fetch the facts of every footage file the draft uses (once each), then draw what needs them. */
+  function loadFootage() {
+    const refs = new Set(draft.tracks.flatMap((t) => t.items.map((i) => i.asset)).filter((r) => isFootage(r) && !footage.has(r)));
+    for (const ref of refs) {
+      footageAsset(ref).then((a) => {
+        if (!a || !ctx.alive() || footage.has(ref)) return;
+        footage.set(ref, a);
+        timeline.refresh();
+        const f = sel.primary ? findItem(sel.primary) : null;
+        if (f?.item.asset === ref && !inspector.contains(document.activeElement)) drawInspector();
+      });
+    }
+  }
+
+  /** Put the file's sound on an audio track, from the point the picture starts at (the item's own `in`). */
+  function addSound(id) {
+    const f = editable(id);
+    const a = f && footage.get(f.item.asset);
+    if (!a?.meta.audio || busy) return;
+    const from = Math.min(f.item.params?.in ?? 0, Math.max(0, a.meta.duration - 0.1));
+    const taken = allIds();
+    const base = { asset: f.item.asset, start: f.item.start, duration: round(Math.min(f.item.duration, a.meta.duration - from)) };
+    edit('footage-sound', (c) => {
+      let track = c.tracks.find((t) => t.id === 'footage-sound' && t.type === 'audio');
+      if (!track) { track = { id: 'footage-sound', name: 'Footage sound', type: 'audio', items: [] }; c.tracks.push(track); }
+      track.items.push({ id: freeId(`${id}-sound`, taken), ...base, ...(from > 0 ? { offset: round(from) } : {}), params: {} });
+    }, { inspector: 'redraw' });
+  }
+
+  // ── caption pages on the timeline ────────────────────────────────────────────────────────
+  // The lane shows the pages the studio builds from the narration's words. A move, a merge or a split changes
+  // only the structure stored in the composition (composition.captions.pages: which word starts each page); the
+  // times of a page always come from its words, so they are never written. The same core functions as edit_clip's
+  // caption_move, caption_merge and caption_split do the editing; the pages are then built again with the same rules.
+  let capSig = '';
+  const captionSig = () => JSON.stringify([draft.captions ?? null, viewOf(draft).format, draft.fps]);
+  const capMerge = h('button.btn.small', { type: 'button', 'data-testid': 'caption-merge', title: 'Merge the selected pages (J)' }, 'Merge pages');
+  const capBreak = h('button.btn.small', { type: 'button', 'data-testid': 'caption-split', title: 'Start a new page at the word under the playhead (B)' }, 'Split at the playhead');
+  const capAuto = h('button.btn.small', { type: 'button', 'data-testid': 'caption-auto', title: 'Let the rules choose the pages again' }, 'Automatic pages');
+  const capInfo = h('p.hint', { 'data-testid': 'caption-selection', role: 'status' });
+  const capCount = h('span.count', { 'data-testid': 'caption-count' });
+  const srtPre = h('pre.srt', { 'data-testid': 'srt-preview', tabIndex: 0, 'aria-label': 'The SRT file the next render writes' });
+  const capPanel = h('section.panel.captions-panel', { 'data-testid': 'captions-panel', hidden: true },
+    h('div.panel-head', h('h2', 'Caption pages'), capCount),
+    h('div.ed-toolbar', { role: 'toolbar', 'aria-label': 'Caption pages' }, capMerge, capBreak, capAuto),
+    capInfo,
+    h('p.hint', 'On the Captions lane: drag the left edge of a page onto another word to move the break, click a word to start a new page there, select two neighbouring pages to merge them. The words and their times never change.'),
+    h('h3', 'SRT the next render writes'),
+    srtPre);
+
+  /** The pages the studio would build for a composition: the same rules and settings as the server's (studio/clips.js captionPages). */
+  function pagesOf(comp) {
+    const c = comp.captions;
+    if (!c) return null;
+    const list = c.from ? words.filter((w) => c.from.includes(w.item)) : words;
+    try {
+      return buildPages(list, { maxLines: c.maxLines ?? 2, maxChars: c.maxChars ?? (comp.format === 'horizontal' ? 32 : 20), fps: comp.fps, lead: c.lead ?? 2, minDuration: c.minDuration ?? 0.8, closeGap: c.closeGap ?? 0.3, pauseBreak: c.pauseBreak ?? 0.6, names: c.names ?? [], pages: c.pages }).pages;
+    } catch {
+      return captionPages;
+    }
+  }
+
+  /** The draft's caption settings or structure changed: build the pages again (the studio's answer follows and replaces them). → did they change */
+  function syncCaptions() {
+    const sig = captionSig();
+    if (sig === capSig) return false;
+    capSig = sig;
+    captionPages = pagesOf(viewOf(draft));
+    timeline.setCaptions(captionPages ?? []);
+    capSel = capSel.filter((i) => i < (captionPages?.length ?? 0));
+    timeline.setCaptionSelection(capSel);
+    drawCaptions();
+    return true;
+  }
+
+  function drawCaptions() {
+    const pages = captionPages ?? [];
+    capPanel.hidden = !pages.length;
+    if (!pages.length) return;
+    capCount.textContent = `${plural(pages.length, 'page')} · ${draft.captions?.pages ? 'set by hand' : 'chosen by the rules'}`;
+    srtPre.textContent = toSrt(pages);
+    capPanel.dataset.structure = draft.captions?.pages ? 'custom' : 'automatic';
+    capAuto.disabled = !draft.captions?.pages || busy;
+    capBreak.disabled = busy;
+    const sorted = [...capSel].sort((a, b) => a - b);
+    const mergeable = (sorted.length === 2 && sorted[1] === sorted[0] + 1) || (sorted.length === 1 && sorted[0] < pages.length - 1);
+    capMerge.disabled = !mergeable || busy;
+    capInfo.textContent = !sorted.length ? 'Click a page to select it; Shift-click a second one to merge them.'
+      : sorted.length === 1 ? `Page ${sorted[0] + 1} selected. Merge joins it with the next page.`
+        : `Pages ${sorted.map((i) => i + 1).join(' and ')} selected.${mergeable ? '' : ' Merge needs two neighbours.'}`;
+  }
+
+  function setCapSel(list, push = true) {
+    capSel = [...list];
+    if (push) timeline.setCaptionSelection(capSel);
+    drawCaptions();
+  }
+  const pickPage = (key) => { const i = (captionPages ?? []).findIndex((p) => p.keys.start === key); setCapSel(i >= 0 ? [i] : []); };
+
+  /**
+   * One edit of the page structure. What the rules refuse (a page left without words, a break outside the page) is said and
+   * nothing is changed. The studio measures the draft at once, so the preview and the SRT follow without waiting.
+   */
+  function captionEdit(make) {
+    if (busy || showProposal || !captionPages?.length) return false;
+    let next;
+    try { next = make(draft.captions?.pages ?? structureOf(captionPages), captionPages.flatMap((p) => p.lines.flat())); } catch (e) {
+      msg.show(`Caption pages: ${e.message}`, 'info');
+      return false;
+    }
+    msg.hide();
+    edit('caption-pages', (c) => { c.captions = { ...(c.captions ?? {}), pages: next }; }, { inspector: 'none' });
+    refreshMeta.cancel();
+    measure();
+    issues.rerunIf((it) => it.check === 'captions');
+    return true;
+  }
+  function captionMove(page, key) { if (captionEdit((s, w) => movePageStart(s, w, page, key))) pickPage(key); }
+  function captionSplitAt(key) { if (captionEdit((s, w) => splitPage(s, w, key))) pickPage(key); }
+  function mergeCaptions() {
+    const sorted = [...capSel].sort((a, b) => a - b);
+    const at = sorted[0];
+    if (!sorted.length || sorted.length > 2 || (sorted.length === 2 && sorted[1] !== at + 1) || at >= (captionPages?.length ?? 0) - 1) {
+      msg.show('Select two neighbouring caption pages to merge them (or one, to merge it with the next).', 'info');
+      return;
+    }
+    const key = captionPages[at].keys.start;
+    if (captionEdit((s) => mergePages(s, at))) pickPage(key);
+  }
+  /** A new page starts at the word under the playhead (the word being said, or the next one in a silence). */
+  function splitCaptionAtPlayhead() {
+    const t = time();
+    const page = [...(captionPages ?? [])].reverse().find((p) => p.start <= t + 1e-6);
+    if (!page) { msg.show('The playhead is before the first caption page.', 'info'); return; }
+    const inPage = page.lines.flat();
+    const word = inPage.find((w) => t >= w.start - 1e-6 && t < w.end) ?? inPage.find((w) => w.start > t);
+    if (!word || word.key === page.keys.start) { msg.show('Move the playhead onto a later word of the page: a new page starts at the word under it.', 'info'); return; }
+    captionSplitAt(word.key);
+  }
+  function captionAuto() {
+    if (busy || !draft.captions?.pages) return;
+    edit('caption-auto', (c) => { if (c.captions) delete c.captions.pages; }, { inspector: 'none' });
+    setCapSel([]);
+    refreshMeta.cancel();
+    measure();
+  }
+  capMerge.addEventListener('click', mergeCaptions);
+  capBreak.addEventListener('click', splitCaptionAtPlayhead);
+  capAuto.addEventListener('click', captionAuto);
 
   // ── markers ──────────────────────────────────────────────────────────────────────────────
   const markerType = h('select.small', { 'data-testid': 'add-marker-type', 'aria-label': 'Type of the new marker' }, MARKER_TYPES.map((t) => h('option', { value: t }, t)));
@@ -857,6 +1040,8 @@ export async function mount(view, ctx) {
     else if (e.key === 'Delete' || e.key === 'Backspace') { if (sel.ids.length) { e.preventDefault(); removeSelected(); } else if (selMarker !== null) { e.preventDefault(); removeMarker(); } }
     else if (k === 's') { e.preventDefault(); split(); }
     else if (k === 'm') { e.preventDefault(); addMarker('note'); }
+    else if (k === 'j' && !capPanel.hidden) { e.preventDefault(); mergeCaptions(); }
+    else if (k === 'b' && !capPanel.hidden) { e.preventDefault(); splitCaptionAtPlayhead(); }
     else if (e.key === '?') { e.preventDefault(); shortcutsSheet(); }
     else if (e.key === 'Escape' && (sel.ids.length || selMarker !== null)) { select([], null, sel.track); }
   };
@@ -910,7 +1095,7 @@ export async function mount(view, ctx) {
   });
 
   addBtn.addEventListener('click', async () => {
-    const picked = await pickAsset({ title: 'Add an item', kinds: ['visual', 'audio'] });
+    const picked = await pickAsset({ title: 'Add an item', kinds: ['visual', 'audio', 'footage'] });
     if (!picked || !ctx.alive() || busy) return;
     const next = clone(draft);
     const audio = picked.kind === 'audio';
@@ -1160,7 +1345,10 @@ export async function mount(view, ctx) {
     const params = paramsSection({ ...env, schema: a.schema, fonts, visual: !audio });
     const mix = audio ? audioSection({ ...env, tracks: draft.tracks.filter((t) => t.type === 'audio' && t.id !== track.id).map((t) => ({ id: t.id, name: t.name, role: t.role })) }) : null;
     const onWord = anchorSection({ item, words, report: anchors.find((x) => x.kind === 'item' && x.id === item.id), fps: draft.fps, duration: draft.duration, commit });
-    for (const s of [tf, kfs, params, mix]) if (s) sections.push(s);
+    // footage: the file's own controls, once its facts are in
+    const file = !audio && isFootage(item.asset) ? footage.get(item.asset) : null;
+    const foot = file ? footageSection({ item, asset: file, fps: draft.fps, commit, sound: soundOf(item.asset), addSound: () => addSound(item.id) }) : null;
+    for (const s of [tf, kfs, params, mix, foot]) if (s) sections.push(s);
 
     const structural = hasRefParams(a.schema);
     const resetBtn = h('button.btn.small', { type: 'button', 'data-testid': 'reset-params' }, 'Reset');
@@ -1173,7 +1361,7 @@ export async function mount(view, ctx) {
     upgrade?.addEventListener('click', () => commit('upgrade', (it) => { it.asset = `${a.slug}@${a.latestVersion}`; }, { structural: true }));
     const change = h('button.btn.small', { type: 'button', 'data-testid': 'change-asset' }, 'Change asset');
     change.addEventListener('click', async () => {
-      const picked = await pickAsset({ title: 'Change the asset', kinds: [audio ? 'audio' : 'visual'] });
+      const picked = await pickAsset({ title: 'Change the asset', kinds: audio ? ['audio'] : ['visual', 'footage'] });
       if (!picked || !ctx.alive()) return;
       commit('change-asset', (it) => { it.asset = picked.ref; it.params = {}; }, { structural: true });
     });
@@ -1187,6 +1375,7 @@ export async function mount(view, ctx) {
     const body = h('fieldset.ed-fields', { disabled: locked },
       h('h3', `Timing · ${track.name ?? track.id} track`),
       h('div.field-grid', start.el, duration.el, fadeIn.el, fadeOut.el),
+      foot?.el ?? (!audio && isFootage(item.asset) ? h('p.hint', { 'data-testid': 'footage-loading' }, 'Reading the file.') : null),
       item.offset !== undefined ? h('p.hint', { 'data-testid': 'item-offset' }, `Starts ${fmtTime(item.offset)} into the asset${item.assetDuration ? ` (of ${fmtTime(item.assetDuration)})` : ''}.`) : null,
       gain?.el,
       onWord.el,
@@ -1297,7 +1486,8 @@ export async function mount(view, ctx) {
           h('div.panel-head', h('div.row', h('h2', 'Timeline'), position, audioStatus), h('div.row', addBtn, timeline.toolbar)),
           h('div.ed-toolbar', { role: 'toolbar', 'aria-label': 'Edit' }, undoBtn, redoBtn, splitBtn, copyBtn, pasteBtn, dupBtn, assetBtn, h('span.ed-marker-add', markerType, markerBtn), keysBtn),
           timeline.el,
-          h('p.hint', `Drag an item to move it (also to another track), drag its edges to trim. Moves snap to the playhead, beats and other items; hold Alt to move freely. ${plural(beats.length, 'beat')} detected in the audio.`)),
+          h('p.hint', `Drag an item to move it (also to another track), drag its edges to trim; footage trims the file and keeps its picture in place. Moves snap to the playhead, beats and other items; hold Alt to move freely. ${plural(beats.length, 'beat')} detected in the audio.`)),
+        capPanel,
         layersPanel),
       h('aside.ed-side', agentBox, inspector, issues.el, assetsPanel)));
 
@@ -1306,7 +1496,10 @@ export async function mount(view, ctx) {
   drawAssets();
   drawInspector();
   updateTools();
-  timeline.setData({ composition: draft, beats, words, anchors });
+  timeline.setData({ composition: draft, beats, words, anchors, captions: captionPages });
+  capSig = captionSig();
+  loadFootage();
+  drawCaptions();
   for (const track of draft.tracks) for (const item of track.items) if (item.anchor) resolved.set(item.id, item.start);
   showPosition(0);
   remember();

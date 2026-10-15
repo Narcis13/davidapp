@@ -15,7 +15,7 @@ const CHECK_LABEL = {
  * @param {{ slug: string, getComposition: () => any, onSeek: (t: number) => void, onPick?: (itemId: string | null) => void }} o
  */
 export function mountIssues({ slug, getComposition, onSeek, onPick = () => {} }) {
-  let issues = null, stale = false, running = false, open = -1, runId = 0, error = '';
+  let again = 0, issues = null, stale = false, running = false, open = -1, runId = 0, error = '';
   const runBtn = h('button.btn.small', { type: 'button', 'data-testid': 'run-check' }, 'Check the clip');
   const loading = h('p.issues-loading', { hidden: true, role: 'status', 'data-testid': 'issues-loading' }, h('span.spinner'), 'Checking frames. This can take up to half a minute.');
   const errorEl = h('p.notice.error', { hidden: true, role: 'alert', 'data-testid': 'issues-error' });
@@ -71,5 +71,7 @@ export function mountIssues({ slug, getComposition, onSeek, onPick = () => {} })
     /** The draft changed: what is listed may no longer hold. */
     markStale() { if (issues && !stale) { stale = true; draw(); } },
     run,
+    /** After an edit that bears on a kind of issue: run the checks again when the last list held one (the list then shows what is left). */
+    rerunIf(match) { if (issues?.some(match)) { clearTimeout(again); again = setTimeout(run, 900); } },
   };
 }
