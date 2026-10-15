@@ -616,13 +616,13 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'upload_image',
       title: 'Upload an image or SVG',
-      description: 'Add a PNG, JPEG, WebP or SVG file as an image asset, the same way a drag-and-drop in the studio does: the type is read from the bytes, a file already in the library is not added twice (duplicate: true), an SVG is sanitised (scripts, event handlers, external references and foreignObject are dropped; a DOCTYPE rejects it) and rasterised, and the size, a dominant palette and a thumbnail are extracted. It then waits on the needs-description list.',
+      description: 'Add a PNG, JPEG, WebP or SVG file as an image asset, the same way a drag-and-drop in the studio does: the type is read from the bytes, a file already in the library is not added twice (duplicate: true), an SVG is sanitised (scripts, event handlers, external references and foreignObject are dropped; a DOCTYPE rejects it; a <style> sheet with simple rules is applied to the shapes, and gradients are kept) and rasterised, and the result carries svg { kept, dropped: [{ what, why }] } says what of the file could not be kept; the size, a dominant palette and a thumbnail are extracted. It then waits on the needs-description list.',
       input: { path: z.string().optional().describe('Absolute path of the file'), data_base64: z.string().optional().describe('Or the file\'s bytes, base64'), name: z.string().describe('File name, e.g. "skyline.jpg"'), for_clip: z.string().optional(), author: AUTHOR },
       run: async (a) => {
         if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64');
         const data = a.path ? readFileSync(a.path) : Buffer.from(a.data_base64, 'base64');
         const r = await studio.uploads.upload({ name: a.name, data, author: who(a.author), forClip: a.for_clip });
-        return { json: { asset: r.asset.ref, duplicate: r.duplicate, removedFromSvg: r.removed, width: r.asset.meta.width, height: r.asset.meta.height, palette: r.asset.meta.palette, needsDescription: r.asset.needsDescription }, images: [{ png: readFileSync(join(studio.dataDir, r.asset.thumb)), path: join(studio.dataDir, r.asset.thumb) }] };
+        return { json: { asset: r.asset.ref, duplicate: r.duplicate, removedFromSvg: r.removed, svg: r.svg, width: r.asset.meta.width, height: r.asset.meta.height, palette: r.asset.meta.palette, needsDescription: r.asset.needsDescription }, images: [{ png: readFileSync(join(studio.dataDir, r.asset.thumb)), path: join(studio.dataDir, r.asset.thumb) }] };
       },
     },
     {

@@ -357,7 +357,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     if (!/^image\/(png|jpeg|webp|svg\+xml)\b/.test(type)) throw new StudioError('Upload one PNG, JPEG, WebP or SVG file as the request body, with its image/* Content-Type', 'unsupported');
     const chunks = await read(req, MAX_UPLOAD, `The file is larger than ${MAX_UPLOAD / 1e6} MB`);
     const r = await uploads.upload({ name: url.searchParams.get('name') || 'upload', data: Buffer.concat(chunks), author: url.searchParams.get('author') || author, forClip: url.searchParams.get('clip') || undefined });
-    return { asset: r.asset, duplicate: r.duplicate, removed: r.removed };
+    return { asset: r.asset, duplicate: r.duplicate, removed: r.removed, svg: r.svg };
   }
 
   async function handle(req, res) {
