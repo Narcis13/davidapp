@@ -1,0 +1,14 @@
+Sweep of the studio after the second UI pass (provenance, credits, render options, write to repo, the kit)
+
+bash .claude/skills/goal-loop/scripts/sweep.sh http://127.0.0.1:8803 <dir>
+Data: serve.sh seed (showcase with clips 1-9 and the kit) + kit-chart-line and kit-chart-donut synced
+(scripts/sync-assets.mjs) + dev-seed-v3 + dev-seed-v2 + scripts/workflows-v4.mjs (all six workflows).
+Screens: 85 (the 68 that were there plus 17 new ones for provenance, credits, the render panel, batches, the repo and the kit),
+each at 1440x900 and 390x844.
+
+Result: 0 console errors and 0 failed requests on every screen; no line starting with ERROR in the server log.
+(One screen of one run, /requests, showed connection errors to another studio's port: a second headless Chrome of another
+session took the same random debugging port. It was shot again alone: clean.)
+
+scripts/workflows-v4.mjs (all six workflows, 146 checks): all pass; the only console message is the 422 of the final render
+that the provenance workflow asks for on purpose (it is declared expected).

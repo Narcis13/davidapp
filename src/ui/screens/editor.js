@@ -14,7 +14,10 @@ import { confirmDialog, openDialog } from '/ui/lib/dialog.js';
 import { createCanvasHandles } from '/ui/lib/canvas-handles.js';
 import { createHistory } from '/ui/lib/history.js';
 import { anchorSection, attachmentsSection, audioSection, captionsSection, footageSection, itemTime, keyMarks, keyframesSection, loudnessSection, markerSection, paramsSection, platformsSection, prune, sampled, setProp, transformSection } from '/ui/lib/inspector.js';
+import { mountCredits } from '/ui/lib/credits.js';
 import { mountIssues } from '/ui/lib/issues.js';
+import { mountRepo } from '/ui/lib/repo.js';
+import { openRenderPanel } from '/ui/lib/render-panel.js';
 import { live as liveEvents } from '/ui/lib/live.js';
 import { createOverlays } from '/ui/lib/overlays.js';
 import { pickAsset } from '/ui/lib/picker.js';
@@ -125,6 +128,10 @@ export async function mount(view, ctx) {
   const addBtn = h('button.btn.small', { type: 'button', 'data-testid': 'add-item' }, icon('plus', 14), 'Add item');
   const inspector = h('section.panel.inspector', { 'data-testid': 'inspector' });
   const assetsPanel = h('section.panel', { 'data-testid': 'clip-assets' }, h('h2', 'Assets in this clip'));
+  // credits and the repo read the saved clip: they check again whenever the assets panel is drawn (open, save, reload)
+  const credits = mountCredits({ slug });
+  const repo = mountRepo({ slug });
+  ctx.onCleanup(() => { credits.destroy(); repo.destroy(); });
   const layersList = h('ol.layers', { 'data-testid': 'layers-list' });
   const layersPanel = h('section.panel.layers-panel', { 'data-testid': 'layers-panel' }, h('div.panel-head', h('h2', 'Layers at the playhead'), h('span.count', { 'data-testid': 'layers-count' })), layersList);
   const agentBox = h('div.ed-agent');
@@ -1052,15 +1059,13 @@ export async function mount(view, ctx) {
   renderBtn.addEventListener('click', async () => {
     if (dirty && !(await save())) return;
     msg.hide();
-    setBusy(true);
-    try {
-      await api.post(`/api/clips/${slug}/render`);
-      renderQueue.refresh();
-      if (ctx.alive()) await ctx.navigate('/renders', { force: true });
-    } catch (e) {
-      msg.show(e.message);
-      setBusy(false);
-    }
+    openRenderPanel({
+      slug, clip: draft, status, getTime: time, duration: draft.duration,
+      onQueued: async () => {
+        renderQueue.refresh();
+        if (ctx.alive()) await ctx.navigate('/renders', { force: true });
+      },
+    });
   });
 
   remixBtn.addEventListener('click', () => {
@@ -1405,6 +1410,8 @@ export async function mount(view, ctx) {
 
   /** The saved clip's pinned assets, with how the clip came by each. */
   async function drawAssets() {
+    credits.refresh();
+    repo.refresh();
     let used;
     try {
       used = (await api.get(`/api/clips/${slug}/assets`)).assets;
@@ -1489,7 +1496,7 @@ export async function mount(view, ctx) {
           h('p.hint', `Drag an item to move it (also to another track), drag its edges to trim; footage trims the file and keeps its picture in place. Moves snap to the playhead, beats and other items; hold Alt to move freely. ${plural(beats.length, 'beat')} detected in the audio.`)),
         capPanel,
         layersPanel),
-      h('aside.ed-side', agentBox, inspector, issues.el, assetsPanel)));
+      h('aside.ed-side', agentBox, inspector, issues.el, assetsPanel, credits.el, repo.el)));
 
   drawMeta();
   drawFormat();

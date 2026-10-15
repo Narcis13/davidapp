@@ -8,6 +8,7 @@ import { api, getStatus, qs } from '/ui/lib/api.js';
 import { openDialog } from '/ui/lib/dialog.js';
 import { virtualGrid } from '/ui/lib/grid.js';
 import { live } from '/ui/lib/live.js';
+import { cachedProvenance, forgetProvenance, isUnknownLicense, issueBadges, lookupProvenance, provenanceIssues } from '/ui/lib/provenance.js';
 import { uploader } from '/ui/lib/upload.js';
 import { assetIcon, debounce, empty, errorBlock, fill, fmtDate, fmtDuration, h, icon, loading, s } from '/ui/lib/util.js';
 
@@ -144,9 +145,13 @@ export async function mount(view, ctx) {
   const up = uploader({ target: view, onUploaded: () => refresh(), onOpen: (slug) => openDetail(slug) });
 
   // ── one card ─────────────────────────────────────────────────────────────────────────────
+  /** The marks of a file whose source or licence is not in order (the list does not carry them: the lookup fills them in). */
+  const provFlags = (a, p) => (a.type === 'function' ? [] : provenanceIssues(p, a.tags ?? []).map((i) => h(`span.flag.prov.prov-${i.id}`, { 'data-testid': 'prov-flag', 'data-issue': i.id, title: i.title }, i.label)));
+
   function card(a, i) {
     const sel = selection.has(a.slug);
     const badge = badgeOf(a);
+    const known = a.type === 'function' ? null : cachedProvenance(a.slug);
     const thumb = h(`div.vthumb${a.strip ? '.has-strip' : ''}`, { style: a.strip ? { '--strip': `url("/media/${a.strip}")` } : null },
       a.thumb ? h('img', { src: `/media/${a.thumb}`, alt: '', loading: 'lazy', decoding: 'async', draggable: false }) : h('span.thumb-icon', icon(assetIcon(a), 32)),
       a.strip ? h('span.vstrip', { 'aria-hidden': 'true' }) : null,
@@ -154,6 +159,7 @@ export async function mount(view, ctx) {
       h('button.vstar', { type: 'button', tabindex: -1, 'aria-label': a.favorite ? 'Remove from favourites' : 'Add to favourites', 'aria-pressed': String(!!a.favorite), 'data-testid': 'card-favorite',
         onclick: (e) => { e.stopPropagation(); setFlag(a.slug, 'favorite', !a.favorite); } }, svg(STAR, 16)),
       h('span.vflags',
+        provFlags(a, known),
         a.featured ? h('span.flag.featured', { 'data-testid': 'featured-mark' }, svg(STAR, 11), 'Featured') : null,
         a.needsDescription ? h('span.flag.needs', { 'data-testid': 'needs-description' }, 'Needs description') : null));
     const el = h('div.vcard', {
@@ -172,6 +178,14 @@ export async function mount(view, ctx) {
         a.edited ? h('span.edited', { 'data-testid': 'edited-mark', title: 'Title, description or tags edited in the studio' }, 'edited') : null,
         a.derivation ? h('span', a.derivation) : null,
         h('span.ref', `v${a.version}`))));
+    if (known === undefined) {
+      lookupProvenance(a.slug).then((p) => {
+        const box = el.querySelector('.vflags');
+        if (!p || !box || !el.isConnected || box.querySelector('[data-testid=prov-flag]')) return;
+        const flags = provFlags(a, p);
+        if (flags.length) { box.prepend(...flags); el.classList.add('has-prov'); }
+      });
+    } else if (provFlags(a, known).length) el.classList.add('has-prov');
     return el;
   }
 
@@ -382,10 +396,13 @@ export async function mount(view, ctx) {
     const f = facets ?? {};
     const sections = [];
     // quick views: flags, recently used, collections
+    // the kit (cursor, spotlight, camera, arrows, callouts, charts …) is the assets tagged `kit`: one click away
+    const kitN = (f.tag ?? []).find((v) => String(v.value) === 'kit')?.count;
     sections.push(h('section.facet-group', { 'aria-label': 'Show' },
       h('div.facet-list',
         FLAGS.map(([k, label]) => facetButton(k, '1', label, f[k] ?? null)),
-        facetButton('recent', '1', 'Recently used', null, 'recent-link'))));
+        facetButton('recent', '1', 'Recently used', null, 'recent-link'),
+        kitN || state.tag.includes('kit') ? facetButton('tag', 'kit', 'Kit', kitN ?? 0, 'kit-link') : null)));
     const colCounts = new Map((f.collection ?? []).map((c) => [c.value, c.count]));
     sections.push(h('section.facet-group', { 'data-testid': 'collections' },
       h('h3', 'Collections'),
@@ -506,6 +523,7 @@ export async function mount(view, ctx) {
         a.featured ? h('span.badge.warn', 'featured') : null,
         a.needsDescription ? h('span.badge.needs', 'needs description') : null,
         a.edited ? h('span.badge', 'edited') : null,
+        full && a.type !== 'function' ? issueBadges(full.provenance, a.tags ?? []) : null,
         h('span.muted', a.usedByClips ? `used by ${a.usedByClips} ${a.usedByClips === 1 ? 'clip' : 'clips'}` : 'not used yet')),
       h('div.detail-actions',
         h('a.btn.primary', { href: `/assets/${a.slug}`, 'data-testid': 'detail-open' }, 'Open in playground'),
@@ -526,6 +544,7 @@ export async function mount(view, ctx) {
         a.duration ? [h('dt', 'Duration'), h('dd', fmtDuration(a.duration))] : null,
         a.formats?.length ? [h('dt', 'Formats'), h('dd', a.formats.join(', '))] : null,
         size ? [h('dt', 'Size'), h('dd', `${size.width}×${size.height}`)] : null,
+        full?.provenance ? [h('dt', 'Licence'), h('dd', { 'data-testid': 'detail-license' }, isUnknownLicense(full.provenance.license) ? 'unknown' : full.provenance.license, full.provenance.creator ? ` · by ${full.provenance.creator}` : '')] : null,
         a.params?.length ? [h('dt', 'Params'), h('dd.mono', a.params.join(', '))] : null,
         a.originClip ? [h('dt', 'Made for'), h('dd', h('a', { href: `/clips/${a.originClip}` }, clipTitle(a.originClip)))] : null,
         lineage.length ? [h('dt', 'Lineage'), h('dd.lineage', lineage)] : null,
@@ -689,7 +708,7 @@ export async function mount(view, ctx) {
   ctx.onCleanup(() => window.removeEventListener('resize', onResize));
 
   // ── live: an asset described over MCP, a bulk edit elsewhere, an upload ──────────────────
-  const offAsset = live.on('asset', () => refresh());
+  const offAsset = live.on('asset', (e) => { if (e?.action === 'metadata') forgetProvenance(e.key); refresh(); });
   const offLibrary = live.on('library', async () => {
     try { collections = (await api.get('/api/collections')).collections; } catch { /* the next refresh tries again */ }
     refresh();
@@ -702,7 +721,7 @@ export async function mount(view, ctx) {
   fill(view,
     h('div.lib-head',
       h('div.lib-title', h('h1', 'Library'), count),
-      h('div.lib-head-side', up.button, up.input)),
+      h('div.lib-head-side', up.licenseButton, up.button, up.input)),
     h('div.lib-toolbar',
       h('label.searchbox', icon('search'), search),
       h('div.lib-tools', sortSel, h('div.seg-group', { role: 'group', 'aria-label': 'Density' }, densityBtns), facetsToggle)),

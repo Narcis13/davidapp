@@ -11,6 +11,7 @@ import { createCodeEditor } from '/ui/lib/code-editor.js';
 import { createDiffView, framePair } from '/ui/lib/diff-view.js';
 import { factsOf, frameOfSecond, frameUrl, secondOfFrame } from '/ui/lib/footage.js';
 import { weightName } from '/ui/lib/font-info.js';
+import { issueBadges, provenancePanel } from '/ui/lib/provenance.js';
 import { assetHref, assetIcon, clamp, errorBlock, fill, fmtBytes, fmtDate, fmtDuration, fmtTime, h, icon, nextId, notice, plural, trim } from '/ui/lib/util.js';
 
 const PREVIEW_FPS = 30;
@@ -174,6 +175,7 @@ function header(a, tg) {
         a.derivation ? h('span.badge', { 'data-testid': 'derivation-badge' }, DERIVATION[a.derivation] ?? a.derivation) : null,
         a.edited ? h('span.badge.warn', { title: 'Title, description or tags edited in the studio' }, 'edited') : null,
         a.needsDescription ? h('span.badge.warn', { 'data-testid': 'needs-description', title: 'Waiting for the agent to describe it' }, 'needs description') : null,
+        a.type !== 'function' ? issueBadges(a.provenance, a.tags ?? []) : null,
         a.version !== a.latestVersion ? h('a.badge.warn', { href: `/assets/${a.slug}` }, `latest is v${a.latestVersion}`) : null)),
     h('div.page-head-side', tg.el));
 }
@@ -324,7 +326,7 @@ function footageView(a, ctx) {
       h('p.muted', `${m.width}×${m.height}, ${trim(m.fps, 3)} fps, ${frames} frames, ${fmtDuration(m.duration)}. The frames are decoded by the studio, the way the preview and the render get them.`)),
     h('section.panel', { 'data-testid': 'footage-facts-panel' },
       h('h2', 'The file'),
-      h('dl.facts', { 'data-testid': 'footage-facts' }, factsOf(a).map(([k, v]) => [h('dt', k), h('dd', v)]), m.license ? [h('dt', 'Licence'), h('dd', m.license)] : null),
+      h('dl.facts', { 'data-testid': 'footage-facts' }, factsOf(a).map(([k, v]) => [h('dt', k), h('dd', v)])),
       strip ? [h('h3.footage-h', 'Filmstrip'), strip] : null,
       wave ? [h('h3.footage-h', 'Sound'), wave, a.file ? h('audio', { controls: true, preload: 'none', src: `/media/${a.file}`, 'data-testid': 'asset-audio' }) : null] : null),
   ];
@@ -407,7 +409,9 @@ async function playground(view, ctx, a, status, favorite) {
   const formats = (a.formats?.length ? a.formats : Object.keys(status.formats)).filter((f) => status.formats[f]);
   if (!formats.length) formats.push('horizontal');
   const fonts = status.fonts.map((f) => f.family);
-  let format = formats.includes(ctx.query.get('format')) ? ctx.query.get('format') : formats[0];
+  // the kit draws over a screen recording (16:9): it opens in the horizontal shape unless the link says otherwise
+  const first = a.tags?.some((t) => t === 'kit' || t === 'end-card') && formats.includes('horizontal') ? 'horizontal' : formats[0];
+  let format = formats.includes(ctx.query.get('format')) ? ctx.query.get('format') : first;
   let duration = a.duration ?? 3;
   let values = {};
   // what the preview is showing: the saved version, or a validated draft of the source
@@ -778,6 +782,7 @@ async function playground(view, ctx, a, status, favorite) {
             h('label.inline-field', { for: 'pg-duration' }, 'Duration', durationInput, h('span.unit', 's')),
             exactBtn, audioBtn, draftFlag),
           !PREVIEWED_KINDS.has(a.kind) ? h('p.hint', `A ${a.kind} asset.`) : null,
+          a.tags?.includes('kit') && a.tags.includes('overlay') ? h('p.hint.kind-hint', { 'data-testid': 'kit-hint' }, 'A kit overlay: it draws over a screen recording or a footage item. Here it is on its own, on the dark stage; the region, point and space parameters are in the recording\'s pixels.') : null,
           ['motion', 'transition', 'effect'].includes(a.kind) ? h('p.hint.kind-hint', a.kind === 'motion' ? 'Shown moving a demo card.' : a.kind === 'transition' ? 'Shown between two demo scenes.' : 'Shown on a demo scene.') : null,
           stageNote.el,
           audioSlot),
@@ -809,7 +814,7 @@ async function playground(view, ctx, a, status, favorite) {
  * Live events for this asset: favourite/featured flip the toggles, metadata redraws the panel, and
  * a new version (from the agent, the MCP server or another tab) reloads unless there are unsaved edits.
  */
-function watchLive(ctx, a, { tg, meta, headSlot, dirty = () => false, liveNote, onMeta = () => {} }) {
+function watchLive(ctx, a, { tg, meta, prov = null, headSlot, dirty = () => false, liveNote, onMeta = () => {} }) {
   const off = live.on('asset', async (e) => {
     if (e.key !== a.slug || !ctx.alive()) return;
     if (e.action === 'favorite') tg.fav.set(!!e.data?.on);
@@ -821,6 +826,7 @@ function watchLive(ctx, a, { tg, meta, headSlot, dirty = () => false, liveNote, 
         Object.assign(a, next);
         onMeta(next);
         meta?.update(a);
+        prov?.update(a);
         fill(headSlot, header(a, tg));
         ctx.setTitle(a.title);
       } catch { /* the next event or a reload shows it */ }
@@ -871,8 +877,12 @@ export async function mount(view, ctx) {
   const meta = metadataPanel(a, {
     onSaved(next) { Object.assign(a, next); meta.update(a); fill(headSlot, header(a, tg)); ctx.setTitle(a.title); },
   });
+  // a function asset is the studio's own code: only files carry a source and a licence
+  const prov = provenancePanel(a, {
+    onSaved(next) { Object.assign(a, next); prov.update(a); meta.update(a); fill(headSlot, header(a, tg)); },
+  });
   const liveNote = notice('live-note');
-  watchLive(ctx, a, { tg, meta, headSlot, liveNote });
+  watchLive(ctx, a, { tg, meta, prov, headSlot, liveNote });
   let main;
   if (a.type === 'image' && a.file) main = imageView(a);
   else if (a.type === 'sequence' && a.file) main = sequenceView(a, ctx);
@@ -888,5 +898,5 @@ export async function mount(view, ctx) {
     liveNote.el,
     h('div.playground.media',
       h('div.pg-main', main),
-      h('aside.pg-side', meta.el, agentSlot, versionsPanel(a, null), detailsPanel(a))));
+      h('aside.pg-side', meta.el, prov.el, agentSlot, versionsPanel(a, null), detailsPanel(a))));
 }
