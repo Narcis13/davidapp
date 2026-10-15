@@ -11,6 +11,7 @@ import { sideBySide, createCanvas, loadImage } from '../render/host.js';
 import { checkTranscript, checkTranscripts } from '../core/words.js';
 import { drawOverlays, OVERLAYS } from '../render/overlays.js';
 import { json } from '../db/db.js';
+import { moreTools } from './more/index.js';
 
 const FORMAT = z.enum(['vertical', 'horizontal', 'square']);
 const REF = z.string().describe('Asset reference: "name" (latest version) or "name@3" (pinned)');
@@ -729,6 +730,8 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       readOnly: true,
       run: () => ({ text: lineage.report() }),
     },
+    // iteration 4: each area keeps its tools in its own module (src/mcp/more/)
+    ...moreTools({ studio, who, image, z, REF, PARAMS, AUTHOR, FORMAT, COMPOSITION, compactAsset, compactRender }),
   ];
 
   /**

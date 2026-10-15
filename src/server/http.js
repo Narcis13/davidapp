@@ -13,6 +13,7 @@ import { createAgentRuns } from '../studio/agent-run.js';
 import { MAX_UPLOAD } from '../studio/uploads.js';
 import { json as parseJson } from '../db/db.js';
 import { zonesOf } from '../studio/inspect.js';
+import { moreRoutes } from './routes/index.js';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -129,7 +130,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     return { composition: pinned, bundle: browserBundle(bundle), beats: audio.beats, words: bundle.words ?? [], captions: bundle.captions ?? null, anchors: clips.anchorReport(pinned), zones: zonesOf(pinned), assets: describeRefs(pinned) };
   }
 
-  /** @type {[string, RegExp, (ctx: any) => any][]} */
+  /** @type {[string, RegExp, (ctx: any) => any, { raw?: boolean }?][]} */
   const routes = [
     ['GET', /^\/api\/status$/, () => ({
       name: 'Fablecut', engine: ENGINE_VERSION, formats: FORMATS, fonts: fonts(), tags: library.allTags(), agent: { runNow: runs.available() },
@@ -287,6 +288,8 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     ['POST', /^\/api\/renders\/(\d+)\/cancel$/, ({ params }) => renders.cancel(Number(params[0]))],
     ['GET', /^\/api\/gallery$/, () => ({ renders: renders.gallery() })],
     ['GET', /^\/api\/lineage$/, () => ({ ...lineage.graph(), report: lineage.report() })],
+    // iteration 4: each area keeps its routes in its own module (src/server/routes/); { raw: true } routes read the body themselves
+    ...moreRoutes({ studio, author, send, png, file, read, int: (v, fallback, min, max) => int(v, fallback, min, max) }),
   ];
 
   /** Only answer requests addressed to this machine, and refuse writes that come from another site's page. */
@@ -352,10 +355,10 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     if (path === '/api/events' && req.method === 'GET') return events(req, res);
     if (path === '/api/uploads' && req.method === 'POST') return send(res, 200, await receiveUpload(req, url));
     if (path.startsWith('/api/')) {
-      for (const [method, re, fn] of routes) {
+      for (const [method, re, fn, opts] of routes) {
         const m = re.exec(path);
         if (!m || method !== req.method) continue;
-        const data = req.method === 'GET' ? {} : await body(req);
+        const data = req.method === 'GET' || opts?.raw ? {} : await body(req);
         const out = await fn({ params: m.slice(1), query: url.searchParams, data, req, res });
         if (!res.headersSent && out !== undefined) send(res, 200, out);
         return;

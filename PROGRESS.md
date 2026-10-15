@@ -1,21 +1,80 @@
 # Progress
 
-Goal: **Fablecut iteration 4: footage, a kit, and a library the repo can rebuild.** Brief:
-`ITERATION_4_PROMPT.md`. Earlier records: `docs/progress/2026-10-02-fablecut-studio.md`,
-`docs/progress/2026-10-06-fablecut-iteration-2.md`, `docs/progress/2026-10-09-fablecut-iteration-3.md`.
+Goal: **Fablecut iteration 4: footage, a kit, and a library the repo can rebuild.** Footage (video files) as
+library assets used like any layer, frame-exact in the preview and the render; speech tools inside the
+studio (transcription, alignment, voice generation); a caption editor on the timeline; font files as
+versioned assets; render options (drafts, workers, several formats, poster, isolated items); clips exported
+with their closure to the repo and imported into an empty library with the same refs and hashes;
+provenance and credits; a motion-graphics kit with an icon set; logos kept as given (internal style
+sheets, gradients); two more finished videos (clips 9 and 10) made through `motion_prompt_fablecut.md`,
+and that prompt revised so no workaround is left. Brief: `ITERATION_4_PROMPT.md`. Earlier records:
+`docs/progress/2026-10-02-fablecut-studio.md`, `docs/progress/2026-10-06-fablecut-iteration-2.md`,
+`docs/progress/2026-10-09-fablecut-iteration-3.md`.
 
 Started 2026-10-15 on branch `main` at `de5d370`, on the Windows 11 PC (i9-14900KF), as iteration 3 was,
 not the macOS Intel machine the brief describes (see `.claude/goal-loop/project.md`).
 
-**Next:** baseline (hashes of clips 1–8 + history-of-ai, speed of clips 1–3) from a worktree of this commit; contract and plan.
+**Next:** baseline finishing (worktree `$SP/base` at `0ea078c`); then the foundation commit (schema v3, tool/route hooks) and wave 1 agents.
 
 ## Contract (Done means)
 
-(being written)
+Evidence goes in `docs/showcase/v4/` (`reports/`, `sheets/`, `studio/`, `gifs/`) with `INDEX.md`; MP4s on the GitHub release `showcase-v4`.
+
+| # | criterion | verified by | evidence | status |
+|---|---|---|---|---|
+| G1 | Every gate in `.claude/goal-loop/gates` passes (typecheck, lint, test) | `gates.sh` | Log | open |
+| G2 | Zero console/network problems on every studio screen (old and new) at 1440×900 and 390×844; no ERROR in the server log | `sweep.sh` on the showcase data | `studio/sweep-*.png`, `reports/sweep.txt` | open |
+| G3 | The showcase is reproducible: `npm run showcase` rebuilds clips 1–10 (library, compositions, renders, the voice files, words and screen recordings from the repo) from an empty data dir | final audit on an empty dir | `showcase/`, Log | open |
+| D1 | Nothing old breaks: hashes of clips 1–8 + `history-of-ai` recorded on this PC before any code change; after the iteration a fresh `npm run showcase` (+ history-of-ai) gives **identical** hashes; every iteration-3 test still passes; compositions in older shapes load, edit and render (tests) | `scripts/hashes.mjs --compare reports/baseline-hashes.json`; legacy tests | `reports/hashes-final.txt` | open |
+| D2 | Footage assets: MP4, MOV, WebM and a screen recording import (MCP `add_footage`, studio drop) and are probed (size, frame rate, duration, rotation, colour, audio, frame table); thumbnail, filmstrip, waveform; bad files (no video, too big, HDR, broken) get useful errors | `test/footage.test.js`, MCP | test names, `reports/footage-probe.json` | open |
+| D3 | Footage as a layer: fit, trim in/out, speed, loop, hold, transforms, effects, masks; conformed to the clip's frame rate by a fixed rule (the source frame shown at a clip time is a pure function of the composition); `testsrc2` at 25 fps with a tone and a studio screen recording, each with trim, speed and loop, in a 30 fps clip | tests (source-frame identity by hash), clip frames | test names, `studio/footage-*.png` | open |
+| D4 | Footage is frame-exact: two renders give identical frame hashes; the preview matches the render within the parity limits (`scripts/parity.mjs` footage cases); disk use measured and every cache bounded; the test video's sound plays as an audio item | render tests, parity, disk report | `reports/parity.json`, `reports/footage-disk.md` | open |
+| D5 | Footage design: at least two designs weighed (decode per worker vs a shared decoder and frame cache; preview decoding in the browser vs frames from the server) for determinism, parity, speed and disk, the choice recorded; no design stores every frame as PNG | Decisions | PROGRESS | open |
+| D6 | A script records a studio workflow in headless Chrome to a video file (H.264 MP4, constant frame rate) | `scripts/record-studio.mjs` run | `showcase/footage/*.mp4` (committed, small), Log | open |
+| D7 | Speech tools behind one interface, each optional: transcription with word times (`whisper-cli`) feeding the transcript check; alignment of a narration to its script when its words came without times; voice generation through an adapter (Kokoro locally; a service only with a key in `.env`), with N voice samples of one line; without them the studio imports files and says what it cannot do. Tested with stubs; run for real with whisper-cli and Kokoro; aligning a take with known word times puts ≥ 95 % of its words within 2 frames; three samples of one line come back for a gate-3 stop | `test/speech.test.js`, real runs | `reports/speech-*.json` | open |
+| D8 | Caption editor: pages adjusted on the timeline in the editor (a moved break, a merge, a split) with real input; the SRT and VTT follow; the words and their times do not change | workflow + API checks | `gifs/captions-editor.gif` | open |
+| D9 | Font assets: a TTF/OTF/WOFF2 added through MCP and one dropped into the studio, with licence, family, weight, style and coverage recorded, work at once (no restart) in the preview and in Node; a clip that pins a font keeps it after the font gets a new version | `test/fonts.test.js`, workflow | test names, `gifs/font-upload.gif` | open |
+| D10 | Render options: a 720p draft (scale on whole pixels, fast preset, labelled draft); a worker count per render, and renders at two worker counts with identical frame hashes; one request that renders three formats; a chosen poster time; `render_clip_frame`, `frame_hashes` and contact sheets isolate items (only / all but) | `test/render-options.test.js`, MCP | test names | open |
+| D11 | Repo and library agree: a clip exported with its closure (every pinned version with its history position, presets, precomps, fonts, footage, a manifest of files with SHA-256, licence and source) and imported into an empty data dir has the same refs and the same frame hashes; an import with a file missing names it; a clip edited in the studio (editor or accepted proposal) is written back to its folder | `test/exchange.test.js`, MCP, real round trip | test names, `reports/roundtrip-*.txt` | open |
+| D12 | Provenance: every file asset carries licence, source URL, creator, credit line, date and flags (AI-generated, Content ID, restrictions), set on upload and editable as metadata; credits and sources generated for a clip from its closure; a final render with a `placeholder` asset or an unlicensed one in its closure is refused (drafts and review renders are not) | `test/provenance.test.js`, MCP, UI | test names, `reports/credits-clip-*.md` | open |
+| D13 | The kit: cursor, plate, UI spotlight, camera (zoom/pan to a region of an image or footage), arrows and callouts, end card, browser/device frame, line chart, donut chart, step indicator, icon (open-source set vendored with its licence; name, one weight, colour); each reads `f.theme`, has notes and a usage example, its text has size floors and shows in the layout report; all appear in the showcase | `test/kit.test.js`, showcase | test names, `studio/kit-*.png` | open |
+| D14 | Logos as given: simple internal style sheets (class, id, type selectors, allowlisted properties) inlined; gradients drawn by `f.svg`; the upload reports exactly what it could not keep; a logo with an internal style sheet and a gradient matches Chrome's drawing by pixel diff; hostile-SVG tests still pass | `test/svg.test.js`, diff script | `reports/logo-diff.json`, `studio/logo-*.png` | open |
+| D15 | MCP: every new capability has a tool or option, covered by stdio client tests; bad inputs get useful errors and crash nothing | tests | test names | open |
+| D16 | Studio UI: footage trimmed on the timeline, caption pages edited, a font upload, the provenance fields, the kit in the playground; each driven in a real browser with real input and recorded as a GIF; clean at 1440×900 and 390×844 | `scripts/workflows-v4.mjs` (+ Claude in Chrome where needed) | `gifs/*.gif`, `studio/*.png` | open |
+| D17 | Clip 9: onboarding video of 45–60 s about the studio, built from screen recordings of it, with cursor, zooms, spotlights, a voice, captions and ducked music; reuses what clips 7 and 8 made | journal + reports | `work/clip-9-*/`, `reports/clip-9-*` | open |
+| D18 | Clip 10: marketing video of about 30 s for Fablecut, square with a vertical render, with its logo as given (internal style sheet + gradient), icons, a chart and an end card with the call to action; reuses what clips 7 and 8 made | journal + reports | `work/clip-10-*/`, `reports/clip-10-*` | open |
+| D19 | Clips 9 and 10 follow the prompt's gates in order through MCP, journalled so `npm run showcase` replays them; `[me]` stops written to `work/<slug>/` with "no owner approved"; every `<checks>` item passes through the studio's tools, report committed; valid MP4s (H.264, AAC 48 kHz, yuv420p, BT.709, faststart, size, fps) at −14 LUFS (±1), TP ≤ −1 dBTP, music 16–20 LU under the voice where it speaks; sheets read frame by frame; the compounding table gains rows for clips 9 and 10 | journal, reports | `reports/clip-9-checks.md`, `reports/clip-10-checks.md`, `reports/compounding.md` | open |
+| D20 | Clips 7–10 each rebuild from a clean checkout into an empty data dir through their exports, with the same refs and the same frame hashes | `scripts/roundtrip.mjs` on a fresh clone | `reports/roundtrip-clips-7-10.txt` | open |
+| D21 | `motion_prompt_fablecut.md` revised: every step runs inside the studio, no workaround remains, every tool and option it names exists (a script checks them against the MCP tool list), it claims nothing the studio cannot do; `README.md`, `docs/ASSET_CONTRACT.md`, `docs/COOKBOOK.md`, `studio_guide` describe the new features | read + `scripts/prompt-tools.mjs` | `reports/prompt-tools.txt` | open |
+| D22 | Speed: clips 1–3 render no more than 10 % slower than the baseline taken at the start on this PC; the cost of footage reported separately | `scripts/speed.mjs` | `reports/render-speed.md` | open |
+| D23 | The showcase voice: iteration 3's route (Kokoro `af_heart` + whisper.cpp `small.en`, outside the repo) if it still works, recorded with its licences; no models committed | Decisions + `docs/showcase/v4/LICENSES.md` | files | open |
+| D24 | Repo hygiene: no database, renders, caches, models or scratch in git; screen recordings committed small (exception in `.gitignore`); voice files compressed < 5 MB; MP4s only on release `showcase-v4`; new dependencies justified; evidence in `docs/showcase/v4/` with `INDEX.md` | `git status`, `gh release view showcase-v4` | Log | open |
+
+Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Milestones
 
+0. [ ] **Baseline and foundation**: project.md (committed on its own), hashes of clips 1–8 + history-of-ai and speed of clips 1–3 from a worktree of `0ea078c`; contract; schema v3 and extension hooks (D1, D22)
+1. [ ] **Render options** (D10)
+2. [ ] **Font assets** (D9)
+3. [ ] **Logos as given** (D14)
+4. [ ] **Speech tools** (D7, D23)
+5. [ ] **Footage** and the screen-recording script (D2–D6)
+6. [ ] **Provenance and credits** (D12)
+7. [ ] **Repo and library** (D11)
+8. [ ] **The kit** (D13)
+9. [ ] **Studio UI**: footage on the timeline, caption editor, font upload, provenance fields, kit; workflows + GIFs (D8, D16)
+10. [ ] **Clips 9 and 10** through the motion prompt (D17–D19)
+11. [ ] **Rebuild through exports**, prompt revision, docs (D20, D21)
+12. [ ] **Final audit**: reviewer pass, clean rebuild, hashes, speed, sweep, evidence index, release (all)
+
 ## Decisions
+
+- **The machine.** As in iteration 3: the brief describes macOS 15.5 on an Intel i5 with 5.5 GB free; this session runs on the Windows 11 PC (i9-14900KF, 32 threads, 1.7 TB free, Node 24.19, FFmpeg 9.0.2). Baselines (hashes, speed) are taken here from a worktree of `0ea078c` sharing this checkout's `node_modules`. Caches are still bounded as the brief asks, and disk use is measured, as if the disk were small.
+
+## Clip concepts (decided before each build starts; not part of the measured build)
+
+(written before clips 9 and 10 start)
 
 ## Blocked
 

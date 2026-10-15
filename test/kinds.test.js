@@ -411,7 +411,10 @@ test('a v1 database (three kinds only) is migrated on open, keeping every row an
     assert.deepEqual(db.prepare('SELECT dep_version_id FROM asset_deps').all().map((r) => r.dep_version_id), [2]);
     assert.throws(() => db.prepare("UPDATE asset_versions SET source = 'x' WHERE id = 1").run(), /immutable/);
     db.prepare("INSERT INTO asset_versions (asset_id, version, kind, description, author, engine, created_at) VALUES (1, 2, 'motion', 'a motion', 'x', 1, '2026')").run();
-    assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get().value, '2');
+    assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get().value, '3');
+    // v3: footage is a type of its own, and renders keep their options
+    assert.match(String(db.prepare("SELECT sql FROM sqlite_master WHERE name = 'assets'").get().sql), /'sequence', 'video'/);
+    assert.ok(db.prepare('PRAGMA table_info(renders)').all().some((c) => c.name === 'options'));
     assert.ok(db.prepare('PRAGMA table_info(assets)').all().some((c) => c.name === 'meta_title'));
     db.close();
     openDb(file).close();

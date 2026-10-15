@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS clips (
 CREATE TABLE IF NOT EXISTS assets (
   id              INTEGER PRIMARY KEY,
   slug            TEXT NOT NULL UNIQUE,
-  type            TEXT NOT NULL CHECK (type IN ('function', 'image', 'sound', 'font', 'sequence')),
+  type            TEXT NOT NULL CHECK (type IN ('function', 'image', 'sound', 'font', 'sequence', 'video')),  -- v3: video (footage)
   latest_version  INTEGER NOT NULL DEFAULT 0,
   forked_from     INTEGER REFERENCES asset_versions(id),  -- the version this asset was forked from
   origin_clip     INTEGER REFERENCES clips(id),           -- the clip that first produced it
@@ -139,7 +139,8 @@ CREATE TABLE IF NOT EXISTS renders (
   created_at        TEXT NOT NULL,
   started_at        TEXT,
   finished_at       TEXT,
-  format            TEXT          -- v2: rendered in another format than the clip's (its overrides apply)
+  format            TEXT,         -- v2: rendered in another format than the clip's (its overrides apply)
+  options           TEXT          -- v3: JSON render options (draft, workers, poster, final, batch)
 );
 CREATE INDEX IF NOT EXISTS renders_status ON renders(status);
 
@@ -279,6 +280,7 @@ const COLUMNS = [
   ['assets', 'needs_description', 'INTEGER NOT NULL DEFAULT 0'],  // an upload waiting for the agent to describe it
   ['assets', 'featured', 'INTEGER NOT NULL DEFAULT 0'],
   ['assets', 'meta_uses', 'TEXT'],
+  ['renders', 'options', 'TEXT'],  // v3: JSON render options (draft, workers, poster, final, batch)
 ];
 
 /** Open (and create or migrate) the database at `file`. */
@@ -300,12 +302,12 @@ export function openDb(file) {
 
 /**
  * v1 databases only allow the kinds visual, value and audio, and the types function, image, sound
- * and font. SQLite cannot change a CHECK constraint in place, so such a table is rebuilt with the
+ * and font (v2 adds sequence, v3 video). SQLite cannot change a CHECK constraint in place, so such a table is rebuilt with the
  * current definition (the documented "twelve steps": foreign keys off, copy, drop, rename, then the
  * triggers and indexes again, and a foreign key check before committing).
  */
 function widenChecks(db) {
-  for (const [table, marker] of [['assets', "'sequence'"], ['asset_versions', "'motion'"]]) {
+  for (const [table, marker] of [['assets', "'video'"], ['asset_versions', "'motion'"]]) {
     const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
     if (!row || String(row.sql).includes(marker)) continue;
     const re = new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n\\);`);
