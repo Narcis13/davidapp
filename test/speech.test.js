@@ -196,6 +196,12 @@ test('generate_narration with a voice that gives no word times: transcribed, ali
   assert.ok(meta.narration.words.every((w, i) => w.i === i && w.end > w.start));
   assert.match(JSON.parse(studio.library.versionRow('gen-voice').meta).license, /Test stand-in/);
   assert.deepEqual(r.seconds && Object.keys(r.seconds).sort(), ['transcription', 'voice']);
+  // a generated take is AI-generated and made by its voice; what the caller says about it wins
+  assert.equal(meta.provenance.aiGenerated, true);
+  assert.match(meta.provenance.creator, /stub-low/);
+  const said = await speech.generateNarration({ script: SCRIPT, voice: 'stub-low', name: 'gen-said', provenance: { license: 'Apache-2.0', credit: 'Voice: a stand-in', redistributable: true }, author: AUTHOR });
+  const p = JSON.parse(studio.library.versionRow(said.asset.ref).meta).provenance;
+  assert.deepEqual([p.license, p.credit, p.redistributable, p.aiGenerated], ['Apache-2.0', 'Voice: a stand-in', true, true]);
 });
 
 test('generate_narration with a voice that times its own words uses those times; a new take is a new version', async () => {

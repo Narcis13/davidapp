@@ -31,7 +31,8 @@ const OPEN = /^(original|cc0(-1\.0)?|cc-by(-[a-z]+)*(-[0-9.]+)?|public domain|of
 export const isUnknownLicense = (license) => license === null || license === undefined || /^\s*(unknown|n\/a|none|\?)?\s*$/i.test(String(license));
 
 /** May a file under this licence be committed to a public repo? Unknown: no. */
-export const defaultRedistributable = (license) => !isUnknownLicense(license) && OPEN.test(String(license).trim());
+/** A licence string may say more after its identifier ("Apache-2.0 (Kokoro-82M weights and voices)"): the identifier decides. */
+export const defaultRedistributable = (license) => !isUnknownLicense(license) && (OPEN.test(String(license).trim()) || OPEN.test(String(license).trim().split(/\s*[(;,]|\s+-\s+/)[0]));
 
 const isoDate = (s) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.exec(s);

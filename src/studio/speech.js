@@ -314,9 +314,9 @@ export function createSpeech(ctx, { library, audio }) {
    * A narration made entirely inside the studio: the voice speaks the script, the words are timed (by the voice service,
    * else by transcribing the take and aligning it to the script), the take is checked against the script, and the sound
    * asset with its words is created. The same name again is a new take (a new version) that keeps the anchors.
-   * @param {{ script: string, voice: string, speed?: number, name: string, title?: string, description?: string, forClip?: string, language?: string, author: string, check?: boolean }} o
+   * @param {{ script: string, voice: string, speed?: number, name: string, title?: string, description?: string, forClip?: string, language?: string, provenance?: any, author: string, check?: boolean }} o
    */
-  async function generateNarration({ script, voice, speed = 1, name, title, description, forClip, language = 'en', author, check = true }) {
+  async function generateNarration({ script, voice, speed = 1, name, title, description, forClip, language = 'en', provenance, author, check = true }) {
     if (!SLUG_RE.test(name ?? '')) throw new StudioError(`name: "${name}" is not a valid asset name: use lowercase letters, digits and dashes`);
     if (typeof script !== 'string' || !script.trim()) throw new StudioError('script: the text to speak (not empty)');
     if (script.length > MAX_SCRIPT) throw new StudioError(`script: at most ${MAX_SCRIPT} characters; split the narration into parts`);
@@ -344,7 +344,8 @@ export function createSpeech(ctx, { library, audio }) {
       const r = await audio.addNarration({
         slug: name, path: s.wavPath, script: text, timings, transcripts, language, author, forClip, title,
         voice: { engine: a.name, voice, speed, license: a.license, timedBy: s.words ? a.name : models?.[0] },
-        license: a.license,
+        // a generated take is AI-generated, under the engine's licence, made by the voice; what the caller says wins
+        provenance: { license: a.license, aiGenerated: true, creator: `${a.name} voice ${voice}`, ...(provenance ?? {}) },
         description: description ?? `Narration (${a.name}, voice ${voice}): "${text.slice(0, 120)}${text.length > 120 ? '…' : ''}" with the time of every word.`,
         tags: [a.name, 'generated'],
       });

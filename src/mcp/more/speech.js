@@ -1,5 +1,7 @@
 // MCP tools: speech (iteration 4). The voice and the word times of a narration, made inside the studio.
 
+import { provenanceInput, fromArgs } from './provenance.js';
+
 /** @param {any} api @returns {any[]} */
 export default function tools(api) {
   const { studio, who, z, REF, AUTHOR } = api;
@@ -34,10 +36,12 @@ export default function tools(api) {
       input: {
         script: z.string().describe('The text to speak'), voice: z.string().describe('A voice id from voice_samples / speech_status'), name: z.string().describe('Asset name: lowercase letters, digits and dashes'),
         speed: z.number().min(0.5).max(2).optional(), title: z.string().optional(), description: z.string().optional(), for_clip: z.string().optional(), language: z.string().optional(),
-        check: z.boolean().optional().describe('Transcribe the take to check it against the script (default true)'), author: AUTHOR,
+        check: z.boolean().optional().describe('Transcribe the take to check it against the script (default true)'),
+        // provenance of the take: by default the engine's licence, AI-generated, and the voice as the creator
+        ...provenanceInput(z), author: AUTHOR,
       },
       run: async (a) => {
-        const r = await studio.speech.generateNarration({ script: a.script, voice: a.voice, speed: a.speed, name: a.name, title: a.title, description: a.description, forClip: a.for_clip, language: a.language, check: a.check, author: who(a.author) });
+        const r = await studio.speech.generateNarration({ script: a.script, voice: a.voice, speed: a.speed, name: a.name, title: a.title, description: a.description, forClip: a.for_clip, language: a.language, check: a.check, provenance: fromArgs(a), author: who(a.author) });
         return { json: { added: r.asset.ref, duration: r.asset.duration, words: r.words, stats: r.stats, voice: r.voice, timedBy: r.timedBy, models: r.models, seconds: r.seconds, transcript: r.transcript, warnings: r.warnings } };
       },
     },

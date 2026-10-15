@@ -21,6 +21,23 @@ const argv = process.argv.slice(2);
 const noRender = argv.includes('--no-render');
 const until = argv.includes('--until') ? Number(argv[argv.indexOf('--until') + 1]) : Infinity;
 
+const SPEECH_ONLY = new Set(['voice_samples', 'transcribe', 'speech_status']);
+
+/**
+ * generate_narration as add_narration of the take it made: showcase/voice/<name>.m4a (the audio, AAC) and
+ * <name>.words.json (the word times it found), written when the clip was made. The words are the same, so the
+ * anchors and captions are too; the audio is the AAC copy of the take.
+ */
+function replayNarration(a) {
+  const pass = ['script', 'language', 'title', 'description', 'for_clip', 'license', 'license_url', 'source_url', 'creator', 'credit', 'date', 'ai_generated', 'content_id', 'restrictions', 'placeholder', 'redistributable'];
+  return {
+    name: a.name, path: `@path:showcase/voice/${a.name}.m4a`, timings_path: `@path:showcase/voice/${a.name}.words.json`,
+    ...Object.fromEntries(pass.filter((k) => a[k] !== undefined).map((k) => [k, a[k]])),
+    voice: { engine: 'kokoro', voice: a.voice, speed: a.speed ?? 1, model: 'Kokoro-82M' },
+    ai_generated: a.ai_generated ?? true,
+  };
+}
+
 // clips 4 to 6 were built step by step with scripts/act.mjs: replay their journals after the plan
 // (tool calls through MCP, the user's studio actions in-process; read-only calls are skipped)
 for (const clip of JOURNALS) {
@@ -45,6 +62,10 @@ for (const clip of JOURNALS) {
   entries.forEach((e, i) => {
     if (e.kind === 'user') steps.push({ user: e.name, args: e.args, clip });
     else if (moduleSave(e) && superseded(i)) return;
+    // speech calls that change nothing in the library (voice samples for a gate, a transcription) are not made again
+    else if (SPEECH_ONLY.has(e.name)) return;
+    // a narration the voice engine made is replayed from its committed take, so a rebuild needs no voice model
+    else if (e.name === 'generate_narration') steps.push({ tool: 'add_narration', args: replayNarration(e.args), journal: true });
     else if (e.name !== 'start_render' || lastRender.get(`${e.args.clip}|${e.args.format ?? ''}`) === i) steps.push({ tool: e.name, args: e.args, render: e.name === 'start_render', journal: true });
   });
 }
