@@ -1,0 +1,76 @@
+{
+  "ref": "text-captions@2",
+  "type": "function",
+  "kind": "visual",
+  "title": "Captions (word timed)",
+  "description": "Captions from the narration: the clip's caption pages in the caption lane, each spoken word lit at its real time, never smaller than its size floor. Falls back to timed cues when the clip has no caption pages.",
+  "tags": ["text", "text-animation", "captions", "subtitles", "safe-zone", "per-word", "narration"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "cues": {
+      "type": "array",
+      "maxItems": 80,
+      "of": {
+        "type": "object",
+        "fields": {
+          "start": {"type": "number", "min": 0, "default": 0},
+          "end": {"type": "number", "min": 0, "default": 0},
+          "text": {"type": "string", "default": ""}
+        },
+        "default": {"start": 0, "end": 0, "text": ""}
+      },
+      "default": [
+        {"start": 0.2, "end": 2.4, "text": "Captions come from the words"},
+        {"start": 2.6, "end": 4.8, "text": "and light up as they are spoken"}
+      ],
+      "description": "Only when the clip has no caption pages; seconds are relative to this item"
+    },
+    "font": {"type": "font", "default": "Inter"},
+    "weight": {"type": "integer", "default": 800, "min": 100, "max": 900, "step": 100},
+    "size": {
+      "type": "number",
+      "default": 4.2,
+      "min": 1,
+      "max": 12,
+      "step": 0.1,
+      "description": "Text size in % of the frame's short side"
+    },
+    "floor": {
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 12,
+      "step": 0.1,
+      "description": "Never smaller than this, in % of the frame's short side"
+    },
+    "color": {"type": "color", "default": "#f4f1ea"},
+    "active": {"type": "color", "default": "#ffd166", "description": "Colour of the word being spoken"},
+    "dim": {
+      "type": "number",
+      "default": 0.55,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Brightness of the words not yet spoken"
+    },
+    "pill": {"type": "color", "default": "rgba(11,11,18,0.78)"},
+    "align": {
+      "type": "enum",
+      "options": ["bottom", "middle", "top"],
+      "default": "bottom",
+      "description": "Where in the caption lane"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1"},
+  "author": "claude-opus-5-5",
+  "note": "Captions from the narration's words: pages built by the studio, each word lit at its real time, a size floor, the caption lane.",
+  "created": "2026-10-15T17:33:10.916Z",
+  "engine": 2,
+  "madeForClip": "clip-7-a-video-that-checks-itself",
+  "parent": "text-captions@1",
+  "asset": {"created": "2026-10-15T17:31:19.068Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/text-captions@2.js", "sha1": "024e7e69f60095f72a11d651c83e549a6218d759"},
+  "hash": "c98279db308e31dc236033296d701f350b80edae58ae3b7d81d3c2518ec6271b"
+}

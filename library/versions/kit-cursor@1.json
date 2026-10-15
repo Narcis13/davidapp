@@ -1,0 +1,193 @@
+{
+  "ref": "kit-cursor@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Cursor",
+  "description": "A crisp vector mouse pointer (arrow, or the pointing hand) that arrives along an eased arc from outside the picture, rests and clicks (it presses down and a ring ripples out). Drive it with from/to/arrive for a simple move, or with a recording sidecar's cursor path and clicks (in the recording's pixels, interpolated smoothly). Place it with the same transform as the footage it annotates; pairs with kit-spotlight, kit-camera and kit-callout. Takes a theme.",
+  "tags": ["kit", "cursor", "pointer", "click", "ui", "overlay", "screen-recording"],
+  "duration": 4,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "space": {
+      "type": "object",
+      "fields": {
+        "width": {"type": "number", "default": 1440, "min": 1, "max": 16000},
+        "height": {"type": "number", "default": 900, "min": 1, "max": 16000}
+      },
+      "description": "Size of the picture the coordinates refer to (a recording's pixels)",
+      "default": {"width": 1440, "height": 900}
+    },
+    "fit": {
+      "type": "enum",
+      "options": ["contain", "cover", "fill"],
+      "default": "contain",
+      "description": "How the picture sits in the item box (as the footage item's fit)"
+    },
+    "shape": {"type": "enum", "options": ["arrow", "hand"], "default": "arrow"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "begin": {
+      "type": "enum",
+      "options": ["offscreen", "point"],
+      "default": "offscreen",
+      "description": "Where a from/to move starts: outside the box, or at from"
+    },
+    "from": {
+      "type": "object",
+      "fields": {"x": {"type": "number", "default": 0}, "y": {"type": "number", "default": 0}},
+      "description": "Start point of a from/to move when begin is \"point\"",
+      "default": {"x": 0, "y": 0}
+    },
+    "to": {
+      "type": "object",
+      "fields": {"x": {"type": "number", "default": 720}, "y": {"type": "number", "default": 450}},
+      "description": "Where a from/to move rests",
+      "default": {"x": 720, "y": 450}
+    },
+    "arrive": {
+      "type": "number",
+      "default": 0.9,
+      "min": 0.05,
+      "max": 10,
+      "step": 0.01,
+      "description": "Seconds the move takes"
+    },
+    "delay": {
+      "type": "number",
+      "default": 0.2,
+      "min": 0,
+      "max": 20,
+      "step": 0.01,
+      "description": "Seconds before the move starts"
+    },
+    "curve": {
+      "type": "number",
+      "default": 0.1,
+      "min": -0.5,
+      "max": 0.5,
+      "step": 0.01,
+      "description": "How far the path bends, as a share of its length (0 = straight)"
+    },
+    "path": {
+      "type": "array",
+      "of": {
+        "type": "object",
+        "fields": {
+          "t": {"type": "number", "default": 0},
+          "x": {"type": "number", "default": 0},
+          "y": {"type": "number", "default": 0},
+          "down": {"type": "boolean", "default": false}
+        },
+        "default": {"t": 0, "x": 0, "y": 0, "down": false}
+      },
+      "description": "A recording sidecar's cursor path [{ t, x, y, down? }]; when given it replaces from/to. A drag (the button held for a while) keeps the pointer pressed",
+      "default": []
+    },
+    "clicks": {
+      "type": "array",
+      "of": {
+        "type": "object",
+        "fields": {
+          "t": {"type": "number", "default": 0},
+          "x": {"type": "number", "default": 0},
+          "y": {"type": "number", "default": 0},
+          "selector": {"type": "string", "default": null, "nullable": true},
+          "drag": {"type": "boolean", "default": false},
+          "box": {
+            "type": "object",
+            "fields": {
+              "x": {"type": "number", "default": 0},
+              "y": {"type": "number", "default": 0},
+              "width": {"type": "number", "default": 0},
+              "height": {"type": "number", "default": 0}
+            },
+            "default": {"x": 0, "y": 0, "width": 0, "height": 0}
+          }
+        },
+        "default": {
+          "t": 0,
+          "x": 0,
+          "y": 0,
+          "selector": null,
+          "drag": false,
+          "box": {"x": 0, "y": 0, "width": 0, "height": 0}
+        }
+      },
+      "description": "A sidecar's clicks [{ t }] (the other fields are ignored: the click happens where the cursor is)",
+      "default": []
+    },
+    "clickTimes": {
+      "type": "array",
+      "of": {"type": "number", "default": 0},
+      "description": "Click times in seconds, when there is no sidecar",
+      "default": []
+    },
+    "at": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 100000,
+      "step": 0.01,
+      "description": "The recording's time (seconds) at the start of this item: the footage item's trim in"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "min": 0.05,
+      "max": 16,
+      "step": 0.01,
+      "description": "Playback speed of the recording (as the footage item's)"
+    },
+    "size": {
+      "type": "number",
+      "default": 2.8,
+      "min": 1,
+      "max": 12,
+      "step": 0.1,
+      "description": "Pointer height in % of the frame's short side"
+    },
+    "color": {
+      "type": "string",
+      "default": "",
+      "description": "Pointer fill, a CSS colour (empty: the theme's ink)"
+    },
+    "outline": {
+      "type": "string",
+      "default": "",
+      "description": "Pointer outline, a CSS colour (empty: the theme's background)"
+    },
+    "ring": {
+      "type": "string",
+      "default": "",
+      "description": "Click ripple colour, a CSS colour (empty: the theme's accent)"
+    },
+    "shadow": {
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.05,
+      "description": "Strength of the drop shadow (0 = none)"
+    },
+    "press": {
+      "type": "number",
+      "default": 0.82,
+      "min": 0.5,
+      "max": 1,
+      "step": 0.01,
+      "description": "Scale of the pointer while pressed"
+    },
+    "fadeIn": {"type": "number", "default": 0.2, "min": 0, "max": 5, "step": 0.01},
+    "fadeOut": {"type": "number", "default": 0.25, "min": 0, "max": 5, "step": 0.01}
+  },
+  "uses": {},
+  "deps": {"theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:49:36.376Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:49:36.376Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/kit-cursor@1.js", "sha1": "49e4268182104c3f89eba8552c6a9869f77cdb71"},
+  "hash": "ad4b0d928d687d011e88dfaac8a4483b5780374fb2a9d9b4475823f6cbd96e80"
+}

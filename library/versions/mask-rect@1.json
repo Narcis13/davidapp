@@ -1,0 +1,39 @@
+{
+  "ref": "mask-rect@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Window mask",
+  "description": "A white rounded rectangle filling its box: attach it as an alpha mask with a fixed transform to keep a layer inside a window while the layer itself moves or zooms (a kit-camera move on footage stays inside its frame). Corner radius as a share of the frame's short side.",
+  "tags": ["mask", "shape", "window", "kit"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "radius": {
+      "type": "number",
+      "default": 1.2,
+      "min": 0,
+      "max": 20,
+      "step": 0.1,
+      "description": "Corner radius in % of the frame's short side"
+    },
+    "inset": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 20,
+      "step": 0.1,
+      "description": "Space kept inside the box, in % of the frame's short side"
+    }
+  },
+  "uses": {},
+  "deps": {},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:52:46.811Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:52:46.811Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/mask-rect@1.js", "sha1": "22136df4468986e5c83d3b7eed1e17d48c426c84"},
+  "hash": "548a075b6efb939eee2e99434e86716bdc81ae2e6c9a196896811318d9485cc4"
+}

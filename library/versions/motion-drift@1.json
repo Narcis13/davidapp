@@ -1,0 +1,36 @@
+{
+  "ref": "motion-drift@1",
+  "type": "function",
+  "kind": "motion",
+  "title": "Drift",
+  "description": "A slow floating loop: the item drifts on a small figure-eight and tilts a little. Use phase loop on logos, stickers and 3D pieces.",
+  "tags": ["motion", "loop", "drift", "float"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "amount": {
+      "type": "number",
+      "default": 0.012,
+      "min": 0,
+      "max": 0.1,
+      "description": "Drift as a fraction of the frame"
+    },
+    "tilt": {"type": "number", "default": 2, "min": 0, "max": 20},
+    "period": {"type": "number", "default": 4, "min": 0.5, "max": 20}
+  },
+  "uses": {},
+  "deps": {},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:31:23.295Z",
+  "engine": 2,
+  "madeForClip": "clip-4-direct-the-studio",
+  "parent": null,
+  "asset": {
+    "created": "2026-10-15T17:31:23.295Z",
+    "originClip": "clip-4-direct-the-studio",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/motion-drift@1.js", "sha1": "98dcc3158e4883e56f0917246d13714b3f26c958"},
+  "hash": "0da3495c5aa78dda5da32a1cdf2c85184ffc7dd196eaca11202c6094fe455f96"
+}

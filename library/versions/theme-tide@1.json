@@ -1,0 +1,22 @@
+{
+  "ref": "theme-tide@1",
+  "type": "function",
+  "kind": "value",
+  "title": "Theme: Tide",
+  "description": "Theme kit with a cool palette on deep navy (cyan, orange, violet), the same typefaces by role and the same shape as theme-ember, so any scene that takes a theme can switch between them.",
+  "tags": ["theme", "palette", "brand", "foundation"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {},
+  "uses": {},
+  "deps": {},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:20.843Z",
+  "engine": 2,
+  "madeForClip": "clip-2-compounding",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:20.843Z", "originClip": "clip-2-compounding", "forkedFrom": null},
+  "source": {"file": "sources/theme-tide@1.js", "sha1": "459ec7f3ad7648abb5965faab352a2d83db59a9f"},
+  "hash": "d195e3766d4ecbca9655a4ff763eda4308d82e82ad57118ca37b48c49c47d848"
+}

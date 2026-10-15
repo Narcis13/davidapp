@@ -293,3 +293,13 @@ test('a clip renders in another format from one composition, with that format\'s
   assert.ok(isBlue(frame.at(540, 960)));
   assert.throws(() => studio.renders.enqueue({ clip: 'formats', format: 'portrait' }), /Unknown format "portrait"/);
 });
+
+test('a saved composition passes its own check again: items kept to the millisecond may end a hair after an unrounded clip length', () => {
+  const duration = 1637 / 30; // 54.566…
+  const { composition, errors } = normalizeComposition({ width: 320, height: 180, fps: 30, duration, tracks: [{ id: 'v', items: [{ id: 'a', asset: 'x', start: 0, duration }] }] });
+  assert.deepEqual(errors, []);
+  assert.equal(composition.tracks[0].items[0].duration, 54.567);
+  assert.deepEqual(normalizeComposition(composition).errors, []);
+  // a real overrun is still refused
+  assert.match(normalizeComposition({ ...composition, tracks: [{ id: 'v', items: [{ id: 'a', asset: 'x', start: 0, duration: duration + 0.01 }] }] }).errors[0].message, /after the clip ends/);
+});

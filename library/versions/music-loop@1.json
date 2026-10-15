@@ -1,0 +1,66 @@
+{
+  "ref": "music-loop@1",
+  "type": "function",
+  "kind": "audio",
+  "title": "Music loop",
+  "description": "A complete synthesized backing track for any length: kick, snare, hats, bass and a seeded arpeggio over a four-bar chord loop, with an arrangement that builds and winds down. Tempo, key, scale and mix are parameters; the kick gives the clip its beats.",
+  "tags": ["audio", "music", "beat", "sequencer", "soundtrack"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "bpm": {"type": "number", "default": 120, "min": 60, "max": 180, "step": 1},
+    "root": {
+      "type": "integer",
+      "default": 45,
+      "min": 24,
+      "max": 60,
+      "description": "MIDI note of the key (45 = A2)"
+    },
+    "scale": {"type": "enum", "options": ["minor", "major", "dorian"], "default": "minor"},
+    "drums": {"type": "number", "default": 0.9, "min": 0, "max": 1, "step": 0.01},
+    "bass": {"type": "number", "default": 0.7, "min": 0, "max": 1, "step": 0.01},
+    "arp": {"type": "number", "default": 0.5, "min": 0, "max": 1, "step": 0.01},
+    "arpWave": {"type": "enum", "options": ["saw", "square", "triangle"], "default": "square"},
+    "swing": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 0.3,
+      "step": 0.01,
+      "description": "Delay of the off-beat sixteenths, as a fraction of a sixteenth"
+    },
+    "build": {
+      "type": "boolean",
+      "default": true,
+      "description": "Bring the parts in one by one over the first bars"
+    },
+    "outroBars": {
+      "type": "integer",
+      "default": 1,
+      "min": 0,
+      "max": 4,
+      "description": "Bars at the end with the drums pulled back"
+    }
+  },
+  "uses": {
+    "drum-kick": "drum-kick",
+    "drum-snare": "drum-snare",
+    "drum-hat": "drum-hat",
+    "synth-note": "synth-note"
+  },
+  "deps": {
+    "drum-kick": "drum-kick@1",
+    "drum-snare": "drum-snare@1",
+    "drum-hat": "drum-hat@1",
+    "synth-note": "synth-note@1"
+  },
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:20.251Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:20.251Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/music-loop@1.js", "sha1": "70ca9023ce812090a9022683938a42e2c4050233"},
+  "hash": "bfafea2fa1ab560972b8bf9a8219278a6c64c0de7c9aeaf838dd2e6877f46628"
+}

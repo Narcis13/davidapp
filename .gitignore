@@ -16,3 +16,6 @@ output/
 .env.*
 npm-debug.log*
 /tmp/
+
+# the deliverables of a clip (MP4, poster, captions, credits): they go on a release, not in git
+work/*/out/

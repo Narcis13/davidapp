@@ -1,0 +1,76 @@
+{
+  "ref": "end-card@3",
+  "type": "function",
+  "kind": "visual",
+  "title": "End card",
+  "description": "A closing card: a logo (an image, or an uploaded SVG drawn as vectors), a title and one line, eased in within the first second and then completely still for the rest of the item, so the last frame holds; optionally a call-to-action button (theme accent, text colour contrast-checked) and a url line under it, and optionally on a solid plate. Version 3 draws exactly like version 2 until `cta`, `url` or a vector logo is asked for. Sizes are a share of the frame's short side, with a floor. Takes a theme.",
+  "tags": ["end-card", "outro", "logo", "title", "cta", "call-to-action", "scene", "static", "marketing"],
+  "duration": 4,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "logo": {"type": "image", "default": "fablecut-mark"},
+    "title": {"type": "string", "default": "Fablecut", "description": "*Asterisks* mark the accent colour"},
+    "line": {"type": "string", "default": "Every clip makes the next one cheaper"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 8,
+      "min": 2.6,
+      "max": 20,
+      "step": 0.1,
+      "description": "Title size in % of the frame's short side"
+    },
+    "inDur": {"type": "number", "default": 0.8, "min": 0, "max": 3, "step": 0.01},
+    "plate": {
+      "type": "boolean",
+      "default": false,
+      "description": "Draw the card on a solid plate (the theme surface) filling its box"
+    },
+    "cta": {
+      "type": "string",
+      "default": "",
+      "description": "The button text, e.g. Start building (empty: no button)"
+    },
+    "ctaColor": {
+      "type": "string",
+      "default": "",
+      "description": "Button colour, a CSS colour (empty: the theme's accent); its text colour is chosen to pass 4.5:1"
+    },
+    "arrow": {"type": "boolean", "default": true, "description": "An arrow after the button text"},
+    "url": {"type": "string", "default": "", "description": "An address under the button (empty: none)"},
+    "ctaDelay": {
+      "type": "number",
+      "default": 0.35,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Seconds before the button and url ease in (keep it short: the card must hold from the first second on)"
+    },
+    "logoMode": {
+      "type": "enum",
+      "options": ["image", "svg", "auto"],
+      "default": "image",
+      "description": "image: draw the logo's raster (as before); svg: draw an uploaded SVG as vectors, crisp at any size; auto: vectors when it is an SVG"
+    },
+    "clipTheme": {
+      "type": "boolean",
+      "default": false,
+      "description": "Read the clip's theme (composition.theme) instead of the theme parameter"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "fablecut-mark": "fablecut-mark@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": "A call to action (button), a URL line and a vector logo; draws exactly like v2 when they are left out.",
+  "created": "2026-10-15T17:49:40.302Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": "end-card@2",
+  "asset": {
+    "created": "2026-10-15T17:33:10.828Z",
+    "originClip": "clip-7-a-video-that-checks-itself",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/end-card@3.js", "sha1": "b8d9ff907c555b8eafdee486242db4a122715e3e"},
+  "hash": "43bf4d4c7b87fe0d70fa6b46a64a4691909547a81be47cf52063501a5c7bd73c"
+}

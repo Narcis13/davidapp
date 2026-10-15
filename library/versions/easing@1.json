@@ -1,0 +1,29 @@
+{
+  "ref": "easing@1",
+  "type": "function",
+  "kind": "value",
+  "title": "Easing curves",
+  "description": "A table of easing functions of x in 0..1 (outCubic, outBack, inOutExpo, outElastic…). Call f.use(\"easing\") once and index it by name; `names` lists them for enum parameters.",
+  "tags": ["easing", "motion", "foundation"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "highlight": {
+      "type": "enum",
+      "options": ["linear", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "outQuart", "outQuint", "inExpo", "outExpo", "inOutExpo", "outBack", "inBack", "outElastic", "outBounce"],
+      "default": "outBack",
+      "description": "Curve emphasized in the preview"
+    }
+  },
+  "uses": {},
+  "deps": {},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:18.279Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:18.279Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/easing@1.js", "sha1": "fa7f7f83a113ec39009985b905ec53c78cca3912"},
+  "hash": "167c27066cec27c09887a2179fb43be9636f43a61027cae4fe9c8c11e8f4b22d"
+}

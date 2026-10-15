@@ -1,0 +1,57 @@
+{
+  "ref": "fablecut-mark@1",
+  "type": "image",
+  "title": null,
+  "description": "The Fablecut mark as a transparent 512×512 PNG, baked from the logo-mark asset at its final frame.",
+  "tags": ["logo", "brand", "still"],
+  "duration": null,
+  "formats": [],
+  "deps": {},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:20.312Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": "logo-mark@1",
+  "asset": {
+    "created": "2026-10-15T17:31:20.312Z",
+    "originClip": "clip-1-every-frame",
+    "forkedFrom": "logo-mark@1",
+    "derivation": "bake"
+  },
+  "mime": "image/png",
+  "files": {
+    "store": "repo",
+    "items": [
+      {
+        "role": "main",
+        "suffix": ".png",
+        "sha256": "44451f570cc97487bf475c2cdb85c048e1e6a06032dcc2b69c230fc33cf61f80",
+        "bytes": 8904
+      }
+    ]
+  },
+  "meta": {
+    "bakedFrom": "logo-mark@1",
+    "params": {"animate": false},
+    "license": "original",
+    "provenance": {
+      "license": "original",
+      "licenseUrl": null,
+      "sourceUrl": null,
+      "creator": null,
+      "credit": null,
+      "date": "2026-10-15",
+      "aiGenerated": false,
+      "contentId": false,
+      "restrictions": null,
+      "placeholder": false,
+      "redistributable": true,
+      "derivedFrom": "logo-mark@1"
+    },
+    "bytes": 8904,
+    "width": 512,
+    "height": 512
+  },
+  "hash": "bafc4940b905afb59ac4c28c3644fb0a430b254f6733d6f185777b5a03cf23ea"
+}

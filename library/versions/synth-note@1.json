@@ -1,0 +1,58 @@
+{
+  "ref": "synth-note@1",
+  "type": "function",
+  "kind": "audio",
+  "title": "Synth note",
+  "description": "A single synthesized note (MIDI pitch): two detuned oscillators through a low-pass filter with an attack/decay envelope. Short decay and a bright filter make a pluck; a low note with a dark filter makes a bass; a long attack makes a pad.",
+  "tags": ["audio", "synth", "note", "bass", "pluck", "pad"],
+  "duration": 0.5,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "note": {
+      "type": "number",
+      "default": 57,
+      "min": 12,
+      "max": 108,
+      "step": 1,
+      "description": "MIDI note (57 = A3)"
+    },
+    "wave": {"type": "enum", "options": ["saw", "square", "triangle", "sine"], "default": "saw"},
+    "detune": {
+      "type": "number",
+      "default": 0.006,
+      "min": 0,
+      "max": 0.05,
+      "step": 0.001,
+      "description": "Second oscillator offset, as a ratio"
+    },
+    "cutoff": {
+      "type": "number",
+      "default": 2400,
+      "min": 80,
+      "max": 12000,
+      "step": 10,
+      "description": "Low-pass cutoff in Hz"
+    },
+    "attack": {"type": "number", "default": 0.004, "min": 0.001, "max": 2, "step": 0.001},
+    "decay": {
+      "type": "number",
+      "default": 0.18,
+      "min": 0.01,
+      "max": 4,
+      "step": 0.01,
+      "description": "Time constant of the fall, in seconds"
+    },
+    "gain": {"type": "number", "default": 0.4, "min": 0, "max": 1, "step": 0.01}
+  },
+  "uses": {},
+  "deps": {},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:20.212Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:20.212Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/synth-note@1.js", "sha1": "90da725e110bff2672aad39aa827c570a99c9b1d"},
+  "hash": "760b65b57e7cf083172009f366d7e14b4ad226d5e85407582222056aa3c3cf82"
+}

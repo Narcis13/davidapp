@@ -76,5 +76,28 @@ export const FOOTAGE = {
   render: { asset: 'studio-render-check', in: 1.2, speed: 1.5 },
 };
 
+/** Seconds a recording takes to wipe in (the carrier between steps); its marks come after it. */
+export const CARRIER = 0.5;
+
+/**
+ * What happens over each recording, in its own seconds (t: seconds into the file, as the sidecar counts them) and in
+ * clip seconds after the scene's cut (after, hold): the camera's move to a region, and the callout (held a little over
+ * its reading time, words / 3 + 1 s, and gone before the camera moves).
+ */
+export const MARKS = {
+  result: { camera: { t: 2.2 } },
+  find: { camera: { t: 7.2, hold: 3.2 }, callout: { after: 0.9, hold: 2.3 } },
+  tune: { camera: { t: 10.6, hold: 3.6 }, callout: { after: 1.2, hold: 2.3 } },
+  place: { camera: { t: 6.2, hold: 3.8 } },
+  render: { camera: { t: 10.4, hold: 2.8 }, callout: { after: 1.8, hold: 2.4 } },
+};
+
+/** The steps: seconds to move on to the next, the glide to the centre for the recap, how each spoken step ticks. */
+export const STEP = { move: 0.5, settle: 0.5, glide: 0.7, reset: 0.3, before: 0.15, after: 0.2, last: 0.5 };
+/** The end card comes in this long before its word ("Open"). */
+export const CARD_LEAD = 0.3;
+/** The opening title is read for this long before anything moves. */
+export const TITLE_HOLD = 1;
+
 /** Clip time of a moment in a scene's recording (seconds into the file). */
 export const clipTimeOf = (scene, t) => f(SCENES[scene].start + (t - FOOTAGE[scene].in) / FOOTAGE[scene].speed);

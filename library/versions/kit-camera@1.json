@@ -1,0 +1,113 @@
+{
+  "ref": "kit-camera@1",
+  "type": "function",
+  "kind": "motion",
+  "title": "Camera",
+  "description": "Zooms and pans an item (an image or footage) to a region given in the picture's pixels: eased zoom in, hold, eased zoom out (phase emphasis), or start on the region and settle (in), or end by zooming to it (out). The region ends up centred in the item's box and filling `fill` of it. Put the same motion on a kit-cursor and a kit-spotlight placed over the footage and they follow the camera.",
+  "tags": ["kit", "camera", "zoom", "pan", "motion", "focus", "ui", "screen-recording"],
+  "duration": 2.4,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "space": {
+      "type": "object",
+      "fields": {
+        "width": {"type": "number", "default": 1440, "min": 1, "max": 16000},
+        "height": {"type": "number", "default": 900, "min": 1, "max": 16000}
+      },
+      "description": "Size of the picture the region refers to (a recording's pixels)",
+      "default": {"width": 1440, "height": 900}
+    },
+    "fit": {
+      "type": "enum",
+      "options": ["contain", "cover", "fill"],
+      "default": "contain",
+      "description": "How the picture sits in the item box (as the footage item's fit)"
+    },
+    "region": {
+      "type": "object",
+      "fields": {
+        "x": {"type": "number", "default": 360},
+        "y": {"type": "number", "default": 225},
+        "width": {"type": "number", "default": 720},
+        "height": {"type": "number", "default": 450},
+        "t": {"type": "number", "default": 0},
+        "kind": {"type": "string", "default": ""},
+        "selector": {"type": "string", "default": null, "nullable": true}
+      },
+      "description": "Where to look, in the picture's pixels: { x, y, width, height } (a sidecar element box works as it is)",
+      "default": {"x": 360, "y": 225, "width": 720, "height": 450, "t": 0, "kind": "", "selector": null}
+    },
+    "fill": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0.05,
+      "max": 1.5,
+      "step": 0.01,
+      "description": "How much of the item's box the region fills when zoomed in (its longer side)"
+    },
+    "maxZoom": {
+      "type": "number",
+      "default": 8,
+      "min": 1,
+      "max": 40,
+      "step": 0.1,
+      "description": "The most it will zoom in (a tiny region would otherwise show a few blown-up pixels)"
+    },
+    "zoomIn": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0,
+      "max": 20,
+      "step": 0.01,
+      "description": "Seconds to zoom in (emphasis)"
+    },
+    "zoomOut": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0,
+      "max": 20,
+      "step": 0.01,
+      "description": "Seconds to zoom back out (emphasis)"
+    },
+    "ease": {
+      "type": "enum",
+      "options": ["inOutCubic", "inOutQuad", "inOutExpo", "outCubic", "linear"],
+      "default": "inOutCubic"
+    },
+    "anchorX": {
+      "type": "number",
+      "default": 0.5,
+      "min": -2,
+      "max": 3,
+      "step": 0.01,
+      "description": "The item transform's anchorX"
+    },
+    "anchorY": {
+      "type": "number",
+      "default": 0.5,
+      "min": -2,
+      "max": 3,
+      "step": 0.01,
+      "description": "The item transform's anchorY"
+    },
+    "itemScale": {
+      "type": "number",
+      "default": 1,
+      "min": 0.01,
+      "max": 20,
+      "step": 0.01,
+      "description": "The item transform's scale"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:49:37.678Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:49:37.678Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/kit-camera@1.js", "sha1": "82b0bc72caccfdc7fb4bccbd6d63c0c25e976798"},
+  "hash": "c10c3471ec120538fba980f0762aa89decf36eed72d748e6e1d6b6ccd3a42709"
+}

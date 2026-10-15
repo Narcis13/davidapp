@@ -1,0 +1,162 @@
+{
+  "ref": "kit-spotlight@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Spotlight",
+  "description": "Dims everything outside a region of the picture it sits over (a rounded rectangle or a circle) with a soft edge and an outline in the theme's accent, eased in and out. The region is in the picture's pixels (a recording sidecar's element box works as it is); give a list of regions with times and it slides from one to the next. Place it with the same transform as the footage it annotates; pairs with kit-cursor, kit-camera and kit-callout. Takes a theme.",
+  "tags": ["kit", "spotlight", "focus", "highlight", "dim", "ui", "overlay", "screen-recording"],
+  "duration": 3,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "space": {
+      "type": "object",
+      "fields": {
+        "width": {"type": "number", "default": 1440, "min": 1, "max": 16000},
+        "height": {"type": "number", "default": 900, "min": 1, "max": 16000}
+      },
+      "description": "Size of the picture the coordinates refer to (a recording's pixels)",
+      "default": {"width": 1440, "height": 900}
+    },
+    "fit": {
+      "type": "enum",
+      "options": ["contain", "cover", "fill"],
+      "default": "contain",
+      "description": "How the picture sits in the item box (as the footage item's fit)"
+    },
+    "region": {
+      "type": "object",
+      "fields": {
+        "x": {"type": "number", "default": 360},
+        "y": {"type": "number", "default": 225},
+        "width": {"type": "number", "default": 720},
+        "height": {"type": "number", "default": 450},
+        "t": {"type": "number", "default": 0},
+        "kind": {"type": "string", "default": ""},
+        "selector": {"type": "string", "default": null, "nullable": true}
+      },
+      "description": "What stays lit, in the picture's pixels: { x, y, width, height } (a sidecar element box works as it is)",
+      "default": {"x": 360, "y": 225, "width": 720, "height": 450, "t": 0, "kind": "", "selector": null}
+    },
+    "regions": {
+      "type": "array",
+      "of": {
+        "type": "object",
+        "fields": {
+          "x": {"type": "number", "default": 0},
+          "y": {"type": "number", "default": 0},
+          "width": {"type": "number", "default": 100},
+          "height": {"type": "number", "default": 100},
+          "t": {"type": "number", "default": 0},
+          "kind": {"type": "string", "default": ""},
+          "selector": {"type": "string", "default": null, "nullable": true}
+        },
+        "default": {"x": 0, "y": 0, "width": 100, "height": 100, "t": 0, "kind": "", "selector": null}
+      },
+      "description": "Several regions in turn, each from its t (recording seconds); when given it replaces region",
+      "default": []
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "shape": {"type": "enum", "options": ["rounded", "circle"], "default": "rounded"},
+    "padding": {
+      "type": "number",
+      "default": 8,
+      "min": 0,
+      "max": 400,
+      "step": 1,
+      "description": "Extra room around the region, in the picture's pixels"
+    },
+    "corner": {
+      "type": "number",
+      "default": 10,
+      "min": 0,
+      "max": 400,
+      "step": 1,
+      "description": "Corner radius of a rounded region, in the picture's pixels"
+    },
+    "dim": {
+      "type": "number",
+      "default": 0.66,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "How dark the outside gets"
+    },
+    "soft": {
+      "type": "number",
+      "default": 28,
+      "min": 0,
+      "max": 400,
+      "step": 1,
+      "description": "Width of the soft edge, in the picture's pixels"
+    },
+    "outline": {
+      "type": "number",
+      "default": 0.3,
+      "min": 0,
+      "max": 2,
+      "step": 0.05,
+      "description": "Outline width in % of the frame's short side (0 = none)"
+    },
+    "color": {
+      "type": "string",
+      "default": "",
+      "description": "Outline colour, a CSS colour (empty: the theme's accent)"
+    },
+    "shade": {
+      "type": "string",
+      "default": "",
+      "description": "Colour of the dimming, a CSS colour (empty: the theme's background)"
+    },
+    "at": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 100000,
+      "step": 0.01,
+      "description": "The recording's time (seconds) at the start of this item, for the times of regions"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "min": 0.05,
+      "max": 16,
+      "step": 0.01,
+      "description": "Playback speed of the recording (as the footage item's)"
+    },
+    "move": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 5,
+      "step": 0.01,
+      "description": "Seconds it takes to slide to the next region"
+    },
+    "in": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 5,
+      "step": 0.01,
+      "description": "Seconds to fade in"
+    },
+    "out": {
+      "type": "number",
+      "default": 0.4,
+      "min": 0,
+      "max": 5,
+      "step": 0.01,
+      "description": "Seconds to fade out"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:49:37.110Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:49:37.110Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/kit-spotlight@1.js", "sha1": "7e60ac0a70c5700cdabeece8c50b369bee28c66c"},
+  "hash": "da63939e66406f2533242f9081de8749a3ccf4955a1190501918301c3a1391b8"
+}

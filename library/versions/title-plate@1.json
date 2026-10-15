@@ -1,0 +1,62 @@
+{
+  "ref": "title-plate@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Title plate",
+  "description": "A title on a solid rounded plate, with an optional eyebrow label: the plate guarantees the contrast behind every letter, whatever the background. Rises in, holds, fades out; sizes are a share of the frame's short side and never go under the floor. Takes a theme.",
+  "tags": ["text", "title", "plate", "contrast", "scene", "overlay"],
+  "duration": 4,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "text": {
+      "type": "string",
+      "default": "A title on a plate",
+      "description": "*Asterisks* mark words in the accent colour; \\n breaks a line"
+    },
+    "eyebrow": {"type": "string", "default": "", "description": "A small label above the title (empty: none)"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 6,
+      "min": 2.6,
+      "max": 20,
+      "step": 0.1,
+      "description": "Title size in % of the frame's short side"
+    },
+    "align": {"type": "enum", "options": ["left", "center", "right"], "default": "left"},
+    "font": {
+      "type": "enum",
+      "options": ["headline", "display", "body", "serif"],
+      "default": "headline",
+      "description": "Which of the theme's faces"
+    },
+    "weight": {"type": "integer", "default": 700, "min": 100, "max": 900, "step": 100},
+    "plate": {
+      "type": "string",
+      "default": "",
+      "description": "Plate colour, a CSS colour (empty: the theme's surface)"
+    },
+    "ink": {
+      "type": "string",
+      "default": "",
+      "description": "Text colour, a CSS colour (empty: the theme's ink)"
+    },
+    "inDur": {"type": "number", "default": 0.45, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:33:10.466Z",
+  "engine": 2,
+  "madeForClip": "clip-7-a-video-that-checks-itself",
+  "parent": null,
+  "asset": {
+    "created": "2026-10-15T17:33:10.466Z",
+    "originClip": "clip-7-a-video-that-checks-itself",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/title-plate@1.js", "sha1": "14bc33f50e686d41eb63ff5d78ab2d02c1016e8b"},
+  "hash": "9415a6a15322b809ba006f86f1fd00f13c3d3e79306c99ec0d3794cdf7b2c16d"
+}

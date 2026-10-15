@@ -167,6 +167,10 @@ export const voiceOf = (meta) => meta?.voice ?? meta?.narration?.voice ?? null;
 // ── credits ──────────────────────────────────────────────────────────────────────────────
 
 const GROUPS = [['footage', 'Footage'], ['images', 'Images'], ['sound', 'Sound and music'], ['voice', 'Voice'], ['fonts', 'Fonts']];
+/** A narration's voice as add_narration records it ({ name, model }) or as generate_narration does ({ voice, engine }). */
+const voiceName = (v) => v.name ?? v.voice ?? v.id ?? null;
+const voiceModel = (v) => v.model ?? v.engine ?? null;
+
 const LABEL = { footage: 'Footage', images: 'Image', sound: 'Sound', voice: 'Voice', fonts: 'Font' };
 const ORIGINAL_LINE = 'Motion graphics: original, made in Fablecut';
 
@@ -270,7 +274,7 @@ export function createProvenance(ctx, library) {
       });
       if (p.contentId) warnings.push(`${ref}: registered with a content-ID system, so a platform may claim a video that uses it`);
       if (p.restrictions) warnings.push(`${ref}: restriction: ${p.restrictions}`);
-      if (voice && isUnknownLicense(voice.license)) warnings.push(`${ref}: the licence of the voice${voice.name ? ` "${voice.name}"` : ''} is not recorded`);
+      if (voice && isUnknownLicense(voice.license)) warnings.push(`${ref}: the licence of the voice${voiceName(voice) ? ` "${voiceName(voice)}"` : ''} is not recorded`);
     }
     const byGroup = (g) => sources.filter((s) => s.group === g).sort((a, b) => (a.ref < b.ref ? -1 : 1));
     // the sources: one entry for the studio's own motion graphics, one per bundled font family
@@ -303,7 +307,7 @@ export function createProvenance(ctx, library) {
     if (s.credit) return s.credit;
     if (s.voice) {
       const v = s.voice;
-      const who = [v.name, v.model ? `(${v.model})` : null].filter(Boolean).join(' ');
+      const who = [voiceName(v), voiceModel(v) ? `(${voiceModel(v)})` : null].filter(Boolean).join(' ');
       return `Voice: ${who || s.title}${isUnknownLicense(v.license) ? '' : `, ${v.license}`}`;
     }
     if (String(s.license).toLowerCase() === 'original' && !s.creator) return null;
@@ -328,7 +332,7 @@ export function createProvenance(ctx, library) {
         bits.push(licenseLabel(s));
         if (s.sourceUrl) bits.push(`source: <${s.sourceUrl}>`);
         if (s.date) bits.push(`obtained ${s.date}`);
-        if (s.voice) bits.push(`voice ${mdText([s.voice.name, s.voice.model].filter(Boolean).join(', '))}${s.voice.license ? ` (${mdText(s.voice.license)})` : ''}`);
+        if (s.voice) bits.push(`voice ${mdText([voiceName(s.voice), voiceModel(s.voice)].filter(Boolean).join(', '))}${s.voice.license ? ` (${mdText(s.voice.license)})` : ''}`);
         if (s.restrictions) bits.push(`restriction: ${mdText(s.restrictions)}`);
         if (s.via) bits.push(`used by \`${s.via}\``);
         out.push(`- ${bits.join('; ')}`);

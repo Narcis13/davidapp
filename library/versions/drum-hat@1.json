@@ -1,0 +1,33 @@
+{
+  "ref": "drum-hat@1",
+  "type": "function",
+  "kind": "audio",
+  "title": "Hi-hat",
+  "description": "Synthesized hi-hat one-shot: high-passed noise with a short decay; set `open` for the longer, washier version.",
+  "tags": ["audio", "drums", "hat", "one-shot", "synth"],
+  "duration": 0.25,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "open": {"type": "boolean", "default": false},
+    "brightness": {
+      "type": "number",
+      "default": 7000,
+      "min": 2000,
+      "max": 12000,
+      "step": 100,
+      "description": "High-pass cutoff in Hz"
+    },
+    "gain": {"type": "number", "default": 0.3, "min": 0, "max": 1, "step": 0.01}
+  },
+  "uses": {},
+  "deps": {},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:20.196Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:20.196Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/drum-hat@1.js", "sha1": "28ed286757becee49ca87443aee78e4b9b674d8e"},
+  "hash": "d7aa354405a19e9329cba24703b5bedba89685c8cccc1c3fa5fd8a3682b5054c"
+}

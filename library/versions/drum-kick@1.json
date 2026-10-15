@@ -1,0 +1,42 @@
+{
+  "ref": "drum-kick@1",
+  "type": "function",
+  "kind": "audio",
+  "title": "Kick drum",
+  "description": "Synthesized kick drum one-shot: a sine with a fast downward pitch sweep and a short click on top. The low thump the beat detector locks onto.",
+  "tags": ["audio", "drums", "kick", "one-shot", "synth"],
+  "duration": 0.45,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "pitch": {
+      "type": "number",
+      "default": 48,
+      "min": 20,
+      "max": 200,
+      "step": 1,
+      "description": "Resting pitch in Hz"
+    },
+    "punch": {
+      "type": "number",
+      "default": 150,
+      "min": 0,
+      "max": 600,
+      "step": 1,
+      "description": "How far above the resting pitch the sweep starts, in Hz"
+    },
+    "decay": {"type": "number", "default": 0.16, "min": 0.02, "max": 1, "step": 0.01},
+    "click": {"type": "number", "default": 0.25, "min": 0, "max": 1, "step": 0.01},
+    "gain": {"type": "number", "default": 0.9, "min": 0, "max": 1, "step": 0.01}
+  },
+  "uses": {},
+  "deps": {},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:20.163Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:20.163Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/drum-kick@1.js", "sha1": "74d05a8e3c05e7a96cddeb7b98bf82a3a4e1bc1a"},
+  "hash": "34fdf3dd9125c701e7dc45cf361c50f0770942e72b0ab93e91abc65f0364a4f3"
+}

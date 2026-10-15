@@ -1,0 +1,50 @@
+{
+  "ref": "bg-gradient-drift@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Gradient drift",
+  "description": "Full-frame animated background: soft colour blobs drift slowly over a dark base, with a vignette. Loops for any length; optionally pulses on the clip's beats.",
+  "tags": ["background", "gradient", "ambient", "loop"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "base": {"type": "color", "default": "#0b0b12"},
+    "colors": {
+      "type": "array",
+      "of": {"type": "color", "default": "#ffffff"},
+      "default": ["#ff5c8a", "#ffd166", "#5b6cff"],
+      "minItems": 1,
+      "maxItems": 5
+    },
+    "intensity": {"type": "number", "default": 0.42, "min": 0, "max": 1, "step": 0.01},
+    "speed": {"type": "number", "default": 0.12, "min": 0, "max": 1, "step": 0.01},
+    "blobSize": {
+      "type": "number",
+      "default": 0.75,
+      "min": 0.2,
+      "max": 1.5,
+      "step": 0.01,
+      "description": "Blob radius as a fraction of the longer side"
+    },
+    "vignette": {"type": "number", "default": 0.55, "min": 0, "max": 1, "step": 0.01},
+    "beatPulse": {
+      "type": "number",
+      "default": 0.15,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "How much the blobs brighten on each beat"
+    }
+  },
+  "uses": {},
+  "deps": {},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:19.394Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:19.394Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/bg-gradient-drift@1.js", "sha1": "1c11a19d0edccb0e6abb795193fb2d0a28caa12b"},
+  "hash": "89fc9f0b9547e508070aacedd2adcb24a46a98d6870206924cacb1db3f116659"
+}

@@ -1,0 +1,70 @@
+{
+  "ref": "kit-steps@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Steps",
+  "description": "A step indicator: two to six labelled steps in a row (or a column in a tall box), a connector that fills as the current step moves on, done steps ticked, the current one ringed in the theme's accent. Drive it with `at` (the seconds each step becomes current) or by keyframing `params.current` (0-based; 1.5 is halfway from step 2 to step 3). Labels are a share of the frame's short side with a floor: one that cannot fit its column wraps, then fails loudly. Pairs with kit-plate and kit-icon. Takes a theme.",
+  "tags": ["kit", "steps", "progress", "process", "timeline", "onboarding", "marketing", "explainer"],
+  "duration": 6,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "steps": {
+      "type": "array",
+      "of": {"type": "string", "default": ""},
+      "minItems": 2,
+      "maxItems": 6,
+      "default": ["Upload", "Describe", "Build", "Render"]
+    },
+    "current": {
+      "type": "number",
+      "default": 1,
+      "min": -1,
+      "max": 6,
+      "step": 0.01,
+      "description": "The current step, 0-based; keyframe it. Fractions move between steps; -1 is before the first. Ignored when `at` is set"
+    },
+    "at": {
+      "type": "array",
+      "of": {"type": "number", "min": 0, "default": 0},
+      "maxItems": 7,
+      "default": [],
+      "description": "Seconds at which each step becomes current; one more time ticks the last step too (empty: use `current`)"
+    },
+    "move": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0.05,
+      "max": 3,
+      "step": 0.05,
+      "description": "Seconds the marker takes to move on when `at` is set"
+    },
+    "direction": {
+      "type": "enum",
+      "options": ["auto", "row", "column"],
+      "default": "auto",
+      "description": "auto: a column in a tall box, a row otherwise"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 3,
+      "min": 2.5,
+      "max": 8,
+      "step": 0.1,
+      "description": "Label size in % of the frame's short side; the markers follow"
+    },
+    "inDur": {"type": "number", "default": 0.5, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.35, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:49:35.135Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:49:35.135Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/kit-steps@1.js", "sha1": "11847d876564a58e2112de6801904e0c31b914bf"},
+  "hash": "4584e4ff6f76954a39e7df9e5aa26dc3eff59026a120a1e323b4c24799deec1f"
+}

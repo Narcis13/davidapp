@@ -205,7 +205,10 @@ export function normalizeComposition(input) {
       if (!num(start) || start < 0) err(`${ip}.start`, 'start must be a number of seconds ≥ 0');
       const dur = it.duration ?? (num(duration) && num(start) ? duration - start : undefined);
       if (!num(dur) || dur <= 0) err(`${ip}.duration`, 'duration must be a number of seconds > 0');
-      else if (num(start) && num(duration) && start + dur > duration + 1e-6) err(ip, `the item ends at ${round(start + dur)}s, after the clip ends (${duration}s)`);
+      // start and duration are kept to the millisecond (below), so an item that ends with the clip may end up to a
+      // millisecond after an unrounded clip length (54.566… s): that is the same end, and a saved composition must
+      // pass this check again when it is prepared again (an import, an export's round trip)
+      else if (num(start) && num(duration) && start + dur > duration + 0.0011) err(ip, `the item ends at ${round(start + dur)}s, after the clip ends (${duration}s)`);
       if (it.params !== undefined && !isPlain(it.params)) err(`${ip}.params`, 'params must be an object');
       const item = { id, asset: it.asset, start: num(start) ? round(start) : 0, duration: num(dur) ? round(dur) : 1, params: isPlain(it.params) ? it.params : {} };
       if (typeof it.label === 'string') item.label = it.label;

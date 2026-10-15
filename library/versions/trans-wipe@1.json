@@ -1,0 +1,30 @@
+{
+  "ref": "trans-wipe@1",
+  "type": "function",
+  "kind": "transition",
+  "title": "Soft wipe",
+  "description": "Reveals the next layer behind a moving, angled edge with a soft feather and a thin accent line along it.",
+  "tags": ["transition", "wipe"],
+  "duration": 0.8,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "angle": {"type": "number", "default": 20, "min": -80, "max": 80},
+    "feather": {"type": "number", "default": 0.06, "min": 0, "max": 0.3},
+    "accent": {"type": "color", "default": "#ffd166"}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:31:23.618Z",
+  "engine": 2,
+  "madeForClip": "clip-4-direct-the-studio",
+  "parent": null,
+  "asset": {
+    "created": "2026-10-15T17:31:23.618Z",
+    "originClip": "clip-4-direct-the-studio",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/trans-wipe@1.js", "sha1": "a6245dea5f067e1217403762c1565479a6c7da0d"},
+  "hash": "b533e7cd1b36fb56f2e0583699e08550249aaed5a2c31bfe692ab763fe656134"
+}
