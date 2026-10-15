@@ -9,17 +9,31 @@ import { createRuntime, describeError } from '../core/runtime.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
 import { nodeHost, registerFonts, createCanvas, loadImage, takeLogs, FRAME_CONTEXT } from './host.js';
+import { ImageData } from '@napi-rs/canvas';
 import { coverageReport } from './glyphs.js';
 import { boxContrast, thumbGray, grayStd } from './contrast.js';
 
 registerFonts();
 
-let state = { key: null, rt: null, comp: null, beats: [], sequences: {}, clip: {} };
+let state = { key: null, rt: null, comp: null, beats: [], sequences: {}, videos: {}, clip: {} };
 let canvas = null;
 
 // Sequence frames are PNG files, loaded as a frame needs them and kept in a small cache.
 const seqCache = new Map();
 const SEQ_CACHE = 96;
+
+// Footage frames come decoded (RGBA) from the process's footage service, through the pool: one decoder per file
+// for every worker, instead of one per worker. A few are kept here, drawn on canvases, for holds and slow motion.
+const vidCache = new Map();
+const VID_CACHE = 6;
+const asked = new Map();
+let askId = 0;
+/** Ask the pool's thread for one decoded footage frame → { buffer, width, height }. */
+const askFrame = (video, index) => new Promise((resolve, reject) => {
+  const id = ++askId;
+  asked.set(id, { resolve, reject });
+  parentPort.postMessage({ footage: { id, path: video.path, meta: video.meta, index } });
+});
 
 async function makeRuntime(bundle) {
   const rt = createRuntime(nodeHost);
@@ -27,6 +41,7 @@ async function makeRuntime(bundle) {
   for (const [ref, s] of Object.entries(bundle.sequences ?? {})) {
     rt.setSequence(ref, { frames: s.frames, fps: s.fps, width: s.width, height: s.height, dir: s.dir, get: (i) => seqCache.get(`${ref}#${i}`) ?? null });
   }
+  for (const [ref, v] of Object.entries(bundle.videos ?? {})) rt.setFootage(ref, { meta: v.meta, get: (i) => vidCache.get(`${v.path}#${i}`) ?? null });
   rt.load(bundle.assets ?? {});
   return rt;
 }
@@ -40,6 +55,27 @@ async function loadSequenceFrames(rt, comp, frame) {
     seqCache.set(key, await loadImage(join(s.dir, `${String(index).padStart(6, '0')}.png`)));
     while (seqCache.size > SEQ_CACHE) seqCache.delete(seqCache.keys().next().value);
   }
+}
+
+/** Decode (through the pool) the footage frames a clip frame needs before it is drawn. */
+async function loadFootageFrames(rt, frame) {
+  const comp = state.comp;
+  for (const { ref, index } of rt.footageFramesAt(comp, frame)) {
+    const v = state.videos[ref];
+    const key = `${v.path}#${index}`;
+    if (vidCache.has(key)) { const c = vidCache.get(key); vidCache.delete(key); vidCache.set(key, c); continue; }
+    const r = await askFrame(v, index);
+    const c = createCanvas(r.width, r.height);
+    c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(r.buffer), r.width, r.height), 0, 0);
+    vidCache.set(key, c);
+    while (vidCache.size > VID_CACHE) vidCache.delete(vidCache.keys().next().value);
+  }
+}
+
+/** Everything a clip frame loads before it is drawn: sequence frames (files) and footage frames (decoded). */
+async function loadMedia(rt, comp, frame) {
+  await loadSequenceFrames(rt, comp, frame);
+  await loadFootageFrames(rt, frame);
 }
 
 function surface(width, height) {
@@ -254,12 +290,12 @@ const handlers = {
     const rt = await makeRuntime(msg.bundle);
     const b = msg.bundle;
     // what reaches assets as f.clip besides the composition: beats, the narration's words, the caption pages and lane
-    state = { key: b.key, rt, comp: b.composition ?? null, beats: b.beats ?? [], sequences: b.sequences ?? {}, clip: { beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane } };
+    state = { key: b.key, rt, comp: b.composition ?? null, beats: b.beats ?? [], sequences: b.sequences ?? {}, videos: b.videos ?? {}, clip: { beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane } };
     return { result: {} };
   },
   async clipFrame(msg) {
     const comp = state.comp;
-    await loadSequenceFrames(state.rt, comp, msg.frame);
+    await loadMedia(state.rt, comp, msg.frame);
     const c = surface(comp.width, comp.height);
     const r = state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, msg.frame, { ...state.clip, record: !!msg.record, suppressText: !!msg.suppressText });
     const out = output(c, msg);
@@ -272,7 +308,7 @@ const handlers = {
    */
   async inspectFrame(msg) {
     const comp = state.comp;
-    await loadSequenceFrames(state.rt, comp, msg.frame);
+    await loadMedia(state.rt, comp, msg.frame);
     const c = surface(comp.width, comp.height);
     const r = state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, msg.frame, { ...state.clip, record: true });
     const a = new Uint8Array(c.data());
@@ -295,7 +331,7 @@ const handlers = {
     const cells = [];
     for (const frame of msg.frames) {
       // each cell is drawn as soon as its sequence frames are in (the cache is smaller than a whole sheet)
-      await loadSequenceFrames(state.rt, comp, frame);
+      await loadMedia(state.rt, comp, frame);
       const c = surface(comp.width, comp.height);
       state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, frame, state.clip);
       // kept at cell size: a full-size copy per cell would be hundreds of MB for a vertical clip
@@ -327,6 +363,13 @@ const handlers = {
 };
 
 parentPort.on('message', async (msg) => {
+  // a decoded footage frame (or why not) for a request made while drawing
+  if (msg.footageReply) {
+    const p = asked.get(msg.footageReply);
+    asked.delete(msg.footageReply);
+    if (msg.ok) p?.resolve(msg); else p?.reject(new Error(msg.error));
+    return;
+  }
   try {
     const { result, transfer } = await handlers[msg.op](msg);
     parentPort.postMessage({ id: msg.id, ok: true, result: { ...result, logs: result.logs ?? takeLogs() } }, transfer ?? []);

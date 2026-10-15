@@ -21,6 +21,7 @@ import { safeZone, formatOf, REF_RE, FORMATS, SAMPLE_RATE } from './engine.js';
 import { forFormat, isV2Item, layerGeometry, sampleItem, spaceRect, TRANSFORM_DEFAULTS } from './transform.js';
 import { drawDemo } from './demo.js';
 import { platformSafe } from './platforms.js';
+import { footageIndex, frameAt } from './footage.js';
 
 /**
  * visual draws; value returns a value; audio returns samples; motion returns a transform delta for
@@ -167,6 +168,8 @@ export function createRuntime(host) {
   const images = new Map();
   /** sequence ref → { frames, fps, width, height, get(index) → image | null } */
   const sequences = new Map();
+  /** footage ref → { meta: { width, height, fps, duration, table }, get(index) → image | null } */
+  const footage = new Map();
   const layers = [];
   let layerIndex = 0;
   let scratch = null;
@@ -195,6 +198,7 @@ export function createRuntime(host) {
   const vectors = new Map();
   function setImage(ref, image, vector = null) { images.set(ref, image); if (vector) vectors.set(ref, vector); }
   function setSequence(ref, seq) { sequences.set(ref, seq); }
+  function setFootage(ref, v) { footage.set(ref, v); }
 
   /** The frame of a sequence an item shows at asset time `at` (held on its last frame, or looped). */
   const sequenceIndex = (seq, at, loop) => {
@@ -231,6 +235,44 @@ export function createRuntime(host) {
     return out;
   }
 
+  /** The frame of footage a function asset sees through an image parameter: the one at its own time, held at the end. */
+  const footageAtAssetTime = (v, at) => frameAt(v.meta.table, Math.min(Math.max(0, at), v.meta.duration - 1e-6));
+
+  /**
+   * The footage frames a clip frame will draw: [{ ref, index }]. Like sequence frames, the host decodes them
+   * before calling renderClipFrame. A footage layer shows the frame its trim, speed, loop and hold pick; a
+   * function asset given footage through an image parameter sees the frame at its own time.
+   */
+  function footageFramesAt(comp, frame) {
+    const out = [];
+    if (!footage.size) return out;
+    const t = frame / comp.fps;
+    const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
+    const format = formatOf(comp.width, comp.height);
+    const want = (raw, time) => {
+      const item = forFormat(raw, format);
+      const at = Math.max(0, time - item.start) + (item.offset ?? 0);
+      for (const [ref, params] of [[item.asset, item.params], [item.mask?.asset, item.mask?.params]]) {
+        if (!ref) continue;
+        const v = footage.get(ref);
+        if (v) { out.push({ ref, index: footageIndex(v.meta, params ?? {}, at) }); continue; }
+        const e = entries.get(ref);
+        if (!e) continue;
+        for (const [name, def] of Object.entries(e.def.schema)) {
+          const value = params?.[name];
+          if (def.type === 'image' && typeof value === 'string' && footage.has(value)) out.push({ ref: value, index: footageAtAssetTime(footage.get(value), at) });
+        }
+      }
+    };
+    for (const tr of comp.tracks) {
+      if (tr.type === 'audio' || tr.hidden || (solo && !tr.solo)) continue;
+      const handoff = transitionsAt(tr, frame, comp.fps);
+      for (const from of handoff.outgoing) want(from, Math.min(t, from.start + from.duration - 1 / comp.fps));
+      for (const item of tr.items) if (activeAt(item, frame, comp.fps)) want(item, t);
+    }
+    return out;
+  }
+
   function entry(ref) {
     const e = entries.get(ref);
     if (!e) throw new AssetError(`Asset ${ref} is not loaded`);
@@ -239,7 +281,7 @@ export function createRuntime(host) {
 
   function resolve(owner, name) {
     if (typeof name !== 'string') throw new AssetError(`f.use() takes an asset name, got ${name === null ? 'null' : typeof name}`);
-    const pinned = owner.deps[name] ?? (entries.has(name) || images.has(name) ? name : null);
+    const pinned = owner.deps[name] ?? (entries.has(name) || images.has(name) || footage.has(name) ? name : null);
     if (!pinned) {
       const declared = Object.keys(owner.deps);
       throw new AssetError(`"${name}" is not declared: add it to uses: [...] or pass it through a parameter of type "asset"/"image" (declared: ${declared.join(', ') || 'none'})`);
@@ -347,6 +389,14 @@ export function createRuntime(host) {
       /** A loaded image asset (drawable with ctx.drawImage; has width and height). */
       image(name) {
         const ref = resolve(e, name);
+        // footage passed as an image: the frame at this asset's own time (held on the last frame)
+        const v = footage.get(ref);
+        if (v) {
+          const index = footageAtAssetTime(v, t);
+          const img = v.get(index);
+          if (!img) throw new AssetError(`frame ${index} of the footage "${name}" is not loaded: footage reaches an asset through an image parameter of the item itself, and shows the frame at the asset's own time`, [e.ref]);
+          return img;
+        }
         const img = images.get(ref);
         if (!img) throw new AssetError(`"${name}" is not an image asset`, [e.ref]);
         return img;
@@ -583,7 +633,7 @@ export function createRuntime(host) {
           if (!activeAt(item, frame, fps)) continue;
           // composition v2 (transforms, keyframes, formats…) and image layers take the new path;
           // everything else is drawn exactly as in v1, so old clips keep their pixels
-          if (isV2Item(item) || images.has(item.asset) || sequences.has(item.asset)) { drawLayer(ctx, comp, forFormat(item, format), t, clip); continue; }
+          if (isV2Item(item) || images.has(item.asset) || sequences.has(item.asset) || footage.has(item.asset)) { drawLayer(ctx, comp, forFormat(item, format), t, clip); continue; }
           const lt = Math.max(0, t - item.start);
           let opacity = item.opacity ?? 1;
           if (item.fadeIn > 0) opacity *= Math.min(1, lt / item.fadeIn);
@@ -680,6 +730,26 @@ export function createRuntime(host) {
     ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
 
+  /**
+   * Draw a footage frame into a w × h box like drawImageFit, except that a frame placed at its own size on whole pixels
+   * (a 1080p file in a 1080p clip, a screen recording at 1:1) is copied as it is: smoothing would soften it a little.
+   */
+  function drawFootageFit(ctx, img, w, h, fit = 'contain') {
+    const k = fit === 'fill' ? null : fit === 'cover' ? Math.max(w / img.width, h / img.height) : Math.min(w / img.width, h / img.height);
+    const dw = k === null ? w : img.width * k, dh = k === null ? h : img.height * k;
+    const dx = (w - dw) / 2, dy = (h - dh) / 2;
+    const m = ctx.getTransform();
+    const whole = (v) => Math.abs(v - Math.round(v)) < 1e-6;
+    if (dw === img.width && dh === img.height && m.a === 1 && m.b === 0 && m.c === 0 && m.d === 1 && whole(m.e + dx) && whole(m.f + dy)) {
+      if (fit === 'cover') { ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip(); }
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, Math.round(m.e + dx) - m.e, Math.round(m.f + dy) - m.f);
+      ctx.imageSmoothingEnabled = true;
+      return;
+    }
+    drawImageFit(ctx, img, w, h, fit);
+  }
+
   /** The length of the timeline an item plays from: its own duration, or for a part of a split item the whole it was cut from. */
   const wholeOf = (item) => item.assetDuration ?? (item.offset ?? 0) + item.duration;
 
@@ -751,11 +821,16 @@ export function createRuntime(host) {
   function drawContent(target, comp, item, st, clip) {
     const { width, height, fps } = comp;
     const seq = sequences.get(item.asset);
+    const vid = footage.get(item.asset);
     let img = images.get(item.asset);
     if (seq) {
       const index = sequenceIndex(seq, st.at, st.params.loop);
       img = seq.get(index);
       if (!img) throw new AssetError(`item "${item.id}": frame ${index} of ${item.asset} is not loaded`);
+    } else if (vid) {
+      const index = footageIndex(vid.meta, st.params, st.at);
+      img = vid.get(index);
+      if (!img) throw new AssetError(`item "${item.id}": frame ${index} of the footage ${item.asset} is not loaded`);
     }
     const e = img ? null : entry(item.asset);
     if (e && e.def.kind !== 'visual') throw new AssetError(`item "${item.id}": ${item.asset} is a ${e.def.kind} asset and cannot sit on a visual track${e.def.kind === 'effect' || e.def.kind === 'motion' || e.def.kind === 'transition' ? ` (attach it to an item: ${e.def.kind === 'effect' ? 'effects' : e.def.kind === 'motion' ? 'motions' : 'transition'})` : ''}`);
@@ -766,7 +841,8 @@ export function createRuntime(host) {
     try {
       target.beginPath();
       target.transform(...geo.matrix);
-      if (img) drawImageFit(target, img, geo.width, geo.height, st.params.fit);
+      if (vid) drawFootageFit(target, img, geo.width, geo.height, st.params.fit);
+      else if (img) drawImageFit(target, img, geo.width, geo.height, st.params.fit);
       else {
         invoke(e, st.params, {
           ctx: target, width: geo.width, height: geo.height, fps, t: st.at, duration: st.whole, depth: 0,
@@ -1006,8 +1082,8 @@ export function createRuntime(host) {
   }
 
   return {
-    lib, load, compile, setImage, setSequence, sequenceFramesAt, renderAsset, renderClipFrame, renderAudio, callValue, callMotion, takeTexts,
-    has: (ref) => entries.has(ref) || images.has(ref) || sequences.has(ref),
+    lib, load, compile, setImage, setSequence, sequenceFramesAt, setFootage, footageFramesAt, renderAsset, renderClipFrame, renderAudio, callValue, callMotion, takeTexts,
+    has: (ref) => entries.has(ref) || images.has(ref) || sequences.has(ref) || footage.has(ref),
     definition: (ref) => entry(ref).def,
     clearTextCache: () => lib.text.clearCache(),
   };

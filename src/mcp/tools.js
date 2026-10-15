@@ -95,7 +95,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       description: 'Find assets in the library by full text (name, description, tags, source), type, kind, tags, format and lineage. Returns the latest version of each match.',
       input: {
         query: z.string().optional().describe('Full-text query, e.g. "typewriter cursor"'),
-        type: z.enum(['function', 'image', 'sound', 'font', 'sequence']).optional(),
+        type: z.enum(['function', 'image', 'sound', 'font', 'sequence', 'video']).optional(),
         kind: z.enum(['visual', 'value', 'audio', 'motion', 'transition', 'effect']).optional().describe('Function assets only'),
         tags: z.array(z.string()).optional().describe('All of these tags'),
         format: FORMAT.optional().describe('Designed for this format'),
@@ -719,7 +719,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       name: 'suggest_assets',
       title: 'Suggest assets for a brief',
       description: 'Start here before writing anything: give the brief of a clip or scene ("a 60 s product teaser with a 3D logo, stats and a calm theme") and get the library\'s best candidates, ranked by how well they match and how proven they are (featured, favourites, used by earlier clips), a few of each kind, with their params, matched words, notes from other agents, and a contact sheet of their thumbnails.',
-      input: { brief: z.string().min(3), kinds: z.array(z.enum(['visual', 'value', 'audio', 'motion', 'transition', 'effect', 'image', 'sound', 'sequence'])).optional().describe('Only these kinds/types'), limit: z.number().int().min(1).max(24).optional() },
+      input: { brief: z.string().min(3), kinds: z.array(z.enum(['visual', 'value', 'audio', 'motion', 'transition', 'effect', 'image', 'sound', 'sequence', 'video'])).optional().describe('Only these kinds/types'), limit: z.number().int().min(1).max(24).optional() },
       readOnly: true,
       run: async (a) => {
         const r = studio.compounding.suggest({ brief: a.brief, kinds: a.kinds, limit: a.limit ?? 12 });

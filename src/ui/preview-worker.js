@@ -30,7 +30,7 @@ const host = {
   createCanvas: (w, h) => new OffscreenCanvas(w, h),
 };
 
-let rt = null, composition = null, clipExtra = { beats: [] }, sequenceUrls = {};
+let rt = null, composition = null, clipExtra = { beats: [] }, sequenceUrls = {}, footageUrls = {};
 let canvas = null;
 // sequence frames are fetched as a frame needs them, and a few seconds of them are kept
 const seqCache = new Map();
@@ -45,6 +45,35 @@ async function loadSequenceFrames(comp, frame) {
     seqCache.set(key, await createImageBitmap(await res.blob()));
     while (seqCache.size > SEQ_CACHE) { const k = seqCache.keys().next().value; seqCache.get(k).close?.(); seqCache.delete(k); }
   }
+}
+
+// Footage frames come from the server, decoded by the same service as the render's (so the same source frame,
+// converted the same way): PNG when the preview is paused or scrubbed (exact), JPEG while it plays (fast).
+// A frame drawn from JPEG is fetched again as PNG once the preview stops on it.
+const vidCache = new Map();
+const VID_CACHE = 36;
+const vidKey = (ref, i, ext) => `${ref}#${i}.${ext}`;
+const pending = new Map();
+
+function fetchFootage(ref, index, ext) {
+  const key = vidKey(ref, index, ext);
+  if (vidCache.has(key)) { const v = vidCache.get(key); vidCache.delete(key); vidCache.set(key, v); return Promise.resolve(); }
+  if (pending.has(key)) return pending.get(key);
+  const p = (async () => {
+    const res = await fetch(`${footageUrls[ref]}${index}.${ext}`);
+    if (!res.ok) throw new Error(`Frame ${index} of the footage ${ref} could not be loaded (${res.status})`);
+    vidCache.set(key, await createImageBitmap(await res.blob()));
+    while (vidCache.size > VID_CACHE) { const k = vidCache.keys().next().value; vidCache.get(k).close?.(); vidCache.delete(k); }
+  })().finally(() => pending.delete(key));
+  pending.set(key, p);
+  return p;
+}
+
+async function loadFootageFrames(comp, frame, fast) {
+  const want = rt.footageFramesAt(comp, frame);
+  await Promise.all(want.map(({ ref, index }) => fetchFootage(ref, index, fast ? 'jpg' : 'png')));
+  // while playing, the next few frames are asked for already (the server decodes forward, so they are cheap)
+  if (fast) for (const { ref, index } of want) for (let k = 1; k <= 3; k++) fetchFootage(ref, index + k, 'jpg').catch(() => {});
 }
 
 function surface(w, h) {
@@ -72,8 +101,12 @@ const handlers = {
     for (const [ref, seq] of Object.entries(bundle.sequences ?? {})) {
       next.setSequence(ref, { frames: seq.frames, fps: seq.fps, width: seq.width, height: seq.height, get: (i) => seqCache.get(`${ref}#${i}`) ?? null });
     }
+    for (const [ref, v] of Object.entries(bundle.footage ?? {})) {
+      next.setFootage(ref, { meta: v.meta, get: (i) => vidCache.get(vidKey(ref, i, 'png')) ?? vidCache.get(vidKey(ref, i, 'jpg')) ?? null });
+    }
     next.load(bundle.assets ?? {});
     sequenceUrls = Object.fromEntries(Object.entries(bundle.sequences ?? {}).map(([ref, seq]) => [ref, seq.url]));
+    footageUrls = Object.fromEntries(Object.entries(bundle.footage ?? {}).map(([ref, v]) => [ref, v.url]));
     rt = next;
     composition = comp ?? null;
     // what reaches assets as f.clip besides the composition: beats, the narration's words, caption pages and lane
@@ -89,6 +122,7 @@ const handlers = {
   async clipFrame(m) {
     const comp = m.composition ?? composition;
     await loadSequenceFrames(comp, m.frame);
+    await loadFootageFrames(comp, m.frame, !!m.fast);
     const c = surface(comp.width, comp.height);
     const r = rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { ...clipExtra, record: !!m.record });
     const bitmap = c.transferToImageBitmap();

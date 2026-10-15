@@ -17,6 +17,7 @@ import { SLUG_RE, StudioError } from './library.js';
 import { glyphFindings, zonesOf } from './inspect.js';
 import { clipWords, narrationOf } from './audio.js';
 import { buildPages, structureOf, splitPage, mergePages, moveBreak, movePageStart } from '../core/captions.js';
+import { FOOTAGE_ITEM_SCHEMA, naturalDuration } from '../core/footage.js';
 
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
 
@@ -26,6 +27,8 @@ const round3 = (v) => Math.round(v * 1000) / 1000;
 const IMAGE_ITEM_SCHEMA = { fit: { type: 'enum', options: ['contain', 'cover', 'fill'], default: 'contain' } };
 /** A baked frame sequence plays like a layer: it fits its box, and holds its last frame or loops. */
 const SEQUENCE_ITEM_SCHEMA = { ...IMAGE_ITEM_SCHEMA, loop: { type: 'boolean', default: false } };
+/** The params of a layer that draws a file asset, by its type (function assets declare their own). */
+const FILE_ITEM_SCHEMA = { image: IMAGE_ITEM_SCHEMA, sequence: SEQUENCE_ITEM_SCHEMA, video: FOOTAGE_ITEM_SCHEMA };
 
 /** Write a cache file so that nobody can read it half-written. */
 function writeAtomic(path, data) {
@@ -77,7 +80,8 @@ export function createClips(ctx, library) {
       const out = mapParams(schema, params, ['asset', 'image'], (value, def) => {
         const dep = pin(value, `${at}: params`);
         if (!dep) return value;
-        if (def.type === 'image' && dep.type !== 'image') problems.push(`${at}: params: "${value}" is a ${dep.type} asset where an image is expected`);
+        // footage can stand in for an image: the asset sees the frame at its own time
+        if (def.type === 'image' && dep.type !== 'image' && dep.type !== 'video') problems.push(`${at}: params: "${value}" is a ${dep.type} asset where an image is expected`);
         if (def.type === 'asset' && (dep.type !== 'function' || (def.kind && dep.kind !== def.kind))) problems.push(`${at}: params: "${value}" is a ${dep.kind ?? dep.type} asset where a ${def.kind ?? 'function'} asset is expected`);
         const pinned = makeRef(dep.slug, dep.version);
         refs.add(pinned);
@@ -98,7 +102,7 @@ export function createClips(ctx, library) {
       if (!kinds.includes(kind)) problems.push(`${where}: ${makeRef(row.slug, row.version)} is a ${kind} asset; this takes ${kinds.join(' or ')} assets`);
       att.asset = makeRef(row.slug, row.version);
       refs.add(att.asset);
-      const schema = row.type === 'function' ? json(row.schema, {}) : row.type === 'image' ? IMAGE_ITEM_SCHEMA : row.type === 'sequence' ? SEQUENCE_ITEM_SCHEMA : {};
+      const schema = row.type === 'function' ? json(row.schema, {}) : FILE_ITEM_SCHEMA[row.type] ?? {};
       att.params = pinWith(schema, att.params ?? {}, where);
     };
     for (const [i, fx] of (composition.effects ?? []).entries()) pinAttachment(fx, `effects[${i}]`, ['effect']);
@@ -110,19 +114,21 @@ export function createClips(ctx, library) {
       item.asset = makeRef(row.slug, row.version);
       refs.add(item.asset);
       if (track.type === 'audio') {
-        if (!(row.type === 'sound' || (row.type === 'function' && row.kind === 'audio'))) problems.push(`${where}: ${item.asset} is a ${row.kind ?? row.type} asset; an audio track takes audio or sound assets`);
-      } else if (!((row.type === 'function' && row.kind === 'visual') || row.type === 'image' || row.type === 'sequence')) {
+        if (!(row.type === 'sound' || row.type === 'video' || (row.type === 'function' && row.kind === 'audio'))) problems.push(`${where}: ${item.asset} is a ${row.kind ?? row.type} asset; an audio track takes audio or sound assets (or footage, for its sound)`);
+        else if (row.type === 'video' && !json(row.meta, {}).audio) problems.push(`${where}: ${item.asset} is footage without sound; put it on a visual track`);
+      } else if (!((row.type === 'function' && row.kind === 'visual') || row.type === 'image' || row.type === 'sequence' || row.type === 'video')) {
         problems.push(`${where}: ${item.asset} is a ${row.kind ?? row.type} asset; a ${track.type} track takes visual or image assets`);
       }
-      const schema = row.type === 'function' ? json(row.schema, {}) : track.type === 'audio' ? null : row.type === 'image' ? IMAGE_ITEM_SCHEMA : row.type === 'sequence' ? SEQUENCE_ITEM_SCHEMA : null;
+      const schema = row.type === 'function' ? json(row.schema, {}) : track.type === 'audio' ? null : FILE_ITEM_SCHEMA[row.type] ?? null;
       if (!schema) { if (Object.keys(item.params).length) problems.push(`${where}: ${row.type} assets take no params`); continue; }
       // the item's params, and each format's overrides of them, are checked and pinned the same way
       const pinParams = (params, at) => pinWith(schema, params, at);
       item.params = pinParams(item.params, where);
+      if (row.type === 'video') checkTrim(json(row.meta, {}), [item.params, ...Object.values(item.formats ?? {}).map((o) => o.params).filter(Boolean)], where, problems);
       for (const [fname, o] of Object.entries(item.formats ?? {})) if (o.params) o.params = pinParams(o.params, `${where} (${fname})`);
       for (const [i, m] of (item.motions ?? []).entries()) pinAttachment(m, `${where}: motions[${i}]`, ['motion']);
       for (const [i, fx] of (item.effects ?? []).entries()) pinAttachment(fx, `${where}: effects[${i}]`, ['effect']);
-      if (item.mask) pinAttachment(item.mask, `${where}: mask`, ['visual', 'image', 'sequence']);
+      if (item.mask) pinAttachment(item.mask, `${where}: mask`, ['visual', 'image', 'sequence', 'video']);
       if (item.transition) pinAttachment(item.transition, `${where}: transition`, ['transition']);
       // keyframed params must be numbers or colours the schema accepts
       const keyed = [item.keyframes, ...Object.values(item.formats ?? {}).map((o) => o.keyframes)];
@@ -151,6 +157,17 @@ export function createClips(ctx, library) {
     if (!problems.length) resolveAnchors(composition, problems);
     if (problems.length) throw new StudioError(`The composition is invalid:\n- ${problems.join('\n- ')}`, 'invalid', { problems });
     return { composition, refs: [...refs], fonts: [...fonts] };
+  }
+
+  /** A footage item's trim and hold must fall inside the file. */
+  function checkTrim(meta, list, where, problems) {
+    const d = meta.duration;
+    for (const p of list) {
+      if ((p.in ?? 0) >= d) problems.push(`${where}: params.in is ${p.in} s, but the footage is ${d} s long`);
+      if ((p.out ?? 0) > 0 && p.out <= (p.in ?? 0)) problems.push(`${where}: params.out (${p.out} s) must come after params.in (${p.in ?? 0} s), or be 0 for the end of the file`);
+      if ((p.out ?? 0) > d + 1e-6) problems.push(`${where}: params.out is ${p.out} s, but the footage is ${d} s long`);
+      if ((p.hold ?? -1) > d) problems.push(`${where}: params.hold is ${p.hold} s, but the footage is ${d} s long`);
+    }
   }
 
   /** The clip time of an anchor's word (start or end, plus its offset) → { time, word, item } or a problem string. */
@@ -244,7 +261,8 @@ export function createClips(ctx, library) {
       const offset = item.offset ?? 0;
       const span = item.assetDuration ?? offset + item.duration;
       let path, beatFile;
-      if (row.type === 'sound') {
+      if (row.type === 'sound' || row.type === 'video') {
+        // footage on an audio track plays its sound
         path = library.absFile(row);
         beatFile = join(audioDir, `${sha1(`${item.asset}|${span}`)}.beats.json`);
         if (wantBeats && !existsSync(beatFile)) {
@@ -759,13 +777,14 @@ export function createClips(ctx, library) {
     for (const ref of assets) {
       const row = library.requireVersion(ref);
       const audio = row.type === 'sound' || row.kind === 'audio';
-      if (!audio && !(row.type === 'image' || row.type === 'sequence' || row.kind === 'visual')) throw new StudioError(`${ref} is a ${row.kind ?? row.type} asset: attach it to an item instead (motions, effects, transition)`);
+      if (!audio && !(row.type === 'image' || row.type === 'sequence' || row.type === 'video' || row.kind === 'visual')) throw new StudioError(`${ref} is a ${row.kind ?? row.type} asset: attach it to an item instead (motions, effects, transition)`);
       const track = audio ? 'added-audio' : 'added';
       ensure(track, audio ? 'audio' : 'visual', audio ? 'Added audio' : 'Added');
       let id = row.slug, n = 2;
       while (ids.has(id)) id = `${row.slug}-${n++}`;
       ids.add(id);
-      const duration = round3(Math.min(row.duration ?? (row.type === 'sequence' ? json(row.meta, {}).duration : null) ?? 3, comp.duration - start));
+      const natural = row.type === 'video' ? naturalDuration({}, json(row.meta, {})) : row.duration ?? (row.type === 'sequence' ? json(row.meta, {}).duration : null);
+      const duration = round3(Math.min(natural ?? 3, comp.duration - start));
       ops.push({ op: 'add_item', track, item: { id, asset: makeRef(row.slug, row.version), start: round3(start), duration, params: {} } });
       added.push(id);
     }

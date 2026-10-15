@@ -126,7 +126,7 @@ export class Preview {
       const v = this.view;
       const frame = Math.min(Math.round(t * this.fps), Math.max(0, Math.round(this.duration * this.fps) - 1));
       const r = this.mode === 'clip'
-        ? await this.send({ op: 'clipFrame', frame, composition: v.composition, record: this.record })
+        ? await this.send({ op: 'clipFrame', frame, composition: v.composition, record: this.record, fast: this.playing })
         : await this.send({ op: 'assetFrame', ref: v.ref, params: v.params, t: Math.min(t, Math.max(0, v.duration - 1 / v.fps)), duration: v.duration, width: v.width, height: v.height, fps: v.fps, seed: v.seed, background: v.background });
       if (this.destroyed) return;
       if (this.canvas.width !== r.bitmap.width || this.canvas.height !== r.bitmap.height) { this.canvas.width = r.bitmap.width; this.canvas.height = r.bitmap.height; }
@@ -182,6 +182,8 @@ export class Preview {
     cancelAnimationFrame(this.raf);
     this.audio?.pause();
     this.onState(false);
+    // the frame it stopped on is drawn again exactly (footage frames are fast JPEGs while playing)
+    if (!this.destroyed) this.request();
   }
 
   toggle() { if (this.playing) this.pause(); else this.play(); }

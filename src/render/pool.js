@@ -4,6 +4,7 @@
 // process down with it.
 
 import { Worker } from 'node:worker_threads';
+import { footageService } from './footage.js';
 
 export class RenderError extends Error {
   /** @param {string} message @param {any} [extra] */
@@ -27,6 +28,8 @@ export class WorkerPool {
     const worker = new Worker(new URL('./frame-worker.js', import.meta.url));
     const w = { worker, busy: false, key: null, pending: new Map() };
     worker.on('message', (m) => {
+      // a worker drawing a frame asks for a decoded footage frame: the process's footage service answers
+      if (m.footage) return this.footage(w, m.footage);
       const p = w.pending.get(m.id);
       if (!p) return;
       w.pending.delete(m.id);
@@ -45,6 +48,15 @@ export class WorkerPool {
     worker.unref();
     this.workers.push(w);
     return w;
+  }
+
+  /** Decode a footage frame for a worker and send it back (the copy is the worker's; the cache keeps its own). */
+  footage(w, { id, path, meta, index }) {
+    footageService().frame({ ...meta, path }, index).then((data) => {
+      const buffer = new ArrayBuffer(data.length);
+      new Uint8Array(buffer).set(data);
+      w.worker.postMessage({ footageReply: id, ok: true, buffer, width: meta.width, height: meta.height }, [buffer]);
+    }, (e) => w.worker.postMessage({ footageReply: id, ok: false, error: e.message }));
   }
 
   send(w, msg, timeout) {

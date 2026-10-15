@@ -109,7 +109,10 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     // a sequence's frames are fetched as the preview needs them: /media/files/<slug>@<v>/000123.png
     const sequences = {};
     for (const [ref, s] of Object.entries(b.sequences ?? {})) sequences[ref] = { url: `/media/${s.file}/`, frames: s.frames, fps: s.fps, width: s.width, height: s.height };
-    return { key: b.key, assets: b.assets, images, sequences, beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane };
+    // footage frames come decoded from the server, as the render workers get them: /api/footage/<slug>/<v>/<index>.png|jpg
+    const footage = {};
+    for (const [ref, v] of Object.entries(b.videos ?? {})) footage[ref] = { url: `/api/footage/${ref.replace('@', '/')}/`, meta: v.meta };
+    return { key: b.key, assets: b.assets, images, sequences, footage, beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane };
   }
 
   /** What the editor needs to know about each asset version a composition names. */

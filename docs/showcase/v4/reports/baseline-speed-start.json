@@ -1,0 +1,59 @@
+{
+ "machine": "Intel(R) Core(TM) i9-14900KF × 32",
+ "node": "v24.19.0",
+ "runs": 5,
+ "method": "MCP start_render with wait; renderSeconds from the render stats (frames drawn by the worker pool + FFmpeg encode, audio mix excluded once cached); median of the runs",
+ "clips": {
+  "clip-1-every-frame": {
+   "size": "1080×1920",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    7.11,
+    6.74,
+    6.83,
+    6.75,
+    6.98
+   ],
+   "median": 6.83,
+   "framesPerSecond": 140.6,
+   "mixSeconds": 0,
+   "reportSeconds": 2.06,
+   "loudnessSeconds": 0
+  },
+  "clip-2-compounding": {
+   "size": "1920×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    8.95,
+    8.44,
+    9.16,
+    9.14,
+    13.24
+   ],
+   "median": 9.14,
+   "framesPerSecond": 105,
+   "mixSeconds": 0,
+   "reportSeconds": 1.45,
+   "loudnessSeconds": 0
+  },
+  "clip-3-release-notes": {
+   "size": "1080×1080",
+   "seconds": 32,
+   "frames": 960,
+   "runs": [
+    6.7,
+    5.88,
+    5.67,
+    5.34,
+    5.21
+   ],
+   "median": 5.67,
+   "framesPerSecond": 169.3,
+   "mixSeconds": 0,
+   "reportSeconds": 1.5,
+   "loudnessSeconds": 0
+  }
+ }
+}

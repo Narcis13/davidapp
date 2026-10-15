@@ -2,13 +2,15 @@
 // render worker (compiled, test frames drawn, determinism checked) before a version is accepted.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef, parseRef } from '../core/engine.js';
 import { staticCheck } from '../core/static-check.js';
 import { walkParams, mapParams } from '../core/schema.js';
 import { createCanvas, fontManifest, loadImage, registerFonts, FONTS_DIR } from '../render/host.js';
+import { ImageData } from '@napi-rs/canvas';
 import { probeSummary } from '../render/ffmpeg.js';
+import { probeFootage, footageService, sha256File, soundPeaks, FootageError } from '../render/footage.js';
 import { json, now, transaction } from '../db/db.js';
 import { presetSource, rewriteDefaults } from './generate.js';
 import { diffLines, unified } from '../core/diff.js';
@@ -385,7 +387,7 @@ export function createLibrary(ctx) {
    */
   function closure(refs) {
     const versions = new Map();
-    const assets = {}, images = {}, sounds = {}, sequences = {};
+    const assets = {}, images = {}, sounds = {}, sequences = {}, videos = {};
     const queue = refs.map((ref) => ({ ref, depth: 0 }));
     while (queue.length) {
       const { ref, depth } = queue.shift();
@@ -401,15 +403,19 @@ export function createLibrary(ctx) {
       } else if (row.type === 'image') images[pinned] = { path: absFile(row), vector: json(row.meta, {}).vector ?? null };
       else if (row.type === 'sound') sounds[pinned] = { path: absFile(row) };
       else if (row.type === 'sequence') { const m = json(row.meta, {}); sequences[pinned] = { dir: absFile(row), file: row.file, frames: m.frames, fps: m.fps, width: m.width, height: m.height }; }
+      else if (row.type === 'video') videos[pinned] = { path: absFile(row), file: row.file, meta: footageMeta(row) };
     }
-    return { versions, assets, images, sounds, sequences };
+    return { versions, assets, images, sounds, sequences, videos };
   }
 
   /** A worker bundle for rendering the given refs (and optionally a composition). */
   function bundle(refs, extra = {}) {
     const c = closure(refs);
-    const key = sha1(JSON.stringify([Object.keys(c.assets).sort(), Object.keys(c.images).sort(), Object.keys(c.sequences).sort(), extra.composition ?? null, extra.beats ?? null]));
-    return { key, assets: c.assets, images: c.images, sounds: c.sounds, sequences: c.sequences, ...extra };
+    // footage adds a key part only when there is some, so bundles without footage keep their keys
+    const parts = [Object.keys(c.assets).sort(), Object.keys(c.images).sort(), Object.keys(c.sequences).sort(), extra.composition ?? null, extra.beats ?? null];
+    if (Object.keys(c.videos).length) parts.push(Object.keys(c.videos).sort());
+    const key = sha1(JSON.stringify(parts));
+    return { key, assets: c.assets, images: c.images, sounds: c.sounds, sequences: c.sequences, videos: c.videos, ...extra };
   }
 
   // ── writing function assets ──────────────────────────────────────────────────────────────
@@ -766,6 +772,115 @@ export function createLibrary(ctx) {
     return { asset: getAsset(makeRef(slug, version), { includeSource: false }) };
   }
 
+  /** What drawing a footage version needs: its display size, rate, duration, frame table and colour (the decoder's input). */
+  function footageMeta(row) {
+    const m = json(row.meta, {});
+    return { width: m.width, height: m.height, fps: m.fps, frames: m.frames, duration: m.duration, start: m.start ?? 0, colour: m.colour, table: m.table };
+  }
+
+  const VIDEO_MIME = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska' };
+
+  /** A canvas holding RGBA pixels. */
+  function canvasOf(data, width, height) {
+    const c = createCanvas(width, height);
+    c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data.buffer, data.byteOffset, data.length), width, height), 0, 0);
+    return c;
+  }
+
+  /**
+   * Add a video file (footage) from a path. The file is kept as it is; what the studio needs to draw it frame-exactly is
+   * read now: size, rate, rotation, colour, audio, and the frame table (the whole file is decoded once). A thumbnail, an
+   * 8-frame filmstrip and, when it has sound, a waveform image are made from it. An existing slug gets a new version.
+   * move: the file is moved in instead of copied (an upload already written to a temp file).
+   * @param {{ slug: string, path: string, description: string, tags?: string[], title?: string, author: string, forClip?: string, note?: string, license?: string, meta?: any, move?: boolean }} o
+   */
+  async function addFootage({ slug, path, description, tags = [], title, author, forClip, note, license, meta = {}, move = false }) {
+    if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name: use lowercase letters, digits and dashes (2–64 characters)`);
+    if (!author) throw new StudioError('author is required');
+    if (typeof description !== 'string' || description.trim().length < 12) throw new StudioError('description is required: what the footage shows, and where it came from');
+    if (!Array.isArray(tags) || !tags.every((t) => /^[a-z0-9][a-z0-9-]*$/.test(t))) throw new StudioError('tags must be lowercase-kebab strings');
+    const e = extname(path ?? '').toLowerCase();
+    if (!VIDEO_MIME[e]) throw new StudioError(`Unsupported video file type "${e || path}": use MP4, MOV, M4V, WebM or MKV`);
+    if (!path || !existsSync(path) || !statSync(path).isFile()) throw new StudioError(`File not found: ${path}`, 'not_found');
+    const existing = q('SELECT * FROM assets WHERE slug = ?').get(slug);
+    if (existing && existing.type !== 'video') throw new StudioError(`"${slug}" already exists as a ${existing.type} asset`, 'conflict');
+    const clip = forClip ? clipBySlug(forClip) : null;
+    if (forClip && !clip) throw new StudioError(`for_clip: no clip named "${forClip}"`, 'not_found');
+    const version = (existing?.latest_version ?? 0) + 1;
+    const file = `files/${slug}@${version}${e}`;
+    const fileTmp = join(dataDir, tempOf(file));
+    const thumb = `thumbs/${slug}@${version}.png`, strip = `thumbs/${slug}@${version}.strip.png`, wave = `thumbs/${slug}@${version}.wave.png`;
+    const temps = [thumb, strip, wave].map((f) => join(dataDir, tempOf(f)));
+    if (move) renameRetry(path, fileTmp); else copyFileSync(path, fileTmp);
+    try {
+      let probed;
+      try { probed = await probeFootage(fileTmp); } catch (err) { throw err instanceof FootageError ? new StudioError(err.message, 'rejected') : err; }
+      const draw = { ...probed, path: fileTmp };
+      const svc = footageService();
+      const frameCanvas = async (sec) => canvasOf(await svc.frameAtTime(draw, sec), probed.width, probed.height);
+      // the thumbnail: a second in (or a tenth of a short file), 640 px on its long side
+      const k = Math.min(1, 640 / Math.max(probed.width, probed.height));
+      const tc = createCanvas(Math.max(1, Math.round(probed.width * k)), Math.max(1, Math.round(probed.height * k)));
+      const tg = tc.getContext('2d');
+      tg.imageSmoothingQuality = 'high';
+      tg.drawImage(await frameCanvas(Math.min(1, probed.duration * 0.1)), 0, 0, tc.width, tc.height);
+      writeFileSync(temps[0], tc.toBuffer('image/png'));
+      // the library's hover filmstrip: eight frames across the file, 240 px cells
+      const cw = 240, ch = Math.max(1, Math.round((cw * probed.height) / probed.width));
+      const sc = createCanvas(cw * 8, ch);
+      const sg = sc.getContext('2d');
+      sg.imageSmoothingQuality = 'high';
+      for (let i = 0; i < 8; i++) sg.drawImage(await frameCanvas(((i + 0.5) / 8) * probed.duration), i * cw, 0, cw, ch);
+      writeFileSync(temps[1], sc.toBuffer('image/png'));
+      let hasWave = false;
+      if (probed.audio) {
+        const peaks = await soundPeaks(fileTmp, probed.duration);
+        if (peaks?.length) {
+          const W = 1200, H = 120;
+          const wc = createCanvas(W, H);
+          const wg = wc.getContext('2d');
+          wg.fillStyle = '#101018'; wg.fillRect(0, 0, W, H);
+          wg.fillStyle = '#7dd3fc';
+          for (let x = 0; x < W; x++) {
+            let m = 0;
+            const from = Math.floor((x / W) * peaks.length), to = Math.max(from + 1, Math.floor(((x + 1) / W) * peaks.length));
+            for (let i = from; i < to && i < peaks.length; i++) m = Math.max(m, peaks[i]);
+            const h = Math.max(1, (m / 255) * (H - 8));
+            wg.fillRect(x, (H - h) / 2, 1, h);
+          }
+          writeFileSync(temps[2], wc.toBuffer('image/png'));
+          hasWave = true;
+        }
+      }
+      // the stills are made: the decoder lets go of the temp file before it is renamed
+      await svc.release(fileTmp);
+      const sha256 = await sha256File(fileTmp);
+      const info = { ...meta, ...probed, license: license ?? meta.license ?? 'original', bytes: statSync(fileTmp).size, sha256, strip: { file: strip, frames: 8 }, wave: hasWave ? { file: wave } : undefined };
+      const at = now();
+      const prev = existing ? versionRow(slug) : null;
+      transaction(db, () => {
+        const assetId = existing?.id ?? q('INSERT INTO assets (slug, type, latest_version, origin_clip, created_at) VALUES (?, ?, 0, ?, ?)').run(slug, 'video', clip?.id ?? null, at).lastInsertRowid;
+        const current = q('SELECT latest_version FROM assets WHERE id = ?').get(assetId).latest_version;
+        if (current !== version - 1) throw new StudioError(`"${slug}" changed while the footage was being read (now v${current}); try again.`, 'conflict');
+        q(`INSERT INTO asset_versions (asset_id, version, title, description, tags, duration, formats, file, mime, meta, thumb, author, note, parent_version, clip_id, engine, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(assetId, version, title ?? null, description.trim(), JSON.stringify(tags), probed.duration, file, VIDEO_MIME[e], JSON.stringify(info), thumb, author, note ?? null, prev?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at);
+        q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
+        reindex(assetId, { slug, title, description: description.trim(), tags, source: '' });
+        touch(slug, 'created');
+        ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, type: 'video', clip: forClip ?? null });
+      });
+      renameRetry(fileTmp, join(dataDir, file));
+      renameRetry(temps[0], join(dataDir, thumb));
+      renameRetry(temps[1], join(dataDir, strip));
+      if (hasWave) renameRetry(temps[2], join(dataDir, wave));
+    } catch (err) {
+      await footageService().release(fileTmp);
+      for (const f of [fileTmp, ...temps]) rmSync(f, { force: true, maxRetries: 5, retryDelay: 100 });
+      throw raceOf(err, slug);
+    }
+    return { asset: getAsset(makeRef(slug, version), { includeSource: false }) };
+  }
+
   /** A sequence already baked with this key (same asset version, params, size, fps and duration). */
   const sequenceByKey = (key) => {
     const r = q("SELECT a.slug, v.version FROM assets a JOIN asset_versions v ON v.asset_id = a.id WHERE a.type = 'sequence' AND json_extract(v.meta, '$.key') = ? ORDER BY v.id LIMIT 1").get(key);
@@ -808,6 +923,6 @@ export function createLibrary(ctx) {
     return fam ? makeRef(fam.slug, 1) : null;
   };
 
-  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, sequenceByKey, setFavorite, setFeatured, touch, listCollections, addToCollection, removeFromCollection, bulk, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
+  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, addFootage, footageMeta, canvasOf, sequenceByKey, setFavorite, setFeatured, touch, listCollections, addToCollection, removeFromCollection, bulk, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
 }
 
