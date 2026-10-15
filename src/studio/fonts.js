@@ -195,5 +195,5 @@ export function createFonts(ctx, library) {
     return out;
   }
 
-  return { addFont, listFonts };
+  return { addFont, listFonts, specimen };
 }

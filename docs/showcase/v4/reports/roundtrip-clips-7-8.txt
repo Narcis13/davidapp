@@ -1,0 +1,26 @@
+# scripts/roundtrip.mjs on the showcase library of this build (iteration 4, exchange; contract items D11 and D20)
+#   STUDIO_DATA=<scratch>/showcase-data node showcase/build.mjs --no-render
+#   STUDIO_DATA=<scratch>/showcase-data node scripts/roundtrip.mjs clip-7-a-video-that-checks-itself clip-8-cuvinte-pe-ritm --clone
+# Scratch paths are shortened to <scratch> and <tmp>. The same run on clips 1 to 6 (clip 5 has a baked sequence, baked again
+# on import) also came back identical: 48 of 48 frames and the composition JSON byte for byte, for each of the six.
+
+Round trip of 2 clips: clip-7-a-video-that-checks-itself, clip-8-cuvinte-pe-ritm
+machine win32-x64, code 64aee60, repo a fresh clone of this checkout (<tmp>/repo)
+original library <scratch>/showcase-data
+new library      <tmp>/library-data (empty)
+
+export clip-7-a-video-that-checks-itself: 19 refs in the closure (18 versions, 0 files left out of git), 48 frame hashes, 37 files written, 0.4 s
+export clip-8-cuvinte-pe-ritm: 15 refs in the closure (15 versions, 0 files left out of git), 48 frame hashes, 3 files written, 0.2 s
+  the store: 0.8 MB in library/, 0.1 MB in clips/
+
+import clip-7-a-video-that-checks-itself: 18 versions created, 0 reused (made by the clips imported before), 0 sequences baked again, 2 files copied, 2.0 s
+  composition JSON  identical (8288 bytes)
+  pinned refs       identical (19 versions: bg-gradient-drift@1, check-list@3, clip-7-voice@1, drum-hat@1, drum-kick@1, drum-snare@1, …)
+  frame hashes      48 of 48 identical
+import clip-8-cuvinte-pe-ritm: 1 versions created, 14 reused (made by the clips imported before), 0 sequences baked again, 0 files copied, 0.4 s
+  composition JSON  identical (5215 bytes)
+  pinned refs       identical (15 versions: beat-bars@1, bg-gradient-drift@1, check-list@3, drum-hat@1, drum-kick@1, drum-snare@1, …)
+  frame hashes      48 of 48 identical
+
+git status of the clone: 3 new entries (?? clips/clip-7-a-video-that-checks-itself/clip.json; ?? clips/clip-8-cuvinte-pe-ritm/clip.json; ?? library/)
+RESULT: every clip came back with the same refs and the same frames.
