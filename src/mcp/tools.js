@@ -19,9 +19,12 @@ const PARAMS = z.record(z.string(), z.any()).describe('Parameter values, validat
 const AUTHOR = z.string().optional().describe('Who is writing this (model id or person). Defaults to the server\'s STUDIO_AUTHOR.');
 const COMPOSITION = z.record(z.string(), z.any()).describe('Clip composition: { format | width+height, fps, duration, background, seed, theme?, easing?, effects?: [{ asset, params }], loudness?: { target, truePeak } | true, captions?: { maxLines, maxChars, lead, minDuration, closeGap, burnIn, names, pages }, platforms?: [youtube|shorts|reels|tiktok|feed], safe?: format|platform, checks?: { minTextSize, contrast }, markers?: [{ t, type: cut|hold|beat|word|note, label, duration?, anchor? }], tracks: [{ id, name, type: visual|text|audio, hidden, locked, solo, muted, effects?: [{ asset, params }], role?: captions|narration|music|sfx, items: [{ id, asset, start, duration, params, fadeIn, fadeOut, opacity, blend, transform: { space: frame|safe, x, y, width, height (fractions of the space), anchorX, anchorY, scale, scaleX, scaleY, rotation (degrees) }, keyframes: { x|y|scale|rotation|opacity|params.<name>: [{ t, v, ease }] }, formats: { vertical|horizontal|square: { transform, keyframes, params, hidden, opacity } }, motions: [{ asset, phase: in|out|emphasis|loop, duration, at, params }], effects: [{ asset, params }], transition: { asset, duration?, params }, mask: { asset, mode: alpha|alpha-inverted|luma|luma-inverted, params, transform? }, offset, assetDuration, seedId (a part of a split item: where it starts in the asset, the length it was cut from, and the id it takes its random seed from; split_item sets them), gain (audio), beats (audio), keyframes.volume (audio: [{ t, v (dB), ease }]), duck (audio: { by, attack, release, hold, source: words|envelope, under, threshold }), anchor ({ item: narration item id, word: index, edge, offset }: the start is set from that word) }] }] }. Tracks draw bottom to top; a visual track also takes image and sequence assets (params.fit: contain|cover|fill; sequences also params.loop). See studio_guide for the layout model and the kinds.');
 
+const ISOLATE = z.object({ only: z.array(z.string()).optional().describe('Draw only these items'), except: z.array(z.string()).optional().describe('Draw everything but these items') }).strict()
+  .describe('Draw only some of the clip\'s items: { only: [item ids] } or { except: [item ids] } (exactly one of the two). Only visual items of the composition itself (not the layers of a precomp); the audio is untouched. The items keep their ids and seeds, so they draw as they do in the whole clip.');
+
 const compactAsset = (a) => ({ ref: a.ref, type: a.type, kind: a.kind, title: a.title, description: a.description, tags: a.tags, formats: a.formats, duration: a.duration, params: a.params, author: a.author, originClip: a.originClip, forkedFrom: a.forkedFrom, usedByClips: a.usedByClips });
-const compactRender = (r) => ({ id: r.id, clip: r.clip, format: r.format, status: r.status, progress: Math.round(r.progress * 1000) / 1000, framesDone: r.framesDone, framesTotal: r.framesTotal, error: r.error, output: r.outputPath, poster: r.posterPath, srt: r.srt, log: r.log || undefined,
-  stats: r.status === 'done' ? { renderSeconds: r.stats.renderSeconds, framesPerSecond: r.stats.framesPerSecond, realtimeFactor: r.stats.realtimeFactor, mixSeconds: r.stats.mixSeconds, reportSeconds: r.stats.reportSeconds, loudnessSeconds: r.stats.loudnessSeconds, probe: r.stats.probe, frameHashes: r.stats.frameHashes, loudness: r.stats.loudness, problems: r.stats.problems, files: r.stats.files } : undefined });
+const compactRender = (r) => ({ id: r.id, clip: r.clip, format: r.format, width: r.width, height: r.height, options: Object.keys(r.options ?? {}).length ? r.options : undefined, status: r.status, progress: Math.round(r.progress * 1000) / 1000, framesDone: r.framesDone, framesTotal: r.framesTotal, error: r.error, output: r.outputPath, poster: r.posterPath, srt: r.srt, log: r.log || undefined,
+  stats: r.status === 'done' ? { renderSeconds: r.stats.renderSeconds, draft: r.stats.draft, workers: r.stats.workers, posterFrame: r.stats.posterFrame, framesPerSecond: r.stats.framesPerSecond, realtimeFactor: r.stats.realtimeFactor, mixSeconds: r.stats.mixSeconds, reportSeconds: r.stats.reportSeconds, loudnessSeconds: r.stats.loudnessSeconds, probe: r.stats.probe, frameHashes: r.stats.frameHashes, loudness: r.stats.loudness, problems: r.stats.problems, files: r.stats.files } : undefined });
 
 /** @param {any} studio @param {{ author?: string }} [o] */
 export function createTools(studio, { author: defaultAuthor = process.env.STUDIO_AUTHOR ?? 'mcp-client' } = {}) {
@@ -352,11 +355,12 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'render_clip_frame',
       title: 'Render a clip frame to PNG',
-      description: 'Draw one frame of a clip at time t, or (sheet: true) a contact sheet of frames across the clip, straight from the composition without encoding. Use it to look at your work. format draws it in another shape (each item\'s overrides for that format apply); composition draws an unsaved draft instead of the saved clip.',
+      description: 'Draw one frame of a clip at time t, or (sheet: true) a contact sheet of frames across the clip, straight from the composition without encoding. Use it to look at your work. format draws it in another shape (each item\'s overrides for that format apply); composition draws an unsaved draft instead of the saved clip. isolate draws only some of the items ({ only: [ids] }) or all but some ({ except: [ids] }): look at one layer alone, or the clip without it.',
       input: {
         clip: z.string().optional().describe('Clip name (or give composition)'),
         composition: COMPOSITION.optional().describe('A draft composition to draw instead of the saved clip (validated and pinned, not saved)'),
         format: FORMAT.optional().describe('Draw it in another format'),
+        isolate: ISOLATE.optional(),
         overlays: z.union([z.boolean(), z.array(z.enum(['grid', 'safe', 'platform', 'lane', 'text']))]).optional().describe('Draw guides over the frame (never into a render): true for all, or some of grid, safe (title-safe, action-safe, f.safe), platform (the platform zones of the clip), lane (the caption lane), text (the measured text boxes)'),
         t: z.number().min(0).optional().describe('Seconds'),
         sheet: z.boolean().optional().describe('Return a contact sheet instead of one frame'),
@@ -367,13 +371,15 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       },
       readOnly: true,
       run: async (a) => {
-        const name = `${a.clip ?? 'draft'}${a.format ? `-${a.format}` : ''}`;
+        // an isolated frame never overwrites the still of the whole clip
+        const name = `${a.clip ?? 'draft'}${a.format ? `-${a.format}` : ''}${a.isolate ? `-${a.isolate.only ? 'only' : 'except'}-${(a.isolate.only ?? a.isolate.except ?? []).join('+').slice(0, 60)}` : ''}`;
+        if (a.isolate && a.overlays) throw new StudioError('overlays measure the whole clip: leave out isolate or overlays');
         if (a.sheet) {
-          const s = await studio.clipSheet({ clip: a.clip, composition: a.composition, format: a.format, count: a.frames ?? 12, from: a.from, to: a.to });
-          return { json: { clip: a.clip ?? null, format: a.format, frames: s.frames }, images: [image(`${name}-sheet${a.from !== undefined ? `-${a.from}-${a.to}` : ''}`, s.png)] };
+          const s = await studio.clipSheet({ clip: a.clip, composition: a.composition, format: a.format, isolate: a.isolate, count: a.frames ?? 12, from: a.from, to: a.to });
+          return { json: { clip: a.clip ?? null, format: a.format, isolate: a.isolate, frames: s.frames }, images: [image(`${name}-sheet${a.from !== undefined ? `-${a.from}-${a.to}` : ''}`, s.png)] };
         }
-        const r = await studio.clipFrame({ clip: a.clip, composition: a.composition, format: a.format, t: a.t ?? 0, maxSize: a.max_size ?? 960, hash: true });
-        if (!a.overlays) return { json: { clip: a.clip ?? null, format: a.format, t: r.t, frame: r.frame, sha256: r.hash }, images: [image(`${name}-t${r.t.toFixed(2)}`, r.png)] };
+        const r = await studio.clipFrame({ clip: a.clip, composition: a.composition, format: a.format, isolate: a.isolate, t: a.t ?? 0, maxSize: a.max_size ?? 960, hash: true });
+        if (!a.overlays) return { json: { clip: a.clip ?? null, format: a.format, isolate: a.isolate, t: r.t, frame: r.frame, sha256: r.hash }, images: [image(`${name}-t${r.t.toFixed(2)}`, r.png)] };
         // the guides go on a copy of the frame; the hash is still the frame's own
         const rep2 = await studio.inspect.layoutReport({ clip: a.clip, composition: a.composition, format: a.format, frame: r.frame });
         const png = await drawOverlays(r.png, { width: rep2.width, height: rep2.height, zones: rep2.zones, texts: rep2.texts, show: a.overlays === true ? OVERLAYS : a.overlays });
@@ -383,10 +389,10 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'frame_hashes',
       title: 'Hash clip frames',
-      description: 'SHA-256 of the raw pixels of a clip at the given times. Equal hashes mean identical frames: use it to check determinism and that an old clip is unchanged after its assets got new versions. format and composition work as in render_clip_frame.',
-      input: { clip: z.string().optional(), composition: COMPOSITION.optional(), format: FORMAT.optional(), times: z.array(z.number().min(0)).min(1).max(64) },
+      description: 'SHA-256 of the raw pixels of a clip at the given times. Equal hashes mean identical frames: use it to check determinism and that an old clip is unchanged after its assets got new versions. format, composition and isolate work as in render_clip_frame (hash a layer alone, or the clip without it).',
+      input: { clip: z.string().optional(), composition: COMPOSITION.optional(), format: FORMAT.optional(), isolate: ISOLATE.optional(), times: z.array(z.number().min(0)).min(1).max(64) },
       readOnly: true,
-      run: async (a) => ({ json: { clip: a.clip ?? null, format: a.format, frames: await studio.frameHashes({ clip: a.clip, composition: a.composition, format: a.format, times: a.times }) } }),
+      run: async (a) => ({ json: { clip: a.clip ?? null, format: a.format, isolate: a.isolate, frames: await studio.frameHashes({ clip: a.clip, composition: a.composition, format: a.format, isolate: a.isolate, times: a.times }) } }),
     },
     // ── narration, words, captions and the mix ───────────────────────────────────────────
     {
@@ -503,12 +509,26 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'start_render',
       title: 'Render a clip to MP4',
-      description: 'Queue a render of the clip to H.264/AAC MP4. Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long.',
-      input: { clip: z.string(), format: FORMAT.optional().describe('Render the same composition in another format; each item\'s overrides for that format apply'), wait_seconds: z.number().min(0).max(900).optional() },
+      description: 'Queue a render of the clip to H.264/AAC MP4. Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long. Options: format renders the same composition in another shape (each item\'s overrides for that format apply); formats: ["horizontal","vertical","square"] (1–3, instead of format) queues one render per format in this one call, with the same options, and returns { batch, renders } (batch = the first render\'s id); draft: true (or { scale }) makes an animatic: the frames are drawn at full size, so a draft shows exactly the final frames and its sampled frame hashes equal a full render\'s, then scaled to 2/3, 1/2 or 1/3 (the largest that gives whole, even pixel sizes; 1920x1080 gives 1280x720) and encoded fast, to a file named ...-draft.mp4; workers: how many worker threads draw frames, 1–16 (default: by CPU count; the pixels do not depend on it); poster_at: the poster frame at this time in seconds (default: 40 % of the clip). The options are stored with the render (get_render).',
+      input: {
+        clip: z.string(),
+        format: FORMAT.optional().describe('Render the same composition in another format; each item\'s overrides for that format apply'),
+        formats: z.array(FORMAT).min(1).max(3).optional().describe('Render several formats in one request (distinct, 1–3); instead of format'),
+        draft: z.union([z.boolean(), z.object({ scale: z.number().gt(0).lt(1).describe('For example 0.5; must give whole, even pixel sizes') }).strict()]).optional().describe('A fast, smaller render for review: true, or { scale }'),
+        workers: z.number().int().min(1).max(16).optional().describe('Worker threads that draw frames, 1–16'),
+        poster_at: z.number().min(0).optional().describe('Seconds: the time of the poster frame (0 up to the clip\'s duration)'),
+        wait_seconds: z.number().min(0).max(900).optional().describe('Wait here for up to this long (for several formats: for all of them)'),
+      },
       run: async (a) => {
-        let r = renders.enqueue({ clip: a.clip, format: a.format, requestedBy: defaultAuthor });
-        if (a.wait_seconds) r = await renders.wait(r.id, a.wait_seconds * 1000);
-        return { json: compactRender(r) };
+        if (a.format && a.formats) throw new StudioError('Give format or formats, not both');
+        const options = { draft: a.draft || undefined, workers: a.workers, poster: a.poster_at };
+        const wait = (r) => (a.wait_seconds ? renders.wait(r.id, a.wait_seconds * 1000) : r);
+        if (!a.formats) return { json: compactRender(await wait(renders.enqueue({ clip: a.clip, format: a.format, requestedBy: defaultAuthor, options }))) };
+        const b = renders.enqueueBatch({ clip: a.clip, formats: a.formats, requestedBy: defaultAuthor, options });
+        // one deadline for all of them
+        const end = Date.now() + (a.wait_seconds ?? 0) * 1000;
+        const list = a.wait_seconds ? await Promise.all(b.renders.map((r) => renders.wait(r.id, Math.max(0, end - Date.now())))) : b.renders;
+        return { json: { batch: b.batch, renders: list.map(compactRender) } };
       },
     },
     {

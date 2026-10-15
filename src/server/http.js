@@ -200,7 +200,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     }],
     // the exact frame, drawn by the renderer (PNG)
     ['POST', /^\/api\/frame\/asset$/, async ({ data, res }) => png(res, (await studio.assetFrame({ ref: data.ref, source: data.source, slug: data.name, params: data.params, t: data.t, duration: data.duration, format: data.format, width: data.width, height: data.height, background: data.background, maxSize: data.maxSize })).png)],
-    ['POST', /^\/api\/frame\/clip$/, async ({ data, res }) => png(res, (await studio.clipFrame({ clip: data.clip, composition: data.composition, t: data.t, maxSize: data.maxSize })).png)],
+    ['POST', /^\/api\/frame\/clip$/, async ({ data, res }) => png(res, (await studio.clipFrame({ clip: data.clip, composition: data.composition, isolate: data.isolate, t: data.t, maxSize: data.maxSize })).png)],
     ['POST', /^\/api\/audio\/asset$/, async ({ data, req, res }) => {
       // an audio asset on its own, as a one-item clip
       const row = library.requireVersion(data.ref);
@@ -232,7 +232,12 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       const wav = await studio.clipAudio({ clip: params[0] });
       return file(req, res, studio.dataDir, wav.slice(studio.dataDir.length + 1));
     }],
-    ['GET', /^\/api\/clips\/([a-z0-9-]+)\/frame\.png$/, async ({ params, query, res }) => png(res, (await studio.clipFrame({ clip: params[0], t: Number(query.get('t') ?? 0), maxSize: Number(query.get('maxSize') ?? 640) })).png)],
+    ['GET', /^\/api\/clips\/([a-z0-9-]+)\/frame\.png$/, async ({ params, query, res }) => {
+      // ?only=a,b or ?except=a,b draws some of the items (comma-separated item ids)
+      const ids = (k) => (query.get(k) ? query.get(k).split(',') : undefined);
+      const isolate = query.has('only') || query.has('except') ? { only: ids('only'), except: ids('except') } : undefined;
+      return png(res, (await studio.clipFrame({ clip: params[0], isolate, t: Number(query.get('t') ?? 0), maxSize: Number(query.get('maxSize') ?? 640) })).png);
+    }],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/add-assets$/, async ({ params, data }) => {
       const r = await clips.addAssets({ slug: params[0], assets: data.slugs ?? [], at: data.at, author: data.author ?? author });
       return { clip: r.clip.slug, revision: r.clip.revision, added: r.added };
@@ -244,7 +249,14 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     }],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/layout$/, async ({ params, data }) => studio.inspect.layoutReport({ clip: data.composition ? undefined : params[0], composition: data.composition, format: data.format, t: data.t ?? 0 })],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/audio-report$/, async ({ params, data }) => studio.audio.report(await studio.compositionOf({ clip: data.composition ? undefined : params[0], composition: data.composition }), { silence: data.silence, minSilence: data.minSilence })],
-    ['POST', /^\/api\/clips\/([a-z0-9-]+)\/render$/, ({ params }) => renders.enqueue({ clip: params[0], requestedBy: author })],
+    // body (all optional): { format | formats: [1–3 formats] (→ { batch, renders }), draft: true | { scale }, workers: 1–16, posterAt: seconds }
+    ['POST', /^\/api\/clips\/([a-z0-9-]+)\/render$/, ({ params, data }) => {
+      if (data.format !== undefined && data.formats !== undefined) throw new StudioError('Give format or formats, not both');
+      const options = { draft: data.draft || undefined, workers: data.workers, poster: data.posterAt };
+      return data.formats !== undefined
+        ? renders.enqueueBatch({ clip: params[0], formats: data.formats, requestedBy: author, options })
+        : renders.enqueue({ clip: params[0], requestedBy: author, format: data.format, options });
+    }],
     ['POST', /^\/api\/clips\/([a-z0-9-]+)\/remix$/, async ({ params, data }) => (await clips.remixClip({ slug: params[0], newSlug: data.name, format: data.format, title: data.title, author: data.author ?? author })).clip],
 
     // uploads waiting for the agent to describe them

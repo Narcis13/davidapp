@@ -41,10 +41,12 @@ export async function replaceAudio(mp4, wav) {
  *   bundle: worker bundle with the composition and beats; mixPath: the clip's mixed audio (a WAV the length of the clip,
  *   made by studio/audio.js: the same file the preview plays), encoded as it is; without it the clip is silent
  *   onProgress(done, total); signal: AbortSignal; hashFrames: frame numbers to SHA-256 (raw RGBA).
+ *   size: { width, height } to encode at instead of the clip's size (a draft): the workers still draw the clip's size, so
+ *   the hashes are those of a full render, and FFmpeg scales the frames in the encode graph.
  * Returns { frames, seconds, fps, hashes: { frame: sha256 }, log, workers }.
  * @param {any} o
  */
-export async function renderVideo({ bundle, mixPath = null, outPath, workers = defaultWorkers(), signal, onProgress = () => {}, hashFrames = [], preset = 'medium', crf = 18 }) {
+export async function renderVideo({ bundle, mixPath = null, outPath, workers = defaultWorkers(), signal, onProgress = () => {}, hashFrames = [], preset = 'medium', crf = 18, size = null }) {
   const comp = bundle.composition;
   const total = Math.round(comp.duration * comp.fps);
   if (total < 1) throw new RenderError('The clip is shorter than one frame');
@@ -57,7 +59,8 @@ export async function renderVideo({ bundle, mixPath = null, outPath, workers = d
   const graph = mixPath ? `[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad,atrim=0:${+comp.duration.toFixed(3)}[aout]` : null;
   // setparams tags the frames BT.709: FFmpeg 9 ignores the -color_* output options for a raw input and writes
   // primaries and transfer as unknown (the pixels are the same either way)
-  const video = '[0:v]scale=in_range=full:out_range=tv:out_color_matrix=bt709:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709[vout]';
+  const resize = size && (size.width !== comp.width || size.height !== comp.height) ? `${size.width}:${size.height}:` : '';
+  const video = `[0:v]scale=${resize}in_range=full:out_range=tv:out_color_matrix=bt709:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709[vout]`;
   args.push('-filter_complex', graph ? `${video};${graph}` : video, '-map', '[vout]', '-map', graph ? '[aout]' : '1:a',
     '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-r', String(comp.fps),
     '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',

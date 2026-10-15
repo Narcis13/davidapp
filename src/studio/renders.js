@@ -25,6 +25,63 @@ export function sampleFrames(total, count = 16) {
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
+/** Draft scales, largest first; a draft keeps the first one that gives whole, even pixel sizes (yuv420p needs even sides). */
+export const DRAFT_SCALES = /** @type {[number, string][]} */ ([[2 / 3, '2/3'], [1 / 2, '1/2'], [1 / 3, '1/3']]);
+export const DRAFT_ENCODE = { preset: 'veryfast', crf: 23 };
+
+const whole = (v) => Math.abs(v - Math.round(v)) < 0.01 && Math.round(v) >= 2 && Math.round(v) % 2 === 0;
+
+/**
+ * The size of a draft of a width × height clip: `scale` if given, else the largest of 2/3, 1/2 and 1/3 that works.
+ * @param {number} width @param {number} height @param {number} [scale]
+ * @returns {{ scale: number, width: number, height: number }}
+ */
+export function draftSize(width, height, scale) {
+  const fits = DRAFT_SCALES.filter(([k]) => whole(width * k) && whole(height * k));
+  const list = fits.map(([k, name]) => `${name} (${Math.round(width * k)}x${Math.round(height * k)})`).join(', ');
+  if (scale === undefined || scale === null) {
+    if (!fits.length) throw new StudioError(`A ${width}x${height} clip has no draft size: none of the scales 2/3, 1/2 and 1/3 gives whole, even pixel sizes. Render it in full, or give draft: { scale } with a scale that does.`);
+    const [k] = fits[0];
+    return { scale: +k.toFixed(5), width: Math.round(width * k), height: Math.round(height * k) };
+  }
+  if (typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0 || scale >= 1) throw new StudioError(`draft.scale must be a number above 0 and below 1 (for example 0.5); got ${JSON.stringify(scale)}`);
+  // 0.6667 and 0.66667 mean 2/3
+  const k = DRAFT_SCALES.find(([c]) => Math.abs(c - scale) < 1e-4)?.[0] ?? scale;
+  if (!whole(width * k) || !whole(height * k)) {
+    throw new StudioError(`A draft at scale ${scale} of a ${width}x${height} clip would be ${+(width * k).toFixed(2)}x${+(height * k).toFixed(2)} pixels; a draft needs whole, even sizes. ${fits.length ? `Scales that work for this clip: ${list}.` : 'None of 2/3, 1/2 and 1/3 works for this clip; try other scales.'}`);
+  }
+  return { scale: +k.toFixed(5), width: Math.round(width * k), height: Math.round(height * k) };
+}
+
+const OPTION_KEYS = ['draft', 'workers', 'poster', 'batch'];
+
+/**
+ * Check render options and fill in what follows from them. Input: { draft?: true | { scale }, workers?: 1–16,
+ * poster?: seconds, batch?: render id }; stored: draft is { scale, width, height }.
+ * @param {any} o @param {{ width: number, height: number, duration: number, fps: number }} comp
+ */
+export function normalizeOptions(o, comp) {
+  if (o === undefined || o === null) return {};
+  if (typeof o !== 'object' || Array.isArray(o)) throw new StudioError('options must be an object');
+  const unknown = Object.keys(o).filter((k) => !OPTION_KEYS.includes(k) && o[k] !== undefined);
+  if (unknown.length) throw new StudioError(`Unknown render option${unknown.length > 1 ? 's' : ''} ${unknown.map((k) => `"${k}"`).join(', ')}; the options are ${OPTION_KEYS.filter((k) => k !== 'batch').join(', ')}`);
+  const out = {};
+  if (o.draft !== undefined && o.draft !== false) {
+    if (o.draft !== true && (typeof o.draft !== 'object' || o.draft === null || Array.isArray(o.draft))) throw new StudioError('draft must be true or { scale }, for example { scale: 0.5 }');
+    out.draft = draftSize(comp.width, comp.height, o.draft === true ? undefined : o.draft.scale);
+  }
+  if (o.workers !== undefined) {
+    if (!Number.isInteger(o.workers) || o.workers < 1 || o.workers > 16) throw new StudioError(`workers must be a whole number from 1 to 16; got ${JSON.stringify(o.workers)}`);
+    out.workers = o.workers;
+  }
+  if (o.poster !== undefined) {
+    if (typeof o.poster !== 'number' || !Number.isFinite(o.poster) || o.poster < 0 || o.poster >= comp.duration) throw new StudioError(`poster time must be from 0 up to the clip's duration (${comp.duration} s); got ${JSON.stringify(o.poster)}`);
+    out.poster = o.poster;
+  }
+  if (o.batch !== undefined) out.batch = o.batch;
+  return out;
+}
+
 /** Clip words grouped by narration item, as the render report wants them. */
 const narrationOf = (words) => {
   const by = new Map();
@@ -49,9 +106,11 @@ export function createRenders(ctx, library, clips, sound) {
     if (!row) return null;
     const clip = q('SELECT slug, title, format, width, height, fps, duration FROM clips WHERE id = ?').get(row.clip_id);
     const own = row.format ? FORMATS[row.format] : null;
+    const options = json(row.options, {});
     return {
       id: row.id, clip: clip.slug, clipTitle: clip.title, clipRevision: row.clip_revision,
-      format: row.format ?? clip.format, width: own?.width ?? clip.width, height: own?.height ?? clip.height,
+      // the size of the file: a draft's is smaller than the clip's
+      format: row.format ?? clip.format, width: options.draft?.width ?? own?.width ?? clip.width, height: options.draft?.height ?? own?.height ?? clip.height, options,
       status: row.status, progress: row.progress, framesDone: row.frames_done, framesTotal: row.frames_total,
       output: row.output, poster: row.poster, srt: row.srt, error: row.error, log: row.log,
       stats: json(row.stats, {}), engine: row.engine, requestedBy: row.requested_by, runner: row.runner,
@@ -64,9 +123,18 @@ export function createRenders(ctx, library, clips, sound) {
   /**
    * Queue a render of the clip as it is now. The composition is copied, so later edits don't change it.
    * format: render it in another format (vertical, horizontal, square); each item's overrides for that format apply.
-   * @param {{ clip: string, requestedBy?: string, format?: string }} o
+   * options: { draft: true | { scale } (frames drawn at full size, scaled and encoded fast: an animatic), workers: 1–16,
+   * poster: seconds (the poster frame), batch } are checked now and stored with the render.
+   * @param {{ clip: string, requestedBy?: string, format?: string, options?: any }} o
    */
-  function enqueue({ clip, requestedBy = 'studio', format }) {
+  function enqueue({ clip, requestedBy = 'studio', format, options }) {
+    const id = transaction(db, () => insert({ clip, requestedBy, format, options }));
+    if (timer) setImmediate(() => { tick().catch(() => {}); });
+    return get(id);
+  }
+
+  /** Check and insert one queued render (inside a transaction); returns its id. */
+  function insert({ clip, requestedBy, format, options }) {
     const row = clips.clipRow(clip);
     if (format && !FORMATS[format]) throw new StudioError(`Unknown format "${format}"; use ${Object.keys(FORMATS).join(', ')}`);
     const other = format && format !== row.format ? format : null;
@@ -75,15 +143,34 @@ export function createRenders(ctx, library, clips, sound) {
     if (!visual) throw new StudioError(`Clip "${clip}" has nothing on its visual tracks yet; add items before rendering.`);
     const total = Math.round(comp.duration * comp.fps);
     if (total < 1) throw new StudioError(`Clip "${clip}" is shorter than one frame.`);
-    const id = transaction(db, () => {
-      const rid = q(`INSERT INTO renders (clip_id, clip_revision, composition, status, frames_total, engine, requested_by, created_at, format) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?)`)
-        .run(row.id, row.revision, other ? JSON.stringify(comp) : row.composition, total, ENGINE_VERSION, requestedBy, now(), other).lastInsertRowid;
-      q('INSERT OR IGNORE INTO render_assets (render_id, version_id) SELECT ?, version_id FROM clip_assets WHERE clip_id = ?').run(rid, row.id);
-      ctx.events?.emit('render', rid, 'queued', { clip, format: other });
-      return rid;
+    const opts = normalizeOptions(options, comp);
+    const rid = q(`INSERT INTO renders (clip_id, clip_revision, composition, status, frames_total, engine, requested_by, created_at, format, options) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`)
+      .run(row.id, row.revision, other ? JSON.stringify(comp) : row.composition, total, ENGINE_VERSION, requestedBy, now(), other, Object.keys(opts).length ? JSON.stringify(opts) : null).lastInsertRowid;
+    q('INSERT OR IGNORE INTO render_assets (render_id, version_id) SELECT ?, version_id FROM clip_assets WHERE clip_id = ?').run(rid, row.id);
+    ctx.events?.emit('render', rid, 'queued', { clip, format: other });
+    return Number(rid);
+  }
+
+  /**
+   * One request, one render per format (1–3, distinct), all with the same options and `options.batch` = the id of the first.
+   * Nothing is queued if any of them is refused.
+   * @param {{ clip: string, formats: string[], requestedBy?: string, options?: any }} o
+   * @returns {{ batch: number, renders: any[] }}
+   */
+  function enqueueBatch({ clip, formats, requestedBy = 'studio', options }) {
+    if (!Array.isArray(formats) || formats.length < 1 || formats.length > 3) throw new StudioError(`formats must list 1 to 3 of ${Object.keys(FORMATS).join(', ')}`);
+    const bad = formats.find((f) => !Object.hasOwn(FORMATS, f));
+    if (bad !== undefined) throw new StudioError(`Unknown format ${JSON.stringify(bad)}; use ${Object.keys(FORMATS).join(', ')}`);
+    if (new Set(formats).size !== formats.length) throw new StudioError(`formats must be distinct; got ${formats.join(', ')}`);
+    const ids = transaction(db, () => {
+      const first = insert({ clip, requestedBy, format: formats[0], options });
+      const batch = (id) => { const r = q('SELECT options FROM renders WHERE id = ?').get(id); q('UPDATE renders SET options = ? WHERE id = ?').run(JSON.stringify({ ...json(r.options, {}), batch: first }), id); };
+      batch(first);
+      const rest = formats.slice(1).map((format) => { const id = insert({ clip, requestedBy, format, options }); batch(id); return id; });
+      return [first, ...rest];
     });
     if (timer) setImmediate(() => { tick().catch(() => {}); });
-    return get(id);
+    return { batch: ids[0], renders: ids.map(get) };
   }
 
   const get = (id) => {
@@ -127,7 +214,11 @@ export function createRenders(ctx, library, clips, sound) {
     current = { id: row.id, abort };
     const comp = json(row.composition);
     const clip = q('SELECT slug FROM clips WHERE id = ?').get(row.clip_id);
-    const base = `renders/${clip.slug}-r${row.id}${row.format ? `-${row.format}` : ''}`;
+    const options = json(row.options, {});
+    const draft = options.draft ?? null;
+    // a draft is drawn at the clip's size and encoded smaller: its file, report and sheets are the draft's
+    const outW = draft?.width ?? comp.width, outH = draft?.height ?? comp.height;
+    const base = `renders/${clip.slug}-r${row.id}${row.format ? `-${row.format}` : ''}${draft ? '-draft' : ''}`;
     const outPath = join(dataDir, `${base}.mp4`);
     let lastWrite = 0;
     const lines = [];
@@ -155,6 +246,7 @@ export function createRenders(ctx, library, clips, sound) {
       const total = row.frames_total;
       const result = await renderVideo({
         bundle, mixPath, outPath, signal: abort.signal, hashFrames: sampleFrames(total),
+        workers: options.workers, ...(draft ? { size: draft, ...DRAFT_ENCODE } : {}),
         onProgress: (done) => {
           const t = Date.now();
           if (t - lastWrite < 400 && done < total) return;
@@ -164,8 +256,8 @@ export function createRenders(ctx, library, clips, sound) {
         },
       });
       if (result.log) lines.push(`ffmpeg: ${result.log}`);
-      const posterFrame = Math.min(total - 1, Math.round(total * 0.4));
-      const poster = await pool.run('clipFrame', { frame: posterFrame, output: 'png' }, { bundle, timeout: 60000 });
+      const posterFrame = options.poster !== undefined ? Math.max(0, Math.min(total - 1, Math.round(options.poster * comp.fps))) : Math.min(total - 1, Math.round(total * 0.4));
+      const poster = await pool.run('clipFrame', { frame: posterFrame, output: 'png', maxSize: draft ? Math.max(outW, outH) : undefined }, { bundle, timeout: 60000 });
       writeFileSync(join(dataDir, `${base}.png`), Buffer.from(poster.png));
       // subtitles: the caption pages (built from the words) when the clip has captions, else the cues of caption items
       const pages = bundle.captions ?? null;
@@ -176,7 +268,7 @@ export function createRenders(ctx, library, clips, sound) {
       if (bundle.words?.length) { writeFileSync(join(dataDir, `${base}.words.json`), JSON.stringify({ clip: clip.slug, fps: comp.fps, words: bundle.words }, null, 1)); files.words = `${base}.words.json`; }
       // the report, from the encoded file: probe facts, loudness (EBU R128), black, freezes, jumps, flashes, silences, narration
       const report0 = performance.now();
-      const reportOpts = { fps: comp.fps, duration: comp.duration, width: comp.width, height: comp.height, markers: (comp.markers ?? []).map((m) => ({ ...m, type: m.type ?? 'note' })), narration: narrationOf(bundle.words) };
+      const reportOpts = { fps: comp.fps, duration: comp.duration, width: outW, height: outH, markers: (comp.markers ?? []).map((m) => ({ ...m, type: m.type ?? 'note' })), narration: narrationOf(bundle.words) };
       halt();
       let report = await analyseFile(outPath, reportOpts);
       let loudnessSeconds = 0;
@@ -217,7 +309,7 @@ export function createRenders(ctx, library, clips, sound) {
       if (probe.video?.codec !== 'h264') problems.push(`video codec is ${probe.video?.codec}`);
       if (probe.video?.pixFmt !== 'yuv420p') problems.push(`pixel format is ${probe.video?.pixFmt}`);
       if (probe.audio?.codec !== 'aac') problems.push(`audio codec is ${probe.audio?.codec}`);
-      if (probe.video?.width !== comp.width || probe.video?.height !== comp.height) problems.push(`size is ${probe.video?.width}x${probe.video?.height}`);
+      if (probe.video?.width !== outW || probe.video?.height !== outH) problems.push(`size is ${probe.video?.width}x${probe.video?.height}`);
       if (Math.abs(probe.duration - comp.duration) > 0.25) problems.push(`duration is ${probe.duration}s, expected ${comp.duration}s`);
       if (problems.length) throw new Error(`The encoded file is not what was asked for: ${problems.join('; ')}`);
       const stats = {
@@ -226,6 +318,7 @@ export function createRenders(ctx, library, clips, sound) {
         probe, frameHashes: result.hashes, audioInputs: audio.inputs.length, beats: audio.beats.length, posterFrame,
         mixSeconds: r2(mixSeconds), mixSha1, reportSeconds: r2(reportSeconds), loudnessSeconds: r2(loudnessSeconds),
         loudness: loud, problems: report.problems, files,
+        ...(draft ? { draft: { scale: draft.scale, width: draft.width, height: draft.height, preset: DRAFT_ENCODE.preset } } : {}),
       };
       const done = transaction(db, () => {
         const d = q(`UPDATE renders SET status = 'done', progress = 1, frames_done = ?, output = ?, poster = ?, srt = ?, error = NULL, log = ?, stats = ?, finished_at = ?, heartbeat = ? WHERE ${mine}`)
@@ -300,5 +393,5 @@ export function createRenders(ctx, library, clips, sound) {
     }
   }
 
-  return { enqueue, get, list, cancel, gallery, assetsOf, startRunner, stopRunner, wait, tick };
+  return { enqueue, enqueueBatch, get, list, cancel, gallery, assetsOf, startRunner, stopRunner, wait, tick };
 }

@@ -130,26 +130,52 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   }
 
   /**
-   * The composition to draw: a draft (validated and pinned, not saved) or the saved clip, optionally in another
-   * format (each item's overrides for that format apply, as in a render with a format).
-   * @param {{ clip?: string, composition?: any, format?: string }} o
+   * Keep only (or all but) some of a composition's items on its visual tracks; audio is untouched. The composition has
+   * been validated and pinned already, so the items that stay draw exactly as they do in the whole clip (they keep their
+   * ids, and so their random seeds). Items inside a precomp layer are not reachable: only the composition's own.
+   * @param {any} comp @param {{ only?: string[], except?: string[] }} isolate
    */
-  async function compositionOf({ clip, composition, format }) {
+  function isolateItems(comp, isolate) {
+    const bad = (m) => new StudioError(`isolate: ${m}`);
+    if (isolate === null || typeof isolate !== 'object' || Array.isArray(isolate)) throw bad('give { only: [item ids] } or { except: [item ids] }');
+    const keys = Object.keys(isolate).filter((k) => isolate[k] !== undefined);
+    const other = keys.find((k) => k !== 'only' && k !== 'except');
+    if (other) throw bad(`unknown key "${other}"; use only or except`);
+    if (keys.length !== 1) throw bad(keys.length ? 'give only or except, not both' : 'give only: [item ids] or except: [item ids]');
+    const mode = keys[0], ids = isolate[mode];
+    if (!Array.isArray(ids) || !ids.length || ids.some((id) => typeof id !== 'string')) throw bad(`${mode} must be a non-empty list of item ids`);
+    const visual = comp.tracks.filter((t) => t.type !== 'audio').flatMap((t) => t.items.map((i) => i.id));
+    const unknown = ids.filter((id) => !visual.includes(id));
+    if (unknown.length) {
+      const audio = unknown.filter((id) => comp.tracks.some((t) => t.type === 'audio' && t.items.some((i) => i.id === id)));
+      throw bad(`unknown item${unknown.length > 1 ? 's' : ''} ${unknown.map((id) => `"${id}"`).join(', ')}${audio.length ? ` (${audio.join(', ')}: audio is never isolated)` : ''}. The clip's visual items: ${visual.join(', ') || 'none'}`);
+    }
+    const keep = (item) => (mode === 'only') === ids.includes(item.id);
+    return { ...comp, tracks: comp.tracks.map((t) => (t.type === 'audio' ? t : { ...t, items: t.items.filter(keep) })) };
+  }
+
+  /**
+   * The composition to draw: a draft (validated and pinned, not saved) or the saved clip, optionally in another
+   * format (each item's overrides for that format apply, as in a render with a format), optionally with only some
+   * of its items (isolate: { only } or { except }, applied last).
+   * @param {{ clip?: string, composition?: any, format?: string, isolate?: { only?: string[], except?: string[] } }} o
+   */
+  async function compositionOf({ clip, composition, format, isolate }) {
     if (!composition && !clip) throw new StudioError('Give clip (a saved clip) or composition (a draft)');
     let comp = composition ? clips.prepare(composition).composition : clips.getClip(clip).composition;
     if (format && format !== comp.format) {
       if (typeof format !== 'string' || !Object.hasOwn(FORMATS, format)) throw new StudioError(`Unknown format "${format}"; use ${Object.keys(FORMATS).join(', ')}`);
       comp = reformat(comp, format);
     }
-    return comp;
+    return isolate === undefined ? comp : isolateItems(comp, isolate);
   }
 
   /**
    * One frame of a clip (saved, or a draft composition) → { png, width, height, hash?, frame, t }.
-   * @param {{ clip?: string, composition?: any, format?: string, t?: number, frame?: number, maxSize?: number, hash?: boolean }} o
+   * @param {{ clip?: string, composition?: any, format?: string, isolate?: any, t?: number, frame?: number, maxSize?: number, hash?: boolean }} o
    */
-  async function clipFrame({ clip, composition, format, t = 0, frame, maxSize, hash }) {
-    const comp = await compositionOf({ clip, composition, format });
+  async function clipFrame({ clip, composition, format, isolate, t = 0, frame, maxSize, hash }) {
+    const comp = await compositionOf({ clip, composition, format, isolate });
     const total = Math.round(comp.duration * comp.fps);
     const n = Math.max(0, Math.min(total - 1, frame ?? Math.round(t * comp.fps)));
     const { bundle } = await clips.bundleFor(comp);
@@ -159,10 +185,10 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
 
   /**
    * A contact sheet of a clip drawn straight from its composition (no encode) → { png, frames }.
-   * @param {{ clip?: string, composition?: any, format?: string, count?: number, cols?: number, cellWidth?: number, from?: number, to?: number }} o
+   * @param {{ clip?: string, composition?: any, format?: string, isolate?: any, count?: number, cols?: number, cellWidth?: number, from?: number, to?: number }} o
    */
-  async function clipSheet({ clip, composition, format, count = 12, cols, cellWidth, from, to }) {
-    const comp = await compositionOf({ clip, composition, format });
+  async function clipSheet({ clip, composition, format, isolate, count = 12, cols, cellWidth, from, to }) {
+    const comp = await compositionOf({ clip, composition, format, isolate });
     const total = Math.round(comp.duration * comp.fps);
     const a = Math.max(0, Math.round((from ?? 0) * comp.fps)), b = Math.min(total, Math.round((to ?? comp.duration) * comp.fps));
     const n = Math.max(1, Math.min(48, count));
@@ -175,10 +201,10 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
 
   /**
    * SHA-256 of the raw RGBA of frames at the given times → [{ t, frame, hash }].
-   * @param {{ clip?: string, composition?: any, format?: string, times: number[] }} o
+   * @param {{ clip?: string, composition?: any, format?: string, isolate?: any, times: number[] }} o
    */
-  async function frameHashes({ clip, composition, format, times }) {
-    const comp = await compositionOf({ clip, composition, format });
+  async function frameHashes({ clip, composition, format, isolate, times }) {
+    const comp = await compositionOf({ clip, composition, format, isolate });
     const total = Math.round(comp.duration * comp.fps);
     const { bundle } = await clips.bundleFor(comp);
     const out = [];
