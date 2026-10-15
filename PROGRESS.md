@@ -62,7 +62,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 5. [ ] **Footage** and the screen-recording script (D2–D6): core `6224168` (lead), recorder `18d4f98` (agent), parity case `a799588`; disk report and the UI still to do
 6. [x] **Provenance and credits** (D12): merged (agent; 14 tests; final renders refuse placeholders and unlicensed files; clip_credits, check_provenance)
 7. [ ] **Repo and library** (D11)
-8. [ ] **The kit** (D13): marketing half merged (agent; 13 tests: kit-plate, kit-chart-line, kit-chart-donut, kit-steps, kit-icon with 155 Lucide icons (ISC, vendor/lucide), end-card@3 drawing exactly like @2 by default); UI half running
+8. [ ] **The kit** (D13): marketing half merged (agent; 13 tests: kit-plate, kit-chart-line, kit-chart-donut, kit-steps, kit-icon with 155 Lucide icons (ISC, vendor/lucide), end-card@3 drawing exactly like @2 by default); UI half merged (agent; 16 tests: kit-cursor driven by a recording sidecar within 1 px at clicks, kit-spotlight, kit-camera (a motion; region centred within 1 px), kit-arrow, kit-callout (stays in the safe area), kit-ui-frame with footage at 1:1). Still to do: asset notes with the usage examples, the kit in the showcase
 9. [ ] **Studio UI**: footage on the timeline, caption editor, font upload, provenance fields, kit; workflows + GIFs (D8, D16)
 10. [ ] **Clips 9 and 10** through the motion prompt (D17–D19)
 11. [ ] **Rebuild through exports**, prompt revision, docs (D20, D21)
