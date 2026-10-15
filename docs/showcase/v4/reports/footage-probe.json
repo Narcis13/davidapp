@@ -1,0 +1,219 @@
+{
+ "written": "scripts/footage-probe.mjs",
+ "files": [
+  {
+   "what": "testsrc2, 25 fps, H.264 with B-frames, a 440 Hz tone (MP4)",
+   "file": "testsrc-25fps.mp4",
+   "ok": true,
+   "probe": {
+    "width": 320,
+    "height": 180,
+    "codedWidth": 320,
+    "codedHeight": 180,
+    "rotation": 0,
+    "fps": 25,
+    "duration": 2,
+    "constantRate": true,
+    "codec": "h264",
+    "pixFmt": "yuv420p",
+    "colour": {
+     "matrix": "bt601",
+     "range": "tv",
+     "primaries": null,
+     "transfer": null,
+     "space": null,
+     "assumed": true
+    },
+    "start": 0,
+    "audio": {
+     "codec": "aac",
+     "sampleRate": 48000,
+     "channels": 1,
+     "duration": 2
+    },
+    "container": "mov,mp4,m4a,3gp,3g2,mj2",
+    "frames": 50,
+    "tableEntries": null,
+    "keyframes": 2
+   }
+  },
+  {
+   "what": "testsrc2, 29.97 fps, H.264 (MOV)",
+   "file": "testsrc-29.97fps.mov",
+   "ok": true,
+   "probe": {
+    "width": 320,
+    "height": 180,
+    "codedWidth": 320,
+    "codedHeight": 180,
+    "rotation": 0,
+    "fps": 29.97,
+    "duration": 1.001,
+    "constantRate": true,
+    "codec": "h264",
+    "pixFmt": "yuv420p",
+    "colour": {
+     "matrix": "bt601",
+     "range": "tv",
+     "primaries": null,
+     "transfer": null,
+     "space": null,
+     "assumed": true
+    },
+    "start": 0,
+    "audio": null,
+    "container": "mov,mp4,m4a,3gp,3g2,mj2",
+    "frames": 30,
+    "tableEntries": null,
+    "keyframes": 1
+   }
+  },
+  {
+   "what": "testsrc2, 23.976 fps, VP9 (WebM)",
+   "file": "vp9.webm",
+   "ok": true,
+   "probe": {
+    "width": 160,
+    "height": 120,
+    "codedWidth": 160,
+    "codedHeight": 120,
+    "rotation": 0,
+    "fps": 23.976,
+    "duration": 1.000708,
+    "constantRate": false,
+    "codec": "vp9",
+    "pixFmt": "yuv420p",
+    "colour": {
+     "matrix": "bt601",
+     "range": "tv",
+     "primaries": null,
+     "transfer": null,
+     "space": null,
+     "assumed": true
+    },
+    "start": 0,
+    "audio": null,
+    "container": "matroska,webm",
+    "frames": 24,
+    "tableEntries": null,
+    "keyframes": 1
+   }
+  },
+  {
+   "what": "rotated by a display matrix (90°)",
+   "file": "rotated.mp4",
+   "ok": true,
+   "probe": {
+    "width": 180,
+    "height": 320,
+    "codedWidth": 320,
+    "codedHeight": 180,
+    "rotation": 270,
+    "fps": 25,
+    "duration": 2,
+    "constantRate": true,
+    "codec": "h264",
+    "pixFmt": "yuv420p",
+    "colour": {
+     "matrix": "bt601",
+     "range": "tv",
+     "primaries": null,
+     "transfer": null,
+     "space": null,
+     "assumed": true
+    },
+    "start": 0,
+    "audio": {
+     "codec": "aac",
+     "sampleRate": 48000,
+     "channels": 1,
+     "duration": 2
+    },
+    "container": "mov,mp4,m4a,3gp,3g2,mj2",
+    "frames": 50,
+    "tableEntries": null,
+    "keyframes": 2
+   }
+  },
+  {
+   "what": "screen recording of the studio (scripts/record-studio.mjs)",
+   "file": "showcase/footage/library-search.mp4",
+   "ok": true,
+   "probe": {
+    "width": 1440,
+    "height": 900,
+    "codedWidth": 1440,
+    "codedHeight": 900,
+    "rotation": 0,
+    "fps": 30,
+    "duration": 13.5,
+    "constantRate": true,
+    "codec": "h264",
+    "pixFmt": "yuv420p",
+    "colour": {
+     "matrix": "bt709",
+     "range": "tv",
+     "primaries": "bt709",
+     "transfer": "bt709",
+     "space": "bt709",
+     "assumed": false
+    },
+    "start": 0,
+    "audio": null,
+    "container": "mov,mp4,m4a,3gp,3g2,mj2",
+    "frames": 405,
+    "tableEntries": null,
+    "keyframes": 2
+   }
+  },
+  {
+   "what": "screen recording for clip 9 (1920×1200 at 0.75)",
+   "file": "showcase/footage/clip-9/editor-place.mp4",
+   "ok": true,
+   "probe": {
+    "width": 1440,
+    "height": 900,
+    "codedWidth": 1440,
+    "codedHeight": 900,
+    "rotation": 0,
+    "fps": 30,
+    "duration": 20.5,
+    "constantRate": true,
+    "codec": "h264",
+    "pixFmt": "yuv420p",
+    "colour": {
+     "matrix": "bt709",
+     "range": "tv",
+     "primaries": "bt709",
+     "transfer": "bt709",
+     "space": "bt709",
+     "assumed": false
+    },
+    "start": 0,
+    "audio": null,
+    "container": "mov,mp4,m4a,3gp,3g2,mj2",
+    "frames": 615,
+    "tableEntries": null,
+    "keyframes": 3
+   }
+  },
+  {
+   "what": "HDR (PQ, BT.2020)",
+   "file": "hdr.mp4",
+   "ok": false,
+   "error": "The video is HDR (PQ); the studio draws in SDR. Convert it to SDR BT.709 first (for example with FFmpeg's zscale and tonemap filters)."
+  },
+  {
+   "what": "sound only",
+   "file": "tone-only.mp4",
+   "ok": false,
+   "error": "The file has no video stream"
+  },
+  {
+   "what": "not a video",
+   "file": "broken.mp4",
+   "ok": false,
+   "error": "This file could not be read as a video: broken.mp4: Invalid data found when processing input"
+  }
+ ]
+}
