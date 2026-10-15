@@ -1,7 +1,11 @@
 // The parity cases: one composition per thing iteration 2 draws, and the frames to compare.
 // Shared by test/parity.test.js (thresholds) and scripts/parity.mjs (evidence with diff images).
 
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createCanvas } from '../../src/render/host.js';
+import { ffmpegPath, run } from '../../src/render/ffmpeg.js';
 import { EASING, LABEL } from '../../test/helpers.js';
 import * as K from '../../test/fixtures/kinds.js';
 import { BALL, LETTERS } from '../../test/fixtures/solid.js';
@@ -86,6 +90,16 @@ export async function seedParity(studio, author = 'parity') {
   const g = c.getContext('2d');
   g.fillStyle = '#00c2a8'; g.fillRect(0, 0, 32, 32); g.fillStyle = '#ffd166'; g.fillRect(32, 0, 32, 32);
   await studio.library.addFileAsset({ slug: 'tiles', type: 'image', data: c.toBuffer('image/png'), ext: '.png', description: 'Two coloured tiles side by side (test image).', tags: ['test'], author });
+  // footage: FFmpeg's testsrc2 at 25 fps (another rate than the cases' 10 fps), the size of the case frame, with a tone
+  const dir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), 'parity-footage-'));
+  try {
+    const file = join(dir, 'testsrc.mp4');
+    const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-f', 'lavfi', '-i', `testsrc2=size=${W}x${H}:rate=25`, '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000', '-t', '3', '-c:v', 'libx264', '-bf', '2', '-g', '25', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', file]);
+    if (r.code !== 0) throw new Error(`ffmpeg: ${r.stderr}`);
+    await studio.library.addFootage({ slug: 'testsrc', path: file, description: 'testsrc2 at 25 fps with a tone, made by FFmpeg (parity case).', author });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 const W = 480, H = 270;
@@ -114,5 +128,8 @@ export const CASES = {
   svg: [comp([{ id: 'v', items: [item('a', 'svg-draw', { transform: { x: 0.3, width: 0.45, height: 0.8 } }), item('b', 'svg-draw', { params: { fill: '#2dd4bf' }, offset: 1, transform: { x: 0.72, width: 0.4, height: 0.7, rotation: -8 } })] }]), [6, 14]],
   'latin-ext': [comp([{ id: 'v', items: [item('ro', 'romanian')] }]), [2, 6, 10, 14, 18]],
   image: [comp([{ id: 'v', items: [item('i', 'tiles', { transform: { width: 0.5, height: 0.5, rotation: 15 } }), item('j', 'tiles', { params: { fit: 'cover' }, transform: { x: 0.2, y: 0.25, width: 0.2, height: 0.3 } })] }]), [10]],
+  // footage at another rate: one layer at 1:1 (an exact copy) trimmed and sped up, one scaled, rotated and looping
+  footage: [comp([{ id: 'v', items: [item('f', 'testsrc', { params: { fit: 'fill', in: 0.3, speed: 1.5 } }),
+    item('g', 'testsrc', { params: { in: 1, out: 1.6, loop: true, fit: 'cover' }, transform: { x: 0.7, y: 0.35, width: 0.4, height: 0.4, rotation: 12 } })] }]), [0, 3, 7, 12, 18]],
 };
 
