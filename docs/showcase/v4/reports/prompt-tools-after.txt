@@ -1,0 +1,7 @@
+Prompt: motion_prompt_fablecut.md
+MCP tools on the server: 67
+Tools the prompt names (43): add_asset_note, add_file_asset, add_font, add_footage, add_narration, anchor_report, audio_report, caption_pages, check_clip, check_provenance, check_transcript, clip_credits, compounding_report, create_clip, create_preset, describe_asset, edit_clip, export_clip, footage_frames, frame_hashes, generate_narration, get_asset, get_render, import_clip, layout_report, list_clip_assets, organize_assets, propose_asset_version, propose_clip_edit, propose_new_asset, render_asset_frame, render_clip_frame, render_report, save_precomp, search_assets, set_asset_metadata, speech_status, start_render, studio_guide, suggest_assets, upload_image, validate_asset, voice_samples
+Tool options the prompt names (6): ai_generated (add_file_asset, add_narration, upload_image, …), content_id (add_file_asset, add_narration, upload_image, …), for_clip (create_asset, update_asset, fork_asset, …), max_size (render_asset_frame, render_clip_frame), poster_at (start_render), source_url (add_file_asset, add_narration, upload_image, …)
+Unknown names (0): none
+Workarounds left (0): none
+PASS

@@ -1,0 +1,40 @@
+# Render speed after iteration 2
+
+Machine: Intel(R) Core(TM) i9-14900KF × 32, win32 x64, Node v24.19.0. Written by `scripts/speed-compare.mjs`.
+
+## The 2D clips against the code before the iteration
+
+Clips 1 to 3 (32 s each, 960 frames) rendered 5 times with the code before iteration 2 (a worktree of `6c9f8cf`, same `node_modules`) and 5 times with the current code, in turns, each through the MCP server (`start_render`); the time is the render's own `renderSeconds` (frames drawn by 8 worker threads and piped into FFmpeg, libx264 `-preset medium -crf 18`; the audio mix is cached and not counted). Medians:
+
+| clip | size | before | now | now / before | runs before (s) | runs now (s) |
+|---|---|---|---|---|---|---|
+| clip-1-every-frame | 1080×1920 | 6.84 s | 7.06 s | 1.032 | 7.23 / 6.84 / 6.67 / 7.07 / 6.81 | 7.12 / 6.98 / 6.8 / 7.25 / 7.06 |
+| clip-2-compounding | 1920×1080 | 8.27 s | 8.09 s | 0.978 | 8.51 / 8.3 / 8.15 / 8.27 / 8.12 | 8.54 / 8.01 / 8.09 / 8.19 / 8.04 |
+| clip-3-release-notes | 1080×1080 | 4.6 s | 4.59 s | 0.998 | 4.97 / 4.5 / 4.6 / 4.71 / 4.6 | 4.65 / 4.51 / 4.59 / 4.75 / 4.47 |
+
+Limit: no clip more than 10 % slower. All three are within it. Items in the old shape still go through the iteration-1 drawing path, which is why the numbers barely move; a 30-second 1080p clip of that kind renders in 4.3 to 7.6 s.
+
+## Clips 4 to 6
+
+The first finished render of each, from the showcase build (`stats` of the render):
+
+| clip | format | size | length | render time | frames/s | vs realtime |
+|---|---|---|---|---|---|---|
+
+These are slower than realtime because of what is on screen, not because of the new layout model: see below.
+
+## What 3D and effects cost
+
+The same 16 frames of a scene drawn with and without one thing, by one worker, with no encoding (`frame_hashes`; best of two passes). The difference is what that thing costs per 1080p frame.
+
+| clip | what | frames from | with | without | cost per frame |
+|---|---|---|---|---|---|
+| clip-4-direct-the-studio (1920×1080) | film grain on the whole clip (fx-grain) | 1–29 s | 217.9 ms | 152.8 ms | 65.1 ms |
+| clip-4-direct-the-studio (1920×1080) | every effect: grain, a vignette on a track, duotone and glow on items | 1–29 s | 215.5 ms | 44.7 ms | 170.8 ms |
+| clip-4-direct-the-studio (1920×1080) | glow on the numbers scene (fx-glow, 0:15 to 0:23) | 16–22 s | 268.6 ms | 122.1 ms | 146.5 ms |
+| clip-4-direct-the-studio (1920×1080) | the 3D orb, rasterized every frame (orb-3d, 0:07 to 0:15) | 8–14 s | 197.3 ms | 121.3 ms | 75.9 ms |
+| clip-5-a-library-in-3d (1080×1920) | the 3D terrain, rasterized every frame (terrain-3d) | 8.3–18.1 s | 345.9 ms | 144 ms | 202 ms |
+| clip-5-a-library-in-3d (1080×1920) | 3D block text, rasterized every frame (block-text-3d) | 9.3–17.7 s | 348.8 ms | 319.5 ms | 29.3 ms |
+| clip-5-a-library-in-3d (1080×1920) | the orb as a baked sequence (orb-spin) | 18.7–27.7 s | 170.3 ms | 118.9 ms | 51.4 ms |
+
+Effects are pixel loops in plain JavaScript over the whole frame (canvas `filter` is not used, so the preview and the render agree), and 3D is a software rasterizer: both cost tens of milliseconds a frame at 1080p, per worker, and they are what makes clips 4 to 6 slower than realtime. A baked sequence replaces the rasterizer with one PNG decode and draw per frame; what it saves depends on the scene it replaces (compare the two orb rows).
