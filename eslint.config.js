@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['node_modules/', 'data/', 'goal-loop/', '.claude/', 'docs/', 'assets/', 'output/'] },
+  { ignores: ['node_modules/', 'data/', 'goal-loop/', '.claude/', 'docs/', 'assets/', 'library/sources/', 'output/'] },
   js.configs.recommended,
   {
     languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: { ...globals.node } },
