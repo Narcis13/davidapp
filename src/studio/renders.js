@@ -53,11 +53,12 @@ export function draftSize(width, height, scale) {
   return { scale: +k.toFixed(5), width: Math.round(width * k), height: Math.round(height * k) };
 }
 
-const OPTION_KEYS = ['draft', 'workers', 'poster', 'batch'];
+const OPTION_KEYS = ['draft', 'workers', 'poster', 'final', 'batch'];
 
 /**
  * Check render options and fill in what follows from them. Input: { draft?: true | { scale }, workers?: 1–16,
- * poster?: seconds, batch?: render id }; stored: draft is { scale, width, height }.
+ * poster?: seconds, final?: true (checked against the clip's provenance, writes the credits), batch?: render id };
+ * stored: draft is { scale, width, height }.
  * @param {any} o @param {{ width: number, height: number, duration: number, fps: number }} comp
  */
 export function normalizeOptions(o, comp) {
@@ -66,6 +67,7 @@ export function normalizeOptions(o, comp) {
   const unknown = Object.keys(o).filter((k) => !OPTION_KEYS.includes(k) && o[k] !== undefined);
   if (unknown.length) throw new StudioError(`Unknown render option${unknown.length > 1 ? 's' : ''} ${unknown.map((k) => `"${k}"`).join(', ')}; the options are ${OPTION_KEYS.filter((k) => k !== 'batch').join(', ')}`);
   const out = {};
+  if (o.final === true && o.draft !== undefined && o.draft !== false) throw new StudioError('A render cannot be both a draft and final: a draft is a fast review render, a final one is checked for placeholders and licences and writes the credits. Pick one.');
   if (o.draft !== undefined && o.draft !== false) {
     if (o.draft !== true && (typeof o.draft !== 'object' || o.draft === null || Array.isArray(o.draft))) throw new StudioError('draft must be true or { scale }, for example { scale: 0.5 }');
     out.draft = draftSize(comp.width, comp.height, o.draft === true ? undefined : o.draft.scale);
@@ -78,6 +80,10 @@ export function normalizeOptions(o, comp) {
     if (typeof o.poster !== 'number' || !Number.isFinite(o.poster) || o.poster < 0 || o.poster >= comp.duration) throw new StudioError(`poster time must be from 0 up to the clip's duration (${comp.duration} s); got ${JSON.stringify(o.poster)}`);
     out.poster = o.poster;
   }
+  if (o.final !== undefined && o.final !== false) {
+    if (o.final !== true) throw new StudioError(`final must be true or false; got ${JSON.stringify(o.final)}`);
+    out.final = true;
+  }
   if (o.batch !== undefined) out.batch = o.batch;
   return out;
 }
@@ -89,7 +95,7 @@ const narrationOf = (words) => {
   return [...by].map(([item, list]) => ({ item, words: list }));
 };
 
-export function createRenders(ctx, library, clips, sound) {
+export function createRenders(ctx, library, clips, sound, provenance) {
   const { db, dataDir, pool } = ctx;
   const dir = join(dataDir, 'renders');
   mkdirSync(dir, { recursive: true });
@@ -144,6 +150,8 @@ export function createRenders(ctx, library, clips, sound) {
     const total = Math.round(comp.duration * comp.fps);
     if (total < 1) throw new StudioError(`Clip "${clip}" is shorter than one frame.`);
     const opts = normalizeOptions(options, comp);
+    // a final render is for publishing: no placeholder and no unlicensed file in its closure
+    if (opts.final) provenance.assertFinal({ clip });
     const rid = q(`INSERT INTO renders (clip_id, clip_revision, composition, status, frames_total, engine, requested_by, created_at, format, options) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`)
       .run(row.id, row.revision, other ? JSON.stringify(comp) : row.composition, total, ENGINE_VERSION, requestedBy, now(), other, Object.keys(opts).length ? JSON.stringify(opts) : null).lastInsertRowid;
     q('INSERT OR IGNORE INTO render_assets (render_id, version_id) SELECT ?, version_id FROM clip_assets WHERE clip_id = ?').run(rid, row.id);
@@ -234,6 +242,8 @@ export function createRenders(ctx, library, clips, sound) {
     // a cancel is also honoured between the passes after the frames (report, loudness correction, sheets)
     const halt = () => { if (abort.signal.aborted) throw Object.assign(new Error('Render cancelled'), { cancelled: true }); };
     try {
+      // checked again before any frame is drawn: an asset may have been flagged since the render was queued
+      if (options.final) provenance.assertFinal({ clip: clip.slug, renderId: row.id });
       const prep0 = performance.now();
       const { bundle, audio } = await clips.bundleFor(comp);
       const prepSeconds = (performance.now() - prep0) / 1000;
@@ -266,6 +276,11 @@ export function createRenders(ctx, library, clips, sound) {
       const files = {};
       if (pages?.length) { writeFileSync(join(dataDir, `${base}.vtt`), pagesToVtt(pages)); files.vtt = `${base}.vtt`; }
       if (bundle.words?.length) { writeFileSync(join(dataDir, `${base}.words.json`), JSON.stringify({ clip: clip.slug, fps: comp.fps, words: bundle.words }, null, 1)); files.words = `${base}.words.json`; }
+      // a final render: the credits go next to the MP4
+      if (options.final) {
+        writeFileSync(join(dataDir, `${base}.credits.md`), provenance.credits({ clip: clip.slug, renderId: row.id, format: 'markdown' }).markdown);
+        files.credits = `${base}.credits.md`;
+      }
       // the report, from the encoded file: probe facts, loudness (EBU R128), black, freezes, jumps, flashes, silences, narration
       const report0 = performance.now();
       const reportOpts = { fps: comp.fps, duration: comp.duration, width: outW, height: outH, markers: (comp.markers ?? []).map((m) => ({ ...m, type: m.type ?? 'note' })), narration: narrationOf(bundle.words) };

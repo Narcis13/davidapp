@@ -287,9 +287,9 @@ export function createAudio(ctx, library, clips) {
    * of the take, checked against the script (case, punctuation and numerals do not count); transcripts: several independent
    * ones, where a word is wrong only when all of them say so.
    * @param {{ slug: string, path?: string, data?: Buffer, ext?: string, script: string, timings: any, unit?: 's'|'ms', transcript?: any, transcripts?: any[], language?: string,
-   *   voice?: any, license?: string, description?: string, title?: string, tags?: string[], take?: string, forClip?: string, author: string }} o
+   *   voice?: any, license?: string, provenance?: any, description?: string, title?: string, tags?: string[], take?: string, forClip?: string, author: string }} o
    */
-  async function addNarration({ slug, path, data, ext, script, timings, unit, transcript, transcripts, language = 'en', voice, license, description, title, tags, take, forClip, author }) {
+  async function addNarration({ slug, path, data, ext, script, timings, unit, transcript, transcripts, language = 'en', voice, license, provenance, description, title, tags, take, forClip, author }) {
     if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name: use lowercase letters, digits and dashes`);
     if (typeof script !== 'string' || !script.trim()) throw new StudioError('script: the text the narration was meant to say');
     let imported;
@@ -306,7 +306,9 @@ export function createAudio(ctx, library, clips) {
     const narration = { script, language, words: aligned.words, extra: aligned.extra, stats: aligned.stats, source: imported.source, take: take ?? null, voice: voice ?? null,
       transcript: { from: given, ok: check.ok, slips: check.slips, drops: check.drops, insertions: check.insertions, disputed: check.disputed } };
     const r = await library.addFileAsset({
-      slug, type: 'sound', path, data, ext, author, forClip, license, title,
+      slug, type: 'sound', path, data, ext, author, forClip, title,
+      // a narration is made for the studio: original unless said otherwise; a voice with a model is a synthetic one
+      provenance: { license: 'original', ...(voice?.model ? { aiGenerated: true } : {}), ...(license !== undefined ? { license } : {}), ...(provenance ?? {}) },
       description: description ?? `Narration: "${script.trim().slice(0, 120)}${script.trim().length > 120 ? '…' : ''}" with the time of every word.`,
       tags: [...new Set(['narration', 'voice', ...(tags ?? [])])], meta: { narration },
       note: previous ? `New take${take ? ` (${take})` : ''} of the narration` : undefined,

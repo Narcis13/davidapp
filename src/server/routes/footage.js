@@ -8,6 +8,7 @@ import { join, extname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { footageService } from '../../render/footage.js';
 import { StudioError } from '../../studio/library.js';
+import { fromQuery, parseProvenance } from '../../studio/provenance.js';
 
 /** Encoded preview frames, newest kept, at most this many bytes (the decoded frames have their own budget). */
 const ENCODED_LIMIT = 128 * 1024 * 1024;
@@ -46,13 +47,16 @@ export default function routes({ studio, author, send }) {
 
   /**
    * An uploaded video file as the raw request body, streamed to disk (never held in memory), then added like
-   * add_footage: ?name=clip.mp4&slug=&title=&description=&license=&clip=
+   * add_footage: ?name=clip.mp4&slug=&title=&description=&clip=
+   * and where it came from: &license=&license_url=&source_url=&creator=&credit=&date=&ai_generated=&content_id=&restrictions=&placeholder=&redistributable=
    */
   async function upload({ req, query }) {
     const name = query.get('name') || 'footage.mp4';
     const ext = extname(name).toLowerCase();
     if (!['.mp4', '.m4v', '.mov', '.webm', '.mkv'].includes(ext)) throw new StudioError(`"${name}" is not a video file the studio takes (MP4, MOV, M4V, WebM, MKV)`, 'unsupported');
     if (Number(req.headers['content-length']) > MAX_UPLOAD) throw new StudioError('The file is larger than 2 GB', 'too_large');
+    // said before the bytes are streamed: a mistake in it costs nothing
+    parseProvenance(fromQuery(query));
     const dir = join(studio.dataDir, 'files');
     mkdirSync(dir, { recursive: true });
     const tmp = join(dir, `.upload-${randomBytes(6).toString('hex')}${ext}`);
@@ -67,7 +71,7 @@ export default function routes({ studio, author, send }) {
       const slug = query.get('slug') || (base.length >= 2 ? base : `footage-${randomBytes(3).toString('hex')}`);
       const r = await library.addFootage({
         slug, path: tmp, move: true, author: query.get('author') || author, forClip: query.get('clip') || undefined,
-        title: query.get('title') || undefined, license: query.get('license') || undefined,
+        title: query.get('title') || undefined, provenance: fromQuery(query),
         description: query.get('description') || `Footage uploaded in the studio from "${name}".`,
         tags: ['footage'],
       });
