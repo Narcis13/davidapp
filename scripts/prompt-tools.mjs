@@ -23,6 +23,7 @@ const NOT_TOOLS = new Set(['snake_case']);
  * Workarounds an earlier prompt needed and the studio no longer does: each is a phrase that must not come back.
  * [pattern, what the studio does instead]
  */
+/** @type {[RegExp, string][]} */
 const WORKAROUNDS = [
   [/has no video asset|no tool\s+exposes|library\.addSequence/i, 'footage is an asset (add_footage)'],
   [/restart the studio|read fonts\.json when they start/i, 'fonts are assets that work at once (add_font)'],
