@@ -6,6 +6,7 @@ output/
 *.webm
 # small screen recordings of the studio (scripts/record-studio.mjs) are source material for clips
 !showcase/footage/*.mp4
+!showcase/footage/*/*.mp4
 # the content store clips are exported to (src/studio/exchange.js): files by SHA-256, whatever their type
 !library/files/*
 *.db

@@ -1,0 +1,6 @@
+This is a clip made in Fablecut. In the next minute, you will make one like it.
+Start in the library. Search for what you need, and every asset shows you what it draws.
+Open one in the playground. Change a parameter, and the preview follows at once.
+Add it to a clip. Drag it on the timeline, and trim it to fit.
+Then render. The studio checks the file it made, from loudness to frozen frames.
+Find, tune, place, render. Open the studio, and make your first clip.
