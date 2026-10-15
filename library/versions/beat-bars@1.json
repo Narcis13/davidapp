@@ -1,0 +1,41 @@
+{
+  "ref": "beat-bars@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Beat bars",
+  "description": "A row of rounded bars that jump on every beat detected in the clip's audio and decay in between, with seeded variation per bar. Falls back to a steady tempo when the clip has no beats. A music-reactive accent for any scene.",
+  "tags": ["beat", "audio-reactive", "equalizer", "accent", "loop"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "bars": {"type": "integer", "default": 24, "min": 3, "max": 96},
+    "color": {"type": "color", "default": "#ffd166"},
+    "color2": {"type": "color", "default": "#ff5c8a", "description": "Colour at the ends of the row"},
+    "height": {
+      "type": "number",
+      "default": 0.12,
+      "min": 0.01,
+      "max": 1,
+      "step": 0.01,
+      "description": "Tallest bar as a fraction of the box height"
+    },
+    "position": {"type": "enum", "options": ["bottom", "middle", "top"], "default": "bottom"},
+    "gap": {"type": "number", "default": 0.45, "min": 0, "max": 0.9, "step": 0.01},
+    "decay": {"type": "number", "default": 0.22, "min": 0.03, "max": 2, "step": 0.01},
+    "fallbackBpm": {"type": "number", "default": 120, "min": 30, "max": 300, "step": 1},
+    "mirror": {"type": "boolean", "default": true, "description": "Grow up and down from the baseline"},
+    "inDur": {"type": "number", "default": 0.5, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.4, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1"},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:19.480Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:19.480Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/beat-bars@1.js", "sha1": "db21935c7b944ecf9ca686e2978520490d31dcc3"},
+  "hash": "f1f15c8b5e51604130a6a55b4ee054cd8ec5a40ff853a330376f17a76afea2ad"
+}

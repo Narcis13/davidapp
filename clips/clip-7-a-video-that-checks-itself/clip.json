@@ -1,0 +1,476 @@
+{
+  "slug": "clip-7-a-video-that-checks-itself",
+  "title": "A video that checks itself",
+  "description": "A voiced explainer, about a minute, horizontal with a vertical render from the same composition: the words drive the captions, the visuals land on their words, the music ducks under the voice, and the studio checks every frame and measures the file.",
+  "format": "horizontal",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 62,
+  "composition": {
+    "format": "horizontal",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "duration": 62,
+    "seed": 7,
+    "background": "#07111f",
+    "tracks": [
+      {
+        "id": "bg",
+        "name": "Background",
+        "type": "visual",
+        "items": [
+          {
+            "id": "drift",
+            "asset": "bg-gradient-drift@1",
+            "start": 0,
+            "duration": 58,
+            "params": {
+              "base": "#07111f",
+              "colors": ["#0f2c4d", "#163a5e", "#1d2a52"],
+              "intensity": 0.38,
+              "speed": 0.16,
+              "beatPulse": 0,
+              "vignette": 0.5
+            },
+            "fadeOut": 1.2
+          }
+        ]
+      },
+      {
+        "id": "life",
+        "name": "Particles",
+        "type": "visual",
+        "items": [
+          {
+            "id": "motes",
+            "asset": "sparkle-field@1",
+            "start": 0,
+            "duration": 58,
+            "params": {
+              "count": 70,
+              "colors": ["#5ce1e6", "#eef4ff", "#b39cff"],
+              "size": 5,
+              "speed": 0.035,
+              "twinkle": 1.2,
+              "shape": "dot",
+              "opacity": 0.45,
+              "inDur": 0,
+              "outDur": 1.2
+            }
+          }
+        ]
+      },
+      {
+        "id": "scenes",
+        "name": "Scenes",
+        "type": "visual",
+        "items": [
+          {
+            "id": "title",
+            "asset": "title-plate@1",
+            "start": 0,
+            "duration": 6.4,
+            "params": {
+              "text": "A video that\n*checks itself*",
+              "eyebrow": "Fablecut · iteration 3",
+              "theme": "theme-tide@1",
+              "size": 7.2,
+              "inDur": 0
+            },
+            "transform": {"x": 0.5, "y": 0.3, "width": 0.8, "height": 0.32},
+            "formats": {
+              "vertical": {"transform": {"x": 0.464, "y": 0.27, "width": 0.78, "height": 0.18}, "params": {"size": 8.4}}
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "strip",
+            "asset": "word-strip@3",
+            "start": 3.37,
+            "duration": 11.3,
+            "params": {"theme": "theme-tide@1", "size": 4},
+            "anchor": {"item": "vo", "word": 5, "offset": -0.3},
+            "transform": {"x": 0.5, "y": 0.58, "width": 0.86, "height": 0.2},
+            "formats": {
+              "vertical": {"transform": {"x": 0.464, "y": 0.55, "width": 0.78, "height": 0.12}, "params": {"size": 4.6}}
+            }
+          },
+          {
+            "id": "knows",
+            "asset": "title-plate@1",
+            "start": 10.36,
+            "duration": 4.4,
+            "params": {
+              "text": "The studio knows\n*every word*",
+              "eyebrow": "Word timings",
+              "theme": "theme-tide@1",
+              "size": 6.4
+            },
+            "anchor": {"item": "vo", "word": 26, "offset": -0.2},
+            "transform": {"x": 0.5, "y": 0.3, "width": 0.8, "height": 0.32},
+            "formats": {
+              "vertical": {"transform": {"x": 0.464, "y": 0.27, "width": 0.78, "height": 0.18}, "params": {"size": 7.6}}
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 7}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "captions-from",
+            "asset": "title-plate@1",
+            "start": 15.91,
+            "duration": 6.2,
+            "params": {
+              "text": "Captions come\nfrom the *words*",
+              "eyebrow": "Two lines at a time",
+              "theme": "theme-tide@1",
+              "size": 6.4
+            },
+            "anchor": {"item": "vo", "word": 38, "offset": -0.2},
+            "transform": {"x": 0.5, "y": 0.38, "width": 0.8, "height": 0.42},
+            "formats": {
+              "vertical": {"transform": {"x": 0.464, "y": 0.4, "width": 0.78, "height": 0.28}, "params": {"size": 7.6}}
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 6}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "visuals",
+            "asset": "title-plate@1",
+            "start": 22.26,
+            "duration": 2.95,
+            "params": {
+              "text": "Visuals land\non their *words*",
+              "eyebrow": "Word anchors",
+              "theme": "theme-tide@1",
+              "size": 6.4
+            },
+            "anchor": {"item": "vo", "word": 58, "offset": -0.15},
+            "transform": {"x": 0.5, "y": 0.38, "width": 0.8, "height": 0.42},
+            "formats": {
+              "vertical": {"transform": {"x": 0.464, "y": 0.4, "width": 0.78, "height": 0.28}, "params": {"size": 7.6}}
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 6}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "contrast",
+            "asset": "title-plate@1",
+            "start": 25.36,
+            "duration": 5.5,
+            "params": {
+              "text": "CONTRAST",
+              "eyebrow": "",
+              "theme": "theme-tide@1",
+              "size": 14,
+              "font": "display",
+              "weight": 400,
+              "align": "center"
+            },
+            "anchor": {"item": "vo", "word": 67, "offset": 0},
+            "transform": {"x": 0.5, "y": 0.38, "width": 0.8, "height": 0.42},
+            "formats": {
+              "vertical": {
+                "transform": {"x": 0.464, "y": 0.4, "width": 0.78, "height": 0.28},
+                "params": {"size": 16.099999999999998}
+              }
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 7}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "ducking",
+            "asset": "duck-meter@2",
+            "start": 31.11,
+            "duration": 4.6,
+            "params": {"theme": "theme-tide@1", "by": 18, "attack": 0.15, "release": 0.45, "seconds": 8},
+            "anchor": {"item": "vo", "word": 83, "offset": -0.3},
+            "transform": {"x": 0.5, "y": 0.38, "width": 0.8, "height": 0.42},
+            "formats": {
+              "vertical": {
+                "transform": {"x": 0.464, "y": 0.4, "width": 0.78, "height": 0.28},
+                "params": {"size": 3.8, "seconds": 6}
+              }
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 6}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "checks",
+            "asset": "check-list@3",
+            "start": 35.71,
+            "duration": 13.3,
+            "params": {
+              "heading": "Before a render",
+              "theme": "theme-tide@1",
+              "items": [
+                {"text": "Inside the safe zone"},
+                {"text": "Big enough to read"},
+                {"text": "Contrast 4.5:1 or more"},
+                {"text": "On screen long enough"}
+              ]
+            },
+            "anchor": {"item": "vo", "word": 95, "offset": -0.2},
+            "transform": {"x": 0.5, "y": 0.4, "width": 0.62, "height": 0.5},
+            "keyframes": {
+              "params.progress": [
+                {"t": 0, "v": 0},
+                {"t": 4.8, "v": 0, "anchor": {"item": "vo", "word": 107, "offset": 0}},
+                {"t": 5.15, "v": 1, "anchor": {"item": "vo", "word": 107, "offset": 0.35}},
+                {"t": 5.59, "v": 1, "anchor": {"item": "vo", "word": 109, "offset": 0}},
+                {"t": 5.94, "v": 2, "anchor": {"item": "vo", "word": 109, "offset": 0.35}},
+                {"t": 7.24, "v": 2, "anchor": {"item": "vo", "word": 115, "offset": 0}},
+                {"t": 7.59, "v": 3, "anchor": {"item": "vo", "word": 115, "offset": 0.35}},
+                {"t": 10.15, "v": 3, "anchor": {"item": "vo", "word": 127, "offset": 0}},
+                {"t": 10.5, "v": 4, "anchor": {"item": "vo", "word": 127, "offset": 0.35}}
+              ]
+            },
+            "formats": {
+              "vertical": {"transform": {"x": 0.464, "y": 0.42, "width": 0.78, "height": 0.34}, "params": {"size": 5}}
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 7}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "measured",
+            "asset": "check-list@3",
+            "start": 49.08,
+            "duration": 8.3,
+            "params": {
+              "heading": "Measured on the file",
+              "theme": "theme-tide@1",
+              "items": [{"text": "Loudness −14 LUFS"}, {"text": "No flashes"}, {"text": "No frozen frames"}]
+            },
+            "anchor": {"item": "vo", "word": 135, "offset": -0.2},
+            "transform": {"x": 0.5, "y": 0.4, "width": 0.62, "height": 0.5},
+            "keyframes": {
+              "params.progress": [
+                {"t": 0, "v": 0},
+                {"t": 2.63, "v": 0, "anchor": {"item": "vo", "word": 140, "offset": 0}},
+                {"t": 2.98, "v": 1, "anchor": {"item": "vo", "word": 140, "offset": 0.35}},
+                {"t": 5.04, "v": 1, "anchor": {"item": "vo", "word": 147, "offset": 0}},
+                {"t": 5.39, "v": 2, "anchor": {"item": "vo", "word": 147, "offset": 0.35}},
+                {"t": 6.22, "v": 2, "anchor": {"item": "vo", "word": 150, "offset": 0}},
+                {"t": 6.57, "v": 3, "anchor": {"item": "vo", "word": 150, "offset": 0.35}}
+              ]
+            },
+            "formats": {
+              "vertical": {"transform": {"x": 0.464, "y": 0.42, "width": 0.78, "height": 0.34}, "params": {"size": 5}}
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "end",
+            "asset": "end-card@2",
+            "start": 57.39,
+            "duration": 4.61,
+            "params": {
+              "title": "Checked by *the studio*",
+              "line": "Fablecut · iteration 3",
+              "theme": "theme-tide@1",
+              "size": 7.4,
+              "plate": true
+            },
+            "anchor": {"item": "vo", "word": 155, "offset": -0.3},
+            "transform": {"x": 0.5, "y": 0.4, "width": 0.56, "height": 0.5},
+            "formats": {"vertical": {"transform": {"x": 0.464, "y": 0.42, "width": 0.78, "height": 0.3}}}
+          }
+        ]
+      },
+      {
+        "id": "caps",
+        "name": "Captions",
+        "type": "text",
+        "items": [
+          {
+            "id": "cap",
+            "asset": "text-captions@2",
+            "start": 0,
+            "duration": 62,
+            "params": {"pill": "rgba(6,14,26,0.94)", "active": "#5ce1e6", "size": 4.2, "floor": 3}
+          }
+        ],
+        "role": "captions"
+      },
+      {
+        "id": "voice",
+        "name": "Narration",
+        "type": "audio",
+        "items": [{"id": "vo", "asset": "clip-7-voice@1", "start": 1, "duration": 61, "params": {}}],
+        "role": "narration"
+      },
+      {
+        "id": "music",
+        "name": "Music",
+        "type": "audio",
+        "items": [
+          {
+            "id": "bed",
+            "asset": "music-loop@1",
+            "start": 0,
+            "duration": 62,
+            "params": {
+              "bpm": 96,
+              "scale": "dorian",
+              "drums": 0.35,
+              "bass": 0.5,
+              "arp": 0.35,
+              "arpWave": "triangle",
+              "root": 45,
+              "outroBars": 2
+            },
+            "fadeOut": 0.9,
+            "gain": 0.5,
+            "keyframes": {
+              "volume": [
+                {"t": 0, "v": -12},
+                {"t": 1.2, "v": 0, "ease": "outCubic"},
+                {"t": 59, "v": 0},
+                {"t": 62, "v": -9, "ease": "inSine"}
+              ]
+            },
+            "duck": {"by": 18, "attack": 0.15, "release": 0.45, "hold": 0.25, "source": "words"}
+          }
+        ],
+        "role": "music"
+      }
+    ],
+    "markers": [
+      {"t": 0, "label": "open", "type": "cut"},
+      {
+        "t": 6.41,
+        "label": "the voice",
+        "type": "cut",
+        "anchor": {"item": "vo", "word": 12, "offset": -0.1}
+      },
+      {
+        "t": 15.88,
+        "label": "captions",
+        "type": "cut",
+        "anchor": {"item": "vo", "word": 37, "offset": -0.1}
+      },
+      {
+        "t": 22.21,
+        "label": "visuals",
+        "type": "cut",
+        "anchor": {"item": "vo", "word": 58, "offset": -0.2}
+      },
+      {"t": 25.36, "label": "contrast", "type": "word", "anchor": {"item": "vo", "word": 67, "offset": 0}},
+      {
+        "t": 31.11,
+        "label": "the mix",
+        "type": "cut",
+        "anchor": {"item": "vo", "word": 82, "offset": -0.2}
+      },
+      {"t": 35.71, "label": "checks", "type": "cut", "anchor": {"item": "vo", "word": 95, "offset": -0.2}},
+      {
+        "t": 49.08,
+        "label": "measured",
+        "type": "cut",
+        "anchor": {"item": "vo", "word": 135, "offset": -0.2}
+      },
+      {
+        "t": 57.39,
+        "label": "end card",
+        "type": "cut",
+        "anchor": {"item": "vo", "word": 155, "offset": -0.3}
+      },
+      {"t": 58, "label": "end card holds", "type": "hold", "duration": 4}
+    ],
+    "theme": "theme-tide@1",
+    "loudness": {"target": -14, "truePeak": -1},
+    "captions": {"burnIn": true},
+    "platforms": ["youtube", "shorts"],
+    "safe": "platform",
+    "easing": "easing@1"
+  },
+  "closure": ["bg-gradient-drift@1", "check-list@3", "clip-7-voice@1", "drum-hat@1", "drum-kick@1", "drum-snare@1", "duck-meter@2", "easing@1", "end-card@2", "fablecut-mark@1", "font-inter@1", "motion-drift@1", "music-loop@1", "sparkle-field@1", "synth-note@1", "text-captions@2", "theme-tide@1", "title-plate@1", "word-strip@3"],
+  "files": [
+    {
+      "ref": "clip-7-voice@1",
+      "sha256": "7590f06ee850c0ece12480d4f66546776f8875e11d338cd80bbdc4e088528555",
+      "bytes": 658983,
+      "ext": "m4a",
+      "store": "repo",
+      "license": "Apache-2.0",
+      "sourceUrl": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "creator": "Kokoro-82M (hexgrad), voice af_heart"
+    },
+    {
+      "ref": "fablecut-mark@1",
+      "sha256": "44451f570cc97487bf475c2cdb85c048e1e6a06032dcc2b69c230fc33cf61f80",
+      "bytes": 8904,
+      "ext": "png",
+      "store": "repo",
+      "license": "original",
+      "sourceUrl": null,
+      "creator": null
+    },
+    {"ref": "font-inter@1", "store": "bundled", "family": "Inter", "license": "OFL-1.1"}
+  ],
+  "check": {
+    "machine": "win32-x64",
+    "engine": 2,
+    "frames": {
+      "19": "2aba1fb28030478b3f9db89e877bea3e6397047dccb0f812610fb3bfc7a8b0ff",
+      "58": "2a5d77bfddc2fcea6b0661c2f8838d4670840cb6189d8815b0b2ed3cdbfc08e5",
+      "96": "27812660a8c446218e860076fb49c4d68a0fac96f6b25f23692cf1e337e8229a",
+      "135": "4fc779a854a6a35b294a2bed3deb1448ad8661db860368ed67852813f91dee1f",
+      "174": "571a5789262c2f2b935e81b31f6b68c9cde71fb4361894f0f3ce97f38f638a48",
+      "213": "1749e580297b3c433fb95b558abd2daea977685a6a3654e9f85919f85fc9407d",
+      "251": "18e5fab6e202995988e9933daa9a6c53e7ef39a7e8d61c98f1579bb7b0faf160",
+      "290": "cbe134d17314627d4784b52215efece8a424e40e48f7c5f29a50c22b89b185c9",
+      "329": "7f7ba665482e2969c071dc736469954b24539f8a168c47ad0e464bec764fbe68",
+      "368": "9925faa83b1850d1d4bd956acdbeb536d90c67f51dc33a677b116d9abaabb01e",
+      "406": "81392660df7be1253fff99718ff145c9c8fb471ad8f34dc2ef4c12333bc665f9",
+      "445": "79de10d5fdfe7cb3b0b980bef10f34f92999311589dc27a511c062d346419af3",
+      "484": "c6fda495ad76fc6f698b11e19fe167f0b5b8e56f7c3f7487ef85684f090a1fa1",
+      "523": "fbb562c599d9cde0aa0e011772cf48d221bfdd867801ad4c5bd99585e2c9e7ad",
+      "561": "c82511b93886c0e6842ca9b8898d23db12762b3c9cf1fc8209fb9dd434e1aa07",
+      "600": "fe875e583ce959a5cf64e4534953016f839ae0b616669f4983ee53ef500786e1",
+      "639": "6052f3c9b999dc4f75de9e05db623d60160ceea40d6420e73989cd07d01abe25",
+      "678": "6eb1f1e135da630c538535c3d6eb2d95a77f82cb4cc2701ab05cc15232bc33fd",
+      "716": "f1f78569039c57ed7bc9b247e17dec74991e36d2bb6442184ec4e9867b1075b1",
+      "755": "772260c87ef60614a68196f1b7bfb94d8671908bd9d4653a11ac88866921031d",
+      "794": "b237e6989f94c4853268d2b3b34bb0a6f110eaa8837fc099528e4718475c2526",
+      "833": "600d7be8d9484fa8ebd2c13541f74afc91176ae79726e686474e4690cd23d8e9",
+      "871": "476d2092cce9daeaaec6bd6a7e0cc36c66ac1726bb676c5d58dcdee0172d3c5e",
+      "910": "784da45c2dd5f3d6ff36a89e932b44202742941fbc2d5bef1ed2b2d180e6f962",
+      "949": "dc20e05ca49b34d397d24f11b172e845c8e607d08b42807c21dcb198b57d5f50",
+      "988": "aa5f9ed980a74e415875490f6a98bbb408acd140b5fdf6ca348e6b0047f8c1ce",
+      "1026": "d37360d120a6e720c94dc738fd0bb46a89928925de8f7dda25d69f89fb9acf85",
+      "1065": "5c88304fb0be10b970faf0770e7c82d87c42d2a73f945a6b014b88d95b666b5b",
+      "1104": "827f374942ab54b76cec3b441033a2775688b7ee67e95f1f55ec3b205918f750",
+      "1143": "2e80b445b408582ecd108681203d340ef817a9607ffd662f57c18bc567a90021",
+      "1181": "850ea36663f7e4a2074be5c9309d76fc108bdd04c759b4aa7f2a86a312945887",
+      "1220": "a3b361835128b2af4667c4476891679f10c9fe1c8de0d366108c12ba87c0b419",
+      "1259": "2771c35807c81563224e185ac0ec0cb07d21d877f229e70ec58e73f12f56a673",
+      "1298": "f724026d3b7336744d60630ab8e740d3f51ba37ce0375523fa88d6421790c3eb",
+      "1336": "53b5665048e1ddcc4335c96f3506aaf131f0e03def4d7cf8fa1af8deb51cc70b",
+      "1375": "e1dbee5134363e7e337cc1d63bc19b80bab6d22fac702b5cb241cdd0539ee3b3",
+      "1414": "8eacce82156987a7f0e44f40d5452b29ee2b4b7c99553a5b01d40270939052f6",
+      "1453": "c673d73b9fd4e6bc0ab9336badca491e5b3b29d4c5cac17114ba83c9b224a2b4",
+      "1491": "39357f56fe0fba82e5862deeaf44555bb54a446a8b8e93443a7911ae45b5fc2c",
+      "1530": "c702f489a97b24c744f57194903dd90c3a732a91942cb668b326001a556825ae",
+      "1569": "18a56beb66b9757b79f06b9347693ddc4c3464600088dd62a921874d753712d2",
+      "1608": "5f66983835e97d6a5250541b158c1f41678d8d18373c432747e24c47ecbf5205",
+      "1646": "def1fd22a75f467cc2e3879fc8721ff6e2535c6013f1681d6661a202cf902a5e",
+      "1685": "0c35112e19cc648f93be3ece255f44254d96c8a58e3a27812964859cadb75d89",
+      "1724": "701a57c6fc6b077154492cffcbef74962e5d05823f88b5bd85e3f1435ace9410",
+      "1763": "bb206912d45bc09cc11180a8a4eea404280fb1c0d834a274dd9b4d5d17d65a2a",
+      "1801": "9512f4026a4f6a76de24e2080b49711eb1c8865da01e816f4b7fa7682d40401a",
+      "1840": "9512f4026a4f6a76de24e2080b49711eb1c8865da01e816f4b7fa7682d40401a"
+    }
+  }
+}

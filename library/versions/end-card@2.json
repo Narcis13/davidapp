@@ -1,0 +1,45 @@
+{
+  "ref": "end-card@2",
+  "type": "function",
+  "kind": "visual",
+  "title": "End card",
+  "description": "A closing card: a logo image, a title and one line, eased in within the first second and then completely still for the rest of the item, so the last frame holds; optionally on a solid plate. Sizes are a share of the frame's short side, with a floor. Takes a theme.",
+  "tags": ["end-card", "outro", "logo", "title", "scene", "static"],
+  "duration": 4,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "logo": {"type": "image", "default": "fablecut-mark"},
+    "title": {"type": "string", "default": "Fablecut", "description": "*Asterisks* mark the accent colour"},
+    "line": {"type": "string", "default": "Every clip makes the next one cheaper"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 8,
+      "min": 2.6,
+      "max": 20,
+      "step": 0.1,
+      "description": "Title size in % of the frame's short side"
+    },
+    "inDur": {"type": "number", "default": 0.8, "min": 0, "max": 3, "step": 0.01},
+    "plate": {
+      "type": "boolean",
+      "default": false,
+      "description": "Draw the card on a solid plate (the theme surface) filling its box"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "fablecut-mark": "fablecut-mark@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": "Optional solid plate: a small card on a dark frame read as black frames in the render report.",
+  "created": "2026-10-15T17:33:11.451Z",
+  "engine": 2,
+  "madeForClip": "clip-7-a-video-that-checks-itself",
+  "parent": "end-card@1",
+  "asset": {
+    "created": "2026-10-15T17:33:10.828Z",
+    "originClip": "clip-7-a-video-that-checks-itself",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/end-card@2.js", "sha1": "eacf4c9a9369d95c856b341ecc300812c14129a8"},
+  "hash": "52eaf3b4924f56351402bd64a3fed6bbbb5911bfc9016fce150fdeaa6b4bbdb0"
+}

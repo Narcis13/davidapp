@@ -50,3 +50,4 @@
 {"at":"2026-10-09T13:36:59.541Z","ms":13467,"kind":"tool","name":"start_render","args":{"clip":"clip-7-a-video-that-checks-itself","format":"vertical","wait_seconds":900},"ok":true}
 {"at":"2026-10-09T13:37:29.441Z","ms":252,"kind":"read","name":"render_report","args":{"id":5},"ok":true}
 {"at":"2026-10-09T13:37:29.834Z","ms":249,"kind":"read","name":"render_report","args":{"id":6},"ok":true}
+{"at":"2026-10-15T18:59:00.589Z","ms":316,"kind":"tool","name":"set_asset_metadata","args":{"name":"clip-7-voice","version":1,"provenance":{"license":"Apache-2.0","creator":"Kokoro-82M (hexgrad), voice af_heart","credit":"Voice: Kokoro-82M, voice af_heart (Apache-2.0)","ai_generated":true,"redistributable":true,"source_url":"https://huggingface.co/hexgrad/Kokoro-82M"}},"ok":true}

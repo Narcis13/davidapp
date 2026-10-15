@@ -1,0 +1,51 @@
+{
+  "ref": "word-strip@3",
+  "type": "function",
+  "kind": "visual",
+  "title": "Word strip",
+  "description": "The narration's words on a strip in reading order, scrolling with the speech so the word being spoken sits at the playhead, lit, with a bar under it that fills for as long as the word lasts. Reads f.clip.words (a placeholder without a narration). Takes a theme.",
+  "tags": ["narration", "words", "timeline", "text", "scene", "diagram"],
+  "duration": 6,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 4,
+      "min": 2.6,
+      "max": 12,
+      "step": 0.1,
+      "description": "Word size in % of the frame's short side"
+    },
+    "label": {
+      "type": "string",
+      "default": "f.clip.words",
+      "description": "A small label above the strip (empty: none)"
+    },
+    "playhead": {
+      "type": "number",
+      "default": 0.42,
+      "min": 0.1,
+      "max": 0.9,
+      "step": 0.01,
+      "description": "Where the spoken word sits, as a share of the width"
+    },
+    "inDur": {"type": "number", "default": 0.4, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": "The scrolling words are marked as a ticker (f.lib.text role): the captions are what is read; check_clip no longer holds each passing word to reading time.",
+  "created": "2026-10-15T17:33:11.366Z",
+  "engine": 2,
+  "madeForClip": "clip-7-a-video-that-checks-itself",
+  "parent": "word-strip@2",
+  "asset": {
+    "created": "2026-10-15T17:33:10.549Z",
+    "originClip": "clip-7-a-video-that-checks-itself",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/word-strip@3.js", "sha1": "9a60b7b3a7fc2707d302b6772bf629f905cbd5f5"},
+  "hash": "760ee1d04e60bae7cf06cb056c331e70a1fe59cdd1d7fb58ddbf556c27c543c6"
+}

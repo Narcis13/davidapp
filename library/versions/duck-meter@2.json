@@ -1,0 +1,57 @@
+{
+  "ref": "duck-meter@2",
+  "type": "function",
+  "kind": "visual",
+  "title": "Duck meter",
+  "description": "A diagram of music ducking under a voice: speech stretches from the narration's words on top, the music's gain curve below dipping while the voice speaks, scrolling with the clip. Reads f.clip.words; by, attack and release mirror the clip's ducking. Takes a theme.",
+  "tags": ["narration", "audio", "ducking", "diagram", "scene", "mix"],
+  "duration": 6,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "by": {
+      "type": "number",
+      "default": 18,
+      "min": 0,
+      "max": 60,
+      "step": 0.5,
+      "description": "How far the music drops, in dB"
+    },
+    "attack": {"type": "number", "default": 0.15, "min": 0, "max": 2, "step": 0.01},
+    "release": {"type": "number", "default": 0.45, "min": 0, "max": 5, "step": 0.01},
+    "hold": {"type": "number", "default": 0.25, "min": 0, "max": 2, "step": 0.01},
+    "seconds": {
+      "type": "number",
+      "default": 8,
+      "min": 2,
+      "max": 30,
+      "step": 0.1,
+      "description": "Seconds across the diagram"
+    },
+    "size": {
+      "type": "number",
+      "default": 3.2,
+      "min": 2.6,
+      "max": 8,
+      "step": 0.1,
+      "description": "Label size in % of the frame's short side"
+    },
+    "inDur": {"type": "number", "default": 0.4, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": "A fixed label for the depth of the dip: a number that changed with every pause was text held too briefly to read.",
+  "created": "2026-10-15T17:33:11.008Z",
+  "engine": 2,
+  "madeForClip": "clip-7-a-video-that-checks-itself",
+  "parent": "duck-meter@1",
+  "asset": {
+    "created": "2026-10-15T17:33:10.650Z",
+    "originClip": "clip-7-a-video-that-checks-itself",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/duck-meter@2.js", "sha1": "ee0e3b028f57cd5eb0b5d6648965213e18b8a466"},
+  "hash": "83ca57e905f78e5efcb7ddcf318a3e202189d598d61767d61142436db6f20b72"
+}

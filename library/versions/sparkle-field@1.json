@@ -1,0 +1,45 @@
+{
+  "ref": "sparkle-field@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Sparkle field",
+  "description": "A field of seeded particles that drift upward and twinkle. The layout comes from f.rng, so the same seed always gives the same field. An ambient accent layer for any scene.",
+  "tags": ["particles", "ambient", "overlay", "seeded", "loop"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "count": {"type": "integer", "default": 90, "min": 1, "max": 600},
+    "colors": {
+      "type": "array",
+      "of": {"type": "color", "default": "#ffffff"},
+      "default": ["#ffd166", "#ff5c8a", "#7cf5c0", "#f4f1ea"],
+      "minItems": 1,
+      "maxItems": 6
+    },
+    "size": {"type": "number", "default": 7, "min": 1, "max": 60, "step": 0.5},
+    "speed": {
+      "type": "number",
+      "default": 0.05,
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "description": "Rise per second, as a fraction of the frame height"
+    },
+    "twinkle": {"type": "number", "default": 1.4, "min": 0, "max": 10, "step": 0.1},
+    "shape": {"type": "enum", "options": ["dot", "plus", "diamond"], "default": "plus"},
+    "opacity": {"type": "number", "default": 0.8, "min": 0, "max": 1, "step": 0.01},
+    "inDur": {"type": "number", "default": 0.6, "min": 0, "max": 5, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.6, "min": 0, "max": 5, "step": 0.01}
+  },
+  "uses": {},
+  "deps": {},
+  "author": "claude-fable-5-1",
+  "note": null,
+  "created": "2026-10-15T17:31:19.638Z",
+  "engine": 2,
+  "madeForClip": "clip-1-every-frame",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:31:19.638Z", "originClip": "clip-1-every-frame", "forkedFrom": null},
+  "source": {"file": "sources/sparkle-field@1.js", "sha1": "730bb7637b01c93105306670713a3e8302a7b000"},
+  "hash": "f501d02e72996d4ae7269017078de84769080f06a1861172642ace88dc93f138"
+}

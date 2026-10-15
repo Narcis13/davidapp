@@ -1,0 +1,63 @@
+{
+  "ref": "check-list@3",
+  "type": "function",
+  "kind": "visual",
+  "title": "Check list",
+  "description": "A list of short statements on a solid plate, checked one by one: with progress (keyframed on the words) every row waits muted and lights up with its tick; with each row's at, rows slide in at their time. For the checks a video passes, steps completed, claims made one by one. Optional heading; sizes are a share of the frame's short side, with a floor. Takes a theme.",
+  "tags": ["list", "checklist", "text", "scene", "bullets", "plate"],
+  "duration": 8,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "heading": {"type": "string", "default": "Checked", "description": "Empty: no heading"},
+    "items": {
+      "type": "array",
+      "maxItems": 8,
+      "of": {
+        "type": "object",
+        "fields": {"text": {"type": "string", "default": ""}, "at": {"type": "number", "min": 0, "default": 0}},
+        "default": {"text": "", "at": 0}
+      },
+      "default": [
+        {"text": "Inside the safe zone", "at": 0.4},
+        {"text": "Big enough to read", "at": 1.4},
+        {"text": "Contrast 4.5:1 or more", "at": 2.4}
+      ],
+      "description": "Each row and the item time (s) it appears at"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 4.2,
+      "min": 2.6,
+      "max": 12,
+      "step": 0.1,
+      "description": "Row size in % of the frame's short side"
+    },
+    "mark": {"type": "enum", "options": ["tick", "dot", "none"], "default": "tick"},
+    "progress": {
+      "type": "number",
+      "default": -1,
+      "min": -1,
+      "max": 8,
+      "step": 0.01,
+      "description": "Rows shown (row i is in when progress passes i + 1); keyframe it, anchored to words, to bring rows in on what is said. -1: use the at of each row"
+    },
+    "inDur": {"type": "number", "default": 0.35, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": "With progress every row is on the plate from the start, muted, and lights up with its tick: an empty plate waited for the first word.",
+  "created": "2026-10-15T17:33:11.286Z",
+  "engine": 2,
+  "madeForClip": "clip-7-a-video-that-checks-itself",
+  "parent": "check-list@2",
+  "asset": {
+    "created": "2026-10-15T17:33:10.746Z",
+    "originClip": "clip-7-a-video-that-checks-itself",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/check-list@3.js", "sha1": "8be6619242b2b8a8c1a2dabc22a214922a381a80"},
+  "hash": "8db1bd9b0d1cc2639f498baa1d5e8574d361d15439b2d5871dff8b299ae013a3"
+}

@@ -1,0 +1,358 @@
+{
+  "slug": "clip-8-cuvinte-pe-ritm",
+  "title": "Cuvinte pe ritm",
+  "description": "A text-and-music video for a feed: vertical, about 38 s, its words in Romanian, every scene cut on a bar of the music. Built from what clip 7 left behind.",
+  "format": "vertical",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "duration": 38.4,
+  "composition": {
+    "format": "vertical",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "duration": 38.4,
+    "seed": 8,
+    "background": "#07111f",
+    "tracks": [
+      {
+        "id": "bg",
+        "name": "Background",
+        "type": "visual",
+        "items": [
+          {
+            "id": "drift",
+            "asset": "bg-gradient-drift@1",
+            "start": 0,
+            "duration": 32.4,
+            "params": {
+              "base": "#07111f",
+              "colors": ["#0f2c4d", "#3a1d55", "#123b5c"],
+              "intensity": 0.4,
+              "speed": 0.18,
+              "beatPulse": 0,
+              "vignette": 0.5
+            },
+            "fadeOut": 1.2
+          }
+        ]
+      },
+      {
+        "id": "life",
+        "name": "Particles",
+        "type": "visual",
+        "items": [
+          {
+            "id": "motes",
+            "asset": "sparkle-field@1",
+            "start": 0,
+            "duration": 32.4,
+            "params": {
+              "count": 70,
+              "colors": ["#5ce1e6", "#eef4ff", "#ffb347"],
+              "size": 6,
+              "speed": 0.04,
+              "twinkle": 1.2,
+              "shape": "dot",
+              "opacity": 0.45,
+              "inDur": 0,
+              "outDur": 1.2
+            }
+          },
+          {
+            "id": "pulse",
+            "asset": "beat-bars@1",
+            "start": 0,
+            "duration": 31.2,
+            "params": {
+              "bars": 28,
+              "color": "#5ce1e6",
+              "color2": "#b39cff",
+              "height": 1,
+              "position": "middle",
+              "fallbackBpm": 100,
+              "inDur": 0.3
+            },
+            "transform": {"x": 0.5, "y": 0.625, "width": 0.8, "height": 0.05}
+          }
+        ]
+      },
+      {
+        "id": "scenes",
+        "name": "Scenes",
+        "type": "visual",
+        "items": [
+          {
+            "id": "titlu",
+            "asset": "title-plate@1",
+            "start": 0,
+            "duration": 4.8,
+            "params": {
+              "text": "Un video care\n*se verifică singur*",
+              "eyebrow": "Fablecut · iterația 3",
+              "theme": "theme-tide@1",
+              "size": 8,
+              "inDur": 0,
+              "outDur": 0.2
+            },
+            "transform": {"x": 0.5, "y": 0.37, "width": 0.84, "height": 0.3},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "cuvinte",
+            "asset": "title-plate@1",
+            "start": 4.8,
+            "duration": 4.8,
+            "params": {
+              "text": "Fiecare cuvânt\nare *clipa lui*",
+              "eyebrow": "Cuvinte la timp",
+              "theme": "theme-tide@1",
+              "size": 8,
+              "inDur": 0.3,
+              "outDur": 0.2
+            },
+            "transform": {"x": 0.5, "y": 0.37, "width": 0.84, "height": 0.3},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 7}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "subtitrari",
+            "asset": "title-plate@1",
+            "start": 9.6,
+            "duration": 4.8,
+            "params": {
+              "text": "Subtitrările\nvin din *cuvinte*",
+              "eyebrow": "Două rânduri",
+              "theme": "theme-tide@1",
+              "size": 8,
+              "inDur": 0.3,
+              "outDur": 0.2
+            },
+            "transform": {"x": 0.5, "y": 0.37, "width": 0.84, "height": 0.3},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 6}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "muzica",
+            "asset": "title-plate@1",
+            "start": 14.4,
+            "duration": 4.8,
+            "params": {
+              "text": "Muzica face loc\n*vocii*",
+              "eyebrow": "Mixaj",
+              "theme": "theme-tide@1",
+              "size": 8,
+              "inDur": 0.3,
+              "outDur": 0.2
+            },
+            "transform": {"x": 0.5, "y": 0.37, "width": 0.84, "height": 0.3},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "verificari",
+            "asset": "check-list@3",
+            "start": 19.2,
+            "duration": 7.2,
+            "params": {
+              "heading": "Înainte de randare",
+              "theme": "theme-tide@1",
+              "size": 5,
+              "items": [
+                {"text": "În zona sigură"},
+                {"text": "Destul de mare"},
+                {"text": "Contrast 4,5:1"},
+                {"text": "Destul timp pe ecran"}
+              ]
+            },
+            "transform": {"x": 0.5, "y": 0.4, "width": 0.84, "height": 0.34},
+            "keyframes": {
+              "params.progress": [
+                {"t": 0, "v": 0},
+                {"t": 1.1999999999999993, "v": 0},
+                {"t": 1.4999999999999993, "v": 1},
+                {"t": 2.400000000000002, "v": 1},
+                {"t": 2.700000000000002, "v": 2},
+                {"t": 3.6000000000000014, "v": 2},
+                {"t": 3.9000000000000012, "v": 3},
+                {"t": 4.800000000000001, "v": 3},
+                {"t": 5.1000000000000005, "v": 4}
+              ]
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 7}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "masurat",
+            "asset": "check-list@3",
+            "start": 26.4,
+            "duration": 4.8,
+            "params": {
+              "heading": "Măsurat pe fișier",
+              "theme": "theme-tide@1",
+              "size": 5,
+              "items": [{"text": "Intensitate −14 LUFS"}, {"text": "Fără flash-uri"}, {"text": "Fără cadre înghețate"}]
+            },
+            "transform": {"x": 0.5, "y": 0.4, "width": 0.84, "height": 0.34},
+            "keyframes": {
+              "params.progress": [
+                {"t": 0, "v": 0},
+                {"t": 0.6000000000000014, "v": 0},
+                {"t": 0.9000000000000015, "v": 1},
+                {"t": 1.8000000000000007, "v": 1},
+                {"t": 2.1000000000000005, "v": 2},
+                {"t": 3, "v": 2},
+                {"t": 3.3, "v": 3}
+              ]
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.005, "tilt": 0.5, "period": 7}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "final",
+            "asset": "end-card@2",
+            "start": 31.2,
+            "duration": 7.2,
+            "params": {
+              "title": "Verificat\n*de studio*",
+              "line": "Fablecut · iterația 3",
+              "theme": "theme-tide@1",
+              "size": 8.5,
+              "plate": true
+            },
+            "transform": {"x": 0.5, "y": 0.4, "width": 0.84, "height": 0.3}
+          }
+        ]
+      },
+      {
+        "id": "music",
+        "name": "Music",
+        "type": "audio",
+        "items": [
+          {
+            "id": "beat",
+            "asset": "music-loop@1",
+            "start": 0,
+            "duration": 38.4,
+            "params": {
+              "bpm": 100,
+              "scale": "minor",
+              "drums": 0.8,
+              "bass": 0.7,
+              "arp": 0.45,
+              "arpWave": "triangle",
+              "root": 43,
+              "build": true,
+              "outroBars": 1
+            },
+            "fadeOut": 0.6,
+            "assetDuration": 40.8,
+            "gain": 0.8,
+            "beats": true,
+            "keyframes": {"volume": [{"t": 0, "v": 0}, {"t": 36, "v": 0}, {"t": 38.4, "v": -4, "ease": "inSine"}]}
+          }
+        ],
+        "role": "music"
+      }
+    ],
+    "markers": [
+      {"t": 0, "label": "bar 1", "type": "cut"},
+      {"t": 2.4, "label": "bar 2", "type": "beat"},
+      {"t": 4.8, "label": "bar 3", "type": "cut"},
+      {"t": 7.2, "label": "bar 4", "type": "beat"},
+      {"t": 9.6, "label": "bar 5", "type": "cut"},
+      {"t": 12, "label": "bar 6", "type": "beat"},
+      {"t": 14.4, "label": "bar 7", "type": "cut"},
+      {"t": 16.8, "label": "bar 8", "type": "beat"},
+      {"t": 19.2, "label": "bar 9", "type": "cut"},
+      {"t": 21.6, "label": "bar 10", "type": "beat"},
+      {"t": 24, "label": "bar 11", "type": "beat"},
+      {"t": 26.4, "label": "bar 12", "type": "cut"},
+      {"t": 28.8, "label": "bar 13", "type": "beat"},
+      {"t": 31.2, "label": "bar 14", "type": "cut"},
+      {"t": 32.4, "label": "end card holds", "type": "hold", "duration": 6},
+      {"t": 33.6, "label": "bar 15", "type": "beat"},
+      {"t": 36, "label": "bar 16", "type": "beat"}
+    ],
+    "theme": "theme-tide@1",
+    "loudness": {"target": -14, "truePeak": -1},
+    "platforms": ["reels"],
+    "safe": "platform",
+    "easing": "easing@1"
+  },
+  "closure": ["beat-bars@1", "bg-gradient-drift@1", "check-list@3", "drum-hat@1", "drum-kick@1", "drum-snare@1", "easing@1", "end-card@2", "fablecut-mark@1", "motion-drift@1", "music-loop@1", "sparkle-field@1", "synth-note@1", "theme-tide@1", "title-plate@1"],
+  "files": [
+    {
+      "ref": "fablecut-mark@1",
+      "sha256": "44451f570cc97487bf475c2cdb85c048e1e6a06032dcc2b69c230fc33cf61f80",
+      "bytes": 8904,
+      "ext": "png",
+      "store": "repo",
+      "license": "original",
+      "sourceUrl": null,
+      "creator": null
+    }
+  ],
+  "check": {
+    "machine": "win32-x64",
+    "engine": 2,
+    "frames": {
+      "12": "624a4668c05f0cb6a5fd787b7ffc7865e77936f7a47842eda7c68dc4c5a4f232",
+      "36": "dcb564607a0b81acf8b1a6a485ef7fae1659aac4d43d8a8b2b938185966f0252",
+      "60": "204d020c1d1fac8d88d7881bd66b09b7cec3e7add015dffb75b24040719687ad",
+      "84": "77398e66c36382520694b2449f9b0fa51df27facfba491fd2973bccd5ebbe5ed",
+      "108": "b7293f74bf7d578bb7b9b88648d9cd6af5f4a19511ff4ee2b6452ada9ea29895",
+      "132": "faacca5a761da39627d4240cd1013dc87f43903c1887260eac9d0e9dfe001546",
+      "156": "34ca681ea0496da281b1a9241412afb4c36259036956ba7939e08a2a8416cb3c",
+      "180": "b0a2e2aca530c5f90dd3bc80b9314abe51422c392c51252f73f473c13b3ad39e",
+      "204": "46c0253a55bc42bbf0460d1723daf0a49600b0b22f109eb29d4d6ba9e1d72e6f",
+      "228": "b1b071dfac66ed889aed5a3b8f524c1c2c834011a04464212b74421c9a41d4a3",
+      "252": "8356c0bf4673943134bf621079c5234aa6934fe9aa85a91d7cfcd516b4e53bfd",
+      "276": "f39a85edfcb313c706ac41eb655b14cc7ffa588fe3d2a54f6b43e4b5dac96038",
+      "300": "14a4e31efc59d669bf93de7890b8e529449676b29f78c93ac592a0d7dcecb6e9",
+      "324": "a2ecb764947addd80e231e86231775b99db6ce9232118c005b352b166051f5c0",
+      "348": "89cbd1c8bdb3bb9d76624d2e1d9c1761b6b0962a09f7c4a01356b76d70655e64",
+      "372": "c65e6968a1273a1a027822a05773713dea27ae34eafaa1cf868ceee642c407b0",
+      "396": "885a90c9e799927c8d67b0503a4b93de3c88298be4c37213a61187ec11d9ce17",
+      "420": "dde70d67fae5f4283542b7083ad383291c5d6479ce4ce7620b41aaf8602f0ff4",
+      "444": "7d0e6a5d697b9f3adda811df0665bb95f363f5730f7e4555c15a23a282b99fdc",
+      "468": "0aed0597ee8a1993c53c7a1696b88fc6bc552d5bfa3fb05e8bdc7d8947c955e6",
+      "492": "97dae008ef28133f2966150f3c3c8854e89441be36b388bf1a99db26cae60dca",
+      "516": "5729a7cd97309e1e85d8af50111356739a305cd9f533bdda459639754b5f9f99",
+      "540": "304922e3713e890a1ee27baac3d8e9b3ed7d141ea529827e80cae4286b53d447",
+      "564": "e502da0f199b2a580811934f639e41064e3cc3dc0273b4114d3b677d34f3608d",
+      "588": "0b087e890e10c9a6570b1b668f7af9cd95bbe4d4dad49c5b5f52518553f305c2",
+      "612": "445d7e5bf5d9a7033d613843bab29e692a9fa39b1ccb93ea83b25554e8fa1ea8",
+      "636": "82dcbdfcba9e8fe6b3b094352f127f61c75689f4afbef5fd13a7673c0daeb3f3",
+      "660": "650fa3461f87176b80e0e53df55d2f4e4ffc0eb1646db1117b1dae8e0a42fa22",
+      "684": "3cc5616c17f26f5b4e8fb6f2171d9bcb1c1773c53b57ccce266360bdacb8ea70",
+      "708": "12ee7d9fb5f2272deb22b7f345e11579db8c66e5fdd4ea6196725cbfbff6e700",
+      "732": "1dfe847440e5455d04104cb021c7445cee0ea4c35cd4b246f57d9bb03e8c456d",
+      "756": "b44f442413f53209473b5e867e3b41d63a13ad6c9fa93dec4a3e6ca620babb3f",
+      "780": "90bdbd0548c884ccec5a7437109ebfde1f62488168d7bdf7a755c4e1913fbb4c",
+      "804": "14cc4ad12bf59e3ba301bac45948b3f1c68671682655e2d54a552b52d6cac68a",
+      "828": "e443e35d3184a65507d9997e02645b78694c96de4a64ec0516379115a66a981f",
+      "852": "80b00f29da25f1f9961455b91a8fc991cf6445af817eda2f630307d580c33a03",
+      "876": "4c60534c7f582c41d287d9da822e7ae6a9e8bf9bc7351778504c24522d5306ec",
+      "900": "46de4484367f15c4d7e7a12cdbe7a3525ed49e1f7672d574bf943febcadc0a0b",
+      "924": "3c0ac06bc0518b32181231d6dcbf4dc01cdadccc6a50db6d40e51e0062d0fdec",
+      "948": "eb9523e01fd1f7dda8863252b5cfd770a077ed10d8859daca3b4ea3aae8a3f35",
+      "972": "316859f76a0fc364cbacdd03ad45a4980ee3ba3b6d60114d5d21938e5eae68cd",
+      "996": "316859f76a0fc364cbacdd03ad45a4980ee3ba3b6d60114d5d21938e5eae68cd",
+      "1020": "316859f76a0fc364cbacdd03ad45a4980ee3ba3b6d60114d5d21938e5eae68cd",
+      "1044": "316859f76a0fc364cbacdd03ad45a4980ee3ba3b6d60114d5d21938e5eae68cd",
+      "1068": "316859f76a0fc364cbacdd03ad45a4980ee3ba3b6d60114d5d21938e5eae68cd",
+      "1092": "316859f76a0fc364cbacdd03ad45a4980ee3ba3b6d60114d5d21938e5eae68cd",
+      "1116": "316859f76a0fc364cbacdd03ad45a4980ee3ba3b6d60114d5d21938e5eae68cd",
+      "1140": "316859f76a0fc364cbacdd03ad45a4980ee3ba3b6d60114d5d21938e5eae68cd"
+    }
+  }
+}
