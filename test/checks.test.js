@@ -132,3 +132,23 @@ test('contrast: text nearly the colour of its background is measured from its re
   assert.deepEqual(parseColor('#fff'), [255, 255, 255]);
   assert.equal(parseColor('gradient'), null);
 });
+
+test('hold: a text that moves and grows is one run of reading time; one that leaves and comes back is two', async () => {
+  // the same line glides across the frame and doubles in size (its words may be grouped as another block as it scales)
+  const moving = {
+    width: W, height: H, fps: 10, duration: 6, background: '#000000',
+    tracks: [{ id: 't', type: 'text', items: [{ ...txt('glide', 'Find tune place', { x: 0.3, y: 0.4, width: 0.4, height: 0.15 }, { start: 0, duration: 6 }),
+      keyframes: { x: [{ t: 2, v: 0.3 }, { t: 2.6, v: 0.6 }], scale: [{ t: 2, v: 1 }, { t: 2.6, v: 1.4 }] } }] }],
+  };
+  await studio.clips.createClip({ slug: 'glide', author: AUTHOR, composition: moving });
+  const r = await studio.checks.checkClip({ clip: 'glide', only: ['hold'], stills: false });
+  assert.deepEqual(r.issues.map((i) => i.message), []);
+  // shown 0.5 s, gone, shown 0.5 s again: each showing is held to the rule on its own
+  const blink = {
+    width: W, height: H, fps: 10, duration: 6, background: '#000000',
+    tracks: [{ id: 't', type: 'text', items: [txt('a', 'Blink', { x: 0.5, y: 0.4, width: 0.4, height: 0.15 }, { start: 1, duration: 0.5 }), txt('b', 'Blink', { x: 0.5, y: 0.4, width: 0.4, height: 0.15 }, { start: 3, duration: 0.5 })] }],
+  };
+  await studio.clips.createClip({ slug: 'blink', author: AUTHOR, composition: blink });
+  const b = await studio.checks.checkClip({ clip: 'blink', only: ['hold'], stills: false });
+  assert.equal(b.issues.length, 2, JSON.stringify(b.issues.map((i) => i.message)));
+});

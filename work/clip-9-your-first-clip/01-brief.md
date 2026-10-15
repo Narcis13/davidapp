@@ -6,15 +6,14 @@ gate message into `work/<slug>/` and goes on, and records that no owner approved
 `motion_prompt_fablecut.md`; its inputs, as filled for this clip, are in `PROMPT.md`.
 
 ## The video, in three lines
-- **What:** an onboarding video of about 50 s that walks through making a first clip in Fablecut, shown on the
+- **What:** an onboarding video of about 55 s that walks through making a first clip in Fablecut, shown on the
   real studio: find an asset, tune it, place it on a clip, render it.
 - **For whom:** someone who has just cloned the repo and opened the studio for the first time.
 - **Takeaway:** *find, tune, place, render: a clip in four steps, all inside the studio.*
 
 ## Inputs and defaults taken (a default is marked †)
 Type onboarding · Narration voiced · Product: Fablecut, `github.com/Narcis13/davidapp` (the repo; given by the
-iteration brief) · Call to action: "Open the studio" with `npm run studio` and the repo URL † · Shape 16:9 primary, 9:16
-second † (a vertical render from the same composition) · Runs on: YouTube and the repo's README † · Language English †
+iteration brief) · Call to action: "Open the studio" with `npm run studio` and the repo URL † · Shape 16:9 only (decided at gate 1: a desktop UI recorded at 1440×900 would be unreadable in a 9:16 frame; the vertical shape goes to clip 10, which is made for feeds) · Runs on: YouTube and the repo's README † · Language English †
 · Captions burned in † · Photos and footage: footage only (screen recordings of the studio, made by
 `scripts/record-studio.mjs`; no photos) · Gates all † · Slug `clip-9-your-first-clip`.
 
@@ -22,8 +21,7 @@ second † (a vertical render from the same composition) · Runs on: YouTube and
 - **YouTube (16:9):** 1920×1080, the recorded frame rate (30), MP4 with fast start, uploads up to 15 min by default;
   no safe area published for cards and end screens, so the studio's title-safe 5 % holds. Source:
   support.google.com/youtube/answer/1722171 and /6375112 (retrieved with iteration 3).
-- **YouTube Shorts (9:16):** at most 60 s for this purpose (the video stays under it); text kept out of the
-  bottom and right overlays by the Shorts profile's zones. Sound: on, but the captions carry every word for sound off.
+Sound on, but the captions carry every word for sound off.
 
 ## Questions that change the video (each with its default)
 1. The voice is synthetic (Kokoro-82M): YouTube asks creators to disclose *realistic* altered or synthetic

@@ -67,12 +67,15 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
       if (data.worse !== undefined && data.worse < prev.worse) Object.assign(prev, { ...data, frame: at, t: r2(at / fps), until: prev.until, frames: prev.frames });
     };
     const allTexts = [];
-    const seen = new Map();
+    // runs of text (see the hold rule below): by block and by words, and every run in the order it began
+    const seen = new Map(), byText = new Map();
+    const runs = [];
     try {
       // a frame whose text cannot fit at its size floor throws (TextFloorError): that is an issue at that time, not a failed check
       const floorError = (e) => /^TextFloorError\b/.test(String(e?.assetStack ?? ''));
       const measured = await Promise.all([...frames].sort((x, y) => x - y).map((f) => pool.run('inspectFrame', { frame: f, contrast: want('contrast') }, { bundle, timeout: 120000 })
         .then((r) => ({ f, ...r }), (e) => { if (!floorError(e)) throw e; return { f, floorError: e.message, texts: [], std: 99 }; })));
+      let prevFrame = -1;
       for (const { f, texts, std, floorError: fe } of measured) {
         if (fe && want('size')) issue('size', `floor|${fe}`, f, { severity: 'error', item: null, message: `Text does not fit at its size floor: ${fe}`, numbers: {} });
         if (f === 0 && want('first-frame') && std < 2) issue('first-frame', 'f0', 0, { severity: 'error', item: null, message: 'The first frame is empty: a single flat colour (it is the thumbnail many feeds show).', numbers: { spread: r2(std) } });
@@ -80,9 +83,17 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
         for (const t of texts) if (t.family) allTexts.push(t);
         for (const blk of blocks) {
           const key = `${blk.item}|${blk.block}`;
-          const s = seen.get(key) ?? { first: f, last: f, words: 0, text: blk.text, item: blk.item, caption: blk.caption, ticker: blk.role === 'ticker' };
-          s.last = f; s.words = Math.max(s.words, words(blk.text)); if (words(blk.text) >= s.words) s.text = blk.text;
+          // how long a text is held: a run goes on while the same block of the same item is drawn (a text that types
+          // itself out grows inside its block), or the same words of the same item are, wherever they are drawn (a block
+          // that moves or scales may be grouped as another block); a text that leaves and comes back starts a new run
+          const textKey = `${blk.item}|${blk.text.replace(/\s+/g, ' ').trim()}`;
+          const going = (x) => (x && x.last >= prevFrame ? x : undefined);
+          let s = going(seen.get(key)) ?? going(byText.get(textKey));
+          if (!s) { s = { first: f, last: f, words: 0, text: blk.text, item: blk.item, caption: blk.caption, ticker: blk.role === 'ticker', key }; runs.push(s); }
+          s.last = f;
+          s.words = Math.max(s.words, words(blk.text)); if (words(blk.text) >= s.words) s.text = blk.text;
           seen.set(key, s);
+          byText.set(textKey, s);
           const label = `"${blk.text.length > 40 ? `${blk.text.slice(0, 37)}…` : blk.text}"`;
           if (blk.approximate) continue;
           const box = blk.box;
@@ -96,6 +107,7 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
           if (blk.screenPct !== null && blk.screenPct < floor) issue('size', key, f, { severity: 'error', item: blk.item, box, worse: blk.screenPct, message: `${label} is ${r2(blk.screenSize)} px on screen (${blk.screenPct}% of the frame's short side), under the floor of ${floor}%.`, numbers: { screenPx: r2(blk.screenSize), screenPct: blk.screenPct, floorPct: floor } });
           if (blk.contrast && blk.alpha >= 0.95 && blk.contrast.ratio < opt.contrast) issue('contrast', key, f, { severity: 'error', item: blk.item, box, worse: blk.contrast.ratio, message: `${label} has a contrast of ${blk.contrast.ratio}:1 against the worst pixels behind it (needs ${opt.contrast}:1).`, numbers: { ...blk.contrast, needs: opt.contrast } });
         }
+        prevFrame = f;
         if (want('overlap')) for (let i = 0; i < blocks.length; i++) for (let j = i + 1; j < blocks.length; j++) {
           const p = blocks[i], q = blocks[j];
           if (p.item === q.item || p.approximate || q.approximate) continue;
@@ -106,7 +118,8 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
         }
       }
       // held long enough to read: words / 3 + 1 seconds (captions follow the speech and have their own rules)
-      if (want('hold')) for (const [key, s] of seen) {
+      if (want('hold')) for (const s of runs) {
+        const key = `${s.key}|${s.first}`;
         // captions, tickers (text that scrolls past, f.lib.text role 'ticker') and numbers that count up are not held to it
         if (s.caption || s.ticker || /^[\d\s.,:%+\-–×x$€£#/]*$/.test(s.text)) continue;
         const held = (s.last - s.first + every) / fps, needs = s.words / 3 + 1;
