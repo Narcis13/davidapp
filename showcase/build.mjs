@@ -129,9 +129,11 @@ try {
     const j = r.json ?? {};
     let note = j.created ?? j.updated ?? j.added?.ref ?? '';
     if (step.render) {
-      if (j.status !== 'done') { console.error(`✖ render of ${what}: ${j.status} ${j.error ?? ''}`); failed = true; break; }
-      note = `render #${j.id} done in ${j.stats.renderSeconds}s (${j.stats.framesPerSecond} fps, ${j.stats.realtimeFactor}× realtime) → ${j.output}`;
-      if (j.log) { console.error(`✖ render of ${what} logged: ${j.log}`); failed = true; break; }
+      // a request for several shapes answers with a batch: every render in it must be done
+      const all = Array.isArray(j.renders) ? j.renders : [j];
+      const bad = all.find((x) => x.status !== 'done' || x.log);
+      if (bad) { console.error(`✖ render of ${what}${bad.format ? ` (${bad.format})` : ''}: ${bad.status} ${bad.error ?? bad.log ?? ''}`); failed = true; break; }
+      note = all.map((x) => `render #${x.id}${all.length > 1 ? ` ${x.format}` : ''} done in ${x.stats.renderSeconds}s (${x.stats.framesPerSecond} fps, ${x.stats.realtimeFactor}× realtime) → ${x.output}`).join('; ');
     }
     console.log(`✓ ${String(i + 1).padStart(2)} ${step.tool.padEnd(14)} ${what.padEnd(24)} ${note} (${ms}ms)`);
     for (const w of j.warnings ?? []) console.log(`     warning: ${w}`);
