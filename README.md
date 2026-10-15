@@ -13,7 +13,7 @@ Claude Code answers with a proposal, and you compare it with what is there and a
 
 ## The showcase
 
-Eight clips, made in order through the MCP server. Each one grew the library and the next one reused it.
+Eleven clips, made in order through the MCP server. Each one grew the library and the next one reused it.
 
 Clips 1 to 3, each 32 seconds:
 
@@ -61,12 +61,27 @@ itself: `check_clip` on every frame sampled, the mix measured, the encoded file 
 Both measure −14 LUFS (±0.2) with a true peak under −1 dBTP on the encoded file; in clip 7 the music sits
 16.8 LU under the voice where it speaks. Evidence: [docs/showcase/v3](docs/showcase/v3/INDEX.md).
 
-The MP4s are attached to the [`showcase-v1`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v1)
-and [`showcase-v2`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v2) releases (videos
-are never committed). Contact sheets, ffprobe reports, the reuse report and the verification
+Clips 9 to 11 use what the fourth iteration added. Clips 9 and 10 went through the gates of the revised motion
+prompt ([motion_prompt_fablecut.md](motion_prompt_fablecut.md)); clip 11 is a short tour so that every kit asset
+appears in the showcase. Each was rendered with `final: true` and travels as `clips/<clip>/clip.json` plus the
+store in `library/`; the working notes are in `work/<clip>/`.
+
+| clip | format | what it adds | what it reuses |
+|---|---|---|---|
+| [**Your first clip**](work/clip-9-your-first-clip/05-final.md) | horizontal 1920×1080, 54.6 s, voiced, captions burned in | five screen recordings of the studio (`scripts/record-studio.mjs`): find, tune, place, render; over them the kit's cursor (from each recording's sidecar), spotlight, camera, callouts and steps; a narration made in the studio (`generate_narration`); end-card@3 | the theme, text-captions@2, the title plate and the music from earlier clips |
+| [**Every clip helps the next**](work/clip-10-every-clip-helps/05-final.md) | square 1080×1080 and vertical 1080×1920 from one request, 27.5 s, voiced | a marketing video: the Fablecut logo as given (an SVG drawn as vectors), kit-ui-frame, kit-icon, kit-chart-line, kit-plate | clip 9's library recording and end card, the theme, captions and music |
+| [**The kit**](work/clip-11-the-kit/README.md) | horizontal 1920×1080, 16.1 s, music only | kit-ui-frame@2 (it scales in at its text floor), kit-chart-donut, and kit-arrow's first use | kit-steps, kit-plate, the library recording, the theme and music |
+
+The MP4s of clips 1 to 8 are attached to the [`showcase-v1`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v1),
+[`showcase-v2`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v2) and
+[`showcase-v3`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v3) releases (videos
+are never committed). Clips 9 to 11 are not on a release yet; `work/clip-9-your-first-clip/RENDER.md` and
+`work/clip-10-every-clip-helps/RENDER.md` say how to render them from a clean checkout. Contact sheets, ffprobe reports, the reuse report and the verification
 results are in [docs/showcase](docs/showcase/INDEX.md) for clips 1 to 3 and in
 [docs/showcase/v2](docs/showcase/v2/INDEX.md) for clips 4 to 6, with the full
-[compounding table](docs/showcase/v2/reports/compounding.md).
+[compounding table](docs/showcase/v2/reports/compounding.md). The checks and sheets of clips 9 to 11 are in
+`work/<clip>/checks/`; the round-trip reports, the prompt check and the speech measurements in
+[docs/showcase/v4/reports](docs/showcase/v4/reports).
 
 ## Run it
 
@@ -75,7 +90,7 @@ is found automatically).
 
 ```bash
 npm install
-npm run showcase      # builds the library and the six clips through the MCP server, and renders them
+npm run showcase      # builds the library and the eleven clips through the MCP server, and renders them
 npm run sync-assets   # pushes every asset in assets/ into the library (new or changed ones only)
 npm run studio        # the studio: http://127.0.0.1:8787
 ```
@@ -94,7 +109,10 @@ each: film grain does not compress), so leave a few gigabytes free for a full sh
 | `STUDIO_TOOLS` | For an MCP server process: a comma-separated list of tool names; only these are registered. A "Run now" session's server gets the tools that read the studio and answer requests. |
 | `STUDIO_RUNNER` | For an MCP server process: `0` means it does not pick up queued renders (a short-lived server would take a render down with it). |
 | `FFMPEG_PATH` | FFmpeg, when it is not on `PATH`. |
-| `STUDIO_RENDER_WORKERS` | Number of render worker threads (default: the CPU count minus two, at most 8). |
+| `STUDIO_RENDER_WORKERS` | Number of render worker threads (default: the CPU count minus two, at most 8). One render can ask for its own (`start_render { workers }`). |
+| `STUDIO_FOOTAGE_CACHE_MB` | Memory for decoded footage frames, per process (default 512). |
+| `STUDIO_REPO` | The repo `export_clip` writes to and `import_clip` reads from (default: this checkout). |
+| `STUDIO_WHISPER_CLI`, `STUDIO_WHISPER_MODEL`, `STUDIO_WHISPER_MODEL_2`, `STUDIO_TTS`, `STUDIO_KOKORO_DIR`, `ELEVENLABS_API_KEY` | Voice and transcription; see [Voice and transcription](#voice-and-transcription). |
 | `STUDIO_CLAUDE_BIN` | The `claude` CLI that "Run now" starts (default: `claude` on `PATH`; without one the button is hidden). |
 | `STUDIO_AGENT_TIMEOUT` | Seconds a "Run now" session may take (default 600). |
 | `CHROME` | The Chrome binary for the parity test and `scripts/parity.mjs`, `scripts/bench-library.mjs` (found automatically in the usual places; the parity test is skipped without one). |
@@ -103,9 +121,13 @@ Where things live:
 
 ```
 assets/          every function asset's source, one flat folder (name.v2.js is version 2 of name)
-clips/<name>/    one folder per clip: compose.mjs holds its composition
+clips/<name>/    one folder per clip: compose.mjs holds its composition; clip.json is its export (export_clip)
+library/         the content store exported clips share: versions/, sources/, files/<sha256>
 showcase/        build.mjs + plan.mjs: the MCP calls that rebuild clips 1 to 3;
-                 journal/<clip>.jsonl: the recorded steps that rebuild clips 4 to 6; uploads/: their pictures, made by make.mjs
+                 journal/<clip>.jsonl: the recorded steps that rebuild clips 4 to 11; uploads/: their pictures, made by make.mjs;
+                 footage/: the screen recordings and their sidecars; voice/: the committed narration takes
+work/<clip>/     the gate notes, checks and sheets of the clips made through the motion prompt
+fonts/           the bundled font files and their licences; vendor/lucide/: the icon set kit-icon draws
 data/            the studio's runtime store: studio.db, thumbnails, files, caches, renders/  (git-ignored)
 output/          exported renders, contact sheets and reports                                (git-ignored)
 ```
@@ -131,16 +153,20 @@ node scripts/speed-compare.mjs <baseline-checkout> <baseline-data> <data> [out-d
 node scripts/synth-library.mjs <data-dir> [--count 5000]             # a seeded synthetic library of thousands of assets
 node scripts/bench-library.mjs http://127.0.0.1:8787 [out.json]      # against a studio serving that library: search latency over HTTP, the library screen's DOM size while scrolling
 node scripts/dev-seed-v2.mjs                            # development data with every new feature (test fixtures only)
+node scripts/record-studio.mjs <url> <workflow> <out.mp4>            # a studio workflow recorded in headless Chrome: an MP4 and <out.mp4>.json (cursor, clicks, element boxes)
+node scripts/library.mjs export <clip> | import <folder> [--verify]  # a clip to the repo and back (STUDIO_DATA or --data is required)
+node scripts/roundtrip.mjs <clip>… [--clone]                         # export, import into an empty library, compare refs and frames
+node scripts/prompt-tools.mjs [prompt.md]                            # every tool and option a prompt names must exist on the MCP server
 ```
 
 ## The studio
 
 | | |
 |---|---|
-| **Library** `/` | Ranked search (text match, boosted by featured, favourites and use) with facets and their counts: type, kind, tags, format, author, the clip that made an asset, the clip that uses it. Sort by relevance, newest, most used or name; favourites, featured, collections, recently used, needs description. A virtualised grid with filmstrip previews, a detail panel, keyboard navigation, multi-select with bulk tagging and add-to-clip. Drop PNG, JPEG, WebP or SVG files on the page to upload them. |
+| **Library** `/` | Ranked search (text match, boosted by featured, favourites and use) with facets and their counts: type, kind, tags, format, author, the clip that made an asset, the clip that uses it. Sort by relevance, newest, most used or name; favourites, featured, collections, recently used, needs description. A virtualised grid with filmstrip previews, a detail panel, keyboard navigation, multi-select with bulk tagging and add-to-clip. Drop PNG, JPEG, WebP or SVG files on the page to upload them, video files (MP4, MOV, M4V, WebM, MKV) to add footage, and TTF, OTF or WOFF2 files to add fonts (a short form asks for the licence). |
 | **Playground** `/assets/<name>` | Live preview of one asset of any kind with controls generated from its parameter schema, a scrub bar, format and safe-zone toggles. Keep a tweak: save the params as the new defaults (a new version) or as a preset, edit title, description and tags without a new version. The source in a CodeMirror editor (validate a draft, save a new version), version diffs (source, and the same frame side by side), versions, lineage. "Exact frame" asks the renderer for the same frame. The agent panel takes a request about this asset and shows the proposal next to the current version. |
 | **Clips** `/clips` | Every clip as a card with a poster frame. |
-| **Clip editor** `/clips/<name>` | Preview with audio and handles on the canvas: move, scale and rotate a layer, snapping to the frame, the safe zone and other layers. A format switch for per-format layouts. A timeline with move, trim, split, snapping, waveforms and keyframe marks; tracks you reorder, rename, lock, solo, mute and hide; a layers view. An inspector for timing, layout, keyframes with easing, parameters, motions, effects, transition and mask. Multi-select, copy, paste, duplicate, undo and redo (each action is one step; a drag or typing in one field counts as one), keyboard shortcuts (`?` lists them). A split leaves two parts that play on as one. "Save as asset" turns the selected layers into one library asset (a precomp) and can put it in their place. Save, remix into another format, render, and the agent panel for requests about the clip. |
+| **Clip editor** `/clips/<name>` | Preview with audio and handles on the canvas: move, scale and rotate a layer, snapping to the frame, the safe zone and other layers. A format switch for per-format layouts. A timeline with move, trim, split, snapping, waveforms and keyframe marks; tracks you reorder, rename, lock, solo, mute and hide; a layers view. An inspector for timing, layout, keyframes with easing, parameters, motions, effects, transition and mask. Multi-select, copy, paste, duplicate, undo and redo (each action is one step; a drag or typing in one field counts as one), keyboard shortcuts (`?` lists them). A split leaves two parts that play on as one. "Save as asset" turns the selected layers into one library asset (a precomp) and can put it in their place. Footage items show a filmstrip of the frames they play and their edges trim the file (`in`, `out`). The caption pages are a lane under the narration: drag a page's start to another word, click a word to start a page there, select pages to merge them; the words and their times never change. Save, remix into another format, render, and the agent panel for requests about the clip. |
 | **Requests** `/requests` | The inbox of requests to the agent by status, and each request's thread with its proposals: preview, accept, reject with a reason, reply, "Run now". |
 | **Renders** `/renders` | The queue with live progress, cancel, timings. |
 | **Gallery** `/gallery` | Finished clips with their poster, the MP4 and the assets each one used. |
@@ -257,7 +283,7 @@ recipes for the tools are in [docs/COOKBOOK.md](docs/COOKBOOK.md). Every asset s
 ## Use it from Claude Code (MCP)
 
 The repository registers the server in [.mcp.json](.mcp.json), so Claude Code started in this
-folder gets a `studio` server with 46 tools:
+folder gets a `studio` server with 67 tools:
 
 | | |
 |---|---|
@@ -267,14 +293,21 @@ folder gets a `studio` server with 46 tools:
 | `validate_asset` | Dry-run a draft: compile, check, and return a filmstrip. Nothing is saved. |
 | `create_asset`, `update_asset`, `fork_asset` | Save a new asset, a new version, or a fork. The code is validated and test frames are rendered first; a broken asset is rejected with the reason. |
 | `save_defaults`, `create_preset`, `save_precomp` | Keep a tweak: params as a new version's defaults, params as a named preset, clip layers as one asset. |
-| `set_asset_metadata`, `organize_assets`, `add_asset_note`, `diff_versions` | Edit title, description and tags without a new version; tag, favourite, feature or collect many assets; leave a note for the next agent; compare two versions (source and frame). |
+| `set_asset_metadata`, `organize_assets`, `add_asset_note`, `diff_versions` | Edit title, description, tags and a file's provenance without a new version; tag, favourite, feature or collect many assets; leave a note for the next agent; compare two versions (source and frame). |
 | `upload_image`, `list_undescribed`, `describe_asset` | Add a PNG, JPEG, WebP or SVG; see the uploads that still need a description and write it (title, description, tags, suggested uses). |
 | `add_file_asset`, `bake_asset`, `bake_sequence` | Add an image or sound file; bake one frame (or an audio asset) into a file asset; bake any visual asset into a frame sequence. All keep their lineage. |
+| `add_footage`, `footage_frames` | Add a video file as footage; see its own frames, labelled with their time and index, to pick trim points. |
+| `add_font`, `list_fonts` | Add a TTF, OTF or WOFF2 font with its licence (usable at once); list every family a font parameter can name. |
+| `clip_credits`, `check_provenance` | A clip's credits and sources from everything it pins; what would stop a final render (placeholders, files with no licence). |
 | `create_clip`, `update_clip`, `edit_clip`, `get_clip`, `list_clips` | Compose clips; references are pinned and params validated against each asset's schema. `edit_clip` has operations for the timeline, layers, transforms, keyframes and per-format overrides. |
 | `remix_clip`, `repin_clip` | A clip in another format; a clip moved to newer asset versions. |
 | `render_asset_frame`, `render_clip_frame` | One frame as PNG, or a contact sheet, so the model can see its work. |
 | `frame_hashes` | SHA-256 of frames, for checking determinism and that old clips did not change. |
-| `start_render`, `get_render`, `list_renders`, `cancel_render` | Render to MP4 (optionally in another format) and follow the queue. |
+| `layout_report`, `check_clip` | Every text in a frame measured; what a careful editor would point at, with item, time, numbers and a still. |
+| `add_narration`, `generate_narration`, `voice_samples`, `transcribe`, `speech_status`, `check_transcript` | A voice with its script and word times: imported, timed by the studio (`align`), or spoken from a script; one line in several voices; word times of any audio; what is set up; a take checked against its script. |
+| `anchor_report`, `caption_pages`, `audio_report`, `export_stems` | How far anchored visuals are from their words; the caption pages and the rules they break; the mix measured; WAV stems. |
+| `start_render`, `get_render`, `list_renders`, `cancel_render`, `render_report` | Render to MP4 (another format, several formats at once, a draft, a final render with credits) and follow the queue; what the studio measured on the encoded file. |
+| `export_clip`, `import_clip` | A clip and everything it pins to `clips/<clip>/clip.json` and `library/` in the repo; that folder into any library, with the same refs and frames. |
 | `list_requests`, `claim_request`, `get_request`, `reply_request`, `propose_asset_version`, `propose_new_asset`, `propose_clip_edit`, `complete_request` | Work the requests the user wrote in the studio and answer them with proposals. |
 | `list_clip_assets`, `reuse_report`, `compounding_report` | What a clip uses and where each asset came from; what each clip cost to build. |
 
@@ -363,8 +396,11 @@ with 413 and the reason), and an image whose header declares more than 16,384 pi
 megapixels is refused before anything decodes it.
 
 An SVG is rebuilt from an allowlist of drawing elements and attributes: scripts, event handlers,
-`foreignObject`, embedded images, style sheets, animation and external references are dropped and
-reported, and a DOCTYPE or an entity declaration rejects the file. Values are checked the same
+`foreignObject`, embedded images, animation and external references are dropped and reported, and a
+DOCTYPE or an entity declaration rejects the file. An internal `<style>` sheet is read, not dropped:
+its simple rules (type, class and id selectors) are applied to the shapes as attributes and the sheet
+goes; at-rules and anything that could fetch are left out and reported (`svg.dropped`). Linear and
+radial gradients are kept, so a logo is drawn as it was given. Values are checked the same
 way: a `url(...)` other than `url(#id)`, a CSS escape, and any function other than a colour (or a
 transform function on a transform attribute) drops the attribute or style property. An SVG whose
 `<use>` references multiply the drawing beyond a budget is refused. The sanitised SVG is stored
@@ -421,7 +457,7 @@ What a voiced, captioned motion-graphics video needs, inside the studio (iterati
   ellipsis), a layout report of every text in frame pixels, glyph coverage from the fonts' own tables, Latin
   Extended in every bundled family, overlays (grid, title-safe, action-safe, platform zones, caption lane, text
   boxes) in the editor and in `render_clip_frame`, platform profiles (YouTube, Shorts, Reels, TikTok, a generic
-  feed; sources in `src/core/platforms.js`) and **`check_clip`**: text outside its safe zone or cut by the frame,
+  feed; sources in `src/core/platforms.js`; each applies only to the shapes it is made for) and **`check_clip`**: text outside its safe zone or cut by the frame,
   overlapping text, text in the caption lane, under its size floor, under 4.5:1 contrast against the worst pixels
   behind it, held too briefly, caption rule breaks, missing glyphs, an empty first frame, a last frame held under
   2 s, each with its item, time, numbers and a still. The editor lists them and jumps to each.
@@ -431,6 +467,126 @@ What a voiced, captioned motion-graphics video needs, inside the studio (iterati
 - **Inspection** in another format and from an unsaved draft (`render_clip_frame`, `frame_hashes`, sheets).
 - **`sync-assets` never undoes a studio change**: it stops on a conflict and can `--pull` the library's version.
 
+## Footage, fonts, voice, credits and the repo (iteration 4)
+
+### Footage, and recordings of the studio
+
+Video files are library assets (`add_footage`, or drop the file on the library): MP4, MOV, M4V, WebM or MKV,
+kept as they are. A footage item is a layer like an image, trimmed with `in` and `out`, played at `speed`,
+looped, or held on one frame (`hold`). It is frame-exact: every clip frame shows the last frame of the file at or
+before its time, never a blend, and the preview and the render show the same one. At 1:1 on whole pixels the frame
+is copied without smoothing, so a screen recording stays as sharp as it was recorded. The same ref on an audio
+track plays the file's sound, and footage goes wherever an asset takes an image (the window of `kit-ui-frame`).
+Each process runs one FFmpeg decoder per file and hands its frames to every render worker from a memory cache
+(`STUDIO_FOOTAGE_CACHE_MB`, default 512).
+
+`scripts/record-studio.mjs` records a studio workflow in headless Chrome with real input (a mouse that moves in
+arcs, typed keys, drags) and writes an H.264 MP4 and a sidecar JSON with the cursor path, the clicks, the keys and
+the boxes of the elements it touched, in the video's pixels. The kit's cursor, spotlight and camera take the
+sidecar's numbers as they are. The workflows clip 9 was made from are in `scripts/recordings/` (each header says
+what state it needs). A workflow changes the data, so point it at a studio on a scratch data dir
+(`STUDIO_DATA=<scratch> PORT=8796 npm run studio`):
+
+```bash
+node scripts/record-studio.mjs http://127.0.0.1:8796/ library-search showcase/footage/library-search.mp4
+```
+
+A live capture is not deterministic; commit the MP4 and its sidecar (`showcase/footage/`) and every clip made from
+them uses the same bytes.
+
+### Fonts
+
+`add_font` (or a font file dropped on the library) adds a TTF, OTF or WOFF2 with its licence. The family, weight
+and style are read from the file, and its coverage (Unicode blocks, Latin Extended-A) is reported. It works at
+once, in the preview and in renders, with no restart: name the family in any font parameter. A clip pins the font
+files it was made with (`composition.fonts`), and `repin_clip` moves it to a new version. The five bundled
+families in `fonts/` are font assets too; a save pins the ones its check saw drawn, so the credits list every font
+a clip shows.
+
+### Voice and transcription
+
+The studio speaks a script and gives back the narration with every word's time, its transcript checked against
+the script (`generate_narration`); times a recording you made (`add_narration { align: true }`); transcribes any
+audio with word times (`transcribe`); and checks a take (`check_transcript { transcribe: true }`). No paid service
+is needed: the voice is Kokoro-82M and the transcription whisper.cpp, both on this machine. A voice service
+(ElevenLabs) is used only when its key is set. The settings come from the environment or a git-ignored `.env` at
+the repo root, and `speech_status` says what is set up and what to set for each missing piece. Models are never
+committed.
+
+| variable | |
+|---|---|
+| `STUDIO_WHISPER_CLI` | whisper.cpp's `whisper-cli` (a release build), unless it is on `PATH`. |
+| `STUDIO_WHISPER_MODEL` | A ggml model: `ggml-small.en.bin` for word times (`base.en` starts words up to 350 ms early). |
+| `STUDIO_WHISPER_MODEL_2` | Optional, a second model (`ggml-base.en.bin`): the transcript check then calls a word wrong only when both models do. |
+| `STUDIO_TTS` | `kokoro`, `elevenlabs` or `none`. Default: `kokoro` when `STUDIO_KOKORO_DIR` is set, else `elevenlabs` when its key is. |
+| `STUDIO_KOKORO_DIR` | A folder that holds `tts/say.mjs`, with `kokoro-js` installed in `tts/node_modules`: `tools/voice` in this repo. |
+| `ELEVENLABS_API_KEY` | The hosted voice; used only when set. |
+
+`tools/voice/tts/say.mjs` is a short script around kokoro-js, kept out of the studio's own dependencies: install it
+once with `npm ci --prefix tools/voice/tts` and set `STUDIO_KOKORO_DIR=tools/voice`. The model (about 90 MB) is
+downloaded on first use into `tools/voice/cache/`, which git ignores. `node say.mjs --list` prints one voice a line
+(`<id> <language> <gender> grade <grade>`), and `node say.mjs --voice <id> --speed <n> --out <file.wav>
+--text-file <file.txt> --timings <file.json>` writes a 24 kHz mono WAV and where each sentence lies. whisper.cpp is
+a separate download (a release build of `whisper-cli` and a ggml model from its Hugging Face page).
+
+### Render options
+
+`start_render` takes `draft: true` (an animatic at 2/3, 1/2 or 1/3 size, 1920×1080 becoming 1280×720, encoded
+fast; the frames are drawn at full size first, so a draft's sampled frame hashes equal the full render's),
+`formats: ["square", "vertical"]` (one render per shape from one request), `workers` (1 to 16 threads; the pixels
+do not depend on it), `poster_at` (the poster frame's time) and `final: true` (below). `render_clip_frame` and
+`frame_hashes` take `isolate: { only: [ids] }` or `{ except: [ids] }` to draw some items alone.
+
+### Provenance, credits and final renders
+
+Every file asset records where it came from: licence, licence and source URLs, creator, credit line, date,
+whether it is AI-generated or registered with a content-ID system, restrictions, whether it is a placeholder and
+whether it may be committed to a public repo. The tools that add files take these fields; what is left out is
+recorded as unknown, never guessed, and `set_asset_metadata { provenance }` corrects it without a new version.
+`clip_credits` builds a clip's credits from everything it pins, dependencies of dependencies included.
+`start_render { final: true }` refuses a clip that holds a placeholder or a file with no licence, naming each and
+what to do (`check_provenance` says the same without rendering), and writes `<render>.credits.md` next to the MP4.
+
+### A clip in the repo, rebuilt anywhere
+
+`export_clip` writes a finished clip to `clips/<clip>/clip.json` with everything it pins, at their version
+numbers, into the shared store `library/` (`versions/`, `sources/`, `files/` by SHA-256), with the hashes of up to
+48 frames. `import_clip` builds it in any library, an empty one included, with the same refs and the same frames.
+Files that may not be redistributed (an unknown licence counts) or are over 50 MB stay out of git, listed by
+SHA-256; an import looks for them in the folders it is given and names each one it cannot find. Clip 10 from a
+clean checkout (`work/clip-10-every-clip-helps/RENDER.md`):
+
+```bash
+npm ci
+export STUDIO_DATA=<an empty scratch dir>
+node scripts/library.mjs import clips/clip-10-every-clip-helps --verify
+node scripts/mcp.mjs call start_render '{"clip":"clip-10-every-clip-helps","formats":["square","vertical"],"final":true,"wait_seconds":900}'
+```
+
+`--verify` compares the frames with the hashes taken in the library the clip was made in; compare on the machine
+that exported it (emoji and some fonts draw per operating system). `node scripts/library.mjs export <clip>` goes
+the other way, and `scripts/roundtrip.mjs` checks the whole trip.
+
+### The kit
+
+Motion graphics for explainers, onboarding videos and marketing. The usage is at the top of each file in `assets/`
+and in each asset's notes (`get_asset`).
+
+| asset | |
+|---|---|
+| `kit-ui-frame` (version 2) | A browser window, a phone or a tablet around a picture or footage; at `scale: 1` a recording is drawn pixel for pixel. |
+| `kit-cursor` | A pointer that follows a recording's cursor path and clicks, or makes a simple move. |
+| `kit-spotlight`, `kit-camera` | Dim all but a region (a sidecar's element box works as it is); zoom and pan to it and back (a motion). |
+| `kit-callout`, `kit-arrow` | A bubble pointing at a spot; a curved arrow that draws itself on. |
+| `kit-steps`, `kit-plate` | Two to six steps, the current one moving on; the panel the others sit on, for contrast. |
+| `kit-chart-line`, `kit-chart-donut` | Charts that draw on, with their labels at a size floor. |
+| `kit-icon` | Icons from Lucide (ISC, in `vendor/lucide`), traced on. |
+| `end-card@3` | A logo (an uploaded SVG drawn as vectors), a title, a button and an address, then still. |
+
+They share a convention: positions are in the picture's own pixels (`space`, default 1440×900, the recorder's
+size), mapped into the item box the way footage is placed there (`fit`); sizes are a share of the frame's short
+side; text has a size floor and fails loudly instead of shrinking.
+
 ## How it works
 
 ```
@@ -439,12 +595,13 @@ src/core      the asset runtime, shared by Node and the browser: contract, schem
 src/render    Node host: vm sandbox, Skia canvas (@napi-rs/canvas), worker pool, FFmpeg pipeline, WAV, beats
 src/studio    library (versioned assets, search), clips (pinned compositions, edit operations), render queue,
               lineage, requests and proposals, "Run now", uploads and the SVG sanitiser, events, compounding: all on SQLite
-src/mcp       the MCP tools and the stdio server
+src/mcp       the MCP tools (iteration 4's in src/mcp/more/, one module per area) and the stdio server
 src/server    HTTP API, server-sent events, media, static files
 src/ui        the studio (vanilla JS, no build step); preview-worker.js runs src/core in a Web Worker
 assets        every function asset's source (synced into the library by scripts/sync-assets.mjs)
 clips         one folder per clip with its composition
-showcase      the plan and the journals that rebuild the six showcase clips
+showcase      the plan and the journals that rebuild the eleven showcase clips
+library       the content store clips are exported to (src/studio/exchange.js)
 ```
 
 - **Rendering.** Worker threads draw frames in parallel with Skia (every frame is a pure function
@@ -488,3 +645,9 @@ Clip 7's narration was generated locally with [Kokoro-82M](https://huggingface.c
 (voice `af_heart`, Apache-2.0, through kokoro-js, Apache-2.0) and timed with whisper.cpp (MIT, Whisper weights
 MIT); the voice file and its word timings are in [showcase/voice](showcase/voice) and the licences in
 [docs/showcase/v3/LICENSES.md](docs/showcase/v3/LICENSES.md). The models are not in the repository.
+
+The narrations of clips 9 and 10 were made the same way, inside the studio (`generate_narration`, voice
+`af_heart`); their takes are in [showcase/voice](showcase/voice). The screen recordings in
+[showcase/footage](showcase/footage) are of this studio, made by `scripts/record-studio.mjs`. `kit-icon` draws icons
+from [Lucide](https://lucide.dev) (ISC licence; the licence and version are in [vendor/lucide](vendor/lucide)).
+A final render lists every source of its clip in `<render>.credits.md`.

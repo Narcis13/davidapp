@@ -31,7 +31,9 @@ Edit a clip with `edit_clip { clip, operations }` instead of resending the compo
 
 Lay out once in fractions (`transform`), then fix what does not fit another format with
 `formats.<name>`; `start_render { clip, format }` renders the same composition in that format.
-Images and baked sequences are layers too: `{ asset: 'photo', params: { fit: 'cover' } }`.
+Images, baked sequences and footage are layers too: `{ asset: 'photo', params: { fit: 'cover' } }`,
+`{ asset: 'studio-library-search', params: { fit: 'contain', in: 2, out: 9.5, speed: 1.5 } }`.
+`render_clip_frame { clip, t, isolate: { only: [ids] } }` (or `except`) draws some items alone; `frame_hashes` takes the same.
 
 ## Motion, transitions, effects, masks
 
@@ -65,6 +67,10 @@ them as layers, or as `image` params (`f.image(p.photo)`). An uploaded SVG also 
 drawing: `f.svg(p.logo).draw(f.ctx, { width, height, progress, fill, stroke })` draws it on and
 recolours it (the `svg-draw-on` asset does this).
 
+Video files go in with `add_footage`, font files with `add_font`, images and sounds made elsewhere with
+`add_file_asset`. Say where every file came from (`license`, `creator`, `source_url`, `credit`): what you leave out
+is recorded as unknown, and a final render refuses a file with no licence.
+
 ## Requests from the studio
 
 The user asks from the studio; you answer with a proposal they compare and accept.
@@ -82,7 +88,8 @@ assets to default to it (`f.theme?.accent ?? p.color`), and a whole clip changes
 
 ## A voice, its words, captions
 
-1. Get the take (a voice service, a local model, a recording) and its word times (the service's word list or
+1. The studio can make the take and its word times itself: see "Narrate a clip from a script" below. Otherwise get
+   the take (a voice service, a local model, a recording) and its word times (the service's word list or
    character alignment, or whisper.cpp: `whisper-cli -m ggml-small.en.bin -f take-16k.wav -ojf`). Then
    `add_narration { name, path, script, timings | timings_path, transcripts: [two transcripts], voice: { name, license } }`.
    It aligns the timings to the script (word *i* is the script's word *i*), and the transcript check names slips,
@@ -118,6 +125,201 @@ assets to default to it (`f.theme?.accent ?? p.color`), and a whole clip changes
   (mark intended stills with a `hold` marker), brightness jumps (fine on a `cut` marker), flashes, silences,
   where the narration sits, and frame sheets from the encoded file. The studio shows the same per render.
 - Markers have types: `cut`, `hold`, `beat`, `word`, `note` (`edit_clip` `add_marker`, `update_marker`, `remove_marker`).
+
+## A screen recording in a browser frame, with a cursor and a spotlight
+
+The recording comes from `scripts/record-studio.mjs` (an MP4 and a sidecar `<file>.mp4.json` with the cursor path,
+the clicks and the boxes of the elements it touched, all in the video's pixels). Add it, and look at its frames:
+
+```json
+{ "path": "/path/to/repo/showcase/footage/library-search.mp4", "name": "studio-library-search",
+  "description": "Screen recording of the studio's library: a search, a kind filter, an asset opened. 1440x900, 13.5 s.",
+  "license": "original", "creator": "Fablecut", "tags": ["footage", "screen-recording", "studio"] }
+```
+
+That is `add_footage`; then `footage_frames { "ref": "studio-library-search", "count": 12 }`.
+
+Put it in `kit-ui-frame@2` as `content` (the frame shows the recording from its start, at the item's own time).
+The cursor and the spotlight must sit on the frame's **viewport**, not on its box: their points are the
+recording's pixels, mapped into their own box. With `scale` set, the viewport is the recording × `scale`, centred
+across the box; the window (the viewport plus the chrome, two bars of `round(2.1 × size% × short side)` px each)
+is centred down it. In a 1920 × 1080 clip, with no transform (the box is the frame), `scale: 0.8` and the default
+`size` 2.6: bars of 59 px, a viewport of 1152 × 720 at (384, 239), which is the transform
+`{ "x": 0.5, "y": 0.55463, "width": 0.6, "height": 0.66667 }`. Then `edit_clip`:
+
+```json
+{ "clip": "studio-tour", "operations": [
+  { "op": "add_track", "track": { "id": "shots", "type": "visual", "name": "Shots" } },
+  { "op": "add_track", "track": { "id": "spots", "type": "visual", "name": "Spotlight" } },
+  { "op": "add_track", "track": { "id": "pointer", "type": "visual", "name": "Cursor" } },
+  { "op": "add_item", "track": "shots", "item": { "id": "browser", "asset": "kit-ui-frame@2", "start": 0, "duration": 10,
+    "params": { "device": "browser", "content": "studio-library-search", "scale": 0.8, "url": "fablecut.studio/library", "title": "Library" } } },
+  { "op": "add_item", "track": "spots", "item": { "id": "spot", "asset": "kit-spotlight", "start": 0, "duration": 10,
+    "transform": { "x": 0.5, "y": 0.55463, "width": 0.6, "height": 0.66667 },
+    "params": { "at": 0, "padding": 10, "regions": [
+      { "t": 1.0, "x": 61, "y": 117, "width": 1102, "height": 30 },
+      { "t": 3.4, "x": 24, "y": 524, "width": 228, "height": 30 }] } } },
+  { "op": "add_item", "track": "pointer", "item": { "id": "cursor", "asset": "kit-cursor", "start": 0, "duration": 10,
+    "transform": { "x": 0.5, "y": 0.55463, "width": 0.6, "height": 0.66667 },
+    "params": { "at": 0, "clicks": [{ "t": 1.496 }, { "t": 4.027 }], "path": [
+      { "t": 0, "x": 720, "y": 450 }, { "t": 0.966, "x": 720, "y": 450 }, { "t": 1.364, "x": 612, "y": 132 },
+      { "t": 1.495, "x": 612, "y": 132, "down": true }, { "t": 1.588, "x": 612, "y": 132 }, { "t": 3.356, "x": 612, "y": 132 },
+      { "t": 4.026, "x": 138, "y": 539, "down": true }, { "t": 4.121, "x": 138, "y": 539 }] } } }
+] }
+```
+
+`path` and `clicks` are the sidecar's `cursor` and `clicks` (paste the whole `cursor` array; a click needs only its
+`t`); the regions are its `boxes`, with the recording time each should light up. Look with
+`render_clip_frame { "clip": "studio-tour", "t": 1.6 }`: the pointer's tip sits on the search field.
+`isolate: { "only": ["browser", "cursor"] }` shows the two without the spotlight. Without a frame (the recording
+straight on a track, as in clip 9), give the overlays the footage item's own transform and `fit`, and put the
+same `kit-camera` motion on all of them so they zoom together.
+
+## Narrate a clip from a script
+
+`speech_status {}` says what is set up and, for each missing piece, what to set. Hear a line in a few voices with
+`voice_samples { "line": "Every clip leaves pieces the next one can use.", "count": 3 }` (it returns the WAV paths
+and the voice ids), then make the narration in one call:
+
+```json
+{ "script": "Every clip leaves pieces behind. The next one starts from them, so it costs less.",
+  "voice": "af_heart", "name": "tour-voice", "for_clip": "studio-tour" }
+```
+
+That is `generate_narration`: it speaks the script, transcribes the take, aligns the words to the script and
+checks the transcript (`transcript` in the result names any slip). For a recording you made, use
+`add_narration { name, path, script, align: true, license: "original" }`; `check_transcript { "narration":
+"tour-voice", "transcribe": true }` checks a take again. Then place it, pin a visual to a word (word 4 is
+"behind", counting from 0), turn on captions, and duck the music (the item `bed`) under it:
+
+```json
+{ "clip": "studio-tour", "operations": [
+  { "op": "add_track", "track": { "id": "voice", "type": "audio", "name": "Voice", "role": "narration" } },
+  { "op": "add_item", "track": "voice", "item": { "id": "vo", "asset": "tour-voice", "start": 0.5, "duration": 5.2 } },
+  { "op": "update_item", "id": "spot", "patch": { "anchor": { "item": "vo", "word": 4, "offset": -0.1 } } },
+  { "op": "set", "captions": { "burnIn": true } },
+  { "op": "add_track", "track": { "id": "caps", "type": "text", "name": "Captions", "role": "captions" } },
+  { "op": "add_item", "track": "caps", "item": { "id": "cap", "asset": "text-captions@2", "start": 0, "duration": 10 } },
+  { "op": "update_item", "id": "bed", "patch": { "duck": { "by": 18, "attack": 0.15, "release": 0.45, "source": "words" } } }
+] }
+```
+
+The item's `duration` is at most the narration's (`duration` in the `generate_narration` result). `anchor_report`
+shows each anchor's distance from its word; `caption_pages { "clip": "studio-tour" }` shows the pages and the rules
+they break. A new take is `generate_narration` with the same name, then `repin_clip { "clip": "studio-tour",
+"only": ["tour-voice"] }`: the anchored items follow their words.
+
+## Render: a draft first, then every shape in one request
+
+```json
+{ "clip": "launch-teaser", "draft": true, "wait_seconds": 300 }
+```
+
+A draft draws the frames at full size, so its sampled frame hashes equal the full render's, then scales them to
+2/3, 1/2 or 1/3 (the largest that gives whole, even sizes: 1920 × 1080 becomes 1280 × 720, 1080 × 1080 becomes
+720 × 720) and encodes fast to `...-draft.mp4`. `draft: { "scale": 0.5 }` picks the scale. When it looks right:
+
+```json
+{ "clip": "launch-teaser", "formats": ["square", "vertical"], "poster_at": 3.2, "wait_seconds": 900 }
+```
+
+Both are `start_render`. `formats` (one to three shapes, instead of `format`) queues one render per shape with the
+same options and returns `{ batch, renders }`; each item's overrides for that format apply. `workers` (1 to 16)
+sets the threads that draw frames; the pixels do not depend on it. `poster_at` is the poster frame's time
+(default 40 % of the clip).
+
+## A final render and its credits
+
+```json
+{ "clip": "launch-teaser" }
+```
+
+`check_provenance` lists what would stop a final render: a placeholder, or a file with no licence, each with the
+call that fixes it. For an upload whose licence you know:
+
+```json
+{ "name": "skyline", "provenance": { "license": "CC-BY-4.0", "creator": "Jane Doe",
+  "sourceUrl": "https://example.com/skyline", "credit": "Photo: Jane Doe" } }
+```
+
+That is `set_asset_metadata` (no new version). Then `start_render`:
+
+```json
+{ "clip": "launch-teaser", "formats": ["square", "vertical"], "final": true, "wait_seconds": 900 }
+```
+
+Each render writes `<render>.credits.md` next to its MP4 (`stats.files.credits` in `get_render`, a path in the data
+directory). `clip_credits { "clip": "launch-teaser", "format": "markdown" }` gives the same text without
+rendering: footage, images, sound and music, voice and fonts, with AI-generated and content-ID material listed
+apart. `final` cannot be combined with `draft`.
+
+## A clip to the repo and back
+
+`export_clip { "clip": "launch-teaser", "dry_run": true }` says what an export would write; then
+`export_clip { "clip": "launch-teaser" }` writes `clips/launch-teaser/clip.json` (the composition, the closure, the
+files, the hashes of up to 48 frames) and adds what `library/` lacks: `library/versions/`, `library/sources/`,
+`library/files/<sha256>`. Exporting an unchanged clip changes no file; nothing is ever deleted from the store.
+Files that may not be redistributed (an unknown licence counts) and files over 50 MB are listed in `clip.json` by
+SHA-256 and stay out of git.
+
+Into an empty library, from a shell (`STUDIO_DATA` is required, so `./data` is never touched by accident):
+
+```bash
+STUDIO_DATA=/tmp/empty-library node scripts/library.mjs import clips/launch-teaser --verify --files /path/to/kept-out
+```
+
+or `import_clip` on a server whose data directory is the new library:
+
+```json
+{ "folder": "/path/to/repo/clips/launch-teaser", "verify": true, "files": ["/path/to/kept-out"] }
+```
+
+Every version comes back with its number (a clip that pins `foo@3` gets `foo@3`), so the refs and the frames are
+the same. A file it cannot find is named with its licence and source; look for it by SHA-256 in the `files`
+folders. `verify` compares the frames with the export's: do it on the machine that exported (emoji and some
+fonts draw per operating system). `scripts/roundtrip.mjs` does the whole trip for several clips.
+
+## A font of your own
+
+```json
+{ "path": "/path/to/AcmeSans-Bold.woff2", "name": "acme-sans-bold", "license": "OFL-1.1",
+  "license_file": "/path/to/OFL.txt", "source": "https://example.com/acme-sans" }
+```
+
+That is `add_font` (TTF, OTF or WOFF2). It reads the family, weight and style from the file and reports its
+coverage (`latinExtendedA`, the Unicode blocks); it works at once, with no restart. Add each weight as its own
+asset with the same family (`acme-sans`, `acme-sans-bold`). Use it by family in a `font` param:
+
+```json
+{ "clip": "launch-teaser", "operations": [
+  { "op": "update_item", "id": "title", "patch": { "params": { "font": "Acme Sans", "weight": 700 } } }
+] }
+```
+
+The save pins the family's font assets in `composition.fonts` (`{ "Acme Sans": ["acme-sans-bold@1"] }`); a new
+version of the font changes the clip only after `repin_clip { "clip": "launch-teaser", "only": ["acme-sans-bold"] }`.
+`list_fonts {}` lists every family a `font` param can name.
+
+## A logo as given, on an end card
+
+```json
+{ "path": "/path/to/acme-logo.svg", "name": "acme-logo.svg", "license": "original", "creator": "Acme Ltd" }
+```
+
+That is `upload_image`. Its internal style sheet and its gradients are kept; `svg.dropped` lists anything that
+was not (read it: a dropped rule can change a colour). Describe it (`describe_asset`), then close the clip with
+`end-card@3` drawing it as vectors:
+
+```json
+{ "clip": "launch-teaser", "operations": [
+  { "op": "add_item", "track": "titles", "item": { "id": "end", "asset": "end-card@3", "start": 26, "duration": 4,
+    "params": { "logo": "acme-logo", "logoMode": "svg", "title": "Made with *Acme*", "line": "Free to try",
+      "cta": "Start building", "url": "acme.example", "plate": true } } }
+] }
+```
+
+`logoMode: "svg"` fails loudly when the logo is not an uploaded SVG; `"auto"` falls back to the raster. The card is
+in within a second and then still, so the last frame holds.
 
 ## Keep assets/ and the library in step
 

@@ -68,8 +68,8 @@ aliases (`{ base: 'lower-third@2' }`).
 | `f.clip.lane` | The caption lane in frame pixels `{ x, y, width, height }`: a band at the bottom of the tightest safe zone (the format's, or the clip's platform profile for this format). Captions go there and nothing else does. |
 | `f.theme` | The value of the clip's theme asset (`composition.theme`), or `null` when the clip has none (and in the playground). Default to it: `f.theme?.accent ?? p.color`. |
 | `f.use(name, params, opts)` | Compose another asset. Visual: draws it; opts `{ x, y, width, height, at, duration, t, hold, alpha, key, ctx }`. Value: returns its value. |
-| `f.image(name)` | A loaded image asset for `ctx.drawImage` (has `width`, `height`). |
-| `f.svg(name)` | The vector drawing of an uploaded SVG, for draw-on and recolouring: see "Uploaded images and SVGs". |
+| `f.image(name)` | A loaded image asset for `ctx.drawImage` (has `width`, `height`). Footage given through an image parameter is one frame of it: see "Footage". |
+| `f.svg(name)` | The vector drawing of an uploaded SVG, for draw-on and recolouring: see "Uploaded images, SVGs, sequences and footage". |
 | `f.offscreen(w, h)` | A cleared scratch layer `{ canvas, ctx, width, height }` for masks and group effects; draw it back with `ctx.drawImage(layer.canvas, x, y)`. |
 | `f.layers(list, values)` | Draw clip-style layers inside this asset's box (a precomp): see "Presets and precomps". |
 | `f.phase` · `f.from`, `f.to` · `f.source` | Only for motions · transitions · effects: see "Kinds". `null` elsewhere. |
@@ -108,6 +108,11 @@ aliases (`{ base: 'lower-third@2' }`).
     glyphs come from the family's own `<Family> Ext` file, which the font string names right after the family.
     The studio flags characters no bundled font has (they would fall back to a system font) when an asset is
     validated and when a clip is saved.
+  - **Fonts by family:** `font` names a family, never a file: a bundled one or one added with `add_font`. Several
+    weights of a family are several font assets with the same family; `weight` and `italic` pick the face. A clip
+    pins the font assets of the added families it uses (`composition.fonts`, written by the studio on save), so a
+    new version of a font does not change an old clip. Text drawn with a raw `ctx.font` string is not measured and
+    does not use pinned fonts.
 - **beat**: `at(t, beats)`, `pulse(t, beats, decay)`, `count(t, beats)`.
 - **noise**: `noise(seed)(x, y, z)` and `fbm(seed, octaves)(x, y, z)` in −1..1.
 - **audio** (for `kind: 'audio'`): `buffer(seconds)`, `tone({ freq, dur, wave, gain, decay })`,
@@ -121,7 +126,7 @@ aliases (`{ base: 'lower-third@2' }`).
 ## Parameter types
 
 `number`, `integer` (`min`, `max`, `step`), `boolean`, `string`, `text` (multi-line), `enum` (`options`),
-`color`, `font` (a family from the library), `image` (an image asset), `asset` (another asset; `kind`
+`color`, `font` (a family: bundled, or added with `add_font`), `image` (an image asset, or footage), `asset` (another asset; `kind`
 narrows it), `array` (`of`, `minItems`, `maxItems`), `object` (`fields`). Every declaration may carry
 `label`, `description` and `group`. Content slots of a template are just `string`/`array` parameters.
 
@@ -134,8 +139,8 @@ Every kind is a versioned function asset, saved, pinned and traced the same way.
   functions. Add `preview(f, p)` to draw a picture of it for the library thumbnail.
 - **audio**: `render(f, p)` synthesizes samples. Audio assets may `f.use()` other audio assets (it
   returns their mono buffer) and value assets.
-- **motion**, **transition**, **effect** are not placed on a track (a track takes visual assets,
-  images and sequences and rejects the rest): they are attached to an item, a track or the clip.
+- **motion**, **transition**, **effect** are not placed on a track (a visual track takes visual assets,
+  images, sequences and footage and rejects the rest): they are attached to an item, a track or the clip.
   The playground previews them on a built-in demo scene, which is also their thumbnail.
 
 ### motion
@@ -247,7 +252,7 @@ asset({
 
 ### Masks
 
-A mask is not a kind: any visual asset, image or baked sequence can be one.
+A mask is not a kind: any visual asset, image, baked sequence or footage can be one.
 `item.mask = { asset, params, mode, transform }` keeps the item's pixels where the mask is opaque
 (`alpha`, the default), where it is clear (`alpha-inverted`), where it is bright (`luma`) or dark
 (`luma-inverted`). The mask runs on the item's clock and moves with the item, unless it has a
@@ -352,13 +357,15 @@ asset({
 - 3D at 1080p is slow (the validator warns above 250 ms a frame). Bake it once with
   `bake_sequence` and use the sequence as a layer.
 
-## Uploaded images, SVGs and sequences
+## Uploaded images, SVGs, sequences and footage
 
 - An **image** asset reaches code through a parameter of type `image` (or `uses`): `f.image(p.photo)`
   for `ctx.drawImage`. On a visual track it is a layer by itself, with `params.fit`: `contain`
   (default), `cover` (cropped to the box) or `fill`.
 - An uploaded **SVG** is sanitised, stored with a PNG raster (what `f.image` and an image layer
-  draw) and a vector model. `f.svg(name)` returns `{ width, height, viewBox, paths, draw }`;
+  draw) and a vector model. A logo is kept as it was drawn: the simple rules of an internal `<style>` sheet
+  (type, class and id selectors) are applied to the shapes, and linear and radial gradients stay gradients in
+  the vector model; the upload's `svg.dropped` lists what could not be kept. `f.svg(name)` returns `{ width, height, viewBox, paths, draw }`;
   `draw(ctx, { x, y, width, height, progress, fill, stroke, colors, strokeWidth, outline })`
   contain-fits it in the box. `progress` 0..1 draws it on (strokes trace in, fills fade in over the
   last third); `fill` and `stroke` replace every colour, `colors: { '#old': '#new' }` some.
@@ -379,6 +386,83 @@ asset({
   },
 });
 ```
+
+### Footage
+
+A video file added with `add_footage` (MP4, MOV, M4V, WebM or MKV; HDR, more than 4096 px a side or more than
+20 minutes is refused) is a `video` asset. The file is kept as it is; the time of every frame is read once, when
+it is added.
+
+- **On a visual track** it is a layer like an image, with transforms, keyframes, motions, effects and masks, and
+  these params:
+
+| param | default | |
+|---|---|---|
+| `fit` | `contain` | `contain`, `cover` or `fill`, as for an image |
+| `in` | 0 | seconds into the file where the item starts |
+| `out` | 0 | seconds into the file where it stops; 0 is the end of the file |
+| `speed` | 1 | 0.05 to 16; 2 plays twice as fast |
+| `loop` | false | play the trimmed range again from `in` when it ends; without it the frame before `out` holds |
+| `hold` | -1 | freeze on this time of the file for the whole item; -1 plays |
+
+- **The frame rule.** Item time becomes file time `in + t × speed`, inside `[in, out)`: `out` is exclusive, so
+  past the end the frame just before `out` holds (or, with `loop`, the range starts again at `in`). `hold` ≥ 0
+  replaces all of it. The frame shown is the last frame of the file whose time is at or before that file time.
+  Nothing is blended: a 25 fps file in a 30 fps clip shows real frames, some of them twice, and the preview and
+  the render show the same one. Playing the trimmed range once takes `(out − in) / speed` seconds.
+- **At its own size**, with no scale or rotation and on whole pixels (a 1080p file in a 1080p clip, a recording at
+  1:1), a frame is copied as it is, without smoothing.
+- **In an image parameter.** Footage may be given where an `image` param is expected, in the item's own params
+  (`kit-ui-frame` with `"content": "studio-library-search"`). `f.image(p.content)` is then the frame at this
+  asset's own time `f.t`, from the start of the file, held on its last frame; `in`, `out`, `speed` and `loop` do
+  not apply. It cannot be handed further down, to an asset drawn with `f.use`.
+- **Its sound.** The same ref on an audio track plays the file's sound (footage without sound is refused there).
+  Give the audio item `offset` equal to the picture's `in` to keep them together.
+- `footage_frames { ref, times | count, from, to }` shows the file's own frames labelled with their time and
+  index: read `in`, `out` and `hold` off it.
+
+## The kit
+
+The `kit-*` assets are the pieces of explainers, onboarding videos and marketing: `kit-ui-frame` (a browser, a
+phone or a tablet around a capture; use version 2), `kit-cursor`, `kit-spotlight`, `kit-camera` (a motion),
+`kit-callout`, `kit-arrow`, `kit-steps`, `kit-plate`, `kit-chart-line`, `kit-chart-donut`, `kit-icon` (Lucide
+icons, ISC licence, from `vendor/lucide`), with `end-card@3` to close. Each source in `assets/` starts with a usage
+example, and `get_asset` shows a note on each. A new kit piece keeps their convention:
+
+- **Positions are in the picture's pixels.** What points at a capture (`kit-cursor`, `kit-spotlight`,
+  `kit-camera`, `kit-callout`, `kit-arrow`) takes `space: { width, height }` (default 1440 × 900, the recorder's
+  size) and `fit`, and maps its points into the item box the way a footage item with that `fit` is placed there.
+  Give it the same transform and `fit` as the footage it annotates, and a recording sidecar's numbers (cursor
+  path, clicks, element boxes) work as they are. Where times are in the recording (a cursor path, spotlight
+  regions), `at` is the recording's time at the item's start (the footage's `in`) and `speed` its speed.
+- **Sizes are a share of the frame's short side** (`size: 2.8` is 2.8 % of it), not of the item box, so a piece
+  reads the same in a small box and a large one.
+- **Text has a floor and fails loudly.** Kit text goes through `f.lib.text` with a size floor (`floor: 2.5` or
+  `2.6` on the asset). A label that does not fit at its floor wraps, is thinned (axis labels of a chart) or
+  throws, naming the item and the time; it never shrinks under the floor and never gets an ellipsis. Give it a
+  larger box or fewer words.
+- Each takes a theme (`theme`, a value asset); a colour param left empty (`''`) takes the theme's.
+
+## Provenance of file assets
+
+Every version of a file asset (image, sound, footage, font, sequence) carries `meta.provenance`:
+`{ license, licenseUrl, sourceUrl, creator, credit, date, aiGenerated, contentId, restrictions, placeholder,
+redistributable }`. Function assets are the studio's own code and carry none.
+
+- The tools that add files (`upload_image`, `add_file_asset`, `add_footage`, `add_font`, `add_narration`,
+  `generate_narration`) take the same fields in snake_case: `license`, `license_url`, `source_url`, `creator`,
+  `credit`, `date` (ISO), `ai_generated`, `content_id`, `restrictions`, `placeholder`, `redistributable`.
+  `license` is an SPDX id (`CC0-1.0`, `CC-BY-4.0`, `OFL-1.1`, `Apache-2.0`), `original` (made for this studio)
+  or free text. What you leave out is recorded as unknown, never guessed. `add_font` requires a licence.
+- `redistributable` (may the file be committed to a public repo) defaults to yes for original, CC0, CC BY,
+  public domain, OFL, MIT, ISC, Apache, BSD, MPL-2.0 and Unlicense, and to no for anything else, an unknown
+  licence included.
+- `set_asset_metadata { name, version, provenance }` changes some fields of one version (default the latest)
+  without making a new one; the edit is recorded with who made it and when.
+- `placeholder: true`, or the tag `placeholder`, marks a stand-in. A final render (`start_render { final: true }`)
+  refuses a clip whose closure holds a placeholder or a file with no licence, and names each one with what to do;
+  `check_provenance` says the same without rendering, and `clip_credits` builds the credits from the closure.
+- `export_clip` keeps files that may not be redistributed, and files over 50 MB, out of git (listed by SHA-256).
 
 ## Placing assets in a clip
 
@@ -479,6 +563,10 @@ fields below is drawn exactly as before they existed, so old clips keep their pi
   `pages` (optional) fixes the structure as word keys `"<item>:<i>"`; times always come from the words. A track
   with `role: 'captions'` is not drawn when `burnIn: false` (file only). Every render writes SRT, WebVTT and the
   words as JSON.
+- **`platforms`**: a profile applies only to the shapes it is made for: `youtube` to horizontal frames; `shorts`,
+  `reels`, `tiktok` and `feed` to vertical ones. A clip that names `youtube` and `shorts` gets YouTube's zones in
+  its horizontal render and Shorts' in its vertical one; a shape that no named profile is made for (a square
+  render of a clip made for Reels) keeps the format's own safe zone.
 
 ## Conventions
 
@@ -494,5 +582,7 @@ fields below is drawn exactly as before they existed, so old clips keep their pi
   or read the clip's as `f.theme`.
 - The library names assets by family (names weigh most in search and `suggest_assets`):
   `motion-*`, `trans-*`, `fx-*`, `mask-*`, `*-3d`, `text-*`, `bg-*`, `theme-*`.
-- Fonts bundled with the studio (all OFL): Inter (400/600/800), Space Grotesk (400/700), JetBrains Mono
+- Fonts bundled with the studio (all OFL, in `fonts/`): Inter (400/600/800), Space Grotesk (400/700), JetBrains Mono
   (400/700), Anton (400), Playfair Display (700/900, 700 italic), each with its Latin Extended file. Emoji fall back to the system emoji font.
+  The bundled families are font assets too (`font-inter`, `font-space-grotesk`, …): a clip save pins the ones its
+  check saw drawn, so the credits list every font, even one a theme chose. Other families come in with `add_font`.

@@ -1,0 +1,9 @@
+{
+  "name": "fablecut-voice-tts",
+  "private": true,
+  "description": "Local Kokoro-82M text-to-speech for the studio's generate_narration (STUDIO_KOKORO_DIR=tools/voice). Kept out of the studio's own dependencies: install it only to make voices.",
+  "type": "commonjs",
+  "dependencies": {
+    "kokoro-js": "^1.2.1"
+  }
+}

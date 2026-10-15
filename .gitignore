@@ -19,3 +19,6 @@ npm-debug.log*
 
 # the deliverables of a clip (MP4, poster, captions, credits): they go on a release, not in git
 work/*/out/
+
+# the voice helper (tools/voice): its node_modules and the Kokoro model cache are never committed
+tools/voice/cache/
