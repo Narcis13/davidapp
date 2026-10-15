@@ -4,6 +4,7 @@
 // worker and starts another.
 
 import { createRuntime, describeError } from '/core/runtime.js';
+import { fontAliases } from '/core/lib/text.js';
 
 // What asset source can see: nothing from the worker's global scope.
 const HIDDEN = ['self', 'globalThis', 'window', 'document', 'fetch', 'XMLHttpRequest', 'WebSocket', 'importScripts', 'setTimeout', 'setInterval',
@@ -30,7 +31,24 @@ const host = {
   createCanvas: (w, h) => new OffscreenCanvas(w, h),
 };
 
-let rt = null, composition = null, clipExtra = { beats: [] }, sequenceUrls = {}, footageUrls = {};
+let rt = null, composition = null, clipExtra = { beats: [] }, sequenceUrls = {}, footageUrls = {}, fontMap = null;
+// uploaded font sets already added to this worker, by alias: a set is loaded the first time a bundle needs it
+const fontSets = new Map();
+
+/** Add the uploaded fonts a bundle pins ({ <alias>: { family, files: [{ url, weight, style }] } }), each set under its alias. */
+async function registerFontSets(fonts) {
+  const loading = [];
+  for (const [alias, set] of Object.entries(fonts ?? {})) {
+    if (!fontSets.has(alias)) {
+      fontSets.set(alias, Promise.all(set.files.map((f) => new FontFace(alias, `url(${f.url})`, { weight: String(f.weight), style: f.style }).load().then((face) => self.fonts.add(face)))).catch((e) => {
+        fontSets.delete(alias); // tried again at the next load
+        throw new Error(`The font "${set.family}" could not be loaded: ${e.message}`);
+      }));
+    }
+    loading.push(fontSets.get(alias));
+  }
+  await Promise.all(loading);
+}
 let canvas = null;
 // sequence frames are fetched as a frame needs them, and a few seconds of them are kept
 const seqCache = new Map();
@@ -93,6 +111,8 @@ const handlers = {
     return {};
   },
   async load({ bundle, composition: comp }) {
+    await registerFontSets(bundle.fonts);
+    fontMap = fontAliases(bundle.fonts);
     const next = createRuntime(host);
     for (const [ref, img] of Object.entries(bundle.images ?? {})) {
       const blob = await (await fetch(img.url)).blob();
@@ -110,12 +130,12 @@ const handlers = {
     rt = next;
     composition = comp ?? null;
     // what reaches assets as f.clip besides the composition: beats, the narration's words, caption pages and lane
-    clipExtra = { beats: bundle.beats ?? [], words: bundle.words, captions: bundle.captions, lane: bundle.lane };
+    clipExtra = { beats: bundle.beats ?? [], words: bundle.words, captions: bundle.captions, lane: bundle.lane, ...(fontMap ? { fonts: fontMap } : {}) };
     return {};
   },
   assetFrame(m) {
     const c = surface(m.width, m.height);
-    rt.renderAsset(c.getContext('2d', { willReadFrequently: true }), m.ref, m.params ?? {}, m);
+    rt.renderAsset(c.getContext('2d', { willReadFrequently: true }), m.ref, m.params ?? {}, fontMap ? { ...m, fonts: fontMap } : m);
     const bitmap = c.transferToImageBitmap();
     return { result: { bitmap }, transfer: [bitmap] };
   },

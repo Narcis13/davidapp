@@ -9,6 +9,7 @@ import { staticCheck } from '../core/static-check.js';
 import { walkParams, mapParams } from '../core/schema.js';
 import { createCanvas, fontManifest, loadImage, registerFonts, FONTS_DIR } from '../render/host.js';
 import { ImageData } from '@napi-rs/canvas';
+import { readCoverage } from '../render/glyphs.js';
 import { probeSummary } from '../render/ffmpeg.js';
 import { probeFootage, footageService, sha256File, soundPeaks, FootageError } from '../render/footage.js';
 import { json, now, transaction } from '../db/db.js';
@@ -31,7 +32,7 @@ export const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
 
 /** A sibling temp name for a data-relative path: files are written there and renamed once the row exists. */
-const tempOf = (rel) => { const i = rel.lastIndexOf('/'); return `${rel.slice(0, i + 1)}.tmp-${randomBytes(6).toString('hex')}-${rel.slice(i + 1)}`; };
+export const tempOf = (rel) => { const i = rel.lastIndexOf('/'); return `${rel.slice(0, i + 1)}.tmp-${randomBytes(6).toString('hex')}-${rel.slice(i + 1)}`; };
 
 /**
  * Rename a freshly written file or folder into place. On Windows an antivirus or the indexer often
@@ -133,7 +134,8 @@ export function createLibrary(ctx) {
     return row;
   }
 
-  const absFile = (row) => (row.type === 'font' ? join(FONTS_DIR, row.file) : join(dataDir, row.file));
+  // the bundled fonts are files of the repo's fonts/ folder; an uploaded font is a file of the data dir like any other asset
+  const absFile = (row) => (row.type === 'font' && !row.file.startsWith('files/') ? join(FONTS_DIR, row.file) : join(dataDir, row.file));
 
   function summary(row) {
     return {
@@ -388,6 +390,7 @@ export function createLibrary(ctx) {
   function closure(refs) {
     const versions = new Map();
     const assets = {}, images = {}, sounds = {}, sequences = {}, videos = {};
+    const uploadedFonts = [];
     const queue = refs.map((ref) => ({ ref, depth: 0 }));
     while (queue.length) {
       const { ref, depth } = queue.shift();
@@ -404,18 +407,133 @@ export function createLibrary(ctx) {
       else if (row.type === 'sound') sounds[pinned] = { path: absFile(row) };
       else if (row.type === 'sequence') { const m = json(row.meta, {}); sequences[pinned] = { dir: absFile(row), file: row.file, frames: m.frames, fps: m.fps, width: m.width, height: m.height }; }
       else if (row.type === 'video') videos[pinned] = { path: absFile(row), file: row.file, meta: footageMeta(row) };
+      else if (row.type === 'font' && isUploaded(row)) uploadedFonts.push(row);
     }
-    return { versions, assets, images, sounds, sequences, videos };
+    // the uploaded fonts among the refs, a set per family (a clip's pins come through bundle's composition instead)
+    const byFamily = new Map();
+    for (const row of uploadedFonts) { const f = json(row.meta, {}).family; byFamily.set(f, [...(byFamily.get(f) ?? []), makeRef(row.slug, row.version)]); }
+    return { versions, assets, images, sounds, sequences, videos, fonts: fontSets([...byFamily]) };
   }
 
   /** A worker bundle for rendering the given refs (and optionally a composition). */
   function bundle(refs, extra = {}) {
     const c = closure(refs);
-    // footage adds a key part only when there is some, so bundles without footage keep their keys
-    const parts = [Object.keys(c.assets).sort(), Object.keys(c.images).sort(), Object.keys(c.sequences).sort(), extra.composition ?? null, extra.beats ?? null];
-    if (Object.keys(c.videos).length) parts.push(Object.keys(c.videos).sort());
-    const key = sha1(JSON.stringify(parts));
-    return { key, assets: c.assets, images: c.images, sounds: c.sounds, sequences: c.sequences, videos: c.videos, ...extra };
+    // a composition pins the font assets of its uploaded families: composition.fonts = { family: [refs] }
+    const fonts = { ...c.fonts, ...fontSets(Object.entries(extra.composition?.fonts ?? {})) };
+    const hasFonts = Object.keys(fonts).length > 0;
+    // footage and uploaded fonts add key parts only when there are some, so the bundles of older clips keep their keys
+    const hasVideos = Object.keys(c.videos).length > 0;
+    const key = sha1(JSON.stringify([Object.keys(c.assets).sort(), Object.keys(c.images).sort(), Object.keys(c.sequences).sort(), extra.composition ?? null, extra.beats ?? null, ...(hasFonts ? [Object.keys(fonts).sort()] : []), ...(hasVideos ? [Object.keys(c.videos).sort()] : [])]));
+    return { key, assets: c.assets, images: c.images, sounds: c.sounds, sequences: c.sequences, videos: c.videos, ...(hasFonts ? { fonts } : {}), ...extra };
+  }
+
+  // ── uploaded fonts: families, pins, the sets a bundle registers ──────────────────────────
+
+  const isUploaded = (row) => !!json(row.meta, {}).uploaded;
+
+  /** The alias an uploaded font set is registered under: it names exactly these files, so another version never takes its place. */
+  const fontAlias = (refs) => `fc-${sha1([...refs].sort().join(','))}`.slice(0, 11);
+
+  /**
+   * The font sets a bundle registers: [[family, refs]] → { <alias>: { family, refs, files: [{ ref, file, path, weight, style }] } }.
+   * @param {[string, string[]][]} groups
+   */
+  function fontSets(groups) {
+    /** @type {Record<string, any>} */
+    const out = {};
+    for (const [family, refs] of groups) {
+      const rows = refs.map((ref) => requireVersion(ref));
+      for (const row of rows) if (row.type !== 'font' || !isUploaded(row)) throw new StudioError(`${makeRef(row.slug, row.version)} is a ${row.type} asset, not an uploaded font (clip fonts: "${family}")`);
+      const pinned = rows.map((r) => makeRef(r.slug, r.version)).sort();
+      const files = pinned.map((ref) => {
+        const row = rows.find((r) => makeRef(r.slug, r.version) === ref);
+        const m = json(row.meta, {});
+        return { ref, file: row.file, path: absFile(row), weight: m.weight ?? 400, style: m.style ?? 'normal' };
+      });
+      out[fontAlias(pinned)] = { family, refs: pinned, files };
+    }
+    return out;
+  }
+
+  /**
+   * A snapshot of the font families the library knows: the bundled ones and the uploaded ones (the latest version of each
+   * font asset names its family). find(family) is case-insensitive → { family, bundled, ref, faces } or null; for an uploaded
+   * family, faces lists its font assets ({ ref, slug, version, weight, style, license }) and ref is the first of them.
+   */
+  function fontCatalog() {
+    const bundled = new Map(fontManifest().map((f) => [f.family.toLowerCase(), f]));
+    /** @type {Map<string, { family: string, faces: any[] }>} */
+    const uploaded = new Map();
+    const rows = q(`SELECT ${VERSION_COLS} FROM assets a JOIN asset_versions v ON v.asset_id = a.id AND v.version = a.latest_version
+      WHERE a.type = 'font' AND json_extract(v.meta, '$.uploaded') = 1 ORDER BY a.slug`).all();
+    for (const row of rows) {
+      const m = json(row.meta, {});
+      const key = String(m.family).toLowerCase();
+      if (!uploaded.has(key)) uploaded.set(key, { family: m.family, faces: [] });
+      uploaded.get(key).faces.push({ ref: makeRef(row.slug, row.version), slug: row.slug, version: row.version, weight: m.weight, style: m.style, license: m.license });
+    }
+    return {
+      families: () => [...fontManifest().map((f) => f.family), ...[...uploaded.values()].map((f) => f.family)],
+      uploaded: () => [...uploaded.values()],
+      find(family) {
+        const key = String(family).toLowerCase();
+        const b = bundled.get(key);
+        if (b) return { family: b.family, bundled: true, ref: makeRef(b.slug, 1), faces: [] };
+        const u = uploaded.get(key);
+        return u ? { family: u.family, bundled: false, ref: u.faces[0].ref, faces: u.faces } : null;
+      },
+    };
+  }
+
+  /**
+   * The font assets a clip pins for each uploaded family its font parameters name. A family not pinned yet gets the latest
+   * version of each of its font assets; one already pinned (current: the composition's fonts) keeps its versions, unless
+   * repin asks for newer ones (true: the family's current set; slugs: those assets' latest versions, and the family's assets
+   * of those names). Bundled families are not pinned here.
+   * @param {Iterable<string>} families canonical family names @param {Record<string, string[]> | undefined} current
+   * @param {true | string[] | undefined} repin @param {ReturnType<typeof fontCatalog>} [catalog]
+   * @returns {{ fonts: Record<string, string[]>, problems: string[] }}
+   */
+  function pinFonts(families, current, repin, catalog = fontCatalog()) {
+    const fonts = {}, problems = [];
+    for (const name of families) {
+      const info = catalog.find(name);
+      if (!info || info.bundled) continue;
+      const prior = current && Object.entries(current).find(([k]) => k.toLowerCase() === info.family.toLowerCase())?.[1];
+      let wanted;
+      if (!prior || repin === true) wanted = info.faces.map((f) => f.ref);
+      else {
+        const slugs = Array.isArray(repin) ? repin : [];
+        wanted = prior.map((ref) => (slugs.includes(parseRef(ref).slug) ? parseRef(ref).slug : ref));
+        for (const f of info.faces) if (slugs.includes(f.slug) && !prior.some((r) => parseRef(r).slug === f.slug)) wanted.push(f.ref);
+      }
+      const refs = [];
+      for (const ref of wanted) {
+        let row;
+        try { row = versionRow(ref); } catch (e) { problems.push(`font "${info.family}": ${e.message}`); continue; }
+        if (!row) problems.push(`font "${info.family}": no font asset "${ref}" in the library`);
+        else if (row.type !== 'font' || !isUploaded(row)) problems.push(`font "${info.family}": ${makeRef(row.slug, row.version)} is not an uploaded font`);
+        else refs.push(makeRef(row.slug, row.version));
+      }
+      fonts[info.family] = [...new Set(refs)].sort();
+    }
+    return { fonts, problems };
+  }
+
+  /** What the clip's pinned uploaded fonts can draw: lower-case family → code points (the files are read once per version). */
+  const coverageOfRef = new Map();
+  function fontCoverage(composition) {
+    const out = new Map();
+    for (const [family, refs] of Object.entries(composition?.fonts ?? {})) {
+      const set = new Set();
+      for (const ref of refs) {
+        let cov = coverageOfRef.get(ref);
+        if (!cov) coverageOfRef.set(ref, (cov = readCoverage(readFileSync(absFile(requireVersion(ref))), ref)));
+        for (const cp of cov) set.add(cp);
+      }
+      out.set(family.toLowerCase(), set);
+    }
+    return out;
   }
 
   // ── writing function assets ──────────────────────────────────────────────────────────────
@@ -916,13 +1034,11 @@ export function createLibrary(ctx) {
     }
   }
 
-  const fontFamilies = () => fontManifest().map((f) => f.family);
-  /** The font asset for a family name, if the library has it. */
-  const fontRef = (family) => {
-    const fam = fontManifest().find((f) => f.family.toLowerCase() === String(family).toLowerCase());
-    return fam ? makeRef(fam.slug, 1) : null;
-  };
+  /** Every family a font parameter can name: the bundled ones, then the uploaded ones. */
+  const fontFamilies = () => fontCatalog().families();
+  /** The font asset for a family name, if the library has it (an uploaded family has several: this is the first, see fontCatalog for all). */
+  const fontRef = (family) => fontCatalog().find(family)?.ref ?? null;
 
-  return { versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, addFootage, footageMeta, canvasOf, sequenceByKey, setFavorite, setFeatured, touch, listCollections, addToCollection, removeFromCollection, bulk, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
+  return { fontCatalog, pinFonts, fontSets, fontCoverage, isUploadedFont: isUploaded, versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, addFootage, footageMeta, canvasOf, sequenceByKey, setFavorite, setFeatured, touch, listCollections, addToCollection, removeFromCollection, bulk, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
 }
 

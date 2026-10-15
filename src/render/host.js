@@ -2,7 +2,7 @@
 // and a vm sandbox that evaluates asset source with nothing but JS builtins in scope.
 
 import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
@@ -24,6 +24,24 @@ export function registerFonts() {
     for (const f of fam.files) GlobalFonts.registerFromPath(join(FONTS_DIR, f.file), fam.family);
     // the Latin Extended files go under their own alias, which fontString puts right after the family
     for (const f of fam.ext?.files ?? []) GlobalFonts.registerFromPath(join(FONTS_DIR, f.file), fam.ext.family);
+  }
+}
+
+const fontSetsRegistered = new Set();
+/**
+ * Register the uploaded fonts a bundle carries: { <alias>: { family, files: [{ path, weight, style }] } }. Each set goes under
+ * the alias that names exactly those files (never under the family name, so another version of the family cannot hijack it).
+ * Idempotent per thread: a set already registered is not registered again, so a worker can load any number of bundles.
+ * @param {Record<string, { family: string, files: { path: string, weight?: number, style?: string }[] }>} [fonts]
+ */
+export function registerFontSets(fonts) {
+  for (const [alias, set] of Object.entries(fonts ?? {})) {
+    if (fontSetsRegistered.has(alias)) continue;
+    for (const f of set.files) {
+      if (!existsSync(f.path)) throw new Error(`The font file of "${set.family}" is missing: ${f.path}`);
+      if (!GlobalFonts.registerFromPath(f.path, alias)) throw new Error(`The font file of "${set.family}" could not be loaded (${f.path}); it may be damaged`);
+    }
+    fontSetsRegistered.add(alias);
   }
 }
 

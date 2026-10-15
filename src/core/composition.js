@@ -317,6 +317,13 @@ export function normalizeComposition(input) {
     else easing = input.easing;
   }
 
+  // v4: the font assets a clip pins for the uploaded families its font parameters name: { "Acme Sans": ["acme-sans@1", …] }
+  let fonts;
+  if (input.fonts !== undefined && input.fonts !== null) {
+    if (!isPlain(input.fonts) || !Object.values(input.fonts).every((l) => Array.isArray(l) && l.length && l.every((r) => typeof r === 'string' && /^[a-z0-9][a-z0-9-]*@\d+$/.test(r)))) err('fonts', 'fonts maps a font family to the pinned font assets that draw it, e.g. { "Acme Sans": ["acme-sans@1", "acme-sans-bold@2"] }; the studio fills it in when a clip uses an uploaded font');
+    else if (Object.keys(input.fonts).length) fonts = Object.fromEntries(Object.entries(input.fonts).map(([family, list]) => [family, [...list]]));
+  }
+
   // v3: loudness target, captions from the words, platform profiles, how f.safe is chosen, check thresholds
   let loudness, captions, platforms, safe, checks;
   if (input.loudness !== undefined && input.loudness !== null && input.loudness !== false) loudness = normalizeLoudness(input.loudness, err);
@@ -346,6 +353,7 @@ export function normalizeComposition(input) {
   if (platforms) composition.platforms = platforms;
   if (safe) composition.safe = safe;
   if (checks) composition.checks = checks;
+  if (fonts) composition.fonts = fonts;
   return { composition, errors };
 }
 

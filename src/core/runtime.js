@@ -471,7 +471,7 @@ export function createRuntime(host) {
 
   /**
    * Draw one frame of a single asset (the playground, thumbnails, validation).
-   * o: { t, duration, width, height, fps, seed, background, beats }
+   * o: { t, duration, width, height, fps, seed, background, beats, fonts (family → alias of uploaded fonts, see fontAliases) }
    */
   function renderAsset(ctx, ref, params, o) {
     const e = entry(ref);
@@ -480,6 +480,7 @@ export function createRuntime(host) {
     resetState(ctx);
     // size floors are relative to the frame; o.record collects what f.lib.text draws (takeTexts())
     inspect.frame = { width: o.width, height: o.height, short: Math.min(o.width, o.height) };
+    inspect.fonts = o.fonts ?? null;
     assetTexts = o.record ? [] : null;
     inspect.record = assetTexts ? recorder(assetTexts) : null;
     assetCanvases.clear();
@@ -497,6 +498,7 @@ export function createRuntime(host) {
     } finally {
       while (ctx.__saveDepth() > 0) ctx.restore();
       inspect.record = null;
+      inspect.fonts = null;
     }
   }
   let assetTexts = null;
@@ -590,7 +592,7 @@ export function createRuntime(host) {
 
   /**
    * Draw one frame of a clip composition (already validated and pinned).
-   * extra: { beats, markers, words, captions, lane, record (collect what f.lib.text and f.lib.solid draw), suppressText (draw everything but text) }.
+   * extra: { beats, markers, words, captions, lane, fonts (family → alias of the uploaded fonts the clip pins; see fontAliases), record (collect what f.lib.text and f.lib.solid draw), suppressText (draw everything but text) }.
    * Returns { texts } when recording (one entry per drawn word, in frame pixels), else undefined.
    */
   function renderClipFrame(ctx, comp, frame, extra = {}) {
@@ -603,6 +605,8 @@ export function createRuntime(host) {
     inspect.record = texts ? recorder(texts) : null;
     inspect.suppress = !!extra.suppressText;
     inspect.frame = { width, height, short: Math.min(width, height) };
+    // v4: the uploaded fonts the clip pinned, by family → alias (only set when it pins any)
+    inspect.fonts = extra.fonts ?? null;
     assetCanvases.clear();
     cur = null; inTransition = false;
     ctx.save();
@@ -685,6 +689,7 @@ export function createRuntime(host) {
       while (ctx.__saveDepth() > 0) ctx.restore();
       inspect.record = null;
       inspect.suppress = false;
+      inspect.fonts = null;
       cur = null; curTrack = null; inTransition = false;
     }
     return texts ? { texts } : undefined;

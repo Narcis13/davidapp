@@ -135,7 +135,8 @@ export function glyphFindings(texts, comp, library) {
     if (track.type === 'audio' || !familiesOf.has(item.id)) continue;
     for (const s of stringsOf(library, item)) for (const family of familiesOf.get(item.id)) entries.push({ text: s.replace(/\*/g, ''), family, item: item.id });
   }
-  const report = /** @type {any[]} */ (coverageReport(entries));
+  // the uploaded fonts the clip pins are read from their pinned files (a bundled family keeps its own coverage)
+  const report = /** @type {any[]} */ (coverageReport(entries, library.fontCoverage?.(comp)));
   for (const g of report) g.items = [...new Set(entries.filter((e) => e.family === g.family && e.text.includes(g.char)).map((e) => e.item))];
   return report;
 }
