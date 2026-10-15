@@ -14,7 +14,7 @@ and that prompt revised so no workaround is left. Brief: `ITERATION_4_PROMPT.md`
 Started 2026-10-15 on branch `main` at `de5d370`, on the Windows 11 PC (i9-14900KF), as iteration 3 was,
 not the macOS Intel machine the brief describes (see `.claude/goal-loop/project.md`).
 
-**Next:** baseline finishing (worktree `$SP/base` at `0ea078c`); then the foundation commit (schema v3, tool/route hooks) and wave 1 agents.
+**Next:** merge the running agents as they finish (logos, speech, provenance, exchange, kit-ui, kit-marketing, ui); then the second UI agent (provenance fields, render options, write to repo, speech), the revised motion prompt, and clips 9 and 10.
 
 ## Contract (Done means)
 
@@ -54,12 +54,12 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Milestones
 
-0. [ ] **Baseline and foundation**: project.md (committed on its own), hashes of clips 1–8 + history-of-ai and speed of clips 1–3 from a worktree of `0ea078c`; contract; schema v3 and extension hooks (D1, D22)
-1. [ ] **Render options** (D10)
-2. [ ] **Font assets** (D9)
+0. [x] **Baseline and foundation**: project.md (committed on its own), hashes of clips 1–8 + history-of-ai and speed of clips 1–3 from a worktree of `0ea078c`; contract; schema v3 and extension hooks (D1, D22)
+1. [x] **Render options** (D10): merged `b580ca4` (agent)
+2. [x] **Font assets** (D9): merged `64aee60` (agent); the font drop in the studio comes with the UI
 3. [ ] **Logos as given** (D14)
 4. [ ] **Speech tools** (D7, D23)
-5. [ ] **Footage** and the screen-recording script (D2–D6)
+5. [ ] **Footage** and the screen-recording script (D2–D6): core `6224168` (lead), recorder `18d4f98` (agent), parity case `a799588`; disk report and the UI still to do
 6. [ ] **Provenance and credits** (D12)
 7. [ ] **Repo and library** (D11)
 8. [ ] **The kit** (D13)
@@ -91,5 +91,6 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Log
 
+- 2026-10-15: Wave 1. Render options merged (agent; 12 tests: drafts at 2/3 with the final's frame hashes, workers 1 vs 3 identical, three formats in one request, poster time, isolate only/except). Footage built by the lead (7 tests: the frame rule, probing, seek = in-order frames on H.264 with B-frames / MKV with a start offset / VP9 / rotated, a clip drawing the exact source frame, two worker counts identical, its sound in the mix, footage in an image param, errors, MCP). The screen recorder merged (agent: two committed recordings, 449 KB and 340 KB, with sidecars). Fonts merged (agent; 21 tests; conflicts with footage in library/frame-worker/preview-worker/http resolved by keeping both). Gates: 334 tests pass. Parity: footage at 25 fps in a 10 fps clip, 1:1 and transformed, mean 0.25 levels, >64: 0.05 % (limit 1.5 / 1.0). `scripts/prompt-tools.mjs` checks a prompt against the live tool list: the prompt as it stands names 25 tools and 19 workarounds (`reports/prompt-tools-before.txt`). Wave 2 started: provenance, exchange, kit-ui, kit-marketing, ui (captions, footage, uploads); logos and speech still running.
 - 2026-10-15: M0 baseline from the worktree `$SP/base` (`0ea078c`, node_modules linked), data in the scratchpad: `npm run showcase` built clips 1–8 (12 min), `clips/history-of-ai/compose.mjs --render`, `scripts/hashes.mjs` → 1,663 dense frames + 162 render samples (`docs/showcase/v4/reports/baseline-hashes.json`); clips 1–6 and history-of-ai identical to iteration 3's baseline. Speed (`--runs 5`, medians 6.83 / 9.14 / 5.67 s) was measured while the wave-1 agents had started, so it is noisy (`baseline-speed-start.json`); the final comparison re-measures the base worktree interleaved with the final code on a quiet machine, as iteration 3 did. Foundation committed (`161cbf9`): schema v3, module hooks. Wave 1 agents started in worktrees: render options, fonts, logos, speech, recording; footage by the lead on main.
 - 2026-10-15: project.md checked against this PC (same as iteration 3; CLI 2.1.299) and committed on its own (`aba3fd8`). Iteration 3's record archived to `docs/progress/2026-10-09-fablecut-iteration-3.md`. `scripts/hashes.mjs` now covers clips 7 and 8 by default.
