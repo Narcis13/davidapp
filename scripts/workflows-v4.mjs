@@ -883,7 +883,9 @@ await workflow('render', 'the render panel: a draft with two workers and a poste
   await s.frame();
   const state0 = await s.evaluate(`document.querySelector('[data-testid=repo-state]').textContent`);
   expect('it says how many changes there are to write', /\d+ changes? to write/.test(state0), state0);
-  expect('the new files are listed', (await s.evaluate(`document.querySelectorAll('[data-testid=repo-new] li').length`)) >= 2);
+  // the clip's own file is new; the versions it pins may be in the repo already (a repo that holds other clips' exports)
+  const listed = await s.evaluate(`[...document.querySelectorAll('[data-testid=repo-new] li')].map((li) => li.textContent)`);
+  expect('the new files are listed, the clip\'s own among them', listed.some((t) => t.includes(`clips/${REPO_CLIP}/clip.json`)), listed);
   expect('nothing was written by looking', !existsSync(join(repo, 'clips', REPO_CLIP, 'clip.json')));
   await s.shot(join(out, 'studio', 'v4-repo-changes.png'));
 
