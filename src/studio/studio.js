@@ -24,6 +24,7 @@ import { createInspect } from './inspect.js';
 import { createAudio } from './audio.js';
 import { createChecks } from './checks.js';
 import { createFonts } from './fonts.js';
+import { createProvenance } from './provenance.js';
 
 export { StudioError };
 
@@ -41,7 +42,8 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   const library = createLibrary(ctx);
   const clips = createClips(ctx, library);
   const audio = createAudio(ctx, library, clips);
-  const renders = createRenders(ctx, library, clips, audio);
+  const provenance = createProvenance(ctx, library);
+  const renders = createRenders(ctx, library, clips, audio, provenance);
   const lineage = createLineage(ctx, library, clips);
   // frame helpers below are function declarations, so they exist already
   const requests = createRequests(ctx, library, clips, { assetSheet, clipFrame, clipSheet });
@@ -303,5 +305,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, checks, fonts, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, checks, fonts, provenance, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }

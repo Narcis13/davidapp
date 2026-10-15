@@ -12,6 +12,7 @@ import { basename, extname } from 'node:path';
 import { createCanvas, loadImage } from '../render/host.js';
 import { json } from '../db/db.js';
 import { StudioError, SLUG_RE, checkImageSize } from './library.js';
+import { parseProvenance } from './provenance.js';
 import { sanitizeSvg, vectorModel, useExpansion, USE_BUDGET, SvgError } from './svg.js';
 
 export const MAX_UPLOAD = 25_000_000;
@@ -89,11 +90,13 @@ export function createUploads(ctx, library) {
 
   /**
    * Add one uploaded file → { asset, duplicate, removed (what the SVG sanitiser dropped) }.
-   * @param {{ name: string, data: Buffer, author: string, forClip?: string, slug?: string }} o
+   * provenance: what the uploader says about the file (licence, creator, source …); what is not said is recorded as unknown.
+   * @param {{ name: string, data: Buffer, author: string, forClip?: string, slug?: string, provenance?: any }} o
    */
-  async function upload({ name, data, author, forClip, slug: wanted }) {
+  async function upload({ name, data, author, forClip, slug: wanted, provenance }) {
     if (!Buffer.isBuffer(data) || !data.length) throw new StudioError('The file is empty');
     if (data.length > MAX_UPLOAD) throw new StudioError(`The file is ${data.length} bytes; uploads are at most ${MAX_UPLOAD}`);
+    if (provenance !== undefined) parseProvenance(provenance);
     const type = sniff(data);
     if (!type) throw new StudioError(`"${name}" is not a PNG, JPEG, WebP or SVG file`, 'unsupported');
     const hash = createHash('sha256').update(data).digest('hex');
@@ -127,7 +130,7 @@ export function createUploads(ctx, library) {
     const colours = palette(img);
     const kindName = { png: 'PNG', jpeg: 'JPEG', webp: 'WebP', svg: 'SVG' }[type.kind];
     const r = await library.addFileAsset({
-      slug, type: 'image', data: raster, ext, author, forClip, license: 'uploaded by the user',
+      slug, type: 'image', data: raster, ext, author, forClip, provenance,
       title: titleOf(name), tags: ['upload', type.kind === 'svg' ? 'svg' : 'photo'],
       description: `An uploaded ${kindName} image, "${basename(name)}" (${natural ? `${natural.width}×${natural.height}` : `${img.width}×${img.height}`}), waiting for a description.`,
       meta: { hash, originalName: basename(name), format: type.kind, palette: colours, natural, sanitized: type.kind === 'svg' ? { removed } : undefined, vector },

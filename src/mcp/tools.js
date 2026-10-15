@@ -12,6 +12,7 @@ import { checkTranscript, checkTranscripts } from '../core/words.js';
 import { drawOverlays, OVERLAYS } from '../render/overlays.js';
 import { json } from '../db/db.js';
 import { moreTools } from './more/index.js';
+import { provenanceInput, fromArgs } from './more/provenance.js';
 
 const FORMAT = z.enum(['vertical', 'horizontal', 'square']);
 const REF = z.string().describe('Asset reference: "name" (latest version) or "name@3" (pinned)');
@@ -184,18 +185,21 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'add_file_asset',
       title: 'Add an image or sound file',
-      description: 'Add an image (png, jpg, webp, svg) or sound (wav, mp3, m4a, ogg) from a local file as a library asset. Only add media you made or that is properly licensed; say which in `license`.',
+      description: 'Add an image (png, jpg, webp, svg) or sound (wav, mp3, m4a, ogg) from a local file as a library asset. Only add media you made or that is properly licensed; say which in `license` (with creator, credit, source_url … as far as you know them: they become the clip\'s credits). What you do not say is recorded as unknown, and a final render (start_render { final: true }) refuses an asset with no licence or marked placeholder: true. Fix it later with set_asset_metadata { provenance }.',
       input: {
         name: z.string(),
         type: z.enum(['image', 'sound']),
         path: z.string().describe('Absolute path of the file'),
         description: z.string(),
         tags: z.array(z.string()).optional(),
-        license: z.string().optional().describe('e.g. "original", "CC0"'),
+        ...provenanceInput(z),
         for_clip: z.string().optional(),
         author: AUTHOR,
       },
-      run: async (a) => ({ json: { added: compactAsset((await library.addFileAsset({ slug: a.name, type: a.type, path: a.path, description: a.description, tags: a.tags ?? [], license: a.license, forClip: a.for_clip, author: who(a.author) })).asset) } }),
+      run: async (a) => {
+        const r = await library.addFileAsset({ slug: a.name, type: a.type, path: a.path, description: a.description, tags: a.tags ?? [], provenance: fromArgs(a), forClip: a.for_clip, author: who(a.author) });
+        return { json: { added: compactAsset(r.asset), provenance: r.asset.provenance } };
+      },
     },
     {
       name: 'bake_asset',
@@ -406,15 +410,17 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         timings_path: z.string().optional().describe('Or a JSON file with the timings'),
         unit: z.enum(['s', 'ms']).optional(), transcript: z.any().optional().describe('Plain text, or timed words'),
         transcripts: z.array(z.any()).optional().describe('Several independent transcripts (two recognisers): a word is wrong only when all of them say so'), language: z.string().optional(),
-        voice: z.record(z.string(), z.any()).optional().describe('Who or what spoke it, and its licence: { name, model, license, source }'),
-        license: z.string().optional(), description: z.string().optional(), title: z.string().optional(), tags: z.array(z.string()).optional(), take: z.string().optional(), for_clip: z.string().optional(), author: AUTHOR,
+        voice: z.record(z.string(), z.any()).optional().describe('Who or what spoke it, and its licence: { name, model, license, source }. A voice with a model is recorded as AI-generated unless ai_generated says otherwise.'),
+        ...provenanceInput(z),
+        license: z.string().optional().describe('Licence of the recording (default "original": made for this studio); the voice\'s own licence goes in voice.license'),
+        description: z.string().optional(), title: z.string().optional(), tags: z.array(z.string()).optional(), take: z.string().optional(), for_clip: z.string().optional(), author: AUTHOR,
       },
       run: async (a) => {
         let timings = a.timings_path ? readFileSync(a.timings_path, 'utf8') : a.timings;
         if (timings === undefined || timings === null) throw new StudioError('Give timings (the word timings) or timings_path (a JSON file of them)');
         if (typeof timings === 'string') { try { timings = JSON.parse(timings); } catch { throw new StudioError('timings: not valid JSON'); } }
         if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64 (with ext)');
-        const r = await studio.audio.addNarration({ slug: a.name, path: a.path, data: a.data_base64 ? Buffer.from(a.data_base64, 'base64') : undefined, ext: a.ext, script: a.script, timings, unit: a.unit, transcript: a.transcript, transcripts: a.transcripts, language: a.language, voice: a.voice, license: a.license, description: a.description, title: a.title, tags: a.tags, take: a.take, forClip: a.for_clip, author: who(a.author) });
+        const r = await studio.audio.addNarration({ slug: a.name, path: a.path, data: a.data_base64 ? Buffer.from(a.data_base64, 'base64') : undefined, ext: a.ext, script: a.script, timings, unit: a.unit, transcript: a.transcript, transcripts: a.transcripts, language: a.language, voice: a.voice, provenance: fromArgs(a), description: a.description, title: a.title, tags: a.tags, take: a.take, forClip: a.for_clip, author: who(a.author) });
         return { json: { added: r.asset.ref, duration: r.asset.duration, words: r.words, stats: r.stats, source: r.source, transcript: r.transcript, warnings: r.warnings } };
       },
     },
@@ -509,7 +515,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'start_render',
       title: 'Render a clip to MP4',
-      description: 'Queue a render of the clip to H.264/AAC MP4. Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long. Options: format renders the same composition in another shape (each item\'s overrides for that format apply); formats: ["horizontal","vertical","square"] (1–3, instead of format) queues one render per format in this one call, with the same options, and returns { batch, renders } (batch = the first render\'s id); draft: true (or { scale }) makes an animatic: the frames are drawn at full size, so a draft shows exactly the final frames and its sampled frame hashes equal a full render\'s, then scaled to 2/3, 1/2 or 1/3 (the largest that gives whole, even pixel sizes; 1920x1080 gives 1280x720) and encoded fast, to a file named ...-draft.mp4; workers: how many worker threads draw frames, 1–16 (default: by CPU count; the pixels do not depend on it); poster_at: the poster frame at this time in seconds (default: 40 % of the clip). The options are stored with the render (get_render).',
+      description: 'Queue a render of the clip to H.264/AAC MP4. Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long. Options: format renders the same composition in another shape (each item\'s overrides for that format apply); formats: ["horizontal","vertical","square"] (1–3, instead of format) queues one render per format in this one call, with the same options, and returns { batch, renders } (batch = the first render\'s id); draft: true (or { scale }) makes an animatic: the frames are drawn at full size, so a draft shows exactly the final frames and its sampled frame hashes equal a full render\'s, then scaled to 2/3, 1/2 or 1/3 (the largest that gives whole, even pixel sizes; 1920x1080 gives 1280x720) and encoded fast, to a file named ...-draft.mp4; workers: how many worker threads draw frames, 1–16 (default: by CPU count; the pixels do not depend on it); poster_at: the poster frame at this time in seconds (default: 40 % of the clip); final: true is the render to publish: every pinned asset is checked first and a placeholder (flag or tag) or a file with no licence refuses the render, naming each (check_provenance lists them without rendering), and the credits are written next to the MP4 (<name>.credits.md, stats.files.credits; clip_credits shows them); drafts and normal renders are not checked, and final cannot be combined with draft. The options are stored with the render (get_render).',
       input: {
         clip: z.string(),
         format: FORMAT.optional().describe('Render the same composition in another format; each item\'s overrides for that format apply'),
@@ -517,11 +523,12 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
         draft: z.union([z.boolean(), z.object({ scale: z.number().gt(0).lt(1).describe('For example 0.5; must give whole, even pixel sizes') }).strict()]).optional().describe('A fast, smaller render for review: true, or { scale }'),
         workers: z.number().int().min(1).max(16).optional().describe('Worker threads that draw frames, 1–16'),
         poster_at: z.number().min(0).optional().describe('Seconds: the time of the poster frame (0 up to the clip\'s duration)'),
+        final: z.boolean().optional().describe('The render to publish: refused while a placeholder or an unlicensed file is in the clip; writes the credits file. Not with draft.'),
         wait_seconds: z.number().min(0).max(900).optional().describe('Wait here for up to this long (for several formats: for all of them)'),
       },
       run: async (a) => {
         if (a.format && a.formats) throw new StudioError('Give format or formats, not both');
-        const options = { draft: a.draft || undefined, workers: a.workers, poster: a.poster_at };
+        const options = { draft: a.draft || undefined, workers: a.workers, poster: a.poster_at, final: a.final || undefined };
         const wait = (r) => (a.wait_seconds ? renders.wait(r.id, a.wait_seconds * 1000) : r);
         if (!a.formats) return { json: compactRender(await wait(renders.enqueue({ clip: a.clip, format: a.format, requestedBy: defaultAuthor, options }))) };
         const b = renders.enqueueBatch({ clip: a.clip, formats: a.formats, requestedBy: defaultAuthor, options });
@@ -589,10 +596,18 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     },
     {
       name: 'set_asset_metadata',
-      title: 'Edit an asset\'s title, description or tags',
-      description: 'Change how an asset is named, described and tagged in the library, without a new code version (it applies to every version and to search). null resets a field to what the source declares. Describing an upload takes it off the needs-description list.',
-      input: { name: z.string(), title: z.string().nullable().optional(), description: z.string().nullable().optional(), tags: z.array(z.string()).nullable().optional(), author: AUTHOR },
-      run: (a) => { const r = library.setMetadata({ slug: a.name, title: a.title, description: a.description, tags: a.tags, author: who(a.author) }); return { json: { updated: r.ref, title: r.title, description: r.description, tags: r.tags, declared: r.declared } }; },
+      title: 'Edit an asset\'s title, description, tags or provenance',
+      description: 'Change how an asset is named, described and tagged in the library, without a new code version (it applies to every version and to search). null resets a field to what the source declares. Describing an upload takes it off the needs-description list. provenance: a partial update of where a file asset (image, sound, footage, font, sequence) came from, kept on one version (version: default the latest) without making a new one, and recorded (by, at): { license, licenseUrl, sourceUrl, creator, credit, date (ISO), aiGenerated, contentId, restrictions, placeholder, redistributable }; null clears a text field. Use it to set the licence of an upload, or to clear placeholder when the real file is in.',
+      input: {
+        name: z.string(), title: z.string().nullable().optional(), description: z.string().nullable().optional(), tags: z.array(z.string()).nullable().optional(),
+        provenance: z.record(z.string(), z.any()).optional().describe('Fields to change, e.g. { license: "CC-BY-4.0", creator: "Jane Doe", sourceUrl: "https://…", credit: "Photo: Jane Doe / Unsplash", placeholder: false }'),
+        version: z.number().int().min(1).optional().describe('With provenance: which version (default the latest)'),
+        author: AUTHOR,
+      },
+      run: (a) => {
+        const r = library.setMetadata({ slug: a.name, title: a.title, description: a.description, tags: a.tags, provenance: a.provenance, version: a.version, author: who(a.author) });
+        return { json: { updated: r.ref, title: r.title, description: r.description, tags: r.tags, declared: r.declared, ...(a.provenance ? { provenance: r.provenance, provenanceEdit: r.meta.provenanceEdit } : {}) } };
+      },
     },
     {
       name: 'diff_versions',
@@ -616,13 +631,13 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'upload_image',
       title: 'Upload an image or SVG',
-      description: 'Add a PNG, JPEG, WebP or SVG file as an image asset, the same way a drag-and-drop in the studio does: the type is read from the bytes, a file already in the library is not added twice (duplicate: true), an SVG is sanitised (scripts, event handlers, external references and foreignObject are dropped; a DOCTYPE rejects it) and rasterised, and the size, a dominant palette and a thumbnail are extracted. It then waits on the needs-description list.',
-      input: { path: z.string().optional().describe('Absolute path of the file'), data_base64: z.string().optional().describe('Or the file\'s bytes, base64'), name: z.string().describe('File name, e.g. "skyline.jpg"'), for_clip: z.string().optional(), author: AUTHOR },
+      description: 'Add a PNG, JPEG, WebP or SVG file as an image asset, the same way a drag-and-drop in the studio does: the type is read from the bytes, a file already in the library is not added twice (duplicate: true), an SVG is sanitised (scripts, event handlers, external references and foreignObject are dropped; a DOCTYPE rejects it) and rasterised, and the size, a dominant palette and a thumbnail are extracted. It then waits on the needs-description list. Say where it came from (license, creator, credit, source_url …): what you leave out is recorded as unknown, and a final render refuses an image with no licence.',
+      input: { path: z.string().optional().describe('Absolute path of the file'), data_base64: z.string().optional().describe('Or the file\'s bytes, base64'), name: z.string().describe('File name, e.g. "skyline.jpg"'), ...provenanceInput(z), for_clip: z.string().optional(), author: AUTHOR },
       run: async (a) => {
         if (!a.path && !a.data_base64) throw new StudioError('Give path or data_base64');
         const data = a.path ? readFileSync(a.path) : Buffer.from(a.data_base64, 'base64');
-        const r = await studio.uploads.upload({ name: a.name, data, author: who(a.author), forClip: a.for_clip });
-        return { json: { asset: r.asset.ref, duplicate: r.duplicate, removedFromSvg: r.removed, width: r.asset.meta.width, height: r.asset.meta.height, palette: r.asset.meta.palette, needsDescription: r.asset.needsDescription }, images: [{ png: readFileSync(join(studio.dataDir, r.asset.thumb)), path: join(studio.dataDir, r.asset.thumb) }] };
+        const r = await studio.uploads.upload({ name: a.name, data, author: who(a.author), forClip: a.for_clip, provenance: fromArgs(a) });
+        return { json: { asset: r.asset.ref, duplicate: r.duplicate, provenance: r.asset.provenance, removedFromSvg: r.removed, width: r.asset.meta.width, height: r.asset.meta.height, palette: r.asset.meta.palette, needsDescription: r.asset.needsDescription }, images: [{ png: readFileSync(join(studio.dataDir, r.asset.thumb)), path: join(studio.dataDir, r.asset.thumb) }] };
       },
     },
     {

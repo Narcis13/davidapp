@@ -6,6 +6,7 @@ import { createCanvas } from '../../render/host.js';
 import { footageService } from '../../render/footage.js';
 import { frameAt, frameTime } from '../../core/footage.js';
 import { StudioError } from '../../studio/library.js';
+import { provenanceInput, fromArgs } from './provenance.js';
 
 /** @param {any} api @returns {any[]} */
 export default function tools({ studio, who, image, z, REF, AUTHOR }) {
@@ -51,14 +52,15 @@ export default function tools({ studio, who, image, z, REF, AUTHOR }) {
         name: z.string().describe('Asset name (lowercase-kebab), e.g. "studio-tour-library"'),
         description: z.string().describe('What the footage shows and where it came from'),
         title: z.string().optional(), tags: z.array(z.string()).optional(),
-        license: z.string().optional().describe('Licence of the file (default "original": made for this studio)'),
+        ...provenanceInput(z),
+        license: z.string().optional().describe('Licence of the file: "original" for a recording made for this studio (e.g. a screen recording), an SPDX id such as "CC-BY-4.0", or free text. Left out, it is recorded as unknown and a final render refuses the footage.'),
         for_clip: z.string().optional(), author: AUTHOR,
       },
       run: async (a) => {
-        const r = await library.addFootage({ slug: a.name, path: a.path, description: a.description, title: a.title, tags: a.tags ?? ['footage'], license: a.license, forClip: a.for_clip, author: who(a.author) });
+        const r = await library.addFootage({ slug: a.name, path: a.path, description: a.description, title: a.title, tags: a.tags ?? ['footage'], provenance: fromArgs(a), forClip: a.for_clip, author: who(a.author) });
         const images = [pngOf(r.asset.thumb)];
         if (r.asset.meta.strip?.file) images.push(pngOf(r.asset.meta.strip.file));
-        return { json: facts(r.asset), images };
+        return { json: { ...facts(r.asset), provenance: r.asset.provenance }, images };
       },
     },
     {
