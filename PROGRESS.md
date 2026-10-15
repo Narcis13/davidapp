@@ -57,7 +57,7 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 0. [x] **Baseline and foundation**: project.md (committed on its own), hashes of clips 1–8 + history-of-ai and speed of clips 1–3 from a worktree of `0ea078c`; contract; schema v3 and extension hooks (D1, D22)
 1. [x] **Render options** (D10): merged `b580ca4` (agent)
 2. [x] **Font assets** (D9): merged `64aee60` (agent); the font drop in the studio comes with the UI
-3. [ ] **Logos as given** (D14)
+3. [x] **Logos as given** (D14): merged `4feddd2` (agent; 16 tests; Chrome pixel diff of the Fablecut logo: mean ≤ 0.15 levels, 99.8 % within 32; old models draw unchanged)
 4. [ ] **Speech tools** (D7, D23)
 5. [ ] **Footage** and the screen-recording script (D2–D6): core `6224168` (lead), recorder `18d4f98` (agent), parity case `a799588`; disk report and the UI still to do
 6. [ ] **Provenance and credits** (D12)
@@ -83,7 +83,10 @@ Status: `open` → `pass` (with evidence) or `blocked` (see Blocked).
 
 ## Clip concepts (decided before each build starts; not part of the measured build)
 
-(written before clips 9 and 10 start)
+(written 2026-10-15, before clips 9 and 10 start; the gates may change them)
+
+- **Clip 9, "Your first clip"** (onboarding, 16:9 + a vertical render, ~55 s, voiced, captions burned in, YouTube and the studio's README). Takeaway: *find, tune, place, render: a clip in four steps, all inside the studio.* Arc (onboarding): the result first (a finished render playing in the studio's gallery), then four steps, one action each, each a screen recording of the real studio (`scripts/record-studio.mjs`) in `kit-ui-frame`, with `kit-cursor` from the recording's sidecar, `kit-spotlight` on the element it touches and `kit-camera` zooming until the UI text meets the size floor: (1) search the library, (2) change a parameter in the playground, (3) place and trim an item on the timeline, (4) render and read the report; then a recap (`kit-steps` ticking) and the next step (an end card). Voice: Kokoro `af_heart` made in the studio (`generate_narration`), music the studio synthesizes, ducked under the voice. Reuses clip 7's theme, captions, end card and music.
+- **Clip 10, "Every clip makes the next one easier"** (marketing, 1:1 primary + 9:16, ~30 s, voiced). Takeaway: *in Fablecut every video leaves reusable pieces, so the next one costs less.* Arc (marketing): the outcome first, the product doing it (a recording from clip 9 in a browser frame, icons), proof with real numbers from this repo's `compounding_report` (a line chart of new lines of asset code per clip, which falls as clips reuse), and the call to action on the last frame: the Fablecut logo as given (`brand/fablecut-logo.svg`, internal style sheet + gradients), "Make your first clip", `github.com/Narcis13/davidapp`. Reuses clip 9's kit and recordings and clip 7/8's pieces.
 
 ## Blocked
 
