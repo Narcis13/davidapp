@@ -467,3 +467,12 @@ test('contact sheet: cursor, spotlight and camera over the committed recording, 
   const cv = await sheet(cells, 3, 720, 450, 'kit-ui-over-footage.png');
   assert.ok(cv.width > 2000);
 });
+
+test('ui frame v2: chrome text at its floor stays at the floor while the frame scales in (v1 failed there); at rest it draws as v1', async () => {
+  await t.studio.library.updateAsset({ slug: 'kit-ui-frame', source: src('kit-ui-frame.v2'), author: AUTHOR, note: 'Chrome text stays at its floor while the frame scales in.' });
+  const at = (v, extra = {}) => comp([item('f', `kit-ui-frame@${v}`, { content: 'tiny', size: 2.6, title: 'Library', url: '127.0.0.1:8787', ...extra })], { width: 1080, height: 1080 });
+  await assert.rejects(t.studio.clipFrame({ composition: at(1, { inDur: 0.6 }), t: 0.1 }), /size floor/);
+  for (const tm of [0.02, 0.1, 0.3, 0.55]) await t.studio.clipFrame({ composition: at(2, { inDur: 0.6 }), t: tm });
+  assert.deepEqual(await hashes(at(2), [1, 3]), await hashes(at(1), [1, 3]));
+  assert.deepEqual(await hashes(at(2, { inDur: 0.6 }), [1, 3]), await hashes(at(1, { inDur: 0.6 }), [1, 3]));
+});

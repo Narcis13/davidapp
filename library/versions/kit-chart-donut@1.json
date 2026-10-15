@@ -1,0 +1,106 @@
+{
+  "ref": "kit-chart-donut@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Donut chart",
+  "description": "An animated donut chart: two to six segments that sweep in around a ring, a number counting up in the centre (the first segment's share, the total, or any value) with a caption, and a legend with each segment's share that fills in as the sweep passes it (to the right in a wide box, below in a tall one). Theme colours or your own per segment. Sizes are a share of the frame's short side with a floor. Pairs with kit-plate and kit-chart-line. Takes a theme.",
+  "tags": ["kit", "chart", "donut", "pie", "data", "graph", "marketing", "explainer"],
+  "duration": 5,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "segments": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 6,
+      "of": {
+        "type": "object",
+        "fields": {
+          "label": {"type": "string", "default": "Segment"},
+          "value": {"type": "number", "min": 0, "default": 1},
+          "color": {"type": "string", "description": "A CSS colour (empty: from the theme)", "default": ""}
+        },
+        "default": {"label": "Segment", "value": 1, "color": ""}
+      },
+      "default": [
+        {"label": "Reused", "value": 72, "color": ""},
+        {"label": "New", "value": 21, "color": ""},
+        {"label": "Forked", "value": 7, "color": ""}
+      ]
+    },
+    "center": {
+      "type": "enum",
+      "options": ["first", "total", "custom"],
+      "default": "first",
+      "description": "What counts up in the middle: the first segment's share (%), the total of the segments, or `value`"
+    },
+    "value": {"type": "number", "default": 0, "description": "The centre number when center is custom"},
+    "caption": {
+      "type": "string",
+      "default": "",
+      "description": "Under the centre number (empty: the first segment's label, or \"Total\")"
+    },
+    "prefix": {
+      "type": "string",
+      "default": "",
+      "description": "Before the centre number (total and custom), e.g. $"
+    },
+    "suffix": {
+      "type": "string",
+      "default": "",
+      "description": "After the centre number (total and custom), e.g. k"
+    },
+    "legend": {
+      "type": "enum",
+      "options": ["auto", "right", "bottom", "none"],
+      "default": "auto",
+      "description": "auto: right in a wide box, below in a tall one"
+    },
+    "legendValues": {"type": "enum", "options": ["percent", "value", "none"], "default": "percent"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "thickness": {
+      "type": "number",
+      "default": 0.3,
+      "min": 0.1,
+      "max": 0.6,
+      "step": 0.01,
+      "description": "Ring thickness as a share of its radius"
+    },
+    "gap": {
+      "type": "number",
+      "default": 0.45,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "description": "Gap between segments, % of the frame's short side"
+    },
+    "size": {
+      "type": "number",
+      "default": 3.3,
+      "min": 2.5,
+      "max": 8,
+      "step": 0.1,
+      "description": "Legend and caption text in % of the frame's short side"
+    },
+    "delay": {"type": "number", "default": 0.4, "min": 0, "max": 10, "step": 0.05},
+    "sweep": {
+      "type": "number",
+      "default": 1.5,
+      "min": 0.2,
+      "max": 20,
+      "step": 0.05,
+      "description": "Seconds the ring takes to sweep around"
+    },
+    "outDur": {"type": "number", "default": 0.35, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T18:56:42.437Z",
+  "engine": 2,
+  "madeForClip": "clip-11-the-kit",
+  "parent": null,
+  "asset": {"created": "2026-10-15T18:56:42.437Z", "originClip": "clip-11-the-kit", "forkedFrom": null},
+  "source": {"file": "sources/kit-chart-donut@1.js", "sha1": "c50ce16a4f3471872505e32889e50e165a97a1bd"},
+  "hash": "0696cb29543e1272cf40d7d24bd77332c6b3b064720944d1d20d44b67d21ec8f"
+}

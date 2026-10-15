@@ -1,0 +1,99 @@
+{
+  "ref": "kit-arrow@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Arrow",
+  "description": "A curved arrow from A to B that draws itself on (the stroke is revealed, then the head pops), with an optional label at its tail on a plate. A and B are in the picture's pixels, so a point read from a recording works unchanged. Place it with the same transform as the footage it annotates; pairs with kit-callout and kit-spotlight. Takes a theme.",
+  "tags": ["kit", "arrow", "pointer", "annotation", "draw-on", "ui", "overlay", "screen-recording"],
+  "duration": 2.6,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "from": {
+      "type": "object",
+      "fields": {"x": {"type": "number", "default": 300}, "y": {"type": "number", "default": 650}},
+      "description": "The tail, in the picture's pixels",
+      "default": {"x": 300, "y": 650}
+    },
+    "to": {
+      "type": "object",
+      "fields": {"x": {"type": "number", "default": 760}, "y": {"type": "number", "default": 340}},
+      "description": "The head points here, in the picture's pixels",
+      "default": {"x": 760, "y": 340}
+    },
+    "space": {
+      "type": "object",
+      "fields": {
+        "width": {"type": "number", "default": 1440, "min": 1, "max": 16000},
+        "height": {"type": "number", "default": 900, "min": 1, "max": 16000}
+      },
+      "description": "Size of the picture the points refer to (a recording's pixels)",
+      "default": {"width": 1440, "height": 900}
+    },
+    "fit": {
+      "type": "enum",
+      "options": ["contain", "cover", "fill"],
+      "default": "contain",
+      "description": "How the picture sits in the item box (as the footage item's fit)"
+    },
+    "label": {"type": "string", "default": "", "description": "A short text at the tail (empty: none)"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "curve": {
+      "type": "number",
+      "default": 0.3,
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "description": "How far the arrow bends, as a share of its length; the sign picks the side (0 = straight)"
+    },
+    "width": {
+      "type": "number",
+      "default": 0.45,
+      "min": 0.1,
+      "max": 3,
+      "step": 0.01,
+      "description": "Line width in % of the frame's short side"
+    },
+    "head": {
+      "type": "number",
+      "default": 1,
+      "min": 0.4,
+      "max": 3,
+      "step": 0.05,
+      "description": "Head size, 1 = as drawn by default"
+    },
+    "size": {
+      "type": "number",
+      "default": 2.8,
+      "min": 2.6,
+      "max": 12,
+      "step": 0.1,
+      "description": "Label size in % of the frame's short side"
+    },
+    "color": {
+      "type": "string",
+      "default": "",
+      "description": "Arrow colour, a CSS colour (empty: the theme's accent)"
+    },
+    "delay": {"type": "number", "default": 0.1, "min": 0, "max": 20, "step": 0.01},
+    "draw": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0.05,
+      "max": 10,
+      "step": 0.01,
+      "description": "Seconds the stroke takes to draw on"
+    },
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:49:38.294Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:49:38.294Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/kit-arrow@1.js", "sha1": "1c7c0dd5d9c36a6664281c998ac67b753b4a0900"},
+  "hash": "f304ee0d82774d004aa15e43fce73f945cd62424f830193a877144b33c46a551"
+}

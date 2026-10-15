@@ -1,0 +1,266 @@
+{
+  "slug": "clip-11-the-kit",
+  "title": "The kit",
+  "description": "A short tour of the kit pieces clips 9 and 10 did not show: kit-ui-frame v2 scaling in at its text floor, kit-arrow pointing at it, and a plate with kit-chart-donut (clip 10's items, reused or new) beside kit-steps. Music only.",
+  "format": "horizontal",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 16.1,
+  "composition": {
+    "format": "horizontal",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "duration": 16.1,
+    "seed": 11,
+    "background": "#07111f",
+    "tracks": [
+      {
+        "id": "bg",
+        "name": "Background",
+        "type": "visual",
+        "items": [
+          {
+            "id": "drift",
+            "asset": "bg-gradient-drift@1",
+            "start": 0,
+            "duration": 16.1,
+            "params": {
+              "base": "#07111f",
+              "colors": ["#0c1a2e", "#11233b", "#0c1a2e"],
+              "intensity": 0.4,
+              "speed": 0.3,
+              "beatPulse": 0,
+              "vignette": 0.5
+            }
+          }
+        ]
+      },
+      {
+        "id": "scenes",
+        "name": "Scenes",
+        "type": "visual",
+        "items": [
+          {
+            "id": "browser",
+            "asset": "kit-ui-frame@2",
+            "start": 0.3,
+            "duration": 8.1,
+            "params": {
+              "device": "browser",
+              "content": "studio-library-search@1",
+              "url": "127.0.0.1:8787",
+              "title": "Library",
+              "theme": "theme-tide@1",
+              "size": 2.6,
+              "inDur": 0.6
+            },
+            "transform": {"x": 0.45, "y": 0.565, "width": 0.8, "height": 0.75},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "plate",
+            "asset": "kit-plate@1",
+            "start": 8,
+            "duration": 8.1,
+            "params": {
+              "eyebrow": "Clip 10",
+              "title": "Most of it *reused*",
+              "theme": "theme-tide@1",
+              "size": 4.4,
+              "inDur": 0.45,
+              "outDur": 0
+            },
+            "transform": {"x": 0.5, "y": 0.53, "width": 0.86, "height": 0.78},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          }
+        ]
+      },
+      {
+        "id": "graphics",
+        "name": "Graphics",
+        "type": "visual",
+        "items": [
+          {
+            "id": "arrow",
+            "asset": "kit-arrow@1",
+            "start": 1.4,
+            "duration": 7,
+            "params": {
+              "from": {"x": 1690, "y": 930},
+              "to": {"x": 1220, "y": 650},
+              "space": {"width": 1920, "height": 1080},
+              "label": "The real studio",
+              "theme": "theme-tide@1",
+              "curve": 0.3,
+              "size": 3,
+              "draw": 0.8
+            },
+            "transform": {"x": 0.5, "y": 0.5, "width": 1, "height": 1}
+          },
+          {
+            "id": "donut",
+            "asset": "kit-chart-donut@1",
+            "start": 8.3,
+            "duration": 7.8,
+            "params": {
+              "segments": [{"label": "Reused", "value": 17}, {"label": "New", "value": 5}],
+              "center": "first",
+              "caption": "of its items",
+              "legend": "bottom",
+              "theme": "theme-tide@1",
+              "delay": 0.3,
+              "sweep": 1.5,
+              "outDur": 0
+            },
+            "transform": {"x": 0.33, "y": 0.6, "width": 0.4, "height": 0.52}
+          },
+          {
+            "id": "steps",
+            "asset": "kit-steps@1",
+            "start": 8.5,
+            "duration": 7.6,
+            "params": {
+              "steps": ["Find", "Tune", "Place", "Render"],
+              "at": [1.9, 2.6, 3.3, 4, 4.7],
+              "direction": "column",
+              "theme": "theme-tide@1",
+              "size": 3.4,
+              "outDur": 0
+            },
+            "transform": {"x": 0.72, "y": 0.6, "width": 0.28, "height": 0.52}
+          }
+        ]
+      },
+      {
+        "id": "titles",
+        "name": "Titles",
+        "type": "text",
+        "items": [
+          {
+            "id": "title",
+            "asset": "title-plate@1",
+            "start": 0,
+            "duration": 8.4,
+            "params": {
+              "text": "The kit: frame a *recording*",
+              "theme": "theme-tide@1",
+              "size": 5,
+              "align": "center",
+              "inDur": 0,
+              "outDur": 0.3
+            },
+            "transform": {"x": 0.5, "y": 0.11, "width": 0.8, "height": 0.11},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          }
+        ]
+      },
+      {
+        "id": "music",
+        "name": "Music",
+        "type": "audio",
+        "items": [
+          {
+            "id": "bed",
+            "asset": "music-loop@1",
+            "start": 0,
+            "duration": 16.1,
+            "params": {"bpm": 112, "scale": "major"},
+            "fadeOut": 1.2,
+            "gain": 0.8,
+            "beats": true
+          }
+        ],
+        "role": "music"
+      }
+    ],
+    "markers": [
+      {"t": 8, "label": "data", "type": "cut"},
+      {"t": 13.7, "label": "the last frame holds", "type": "hold", "duration": 2.4}
+    ],
+    "theme": "theme-tide@1",
+    "loudness": {"target": -14, "truePeak": -1}
+  },
+  "closure": ["bg-gradient-drift@1", "drum-hat@1", "drum-kick@1", "drum-snare@1", "easing@1", "font-inter@1", "font-jetbrains-mono@1", "font-space-grotesk@1", "kit-arrow@1", "kit-chart-donut@1", "kit-plate@1", "kit-steps@1", "kit-ui-frame@2", "motion-drift@1", "music-loop@1", "studio-library-search@1", "synth-note@1", "theme-tide@1", "title-plate@1"],
+  "files": [
+    {"ref": "font-inter@1", "store": "bundled", "family": "Inter", "license": "OFL-1.1"},
+    {
+      "ref": "font-jetbrains-mono@1",
+      "store": "bundled",
+      "family": "JetBrains Mono",
+      "license": "OFL-1.1"
+    },
+    {"ref": "font-space-grotesk@1", "store": "bundled", "family": "Space Grotesk", "license": "OFL-1.1"},
+    {
+      "ref": "studio-library-search@1",
+      "sha256": "d30473b0f6d65717c195dfd47fe08aa20d0926414d09d7bd82eeb976e25b0197",
+      "bytes": 447934,
+      "ext": "mp4",
+      "store": "repo",
+      "license": "original",
+      "sourceUrl": null,
+      "creator": "Fablecut (scripts/record-studio.mjs)"
+    }
+  ],
+  "check": {
+    "machine": "win32-x64",
+    "engine": 2,
+    "frames": {
+      "5": "806fe88f74d8f6a5b523cc3c9b7dae03a301940baa97c3e834cf67fdc7fa37e9",
+      "15": "15afc0c8c87815cf20dde33c02e5a6590c63480e4b88400bf1ba1c8515baa7a7",
+      "25": "13ca3b20cdca86fb375d26060547b8965ffe0adf216e6b5d28f69327edbff56d",
+      "35": "01b58adbf8adb0b88ca246ad2c2be4f3eb8204707385b60536c1ec8ffb20a0ff",
+      "45": "0e98097ab5224a3ce811d78c052d83018c73d5a79db314930e3d70794d1c5624",
+      "55": "3b69b05c05402daf69bad3302fb9fd4a2aecdcadb1a0d6e943239403311841d1",
+      "65": "3a919124954a70172467d73757490e54fd7f5c468f4c08e389f58ba0adcb8173",
+      "75": "da24134e0c6a6e55751818ea18e5d7c6af0b1b061cef356543681a70b8b8e37e",
+      "85": "2346b64137b037bb3305bb589909db59851d986df01eaecd8b4047462040d2b0",
+      "95": "9a575286976da2d0063ef42c0ddae61631952a5ce0dbcf9b3f5aa4642593b0f6",
+      "105": "43252767cb1aa1a0129b031d19eda95cb7e9650f283ee378b5a976bd0b5c77da",
+      "115": "1d6ab67cd51fbe10da2bc46dde713f1e79a2cb4e862b3be52dbe36e481dbbac6",
+      "125": "fe4bd564fc7338c49634eb0aa674c1b590708ae0ff1ceaaa56c506e4cf5a787d",
+      "135": "ad304011159428740ef245dc71750baf7f936a19f975b84b0932d05945ebb270",
+      "145": "04c12d7c9aa8245033b8849afe2f599d0317c39fbb2093f65690d49842f097f5",
+      "155": "a4c21228504f12a23af01b318fd4794a529a9bae8ca38650e8e3ba816e9bbdf7",
+      "166": "0517802c8185106e925fdd94c332a8b2d214553f142c7278cbc41fbbe7c14bc7",
+      "176": "2cd4c39044acd44a51ef860ab65be153ac0875c0a9a4af8f70dd2d5aa44bb481",
+      "186": "9f60212204dd3b04919a194fdc741ade26a4383e5e067e003c47663f553cc23b",
+      "196": "89ad1173848a4062a1a63c14c60801ad894d08392d73f018a93b08e5a54fcdab",
+      "206": "ba3c2396ef5220fcdad35c79c969bc477e47ceed1ac743d1ba3decbb75839829",
+      "216": "985ffab0329628a815eea2eb4aa51f0a085ffe779d0f993c36e78e999e86e9b6",
+      "226": "c2dec05765de5d4ad2bc0877bd859ecafd1d32126de46caa53f6991d1338a8d5",
+      "236": "04273c8287c53019286c3a01a6865e13a6f8e6a0379dadcd66108336afa6d523",
+      "246": "12b2b3ba24589ea7a5842ff276732e425c29909474cbd7c61bd179977c69bc9f",
+      "256": "0156f627432d27d2eed353d3beceb106150af9fb2a54152e12625b63e190d933",
+      "266": "7eb82823a030247e1119be63a5dfc892a53976713fa7ec1c34af56470f8f572b",
+      "276": "2bdae7d7b6a0b49b539a5ccf829a5bc7d50bc04ed287287e261b4c17b67dba2b",
+      "286": "7ca9810272ccd045751785cacb61e87c878095fb0377620c65e2262fb459c7c6",
+      "296": "4924f65b4e0771c5331e4ba0f821f54337a0d97403eadb2cd0741f5d5aa83249",
+      "306": "9a3a387d3fc8811c18cb8c06bb99670bb115686ba6cb7006fd7c82892e4e4f96",
+      "316": "d9ae4d18b12a81e53b7c5c8335fe06014fb47e5410c7a9618e3c42622e9d4afd",
+      "327": "94270bd635d56918ad8710883a8725c2791dd849156930712613834effb72994",
+      "337": "85ed4b82a96737d9fd8a40fdcf3ebd3d6ad3466f13ea989964741c94df5bc15b",
+      "347": "3972a69c12b58ab08c6da325d426d47f117125205f54d634561555e5c0bb220c",
+      "357": "61d542c979577e21c6137fccf4da403891fd0e07e2b38581d802caa9a238ab12",
+      "367": "8ad3b49dc6762cabc4e50561fa8b5e1271659be5565f0cf4669865c37525d349",
+      "377": "210a525bccce9faabd698fcc3de3907ae62e4647379fc1a7818479b301adf287",
+      "387": "021bd83258f76db4d33ba733aec8b0f14d9cb77a17f05770bf124eb9bbb19f60",
+      "397": "b06f92f817181123f14a99e0fb2e3188ca720242c18383db3b2a3793829a14fe",
+      "407": "a992113d76236913af25c028dd164910e239b8c7a6d902aaab369a6af2a45c16",
+      "417": "0b4c891a3a98b057969a3d9903741ae8e68c62ee705ee50acf96525130a9ee8e",
+      "427": "e8cdef6f20ae1b8ac3b329342db9e01c5e11b07095bd6cb0cf852095cfd45a05",
+      "437": "1e25b2b1619c0509899fca7ce1f0f671834a0a9627826e494f8aedd18030866a",
+      "447": "136d498b0eb86c182e0a25449cfca43b9eeafbd014f3f7bf06ab8b471de7b3e8",
+      "457": "a2a64c603007191924e0e2a620553710a87ffae970b60820eee6ef4560502fbc",
+      "467": "5ed504e94b45533f90498063486432d057f231a012f95df5c6a4fb3442886fc7",
+      "477": "29ed9241a97e96f3ca074747cd02d2417efce646a0c5edfe683edd2fa24c4502"
+    }
+  }
+}
