@@ -88,6 +88,62 @@ export function checkImageSize(buf, name = 'The image') {
   return s;
 }
 
+/** A library thumbnail of a loaded image: PNG, 640 px on its long side. @param {{ width: number, height: number }} img @returns {Buffer} */
+export function imageThumbPng(img) {
+  const k = Math.min(1, 640 / Math.max(img.width, img.height));
+  const c = createCanvas(Math.max(1, Math.round(img.width * k)), Math.max(1, Math.round(img.height * k)));
+  c.getContext('2d').drawImage(/** @type {any} */ (img), 0, 0, c.width, c.height);
+  return c.toBuffer('image/png');
+}
+
+/** A canvas holding RGBA pixels. */
+export function canvasOf(data, width, height) {
+  const c = createCanvas(width, height);
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data.buffer, data.byteOffset, data.length), width, height), 0, 0);
+  return c;
+}
+
+/**
+ * The stills the library keeps of a footage file, written to the given paths: a thumbnail (a second in, or a tenth of a
+ * short file; 640 px on its long side), the hover filmstrip (eight frames across the file, 240 px cells) and, when the file has
+ * sound, a waveform image. `probed` is the file's probe record (with its frame table). → whether the waveform was written.
+ * @param {any} probed @param {string} path @param {{ thumb: string, strip: string, wave: string }} out
+ */
+export async function footageStills(probed, path, out) {
+  const draw = { ...probed, path };
+  const svc = footageService();
+  const frameCanvas = async (sec) => canvasOf(await svc.frameAtTime(draw, sec), probed.width, probed.height);
+  const k = Math.min(1, 640 / Math.max(probed.width, probed.height));
+  const tc = createCanvas(Math.max(1, Math.round(probed.width * k)), Math.max(1, Math.round(probed.height * k)));
+  const tg = tc.getContext('2d');
+  tg.imageSmoothingQuality = 'high';
+  tg.drawImage(await frameCanvas(Math.min(1, probed.duration * 0.1)), 0, 0, tc.width, tc.height);
+  writeFileSync(out.thumb, tc.toBuffer('image/png'));
+  const cw = 240, ch = Math.max(1, Math.round((cw * probed.height) / probed.width));
+  const sc = createCanvas(cw * 8, ch);
+  const sg = sc.getContext('2d');
+  sg.imageSmoothingQuality = 'high';
+  for (let i = 0; i < 8; i++) sg.drawImage(await frameCanvas(((i + 0.5) / 8) * probed.duration), i * cw, 0, cw, ch);
+  writeFileSync(out.strip, sc.toBuffer('image/png'));
+  if (!probed.audio) return false;
+  const peaks = await soundPeaks(path, probed.duration);
+  if (!peaks?.length) return false;
+  const W = 1200, H = 120;
+  const wc = createCanvas(W, H);
+  const wg = wc.getContext('2d');
+  wg.fillStyle = '#101018'; wg.fillRect(0, 0, W, H);
+  wg.fillStyle = '#7dd3fc';
+  for (let x = 0; x < W; x++) {
+    let m = 0;
+    const from = Math.floor((x / W) * peaks.length), to = Math.max(from + 1, Math.floor(((x + 1) / W) * peaks.length));
+    for (let i = from; i < to && i < peaks.length; i++) m = Math.max(m, peaks[i]);
+    const h = Math.max(1, (m / 255) * (H - 8));
+    wg.fillRect(x, (H - h) / 2, 1, h);
+  }
+  writeFileSync(out.wave, wc.toBuffer('image/png'));
+  return true;
+}
+
 /** Two writers racing for the same name or version: say so, instead of a raw SQLite error. */
 const raceOf = (e, slug) => (/UNIQUE constraint/i.test(String(e?.message)) ? new StudioError(`"${slug}" was saved by someone else at the same moment; try again.`, 'conflict') : e);
 
@@ -548,9 +604,11 @@ export function createLibrary(ctx) {
   /**
    * Compile, pin and test unsaved source. Nothing is written.
    * Returns { meta, deps, warnings, frames, thumb (PNG Buffer), logs }.
-   * @param {{ slug: string, version: number, source: string, params?: any }} o
+   * exact (an import, see exchange.js): the exact versions the source's references resolve to, instead of the latest in this
+   * library: { deps: alias → ref, row(ref) → { slug, version, type, kind }, closure(refs) → { assets, images } }.
+   * @param {{ slug: string, version: number, source: string, params?: any, exact?: { deps: Record<string, string>, row: (ref: string) => any, closure: (refs: string[]) => any } }} o
    */
-  async function validate({ slug, version, source, params }) {
+  async function validate({ slug, version, source, params, exact }) {
     const problems = staticCheck(source);
     if (problems.length) reject(problems);
     const ref = `${slug}@${version}`;
@@ -566,7 +624,8 @@ export function createLibrary(ctx) {
     const pin = (alias, spec, what) => {
       const { slug: depSlug } = parseRef(spec);
       if (depSlug === slug) throw new StudioError(`The asset was rejected: ${what} refers to "${spec}", which is this asset itself`, 'rejected');
-      const row = versionRow(spec);
+      const row = exact ? exact.row(exact.deps[alias]) : versionRow(spec);
+      if (!row && exact) throw new StudioError(`The asset was rejected: ${what} refers to "${spec}", which the export did not pin (it pinned ${Object.keys(exact.deps).join(', ') || 'nothing'}): this engine reads the source differently`, 'rejected');
       if (!row) throw new StudioError(`The asset was rejected: ${what} refers to "${spec}", which is not in the library. Create it first, or use search_assets to find the right name.`, 'rejected');
       const pinned = makeRef(row.slug, row.version);
       if (deps[alias] && deps[alias] !== pinned) throw new StudioError(`The asset was rejected: "${alias}" is already pinned to ${deps[alias]}, but ${what} asks for ${pinned}. Use the same reference in both places.`, 'rejected');
@@ -582,7 +641,7 @@ export function createLibrary(ctx) {
       if (def.type === 'image' && row.type !== 'image') throw new StudioError(`The asset was rejected: the default of parameter "${path}" must be an image asset; "${value}" is a ${row.type} asset`, 'rejected');
       if (def.type === 'asset' && (row.type !== 'function' || (def.kind && row.kind !== def.kind))) throw new StudioError(`The asset was rejected: the default of parameter "${path}" must be a ${def.kind ?? 'function'} asset; "${value}" is a ${row.kind ?? row.type} asset`, 'rejected');
     });
-    const c = closure([...new Set(Object.values(deps))]);
+    const c = (exact ? exact.closure : closure)([...new Set(Object.values(deps))]);
     let result;
     try {
       result = await pool.run('validate', { ref, source, deps, assets: c.assets, images: c.images, params }, { timeout: 12000 });
@@ -833,12 +892,9 @@ export function createLibrary(ctx) {
     if (type === 'image') {
       const img = await loadImage(fileTmp);
       info.width = img.width; info.height = img.height;
-      const k = Math.min(1, 640 / Math.max(img.width, img.height));
-      const c = createCanvas(Math.max(1, Math.round(img.width * k)), Math.max(1, Math.round(img.height * k)));
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       thumb = `thumbs/${slug}@${version}.png`;
       thumbTmp = join(dataDir, tempOf(thumb));
-      writeFileSync(thumbTmp, c.toBuffer('image/png'));
+      writeFileSync(thumbTmp, imageThumbPng(img));
     } else {
       const p = await probeSummary(fileTmp);
       if (!p.audio) throw new StudioError('The file has no audio stream');
@@ -919,13 +975,6 @@ export function createLibrary(ctx) {
 
   const VIDEO_MIME = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska' };
 
-  /** A canvas holding RGBA pixels. */
-  function canvasOf(data, width, height) {
-    const c = createCanvas(width, height);
-    c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data.buffer, data.byteOffset, data.length), width, height), 0, 0);
-    return c;
-  }
-
   /**
    * Add a video file (footage) from a path. The file is kept as it is; what the studio needs to draw it frame-exactly is
    * read now: size, rate, rotation, colour, audio, and the frame table (the whole file is decoded once). A thumbnail, an
@@ -955,45 +1004,9 @@ export function createLibrary(ctx) {
     try {
       let probed;
       try { probed = await probeFootage(fileTmp); } catch (err) { throw err instanceof FootageError ? new StudioError(err.message, 'rejected') : err; }
-      const draw = { ...probed, path: fileTmp };
-      const svc = footageService();
-      const frameCanvas = async (sec) => canvasOf(await svc.frameAtTime(draw, sec), probed.width, probed.height);
-      // the thumbnail: a second in (or a tenth of a short file), 640 px on its long side
-      const k = Math.min(1, 640 / Math.max(probed.width, probed.height));
-      const tc = createCanvas(Math.max(1, Math.round(probed.width * k)), Math.max(1, Math.round(probed.height * k)));
-      const tg = tc.getContext('2d');
-      tg.imageSmoothingQuality = 'high';
-      tg.drawImage(await frameCanvas(Math.min(1, probed.duration * 0.1)), 0, 0, tc.width, tc.height);
-      writeFileSync(temps[0], tc.toBuffer('image/png'));
-      // the library's hover filmstrip: eight frames across the file, 240 px cells
-      const cw = 240, ch = Math.max(1, Math.round((cw * probed.height) / probed.width));
-      const sc = createCanvas(cw * 8, ch);
-      const sg = sc.getContext('2d');
-      sg.imageSmoothingQuality = 'high';
-      for (let i = 0; i < 8; i++) sg.drawImage(await frameCanvas(((i + 0.5) / 8) * probed.duration), i * cw, 0, cw, ch);
-      writeFileSync(temps[1], sc.toBuffer('image/png'));
-      let hasWave = false;
-      if (probed.audio) {
-        const peaks = await soundPeaks(fileTmp, probed.duration);
-        if (peaks?.length) {
-          const W = 1200, H = 120;
-          const wc = createCanvas(W, H);
-          const wg = wc.getContext('2d');
-          wg.fillStyle = '#101018'; wg.fillRect(0, 0, W, H);
-          wg.fillStyle = '#7dd3fc';
-          for (let x = 0; x < W; x++) {
-            let m = 0;
-            const from = Math.floor((x / W) * peaks.length), to = Math.max(from + 1, Math.floor(((x + 1) / W) * peaks.length));
-            for (let i = from; i < to && i < peaks.length; i++) m = Math.max(m, peaks[i]);
-            const h = Math.max(1, (m / 255) * (H - 8));
-            wg.fillRect(x, (H - h) / 2, 1, h);
-          }
-          writeFileSync(temps[2], wc.toBuffer('image/png'));
-          hasWave = true;
-        }
-      }
+      const hasWave = await footageStills(probed, fileTmp, { thumb: temps[0], strip: temps[1], wave: temps[2] });
       // the stills are made: the decoder lets go of the temp file before it is renamed
-      await svc.release(fileTmp);
+      await footageService().release(fileTmp);
       const sha256 = await sha256File(fileTmp);
       const info = { ...meta, ...probed, license: prov.license, provenance: prov, bytes: statSync(fileTmp).size, sha256, strip: { file: strip, frames: 8 }, wave: hasWave ? { file: wave } : undefined };
       const at = now();

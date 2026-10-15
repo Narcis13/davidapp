@@ -25,6 +25,7 @@ import { createAudio } from './audio.js';
 import { createSpeech } from './speech.js';
 import { createChecks } from './checks.js';
 import { createFonts } from './fonts.js';
+import { createExchange } from './exchange.js';
 import { createProvenance } from './provenance.js';
 
 export { StudioError };
@@ -54,6 +55,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   const inspect = createInspect(ctx, { clips, compositionOf });
   const checks = createChecks(ctx, { clips, library, compositionOf, clipFrame, saveFrame });
   const fonts = createFonts(ctx, library);
+  const exchange = createExchange(ctx, { library, clips, fonts }, { rebake });
   library.seedFonts();
   if (runner) renders.startRunner();
   const framesDir = join(dataDir, 'frames');
@@ -254,6 +256,28 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     const key = sha1(JSON.stringify([ENGINE_VERSION, a.target, a.params, size, fps, d]));
     const hit = library.sequenceByKey(key);
     if (hit) return { asset: hit, cached: true, frames };
+    const baked = await drawBake(a, size, fps, d);
+    try {
+      const r = library.addSequence({
+        slug, dir: baked.dir, author, forClip, derivedFrom: a.target, title, thumb: baked.thumb,
+        description: description ?? `${frames} frames of ${a.target} at ${size.width}×${size.height}, ${fps} fps, with a transparent background: a baked sequence to use as a layer.`,
+        tags: tags ?? ['sequence', 'baked'],
+        meta: { frames, fps, width: size.width, height: size.height, duration: d, key, bakedFrom: a.target, params: a.params, bakeSeconds: baked.seconds },
+      });
+      return { asset: r.asset, cached: false, frames, seconds: baked.seconds };
+    } catch (e) {
+      rmSync(baked.dir, { recursive: true, force: true });
+      throw e;
+    }
+  }
+
+  /**
+   * Draw the frames of a bake (PNG with a transparent background, in parallel) into a new folder under files/ → { dir, thumb (PNG
+   * of the middle frame on the library's dark ground), seconds }. The folder is the caller's to move into place or remove.
+   * @param {any} a a loaded asset (loadAsset) @param {{ width: number, height: number }} size
+   */
+  async function drawBake(a, size, fps, d) {
+    const frames = Math.max(1, Math.round(d * fps));
     const dir = mkdtempSync(join(dataDir, 'files', '.bake-'));
     const bakePool = new WorkerPool({ size: defaultWorkers() });
     const t0 = performance.now();
@@ -271,20 +295,21 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
       g.fillStyle = '#101018';
       g.fillRect(0, 0, thumb.width, thumb.height);
       g.drawImage(img, 0, 0, thumb.width, thumb.height);
-      const seconds = Math.round((performance.now() - t0) / 10) / 100;
-      const r = library.addSequence({
-        slug, dir, author, forClip, derivedFrom: a.target, title, thumb: thumb.toBuffer('image/png'),
-        description: description ?? `${frames} frames of ${a.target} at ${size.width}×${size.height}, ${fps} fps, with a transparent background: a baked sequence to use as a layer.`,
-        tags: tags ?? ['sequence', 'baked'],
-        meta: { frames, fps, width: size.width, height: size.height, duration: d, key, bakedFrom: a.target, params: a.params, bakeSeconds: seconds },
-      });
-      return { asset: r.asset, cached: false, frames, seconds };
+      return { dir, thumb: thumb.toBuffer('image/png'), seconds: Math.round((performance.now() - t0) / 10) / 100 };
     } catch (e) {
       rmSync(dir, { recursive: true, force: true });
       throw e;
     } finally {
       await bakePool.destroy();
     }
+  }
+
+  /**
+   * Bake a sequence again from its recipe (an import: the exported frames are not kept, baking is deterministic).
+   * @param {{ ref: string, params: any, width: number, height: number, fps: number, duration: number }} o
+   */
+  async function rebake({ ref, params, width, height, fps, duration }) {
+    return drawBake(await loadAsset({ ref, params }), { width, height }, fps, duration);
   }
 
   /** Write a PNG under the data dir's frames/ folder and return its path. */
@@ -307,5 +332,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, speech, checks, fonts, provenance, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, speech, checks, fonts, provenance, exchange, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }
