@@ -1,0 +1,52 @@
+{
+ "transcription": {
+  "available": true,
+  "cli": {
+   "path": "C:/newme/fablecut-voice/whisper/Release/whisper-cli.exe",
+   "source": "STUDIO_WHISPER_CLI",
+   "found": true
+  },
+  "models": [
+   {
+    "id": "primary",
+    "path": "C:/newme/fablecut-voice/whisper/models/ggml-small.en.bin",
+    "found": true
+   },
+   {
+    "id": "secondary",
+    "path": "C:/newme/fablecut-voice/whisper/models/ggml-base.en.bin",
+    "found": true
+   }
+  ],
+  "missing": [],
+  "optional": []
+ },
+ "voice": {
+  "engine": "kokoro",
+  "available": true,
+  "missing": [],
+  "dir": "C:/newme/fablecut-voice"
+ },
+ "ffmpeg": {
+  "found": true,
+  "path": "ffmpeg"
+ },
+ "config": {
+  "dotenv": null,
+  "set": [
+   "STUDIO_WHISPER_CLI",
+   "STUDIO_WHISPER_MODEL",
+   "STUDIO_WHISPER_MODEL_2",
+   "STUDIO_KOKORO_DIR"
+  ],
+  "keys": [
+   "STUDIO_WHISPER_CLI",
+   "STUDIO_WHISPER_MODEL",
+   "STUDIO_WHISPER_MODEL_2",
+   "STUDIO_TTS",
+   "STUDIO_KOKORO_DIR",
+   "ELEVENLABS_API_KEY"
+  ]
+ },
+ "note": "Without any of this the studio still imports files: add_narration with timings works as before."
+}
