@@ -4,7 +4,7 @@
 //
 //   STUDIO_DATA=<dir with the showcase> node scripts/hashes.mjs out.json [--compare baseline.json] [clip …]
 //
-// The default clips are the six showcase clips and the user's history-of-ai (build it into the same
+// The default clips are the eight showcase clips and the user's history-of-ai (build it into the same
 // data dir with `node clips/history-of-ai/compose.mjs --render`). A clip in the baseline that is
 // missing from the data dir fails the comparison.
 
@@ -14,7 +14,7 @@ import { connect, callTool } from './mcp.mjs';
 export const CLIPS = [
   'clip-1-every-frame', 'clip-2-compounding', 'clip-3-release-notes',
   'clip-4-direct-the-studio', 'clip-5-a-library-in-3d', 'clip-6-what-the-library-holds',
-  'history-of-ai',
+  'clip-7-a-video-that-checks-itself', 'clip-8-cuvinte-pe-ritm', 'history-of-ai',
 ];
 const STEP = 8;
 const argv = process.argv.slice(2);
