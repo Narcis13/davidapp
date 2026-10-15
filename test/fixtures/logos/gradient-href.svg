@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="120" viewBox="0 0 200 120">
+  <defs>
+    <linearGradient id="base">
+      <stop offset="0%" stop-color="#ff0000"/>
+      <stop offset="50%" stop-color="#00ff00" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0000ff"/>
+    </linearGradient>
+    <linearGradient id="sky" xlink:href="#base" x1="0" y1="0" x2="0" y2="1" gradientTransform="rotate(30 0.5 0.5)"/>
+    <linearGradient id="wide" href="#base" gradientUnits="userSpaceOnUse" x1="100" y1="0" x2="190" y2="0"/>
+    <radialGradient id="glow" href="#base" cx="0.5" cy="0.5" r="0.5" fx="0.35" fy="0.35" gradientTransform="translate(0.1 0) scale(0.8 1)"/>
+  </defs>
+  <rect x="10" y="10" width="80" height="100" fill="url(#sky)"/>
+  <rect x="100" y="10" width="90" height="45" fill="url(#wide)"/>
+  <ellipse cx="145" cy="85" rx="45" ry="25" fill="url(#glow)" stroke="#222222" stroke-width="3"/>
+</svg>

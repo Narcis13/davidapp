@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100">
+  <style>
+    @media (min-width: 100px) { .a { fill: red } }
+    g .a { fill: blue }
+    .a:hover { fill: green }
+    rect.a, circle.b { fill: #2a6f97; mix-blend-mode: multiply; foo: bar }
+    .c { fill: url(#p) }
+    .d { filter: url(#blur) }
+    .e { stroke: url(#refl); stroke-width: 6; fill: none; stroke-dasharray: 8 4 }
+  </style>
+  <defs>
+    <pattern id="p" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#000"/></pattern>
+    <filter id="blur"><feGaussianBlur stdDeviation="2"/></filter>
+    <linearGradient id="refl" spreadMethod="reflect" x1="0" x2="0.2" y1="0" y2="0">
+      <stop offset="0" stop-color="#ff5c8a"/><stop offset="1" stop-color="#7b5cff"/>
+    </linearGradient>
+  </defs>
+  <rect class="a" x="10" y="10" width="60" height="40"/>
+  <circle class="b" cx="110" cy="30" r="20"/>
+  <rect class="c" x="140" y="10" width="50" height="40"/>
+  <rect class="d" x="10" y="60" width="40" height="30"/>
+  <line class="e" x1="70" y1="80" x2="190" y2="80"/>
+</svg>

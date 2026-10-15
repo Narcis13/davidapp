@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fablecut logo: a mark and the word as outlined paths. Original artwork, made for the studio. -->
+<svg version="1.1" id="Fablecut" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 652 130" xml:space="preserve">
+<style type="text/css">
+	.mark{fill:url(#SVGID_1_);}
+	.spark{fill:url(#SVGID_2_);}
+	.ink{fill:url(#SVGID_3_);}
+	.rule{fill:none;stroke:url(#SVGID_3_);stroke-width:3;stroke-linecap:round;opacity:0.55;}
+</style>
+<linearGradient id="SVGID_1_" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="92" y2="92">
+	<stop  offset="0" style="stop-color:#7B5CFF"/>
+	<stop  offset="0.55" style="stop-color:#FF5C8A"/>
+	<stop  offset="1" style="stop-color:#FFD166"/>
+</linearGradient>
+<radialGradient id="SVGID_2_" cx="0.5" cy="0.5" r="0.5">
+	<stop  offset="0" style="stop-color:#FFFFFF"/>
+	<stop  offset="0.45" style="stop-color:#FFE9A8"/>
+	<stop  offset="1" style="stop-color:#FFD166;stop-opacity:0"/>
+</radialGradient>
+<linearGradient id="SVGID_3_" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="502" y2="0">
+	<stop  offset="0" style="stop-color:#6A4CF0"/>
+	<stop  offset="1" style="stop-color:#F0497C"/>
+</linearGradient>
+<g transform="translate(12 22)">
+	<path class="mark" d="M22,0H52L32,92H22C9.85,92,0,82.15,0,70V22C0,9.85,9.85,0,22,0z"/>
+	<path class="mark" d="M60,0H70C82.15,0,92,9.85,92,22V70C92,82.15,82.15,92,70,92H40L60,0z"/>
+	<circle class="spark" cx="47" cy="46" r="17"/>
+</g>
+<g transform="translate(138 10)">
+    <path class="ink" d="M0,8H12V100H0ZM12,8H46V20H12ZM12,46H38V58H12Z"/>
+    <path class="ink" d="M60,70A30,30 0 1 0 120,70A30,30 0 1 0 60,70ZM72,70A18,18 0 1 1 108,70A18,18 0 1 1 72,70ZM108,40H120V100H108Z"/>
+    <path class="ink" d="M146,14A6,6 0 0 1 158,14V100H146ZM146,70A30,30 0 1 0 206,70A30,30 0 1 0 146,70ZM158,70A18,18 0 1 1 194,70A18,18 0 1 1 158,70Z"/>
+    <path class="ink" d="M220,14A6,6 0 0 1 232,14V100H220Z"/>
+    <path class="ink" d="M298.98,89.28A30,30 0 1 1 306,70L294,70A18,18 0 1 0 289.79,81.57ZM246,64H306V76H246Z"/>
+    <path class="ink" d="M372.98,89.28A30,30 0 1 1 372.98,50.72L363.79,58.43A18,18 0 1 0 363.79,81.57Z"/>
+    <path class="ink" d="M394,40H406V70A18,18 0 0 0 442,70V40H454V70A30,30 0 0 1 394,70ZM442,40H454V100H442Z"/>
+    <path class="ink" d="M476,28A6,6 0 0 1 488,28V100H476ZM468,40H502V52H468Z"/>
+	<path class="rule" d="M0,112H502"/>
+</g>
+</svg>
