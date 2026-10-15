@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { openDb, json } from '../db/db.js';
 import { reformat } from '../core/composition.js';
-import { mapParams } from '../core/schema.js';
+import { mapParams, walkParams } from '../core/schema.js';
 import { WorkerPool } from '../render/pool.js';
 import { ROOT } from '../render/host.js';
 import { defaultWorkers } from '../render/video.js';
@@ -23,6 +23,7 @@ import { createCompounding } from './compounding.js';
 import { createInspect } from './inspect.js';
 import { createAudio } from './audio.js';
 import { createChecks } from './checks.js';
+import { createFonts } from './fonts.js';
 
 export { StudioError };
 
@@ -48,6 +49,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   const compounding = createCompounding(ctx, library, clips);
   const inspect = createInspect(ctx, { clips, compositionOf });
   const checks = createChecks(ctx, { clips, library, compositionOf, clipFrame, saveFrame });
+  const fonts = createFonts(ctx, library);
   library.seedFonts();
   if (runner) renders.startRunner();
   const framesDir = join(dataDir, 'frames');
@@ -86,17 +88,23 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   /** @param {{ ref?: string, source?: string, slug?: string, params?: any }} o */
   async function loadAsset({ ref, source, slug, params = {} }) {
     const extra = [];
-    const pin = (schema) => mapParams(schema, params, ['asset', 'image'], (value) => {
-      const row = library.requireVersion(value);
-      extra.push(makeRef(row.slug, row.version));
-      return extra[extra.length - 1];
-    });
+    const pin = (schema) => {
+      const pinned = mapParams(schema, params, ['asset', 'image'], (value) => {
+        const row = library.requireVersion(value);
+        extra.push(makeRef(row.slug, row.version));
+        return extra[extra.length - 1];
+      });
+      // an uploaded family named by a font parameter draws with its latest files (a frame of one asset is not pinned by a clip)
+      const catalog = library.fontCatalog();
+      walkParams(schema, params, ['font'], (family) => { for (const face of catalog.find(family)?.faces ?? []) extra.push(face.ref); });
+      return pinned;
+    };
     if (source !== undefined) {
       const d = await draftBundle({ slug, source });
       const m = d.validation.meta;
       const pinned = pin(m.schema);
       const more = extra.length ? library.bundle(extra) : null;
-      const bundle = more ? { ...d.bundle, key: sha1(d.bundle.key + more.key), assets: { ...more.assets, ...d.bundle.assets }, images: { ...more.images, ...d.bundle.images } } : d.bundle;
+      const bundle = more ? { ...d.bundle, key: sha1(d.bundle.key + more.key), assets: { ...more.assets, ...d.bundle.assets }, images: { ...more.images, ...d.bundle.images }, ...(more.fonts ? { fonts: more.fonts } : {}) } : d.bundle;
       return { bundle, target: d.ref, formats: m.formats, natural: m.duration, params: pinned };
     }
     const row = library.requireVersion(ref);
@@ -269,5 +277,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, checks, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, checks, fonts, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }

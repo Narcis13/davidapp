@@ -18,7 +18,7 @@ import { moreRoutes } from './routes/index.js';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
-  '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2', '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf', '.ico': 'image/x-icon',
 };
 const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501, too_large: 413 };
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
@@ -100,7 +100,11 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
 
   const fontFile = (x) => ({ url: `/fonts/${x.file}`, weight: x.weight, style: x.style });
   // ext: the family's Latin Extended files, registered under their own alias (see fontString in core/lib/text.js)
-  const fonts = () => fontManifest().map((f) => ({ family: f.family, slug: f.slug, license: f.license, files: f.files.map(fontFile), ext: f.ext ? { family: f.ext.family, files: f.ext.files.map(fontFile) } : undefined }));
+  // uploaded families are listed for the font menus without files: a clip's preview loads the files it pins through its bundle
+  const fonts = () => [
+    ...fontManifest().map((f) => ({ family: f.family, slug: f.slug, license: f.license, files: f.files.map(fontFile), ext: f.ext ? { family: f.ext.family, files: f.ext.files.map(fontFile) } : undefined })),
+    ...library.fontCatalog().uploaded().map((u) => ({ family: u.family, slug: u.faces[0].slug, license: u.faces[0].license, uploaded: true, files: [] })),
+  ];
 
   /** The browser-side bundle: sources and pinned deps, with image URLs instead of paths. */
   function browserBundle(b) {
@@ -109,7 +113,9 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     // a sequence's frames are fetched as the preview needs them: /media/files/<slug>@<v>/000123.png
     const sequences = {};
     for (const [ref, s] of Object.entries(b.sequences ?? {})) sequences[ref] = { url: `/media/${s.file}/`, frames: s.frames, fps: s.fps, width: s.width, height: s.height };
-    return { key: b.key, assets: b.assets, images, sequences, beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane };
+    // the uploaded fonts a clip pins: one alias per pinned set, the files by URL (served from /media/files/)
+    const fonts = Object.fromEntries(Object.entries(b.fonts ?? {}).map(([alias, set]) => [alias, { family: set.family, files: set.files.map((f) => ({ ref: f.ref, url: `/media/${f.file}`, weight: f.weight, style: f.style })) }]));
+    return { key: b.key, assets: b.assets, images, sequences, ...(b.fonts ? { fonts } : {}), beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane };
   }
 
   /** What the editor needs to know about each asset version a composition names. */

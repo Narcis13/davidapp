@@ -17,13 +17,34 @@ export const FALLBACK_FONTS = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Colo
  * their Latin Extended files under it, so ă, ș, ț come from the family's own design (Skia and Chrome pick a font
  * per character down the list, so every character the family's main file has is drawn exactly as before).
  */
-export function fontString({ font = 'Inter', size = 64, weight = 400, italic = false } = {}) {
+export function fontString({ font = 'Inter', size = 64, weight = 400, italic = false, aliases = null } = {}) {
   const family = String(font).replace(/"/g, '');
-  return `${italic ? 'italic ' : ''}${weight} ${+size.toFixed(2)}px "${family}", "${family} Ext", ${FALLBACK_FONTS}`;
+  // an uploaded family the clip pinned: the alias of exactly the files it pinned comes first (see fontAliases)
+  const alias = aliasOf(aliases, family);
+  return `${italic ? 'italic ' : ''}${weight} ${+size.toFixed(2)}px ${alias ? `"${alias}", ` : ''}"${family}", "${family} Ext", ${FALLBACK_FONTS}`;
 }
 
-/** The family named first in a font string. */
-export const familyOf = (font) => /"([^"]+)"/.exec(font)?.[1] ?? 'sans-serif';
+/** The alias an uploaded font set is registered under: "fc-" and a short hash of the files it holds. */
+const ALIAS_RE = /^fc-[0-9a-f]{6,}$/;
+const aliasOf = (aliases, family) => (aliases && Object.hasOwn(aliases, String(family).toLowerCase()) ? aliases[String(family).toLowerCase()] : undefined);
+
+/** The family named first in a font string (the alias of an uploaded set is skipped: the family follows it). */
+export const familyOf = (font) => {
+  const names = /"[^"]+"/g;
+  for (let m = names.exec(font); m; m = names.exec(font)) if (!ALIAS_RE.test(m[0].slice(1, -1))) return m[0].slice(1, -1);
+  return 'sans-serif';
+};
+
+/**
+ * family (lower case) → alias, from a bundle's `fonts` ({ <alias>: { family, … } }), or null when the clip pins no uploaded font.
+ * This is what the runtime gives f.lib.text for the frame it draws. Text drawn with a raw ctx.font string bypasses it.
+ * @param {Record<string, { family: string }> | undefined | null} fonts
+ * @returns {Record<string, string> | null}
+ */
+export function fontAliases(fonts) {
+  const entries = Object.entries(fonts ?? {});
+  return entries.length ? Object.fromEntries(entries.map(([alias, set]) => [String(set.family).toLowerCase(), alias])) : null;
+}
 
 /** A text that cannot be drawn at its size floor: overflowing, truncated, or with a word broken in two. */
 export class TextFloorError extends Error {
@@ -85,11 +106,15 @@ function tokenize(text, markup) {
 
 /**
  * inspect: the runtime's inspection state, shared with f.lib.solid: { record (fn or null), suppress (skip drawing,
- * keep recording), frame ({ width, height, short } of the frame being drawn), floor (the asset's default floor) }.
+ * keep recording), frame ({ width, height, short } of the frame being drawn), floor (the asset's default floor),
+ * fonts (family → alias of the uploaded fonts the clip pinned, or null; see fontAliases) }.
+ * @param {{ record: any, suppress: boolean, frame: any, floor: number, fonts?: Record<string, string> | null }} [inspect]
  */
-export function createText(inspect = { record: null, suppress: false, frame: null, floor: 0 }) {
+export function createText(inspect = { record: null, suppress: false, frame: null, floor: 0, fonts: null }) {
   const widths = new Map();
   const layouts = new Map();
+  /** fontString for the frame being drawn: the clip's uploaded families come first under their alias. */
+  const faceString = (o) => fontString({ ...o, aliases: inspect.fonts });
 
   const width = (ctx, font, str) => {
     const key = `${font}\n${str}`;
@@ -123,8 +148,8 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
   };
 
   function build(ctx, paragraphs, size, o) {
-    const base = fontString({ font: o.font, size, weight: o.weight, italic: o.italic });
-    const emph = fontString({ font: o.emFont ?? o.font, size, weight: o.emWeight ?? o.weight, italic: o.emItalic ?? o.italic });
+    const base = faceString({ font: o.font, size, weight: o.weight, italic: o.italic });
+    const emph = faceString({ font: o.emFont ?? o.font, size, weight: o.emWeight ?? o.weight, italic: o.emItalic ?? o.italic });
     const tracking = (o.letterSpacing ?? 0) * size;
     const spaceW = width(ctx, base, ' ') + 2 * tracking;
     const maxWidth = o.maxWidth ?? Infinity;
@@ -237,7 +262,10 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
     // a size floor (opt-in): a share of the frame's short side, as a size in this context's units
     const floor = o.floor ?? inspect.floor ?? 0;
     const minLocal = floor > 0 && inspect.frame ? ((floor / 100) * inspect.frame.short) / scaleOf(ctx) : 0;
-    const key = minLocal ? JSON.stringify([str, o, Math.round(minLocal * 100) / 100]) : JSON.stringify([str, o]);
+    let key = minLocal ? JSON.stringify([str, o, Math.round(minLocal * 100) / 100]) : JSON.stringify([str, o]);
+    // the same text in the same family draws differently under another pinned set of files: the aliases are part of the key
+    const aliases = inspect.fonts && [aliasOf(inspect.fonts, o.font), aliasOf(inspect.fonts, o.emFont ?? o.font)];
+    if (aliases?.some(Boolean)) key += `\n${aliases.join('|')}`;
     const hit = layouts.get(key);
     if (hit) return hit;
     const paragraphs = tokenize(str, !!o.markup);
@@ -367,5 +395,5 @@ export function createText(inspect = { record: null, suppress: false, frame: nul
 
   const clearCache = () => { widths.clear(); layouts.clear(); };
 
-  return { layout, measure, fill, fillLine, fillWord, strokeWord, fillGlyph, fontString, graphemes, clearCache, TextFloorError };
+  return { layout, measure, fill, fillLine, fillWord, strokeWord, fillGlyph, fontString: faceString, graphemes, clearCache, TextFloorError };
 }

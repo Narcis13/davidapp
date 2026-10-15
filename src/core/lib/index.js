@@ -14,7 +14,8 @@ import * as svg from './svg.js';
 /** @param {{ sampleRate?: number }} [o] */
 export function createLib({ sampleRate } = {}) {
   // the runtime's inspection state: who records what is drawn (layout report, checks), whether text is skipped
-  const inspect = { record: null, suppress: false, frame: null, floor: 0 };
+  // fonts: family → alias of the uploaded fonts the clip being drawn pinned (null: none), set by the runtime per frame
+  const inspect = { record: null, suppress: false, frame: null, floor: 0, fonts: null };
   return Object.freeze({
     ...math,
     math,

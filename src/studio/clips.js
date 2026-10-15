@@ -55,6 +55,8 @@ export function createClips(ctx, library) {
     if (errors.length) throw new StudioError(`The composition is invalid:\n- ${errors.map((e) => `${e.path}: ${e.message}`).join('\n- ')}`, 'invalid', { errors });
     const problems = [];
     const refs = new Set(), fonts = new Set();
+    // the font families the parameters name; the uploaded ones are pinned to font assets below (composition.fonts)
+    const catalog = library.fontCatalog(), uploadedFamilies = new Set();
     let wantsEasing = false;
     const pin = (ref, where) => {
       let wanted = ref, row;
@@ -84,9 +86,10 @@ export function createClips(ctx, library) {
         return pinned;
       });
       walkParams(schema, out, ['font'], (family) => {
-        const ref = library.fontRef(family);
-        if (ref) fonts.add(ref);
-        else problems.push(`${at}: params: unknown font family "${family}" (available: ${library.fontFamilies().join(', ')})`);
+        const found = catalog.find(family);
+        if (!found) problems.push(`${at}: params: unknown font family "${family}" (available: ${catalog.families().join(', ')})`);
+        else if (found.bundled) fonts.add(found.ref);
+        else uploadedFamilies.add(found.family);
       });
       return out;
     };
@@ -146,6 +149,15 @@ export function createClips(ctx, library) {
       const row = pin(composition.easing ?? 'easing', 'easing');
       if (row && !(row.type === 'function' && row.kind === 'value')) problems.push(`easing: ${makeRef(row.slug, row.version)} is a ${row.kind ?? row.type} asset; keyframe curves come from a value asset such as "easing"`);
       else if (row) { composition.easing = makeRef(row.slug, row.version); refs.add(composition.easing); }
+    }
+    // v4: an uploaded family is pinned to the font assets that draw it, like any asset; bundled families are not listed
+    // (old compositions stay exactly as they were). Saving again keeps the pinned versions unless repin asks for newer ones.
+    const pins = library.pinFonts(uploadedFamilies, composition.fonts, repin, catalog);
+    problems.push(...pins.problems);
+    delete composition.fonts;
+    if (Object.keys(pins.fonts).length) {
+      composition.fonts = Object.fromEntries(Object.entries(pins.fonts).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+      for (const ref of Object.values(pins.fonts).flat()) refs.add(ref);
     }
     // word anchors: an item's start, a keyframe or a marker on a narration word, resolved now from the pinned take
     if (!problems.length) resolveAnchors(composition, problems);
@@ -370,7 +382,7 @@ export function createClips(ctx, library) {
       ins.run(clipId, row.version_id, direct ? 1 : 0, depth);
       if (direct) library.touch(row.slug, 'used');
       // an asset nobody claimed is first produced by the first clip that uses it
-      if (row.origin_clip === null) q('UPDATE assets SET origin_clip = ? WHERE id = ? AND origin_clip IS NULL').run(clipId, row.asset_id);
+      if (row.origin_clip === null && row.type !== 'font') q('UPDATE assets SET origin_clip = ? WHERE id = ? AND origin_clip IS NULL').run(clipId, row.asset_id);
     }
     for (const ref of fonts) ins.run(clipId, library.requireVersion(ref).version_id, 0, 1);
   }

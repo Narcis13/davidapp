@@ -153,37 +153,156 @@ function rank(platform, encoding) {
  * @returns {Set<number>}
  */
 export function readCoverage(buffer, name = 'font') {
+  const { buf, bad } = openBuffer(buffer, name);
+  return guarded(name, bad, () => cmapCoverage(tablesOf(buf, bad), bad));
+}
+
+/** The Buffer of any byte container, and the "not a font file" error for this name. */
+function openBuffer(buffer, name) {
   const bad = (why) => new Error(`${name}: not a font file (${why})`);
   const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   if (buf.length < 12) throw bad(`only ${buf.length} bytes`);
-  try {
-    const magic = tagAt(buf, 0);
-    let tables;
-    if (magic === 'wOF2') tables = woff2Tables(buf);
-    else if (magic === 'wOFF') tables = woffTables(buf);
-    else if (magic === 'OTTO' || magic === 'true' || magic === 'ttcf' || buf.readUInt32BE(0) === 0x00010000) tables = sfntTables(buf);
-    else throw bad(`unknown signature ${JSON.stringify(magic)}`);
-    const cmap = tables.get('cmap');
-    if (!cmap) throw bad('no cmap table');
-    const n = cmap.readUInt16BE(2);
-    const candidates = [];
-    for (let i = 0; i < n; i++) {
-      const rec = 4 + i * 8;
-      const platform = cmap.readUInt16BE(rec);
-      const encoding = cmap.readUInt16BE(rec + 2);
-      const r = rank(platform, encoding);
-      if (r >= 0) candidates.push({ r, offset: cmap.readUInt32BE(rec + 4) });
-    }
-    candidates.sort((a, b) => a.r - b.r);
-    for (const { offset } of candidates) {
-      const out = new Set();
-      if (readSubtable(cmap, offset, out)) return out;
-    }
-    throw bad('no Unicode cmap subtable in format 0, 4, 6 or 12');
-  } catch (e) {
+  return { buf, bad };
+}
+
+/** The tables of a font file by its signature: woff2, woff, or sfnt (TrueType, OpenType, the first font of a collection). */
+function tablesOf(buf, bad) {
+  const magic = tagAt(buf, 0);
+  if (magic === 'wOF2') return woff2Tables(buf);
+  if (magic === 'wOFF') return woffTables(buf);
+  if (magic === 'OTTO' || magic === 'true' || magic === 'ttcf' || buf.readUInt32BE(0) === 0x00010000) return sfntTables(buf);
+  throw bad(`unknown signature ${JSON.stringify(magic)}`);
+}
+
+/** The code points of the best Unicode cmap subtable. */
+function cmapCoverage(tables, bad) {
+  const cmap = tables.get('cmap');
+  if (!cmap) throw bad('no cmap table');
+  const n = cmap.readUInt16BE(2);
+  const candidates = [];
+  for (let i = 0; i < n; i++) {
+    const rec = 4 + i * 8;
+    const platform = cmap.readUInt16BE(rec);
+    const encoding = cmap.readUInt16BE(rec + 2);
+    const r = rank(platform, encoding);
+    if (r >= 0) candidates.push({ r, offset: cmap.readUInt32BE(rec + 4) });
+  }
+  candidates.sort((a, b) => a.r - b.r);
+  for (const { offset } of candidates) {
+    const out = new Set();
+    if (readSubtable(cmap, offset, out)) return out;
+  }
+  throw bad('no Unicode cmap subtable in format 0, 4, 6 or 12');
+}
+
+/** Run a font reader so that every failure, whatever its cause, is the one "not a font file" error. */
+function guarded(name, bad, fn) {
+  try { return fn(); } catch (e) {
     if (e instanceof Error && e.message.startsWith(`${name}: not a font file`)) throw e;
     throw bad(e instanceof Error ? e.message : String(e));
   }
+}
+
+/** The strings of a name table by name ID: platform 3 (Windows, English first) before 0 (Unicode) before 1 (Macintosh). */
+function readNames(table) {
+  const out = new Map();
+  if (!table || table.length < 6) return out;
+  const count = table.readUInt16BE(2), base = table.readUInt16BE(4);
+  const best = new Map();
+  for (let i = 0; i < count; i++) {
+    const rec = 6 + i * 12;
+    if (rec + 12 > table.length) break;
+    const platform = table.readUInt16BE(rec), language = table.readUInt16BE(rec + 4), id = table.readUInt16BE(rec + 6);
+    const length = table.readUInt16BE(rec + 8), at = base + table.readUInt16BE(rec + 10);
+    if (at + length > table.length) continue;
+    const rank2 = platform === 3 ? (language === 0x409 ? 0 : 1) : platform === 0 ? 2 : platform === 1 ? 3 : -1;
+    if (rank2 < 0 || (best.has(id) && best.get(id) <= rank2)) continue;
+    const raw = Buffer.from(table.subarray(at, at + length));
+    const text = platform === 1 ? raw.toString('latin1') : raw.swap16().toString('utf16le');
+    const clean = text.replaceAll('\u0000', '').trim();
+    if (!clean) continue;
+    best.set(id, rank2);
+    out.set(id, clean);
+  }
+  return out;
+}
+
+/**
+ * What a font file says about itself, from its tables (woff2, woff, ttf, otf): family (name ID 16, else 1), subfamily
+ * (17, else 2), weight (OS/2 usWeightClass), style (italic from OS/2 fsSelection or head macStyle), the licence text and
+ * URL it embeds (IDs 13, 14), its code points. Throws Error('<name>: not a font file (…)') on bad input.
+ * @param {Buffer | Uint8Array} buffer @param {string} [name]
+ */
+export function parseFont(buffer, name = 'font') {
+  const { buf, bad } = openBuffer(buffer, name);
+  return guarded(name, bad, () => {
+    const tables = tablesOf(buf, bad);
+    const codepoints = cmapCoverage(tables, bad);
+    if (!tables.has('glyf') && !tables.has('CFF ') && !tables.has('CFF2')) throw bad('no outlines: the file has neither a glyf nor a CFF table');
+    const names = readNames(tables.get('name'));
+    const head = tables.get('head'), os2 = tables.get('OS/2'), maxp = tables.get('maxp');
+    const macStyle = head && head.length >= 46 ? head.readUInt16BE(44) : 0;
+    let weightClass = os2 && os2.length >= 6 ? os2.readUInt16BE(4) : 0;
+    if (weightClass >= 1 && weightClass <= 9) weightClass *= 100; // old files count 1–9
+    const fsSelection = os2 && os2.length >= 64 ? os2.readUInt16BE(62) : 0;
+    const magic = tagAt(buf, 0);
+    return {
+      format: magic === 'wOF2' ? 'woff2' : magic === 'wOFF' ? 'woff' : magic === 'ttcf' ? 'ttc' : tables.has('CFF ') || tables.has('CFF2') ? 'otf' : 'ttf',
+      family: names.get(16) ?? names.get(1) ?? null,
+      subfamily: names.get(17) ?? names.get(2) ?? null,
+      fullName: names.get(4) ?? null,
+      weight: weightClass >= 1 && weightClass <= 1000 ? weightClass : macStyle & 1 ? 700 : 400,
+      style: fsSelection & 0x201 || macStyle & 2 ? 'italic' : 'normal',
+      licenseText: names.get(13) ?? null,
+      licenseUrl: names.get(14) ?? null,
+      copyright: names.get(0) ?? null,
+      glyphs: maxp && maxp.length >= 6 ? maxp.readUInt16BE(4) : null,
+      unitsPerEm: head && head.length >= 20 ? head.readUInt16BE(18) : null,
+      variable: tables.has('fvar'),
+      codepoints,
+    };
+  });
+}
+
+/** Unicode blocks worth naming in a coverage summary: [name, first, last] (Basic Latin starts at the space). */
+/** @type {[string, number, number][]} */
+export const UNICODE_BLOCKS = [
+  ['Basic Latin', 0x20, 0x7e], ['Latin-1 Supplement', 0xa0, 0xff], ['Latin Extended-A', 0x100, 0x17f], ['Latin Extended-B', 0x180, 0x24f],
+  ['IPA Extensions', 0x250, 0x2af], ['Greek and Coptic', 0x370, 0x3ff], ['Cyrillic', 0x400, 0x4ff], ['Armenian', 0x530, 0x58f], ['Hebrew', 0x590, 0x5ff],
+  ['Arabic', 0x600, 0x6ff], ['Devanagari', 0x900, 0x97f], ['Thai', 0xe00, 0xe7f], ['Georgian', 0x10a0, 0x10ff], ['Latin Extended Additional', 0x1e00, 0x1eff],
+  ['Greek Extended', 0x1f00, 0x1fff], ['General Punctuation', 0x2000, 0x206f], ['Superscripts and Subscripts', 0x2070, 0x209f], ['Currency Symbols', 0x20a0, 0x20cf],
+  ['Letterlike Symbols', 0x2100, 0x214f], ['Number Forms', 0x2150, 0x218f], ['Arrows', 0x2190, 0x21ff], ['Mathematical Operators', 0x2200, 0x22ff],
+  ['Miscellaneous Technical', 0x2300, 0x23ff], ['Box Drawing', 0x2500, 0x257f], ['Block Elements', 0x2580, 0x259f], ['Geometric Shapes', 0x25a0, 0x25ff],
+  ['Miscellaneous Symbols', 0x2600, 0x26ff], ['Dingbats', 0x2700, 0x27bf], ['CJK Symbols and Punctuation', 0x3000, 0x303f], ['Hiragana', 0x3040, 0x309f],
+  ['Katakana', 0x30a0, 0x30ff], ['CJK Unified Ideographs', 0x4e00, 0x9fff], ['Hangul Syllables', 0xac00, 0xd7af], ['Halfwidth and Fullwidth Forms', 0xff00, 0xffef],
+  ['Miscellaneous Symbols and Pictographs', 0x1f300, 0x1f5ff], ['Emoticons', 0x1f600, 0x1f64f],
+];
+
+const ROMANIAN_LETTERS = [...'ăâîșțĂÂÎȘȚ'].map((c) => c.codePointAt(0));
+
+/**
+ * A short account of what a code point set covers: how many, as ranges, per Unicode block (only blocks with at least
+ * one character), and the two questions this studio is asked most: all of Latin Extended-A (at least 95 % of the block),
+ * and the Romanian letters ă â î ș ț (comma-below) in both cases.
+ * @param {Set<number>} set
+ * @returns {{ codepoints: number, ranges: [number, number][], blocks: { name: string, from: number, to: number, covered: number, total: number }[], latinExtendedA: boolean, romanian: boolean }}
+ */
+export function summarizeCoverage(set) {
+  const sorted = [...set].sort((a, b) => a - b);
+  /** @type {[number, number][]} */
+  const ranges = [];
+  for (const cp of sorted) {
+    const last = ranges[ranges.length - 1];
+    if (last && cp === last[1] + 1) last[1] = cp; else ranges.push([cp, cp]);
+  }
+  const blocks = [];
+  for (const [name, from, to] of UNICODE_BLOCKS) {
+    let covered = 0;
+    for (let cp = from; cp <= to; cp++) if (set.has(cp)) covered++;
+    if (covered) blocks.push({ name, from, to, covered, total: to - from + 1 });
+  }
+  const extA = blocks.find((b) => b.name === 'Latin Extended-A');
+  return { codepoints: set.size, ranges, blocks, latinExtendedA: !!extA && extA.covered / extA.total >= 0.95, romanian: ROMANIAN_LETTERS.every((cp) => set.has(cp)) };
 }
 
 /** @type {Map<string, Set<number>> | undefined} */
@@ -214,9 +333,9 @@ const PICTO = /^[\p{Extended_Pictographic}\p{Emoji_Presentation}\u{1f1e6}-\u{1f1
 const LETTER = /^[\p{L}\p{M}\p{N}]$/u;
 const hex = (cp) => `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`;
 
-/** Every uncovered grapheme of `text` in order, repeats included. */
-function scan(text, family) {
-  const covered = familyCoverage().get(family);
+/** Every uncovered grapheme of `text` in order, repeats included. extra: coverage of families that are not bundled (lower-case name → code points). */
+function scan(text, family, extra) {
+  const covered = extra?.get(String(family).toLowerCase()) ?? familyCoverage().get(family);
   const out = [];
   for (const { segment } of segmenter.segment(String(text))) {
     const cps = [...segment].map((c) => c.codePointAt(0));
@@ -248,13 +367,15 @@ export function missingChars(text, family) {
 /**
  * What an asset or clip draws, checked against the fonts it draws it in.
  * `count` is the total number of occurrences across all the entries; `samples` the first 3 distinct texts it appears in.
+ * Families that are not bundled (uploaded fonts) are looked up in `extra`: lower-case family → code points.
  * @param {{ text: string, family: string }[]} entries
+ * @param {Map<string, Set<number>>} [extra]
  * @returns {{ family: string, char: string, codepoints: string[], kind: MissingChar['kind'], count: number, samples: string[] }[]}
  */
-export function coverageReport(entries) {
+export function coverageReport(entries, extra) {
   const groups = new Map();
   for (const { text, family } of entries) {
-    for (const m of scan(text, family)) {
+    for (const m of scan(text, family, extra)) {
       const key = `${family}\u0000${m.char}`;
       let g = groups.get(key);
       if (!g) groups.set(key, (g = { family, ...m, count: 0, samples: [] }));

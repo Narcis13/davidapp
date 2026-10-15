@@ -8,13 +8,14 @@ import { join } from 'node:path';
 import { createRuntime, describeError } from '../core/runtime.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
-import { nodeHost, registerFonts, createCanvas, loadImage, takeLogs, FRAME_CONTEXT } from './host.js';
+import { fontAliases } from '../core/lib/text.js';
+import { nodeHost, registerFonts, registerFontSets, createCanvas, loadImage, takeLogs, FRAME_CONTEXT } from './host.js';
 import { coverageReport } from './glyphs.js';
 import { boxContrast, thumbGray, grayStd } from './contrast.js';
 
 registerFonts();
 
-let state = { key: null, rt: null, comp: null, beats: [], sequences: {}, clip: {} };
+let state = { key: null, rt: null, comp: null, beats: [], sequences: {}, clip: {}, fonts: null };
 let canvas = null;
 
 // Sequence frames are PNG files, loaded as a frame needs them and kept in a small cache.
@@ -251,10 +252,13 @@ function demoThumb(rt, ref, params, t, duration) {
 const handlers = {
   async load(msg) {
     takeLogs();
+    // the uploaded fonts the bundle pins, each set under its own alias, before anything can draw (no restart needed)
+    registerFontSets(msg.bundle.fonts);
     const rt = await makeRuntime(msg.bundle);
     const b = msg.bundle;
+    const fonts = fontAliases(b.fonts);
     // what reaches assets as f.clip besides the composition: beats, the narration's words, the caption pages and lane
-    state = { key: b.key, rt, comp: b.composition ?? null, beats: b.beats ?? [], sequences: b.sequences ?? {}, clip: { beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane } };
+    state = { key: b.key, rt, comp: b.composition ?? null, beats: b.beats ?? [], sequences: b.sequences ?? {}, clip: { beats: b.beats ?? [], words: b.words, captions: b.captions, lane: b.lane, ...(fonts ? { fonts } : {}) }, fonts };
     return { result: {} };
   },
   async clipFrame(msg) {
@@ -287,7 +291,7 @@ const handlers = {
     return { result: { texts, thumb, std: grayStd(thumb) }, transfer: [thumb.buffer] };
   },
   assetFrame(msg) {
-    return output(drawAsset(state.rt, msg.ref, msg), msg);
+    return output(drawAsset(state.rt, msg.ref, state.fonts ? { ...msg, fonts: state.fonts } : msg), msg);
   },
   /** Contact sheet of clip frames: msg.frames = [frame numbers]. */
   async clipSheet(msg) {
@@ -310,7 +314,7 @@ const handlers = {
   },
   /** Filmstrip of one asset: msg.times = [seconds]. */
   assetSheet(msg) {
-    const cells = msg.times.map((t) => ({ label: `${t.toFixed(2)}s`, draw: () => drawAsset(state.rt, msg.ref, { ...msg, t, background: msg.background ?? '#101018' }) }));
+    const cells = msg.times.map((t) => ({ label: `${t.toFixed(2)}s`, draw: () => drawAsset(state.rt, msg.ref, { ...msg, t, background: msg.background ?? '#101018', fonts: state.fonts }) }));
     const out = sheet(cells, { cols: msg.cols, cellWidth: msg.cellWidth, width: msg.width, height: msg.height });
     return { result: { png: out.toBuffer('image/png'), width: out.width, height: out.height } };
   },
