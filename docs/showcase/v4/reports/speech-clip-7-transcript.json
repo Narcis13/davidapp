@@ -1,0 +1,83 @@
+{
+ "take": "showcase/voice/clip-7-narration.m4a",
+ "script": "clips/clip-7-a-video-that-checks-itself/narration.txt",
+ "models": [
+  {
+   "role": "primary",
+   "model": "ggml-small.en.bin",
+   "seconds": 9.449,
+   "words": 158,
+   "text": "Every video starts as words. In this studio, the words come first. The voice you are hearing was read by an open model, and the studio knows the moment each word is spoken. That timing drives everything. The captions below are built from it, two lines at a time, and each word lights up as it is said. Visuals land on their words, too. When I say contrast, a title appears, and it stays on its word even if the take changes. The music steps back while I speak and comes forward in the pauses. Before render, the studio checks every frame. Text sits inside the safe zone, big enough to read, with a contrast of at least four and a half to one, and it stays long enough to finish. After the render, it measures the file itself. Loudness lands at minus 14, with no flashes and no frozen frames. Nothing here was checked by eye alone."
+  },
+  {
+   "role": "secondary",
+   "model": "ggml-base.en.bin",
+   "seconds": 3.119,
+   "words": 158,
+   "text": "Every video starts as words. In this studio, the words come first. The voice you are hearing was read by an open model, and the studio knows the moment each word is spoken. That timing drives everything. The captions below are built from it, two lines at a time, and each word lights up as it is said. Visuals land on their words, too. When I say contrast, a title appears, and it stays on its word even if the take changes. The music steps back while I speak and comes forward in the pauses. Before a render, the studio checks every frame. Text sits inside the safe zone, big enough to read, with a contrast of at least four and a half to one, and it stays long enough to finish. After the render, it measures the file itself. Loudness lands at -14, with no flashes and no frozen frames. Nothing here was checked by I alone."
+  }
+ ],
+ "transcriptCheck": {
+  "ok": true,
+  "counts": {
+   "script": 159,
+   "transcripts": 2,
+   "slips": 0,
+   "drops": 0,
+   "insertions": 0,
+   "disputed": 2
+  },
+  "slips": [],
+  "drops": [],
+  "insertions": [],
+  "disputed": [
+   {
+    "kind": "slip",
+    "transcript": 1,
+    "i": 157,
+    "script": "eye",
+    "heard": "I"
+   },
+   {
+    "kind": "drop",
+    "transcript": 0,
+    "i": 96,
+    "script": "a"
+   }
+  ],
+  "models": [
+   "ggml-small.en.bin",
+   "ggml-base.en.bin"
+  ],
+  "seconds": 19.73
+ },
+ "againstManualRun": {
+  "words": 159,
+  "medianMs": 120,
+  "p95Ms": 170,
+  "maxMs": 420,
+  "over1Frame": 152,
+  "over2Frames": 147,
+  "note": "not the same input: iteration 3 ran on the WAV, this is the committed AAC take",
+  "source": "showcase/voice/clip-7-narration.whisper.json (iteration 3, whisper-cli small.en -ojf)"
+ },
+ "movedOntoPauses": {
+  "note": "Word times moved from whisper's token times onto the pauses of the sound (src/studio/speech/refine.js); shifts are the differences after alignment to the script.",
+  "starts": {
+   "medianMs": 115,
+   "p95Ms": 660,
+   "maxMs": 890,
+   "over1Frame": 104,
+   "over2Frames": 96
+  },
+  "ends": {
+   "medianMs": 130,
+   "p95Ms": 750,
+   "maxMs": 880,
+   "over1Frame": 108,
+   "over2Frames": 100
+  },
+  "boundariesMoved": 45,
+  "boundaries": 159
+ }
+}

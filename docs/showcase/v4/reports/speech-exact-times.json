@@ -1,0 +1,1239 @@
+{
+ "script": "Every frame is a function of time. Nothing moves unless the clock says so, and the clock belongs to the studio. A voice is read word by word, each word alone, so we know exactly when it starts and when it stops. Then an aligner listens to the whole take and tells us where it thinks every word begins. The difference between the two is the error we measure.",
+ "voice": "af_heart",
+ "engine": "kokoro (kokoro-js, each word synthesised alone)",
+ "gapSeconds": 0.2,
+ "toleranceMs": 67,
+ "fps": 30,
+ "note": "The true times are those of the word-by-word take: each word alone, its silence trimmed at a threshold, fixed gaps between. The take has real pauses between words, which is what the studio moves word times onto, so this measures the pipeline (which sound belongs to which word, and where it starts) on a take with known times; it is not a measure of accuracy on continuous speech (see speech-clip-7-transcript.json for what the same step does there). perWord rows: [word, known start, found start, known end, found end].",
+ "take": {
+  "words": 69,
+  "seconds": 44.555,
+  "synthesisSeconds": 55.986
+ },
+ "aligners": {
+  "ggml-small.en.bin": {
+   "model": "ggml-small.en.bin",
+   "role": "primary",
+   "transcribeSeconds": 6.087,
+   "alignment": {
+    "matched": 69,
+    "substituted": 0,
+    "missing": 0,
+    "extra": 0
+   },
+   "words": 69,
+   "starts": {
+    "within2Frames": 69,
+    "share": 1,
+    "meanAbsMs": 0,
+    "medianAbsMs": 0,
+    "p95AbsMs": 0,
+    "maxAbsMs": 0,
+    "biasMs": 0
+   },
+   "ends": {
+    "within2Frames": 69,
+    "share": 1,
+    "meanAbsMs": 1,
+    "medianAbsMs": 0,
+    "p95AbsMs": 0,
+    "maxAbsMs": 55,
+    "biasMs": 1
+   },
+   "perWord": [
+    [
+     "Every",
+     0.3,
+     0.3,
+     0.78,
+     0.78
+    ],
+    [
+     "frame",
+     0.98,
+     0.98,
+     1.46,
+     1.46
+    ],
+    [
+     "is",
+     1.66,
+     1.66,
+     2.085,
+     2.085
+    ],
+    [
+     "a",
+     2.285,
+     2.285,
+     2.615,
+     2.615
+    ],
+    [
+     "function",
+     2.815,
+     2.815,
+     3.38,
+     3.38
+    ],
+    [
+     "of",
+     3.58,
+     3.58,
+     3.985,
+     3.985
+    ],
+    [
+     "time.",
+     4.185,
+     4.185,
+     4.64,
+     4.64
+    ],
+    [
+     "Nothing",
+     4.84,
+     4.84,
+     5.375,
+     5.375
+    ],
+    [
+     "moves",
+     5.575,
+     5.575,
+     6.11,
+     6.11
+    ],
+    [
+     "unless",
+     6.31,
+     6.31,
+     6.865,
+     6.865
+    ],
+    [
+     "the",
+     7.065,
+     7.065,
+     7.415,
+     7.415
+    ],
+    [
+     "clock",
+     7.615,
+     7.615,
+     8.06,
+     8.06
+    ],
+    [
+     "says",
+     8.26,
+     8.26,
+     8.73,
+     8.73
+    ],
+    [
+     "so,",
+     8.93,
+     8.93,
+     9.33,
+     9.33
+    ],
+    [
+     "and",
+     9.53,
+     9.53,
+     9.935,
+     9.935
+    ],
+    [
+     "the",
+     10.135,
+     10.135,
+     10.485,
+     10.485
+    ],
+    [
+     "clock",
+     10.685,
+     10.685,
+     11.13,
+     11.13
+    ],
+    [
+     "belongs",
+     11.33,
+     11.33,
+     11.91,
+     11.91
+    ],
+    [
+     "to",
+     12.11,
+     12.11,
+     12.56,
+     12.56
+    ],
+    [
+     "the",
+     12.76,
+     12.76,
+     13.11,
+     13.11
+    ],
+    [
+     "studio.",
+     13.31,
+     13.31,
+     13.895,
+     13.895
+    ],
+    [
+     "A",
+     14.095,
+     14.095,
+     14.425,
+     14.425
+    ],
+    [
+     "voice",
+     14.625,
+     14.625,
+     15.115,
+     15.115
+    ],
+    [
+     "is",
+     15.315,
+     15.315,
+     15.74,
+     15.74
+    ],
+    [
+     "read",
+     15.94,
+     15.94,
+     16.34,
+     16.34
+    ],
+    [
+     "word",
+     16.54,
+     16.54,
+     16.975,
+     16.975
+    ],
+    [
+     "by",
+     17.175,
+     17.175,
+     17.575,
+     17.575
+    ],
+    [
+     "word,",
+     17.775,
+     17.775,
+     18.21,
+     18.21
+    ],
+    [
+     "each",
+     18.41,
+     18.41,
+     18.74,
+     18.74
+    ],
+    [
+     "word",
+     18.94,
+     18.94,
+     19.375,
+     19.375
+    ],
+    [
+     "alone,",
+     19.575,
+     19.575,
+     20.05,
+     20.05
+    ],
+    [
+     "so",
+     20.25,
+     20.25,
+     20.65,
+     20.65
+    ],
+    [
+     "we",
+     20.85,
+     20.85,
+     21.245,
+     21.245
+    ],
+    [
+     "know",
+     21.445,
+     21.445,
+     21.835,
+     21.835
+    ],
+    [
+     "exactly",
+     22.035,
+     22.035,
+     22.7,
+     22.7
+    ],
+    [
+     "when",
+     22.9,
+     22.9,
+     23.3,
+     23.3
+    ],
+    [
+     "it",
+     23.5,
+     23.5,
+     23.87,
+     23.87
+    ],
+    [
+     "starts",
+     24.07,
+     24.07,
+     24.63,
+     24.63
+    ],
+    [
+     "and",
+     24.83,
+     24.83,
+     25.235,
+     25.235
+    ],
+    [
+     "when",
+     25.435,
+     25.435,
+     25.835,
+     25.835
+    ],
+    [
+     "it",
+     26.035,
+     26.035,
+     26.405,
+     26.405
+    ],
+    [
+     "stops.",
+     26.605,
+     26.605,
+     27.16,
+     27.16
+    ],
+    [
+     "Then",
+     27.36,
+     27.36,
+     27.77,
+     27.77
+    ],
+    [
+     "an",
+     27.97,
+     27.97,
+     28.36,
+     28.36
+    ],
+    [
+     "aligner",
+     28.56,
+     28.56,
+     29.065,
+     29.12
+    ],
+    [
+     "listens",
+     29.265,
+     29.265,
+     29.87,
+     29.87
+    ],
+    [
+     "to",
+     30.07,
+     30.07,
+     30.52,
+     30.52
+    ],
+    [
+     "the",
+     30.72,
+     30.72,
+     31.07,
+     31.07
+    ],
+    [
+     "whole",
+     31.27,
+     31.27,
+     31.66,
+     31.66
+    ],
+    [
+     "take",
+     31.86,
+     31.86,
+     32.295,
+     32.295
+    ],
+    [
+     "and",
+     32.495,
+     32.495,
+     32.9,
+     32.9
+    ],
+    [
+     "tells",
+     33.1,
+     33.1,
+     33.575,
+     33.575
+    ],
+    [
+     "us",
+     33.775,
+     33.775,
+     34.17,
+     34.17
+    ],
+    [
+     "where",
+     34.37,
+     34.37,
+     34.755,
+     34.755
+    ],
+    [
+     "it",
+     34.955,
+     34.955,
+     35.325,
+     35.325
+    ],
+    [
+     "thinks",
+     35.525,
+     35.525,
+     36.02,
+     36.02
+    ],
+    [
+     "every",
+     36.22,
+     36.22,
+     36.7,
+     36.7
+    ],
+    [
+     "word",
+     36.9,
+     36.9,
+     37.335,
+     37.335
+    ],
+    [
+     "begins.",
+     37.535,
+     37.535,
+     38.135,
+     38.135
+    ],
+    [
+     "The",
+     38.335,
+     38.335,
+     38.685,
+     38.685
+    ],
+    [
+     "difference",
+     38.885,
+     38.885,
+     39.505,
+     39.505
+    ],
+    [
+     "between",
+     39.705,
+     39.705,
+     40.26,
+     40.26
+    ],
+    [
+     "the",
+     40.46,
+     40.46,
+     40.81,
+     40.81
+    ],
+    [
+     "two",
+     41.01,
+     41.01,
+     41.46,
+     41.46
+    ],
+    [
+     "is",
+     41.66,
+     41.66,
+     42.085,
+     42.085
+    ],
+    [
+     "the",
+     42.285,
+     42.285,
+     42.635,
+     42.635
+    ],
+    [
+     "error",
+     42.835,
+     42.835,
+     43.265,
+     43.265
+    ],
+    [
+     "we",
+     43.465,
+     43.465,
+     43.86,
+     43.86
+    ],
+    [
+     "measure.",
+     44.06,
+     44.06,
+     44.555,
+     44.555
+    ]
+   ],
+   "worstStarts": [
+    {
+     "i": 0,
+     "word": "Every",
+     "knownStart": 0.3,
+     "knownEnd": 0.78,
+     "start": 0.3,
+     "end": 0.78,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 1,
+     "word": "frame",
+     "knownStart": 0.98,
+     "knownEnd": 1.46,
+     "start": 0.98,
+     "end": 1.46,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 2,
+     "word": "is",
+     "knownStart": 1.66,
+     "knownEnd": 2.085,
+     "start": 1.66,
+     "end": 2.085,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 3,
+     "word": "a",
+     "knownStart": 2.285,
+     "knownEnd": 2.615,
+     "start": 2.285,
+     "end": 2.615,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 4,
+     "word": "function",
+     "knownStart": 2.815,
+     "knownEnd": 3.38,
+     "start": 2.815,
+     "end": 3.38,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 5,
+     "word": "of",
+     "knownStart": 3.58,
+     "knownEnd": 3.985,
+     "start": 3.58,
+     "end": 3.985,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    }
+   ],
+   "whisperTokenTimes": {
+    "alignment": {
+     "matched": 69,
+     "substituted": 0,
+     "missing": 0,
+     "extra": 0
+    },
+    "starts": {
+     "within2Frames": 29,
+     "share": 0.42,
+     "meanAbsMs": 221,
+     "medianAbsMs": 155,
+     "p95AbsMs": 725,
+     "maxAbsMs": 1005,
+     "biasMs": -176
+    },
+    "ends": {
+     "within2Frames": 32,
+     "share": 0.464,
+     "meanAbsMs": 182,
+     "medianAbsMs": 80,
+     "p95AbsMs": 655,
+     "maxAbsMs": 805,
+     "biasMs": -105
+    }
+   }
+  },
+  "ggml-base.en.bin": {
+   "model": "ggml-base.en.bin",
+   "role": "secondary",
+   "transcribeSeconds": 2.544,
+   "alignment": {
+    "matched": 68,
+    "substituted": 1,
+    "missing": 0,
+    "extra": 0
+   },
+   "words": 69,
+   "starts": {
+    "within2Frames": 68,
+    "share": 0.986,
+    "meanAbsMs": 2,
+    "medianAbsMs": 0,
+    "p95AbsMs": 0,
+    "maxAbsMs": 125,
+    "biasMs": -2
+   },
+   "ends": {
+    "within2Frames": 69,
+    "share": 1,
+    "meanAbsMs": 0,
+    "medianAbsMs": 0,
+    "p95AbsMs": 0,
+    "maxAbsMs": 0,
+    "biasMs": 0
+   },
+   "perWord": [
+    [
+     "Every",
+     0.3,
+     0.3,
+     0.78,
+     0.78
+    ],
+    [
+     "frame",
+     0.98,
+     0.98,
+     1.46,
+     1.46
+    ],
+    [
+     "is",
+     1.66,
+     1.66,
+     2.085,
+     2.085
+    ],
+    [
+     "a",
+     2.285,
+     2.285,
+     2.615,
+     2.615
+    ],
+    [
+     "function",
+     2.815,
+     2.815,
+     3.38,
+     3.38
+    ],
+    [
+     "of",
+     3.58,
+     3.58,
+     3.985,
+     3.985
+    ],
+    [
+     "time.",
+     4.185,
+     4.185,
+     4.64,
+     4.64
+    ],
+    [
+     "Nothing",
+     4.84,
+     4.84,
+     5.375,
+     5.375
+    ],
+    [
+     "moves",
+     5.575,
+     5.575,
+     6.11,
+     6.11
+    ],
+    [
+     "unless",
+     6.31,
+     6.31,
+     6.865,
+     6.865
+    ],
+    [
+     "the",
+     7.065,
+     7.065,
+     7.415,
+     7.415
+    ],
+    [
+     "clock",
+     7.615,
+     7.615,
+     8.06,
+     8.06
+    ],
+    [
+     "says",
+     8.26,
+     8.26,
+     8.73,
+     8.73
+    ],
+    [
+     "so,",
+     8.93,
+     8.93,
+     9.33,
+     9.33
+    ],
+    [
+     "and",
+     9.53,
+     9.53,
+     9.935,
+     9.935
+    ],
+    [
+     "the",
+     10.135,
+     10.135,
+     10.485,
+     10.485
+    ],
+    [
+     "clock",
+     10.685,
+     10.685,
+     11.13,
+     11.13
+    ],
+    [
+     "belongs",
+     11.33,
+     11.33,
+     11.91,
+     11.91
+    ],
+    [
+     "to",
+     12.11,
+     12.11,
+     12.56,
+     12.56
+    ],
+    [
+     "the",
+     12.76,
+     12.76,
+     13.11,
+     13.11
+    ],
+    [
+     "studio.",
+     13.31,
+     13.31,
+     13.895,
+     13.895
+    ],
+    [
+     "A",
+     14.095,
+     14.095,
+     14.425,
+     14.425
+    ],
+    [
+     "voice",
+     14.625,
+     14.625,
+     15.115,
+     15.115
+    ],
+    [
+     "is",
+     15.315,
+     15.315,
+     15.74,
+     15.74
+    ],
+    [
+     "read",
+     15.94,
+     15.94,
+     16.34,
+     16.34
+    ],
+    [
+     "word",
+     16.54,
+     16.54,
+     16.975,
+     16.975
+    ],
+    [
+     "by",
+     17.175,
+     17.175,
+     17.575,
+     17.575
+    ],
+    [
+     "word,",
+     17.775,
+     17.775,
+     18.21,
+     18.21
+    ],
+    [
+     "each",
+     18.41,
+     18.41,
+     18.74,
+     18.74
+    ],
+    [
+     "word",
+     18.94,
+     18.94,
+     19.375,
+     19.375
+    ],
+    [
+     "alone,",
+     19.575,
+     19.575,
+     20.05,
+     20.05
+    ],
+    [
+     "so",
+     20.25,
+     20.25,
+     20.65,
+     20.65
+    ],
+    [
+     "we",
+     20.85,
+     20.85,
+     21.245,
+     21.245
+    ],
+    [
+     "know",
+     21.445,
+     21.32,
+     21.835,
+     21.835
+    ],
+    [
+     "exactly",
+     22.035,
+     22.035,
+     22.7,
+     22.7
+    ],
+    [
+     "when",
+     22.9,
+     22.9,
+     23.3,
+     23.3
+    ],
+    [
+     "it",
+     23.5,
+     23.5,
+     23.87,
+     23.87
+    ],
+    [
+     "starts",
+     24.07,
+     24.07,
+     24.63,
+     24.63
+    ],
+    [
+     "and",
+     24.83,
+     24.83,
+     25.235,
+     25.235
+    ],
+    [
+     "when",
+     25.435,
+     25.435,
+     25.835,
+     25.835
+    ],
+    [
+     "it",
+     26.035,
+     26.035,
+     26.405,
+     26.405
+    ],
+    [
+     "stops.",
+     26.605,
+     26.605,
+     27.16,
+     27.16
+    ],
+    [
+     "Then",
+     27.36,
+     27.36,
+     27.77,
+     27.77
+    ],
+    [
+     "an",
+     27.97,
+     27.97,
+     28.36,
+     28.36
+    ],
+    [
+     "aligner",
+     28.56,
+     28.56,
+     29.065,
+     29.065
+    ],
+    [
+     "listens",
+     29.265,
+     29.265,
+     29.87,
+     29.87
+    ],
+    [
+     "to",
+     30.07,
+     30.07,
+     30.52,
+     30.52
+    ],
+    [
+     "the",
+     30.72,
+     30.72,
+     31.07,
+     31.07
+    ],
+    [
+     "whole",
+     31.27,
+     31.27,
+     31.66,
+     31.66
+    ],
+    [
+     "take",
+     31.86,
+     31.86,
+     32.295,
+     32.295
+    ],
+    [
+     "and",
+     32.495,
+     32.495,
+     32.9,
+     32.9
+    ],
+    [
+     "tells",
+     33.1,
+     33.1,
+     33.575,
+     33.575
+    ],
+    [
+     "us",
+     33.775,
+     33.775,
+     34.17,
+     34.17
+    ],
+    [
+     "where",
+     34.37,
+     34.37,
+     34.755,
+     34.755
+    ],
+    [
+     "it",
+     34.955,
+     34.955,
+     35.325,
+     35.325
+    ],
+    [
+     "thinks",
+     35.525,
+     35.525,
+     36.02,
+     36.02
+    ],
+    [
+     "every",
+     36.22,
+     36.22,
+     36.7,
+     36.7
+    ],
+    [
+     "word",
+     36.9,
+     36.9,
+     37.335,
+     37.335
+    ],
+    [
+     "begins.",
+     37.535,
+     37.535,
+     38.135,
+     38.135
+    ],
+    [
+     "The",
+     38.335,
+     38.335,
+     38.685,
+     38.685
+    ],
+    [
+     "difference",
+     38.885,
+     38.885,
+     39.505,
+     39.505
+    ],
+    [
+     "between",
+     39.705,
+     39.705,
+     40.26,
+     40.26
+    ],
+    [
+     "the",
+     40.46,
+     40.46,
+     40.81,
+     40.81
+    ],
+    [
+     "two",
+     41.01,
+     41.01,
+     41.46,
+     41.46
+    ],
+    [
+     "is",
+     41.66,
+     41.66,
+     42.085,
+     42.085
+    ],
+    [
+     "the",
+     42.285,
+     42.285,
+     42.635,
+     42.635
+    ],
+    [
+     "error",
+     42.835,
+     42.835,
+     43.265,
+     43.265
+    ],
+    [
+     "we",
+     43.465,
+     43.465,
+     43.86,
+     43.86
+    ],
+    [
+     "measure.",
+     44.06,
+     44.06,
+     44.555,
+     44.555
+    ]
+   ],
+   "worstStarts": [
+    {
+     "i": 33,
+     "word": "know",
+     "knownStart": 21.445,
+     "knownEnd": 21.835,
+     "start": 21.32,
+     "end": 21.835,
+     "startError": -0.125,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 0,
+     "word": "Every",
+     "knownStart": 0.3,
+     "knownEnd": 0.78,
+     "start": 0.3,
+     "end": 0.78,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 1,
+     "word": "frame",
+     "knownStart": 0.98,
+     "knownEnd": 1.46,
+     "start": 0.98,
+     "end": 1.46,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 2,
+     "word": "is",
+     "knownStart": 1.66,
+     "knownEnd": 2.085,
+     "start": 1.66,
+     "end": 2.085,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 3,
+     "word": "a",
+     "knownStart": 2.285,
+     "knownEnd": 2.615,
+     "start": 2.285,
+     "end": 2.615,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    },
+    {
+     "i": 4,
+     "word": "function",
+     "knownStart": 2.815,
+     "knownEnd": 3.38,
+     "start": 2.815,
+     "end": 3.38,
+     "startError": 0,
+     "endError": 0,
+     "missing": false
+    }
+   ],
+   "whisperTokenTimes": {
+    "alignment": {
+     "matched": 68,
+     "substituted": 1,
+     "missing": 0,
+     "extra": 0
+    },
+    "starts": {
+     "within2Frames": 15,
+     "share": 0.217,
+     "meanAbsMs": 885,
+     "medianAbsMs": 385,
+     "p95AbsMs": 4600,
+     "maxAbsMs": 5865,
+     "biasMs": 163
+    },
+    "ends": {
+     "within2Frames": 19,
+     "share": 0.275,
+     "meanAbsMs": 900,
+     "medianAbsMs": 215,
+     "p95AbsMs": 4975,
+     "maxAbsMs": 7335,
+     "biasMs": 370
+    }
+   }
+  }
+ },
+ "requirement": {
+  "startsShare": 1,
+  "required": 0.95,
+  "pass": true
+ }
+}

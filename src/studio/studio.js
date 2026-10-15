@@ -22,6 +22,7 @@ import { createUploads } from './uploads.js';
 import { createCompounding } from './compounding.js';
 import { createInspect } from './inspect.js';
 import { createAudio } from './audio.js';
+import { createSpeech } from './speech.js';
 import { createChecks } from './checks.js';
 import { createFonts } from './fonts.js';
 
@@ -41,6 +42,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   const library = createLibrary(ctx);
   const clips = createClips(ctx, library);
   const audio = createAudio(ctx, library, clips);
+  const speech = createSpeech(ctx, { library, audio });
   const renders = createRenders(ctx, library, clips, audio);
   const lineage = createLineage(ctx, library, clips);
   // frame helpers below are function declarations, so they exist already
@@ -303,5 +305,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, checks, fonts, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, speech, checks, fonts, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }
