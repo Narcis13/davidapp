@@ -1,0 +1,26 @@
+Prompt: motion_prompt_fablecut.md
+MCP tools on the server: 59
+Tools the prompt names (25): add_asset_note, add_file_asset, compounding_report, create_clip, create_preset, describe_asset, frame_hashes, get_asset, get_clip, get_render, list_clip_assets, organize_assets, propose_asset_version, propose_clip_edit, propose_new_asset, render_asset_frame, render_clip_frame, save_precomp, search_assets, start_render, studio_guide, suggest_assets, update_clip, upload_image, validate_asset
+Tool options the prompt names (2): for_clip (create_asset, update_asset, fork_asset, …), max_size (render_asset_frame, render_clip_frame)
+Unknown names (2): render_contract (line 420), text_and_captions (line 263)
+Workarounds left (19):
+- line 375: "and has no video asset. Moving footage could enter only as a PNG" → footage is an asset (add_footage)
+- line 376: "frame sequence through library.addSequence, which no tool" → footage is an asset (add_footage)
+- line 213: "(scripts/vendor-fonts.mjs, or by hand) and restart the studio" → fonts are assets that work at once (add_font)
+- line 214: "and the MCP server, which read fonts.json when they start." → fonts are assets that work at once (add_font)
+- line 357: "one gain and the studio does not duck: split the music around" → ducking is a property of the music item (duck)
+- line 359: "premix a ducked file and record how in RENDER.md." → ducking is a property of the music item (duck)
+- line 454: "studio does not set loudness: its mix only holds sample peaks" → composition.loudness sets the target; the render measures and corrects
+- line 500: "on a runner with another STUDIO_RENDER_WORKERS equals both." → start_render takes workers
+- line 243: "recoloured, never redrawn. The SVG sanitiser drops style sheets," → internal style sheets are inlined and the upload reports what it could not keep
+- line 460: "yours is newer. start_render has no scale, so the animatic" → start_render takes draft
+- line 280: "word by splitting the page evenly and shrinks text to fit; for" → captions are built from the words
+- line 444: "bounding box of its pixels (createStudio().clipFrame draws an" → everything is an MCP tool
+- line 529: "(createStudio().clipAudio on the composition with the other" → everything is an MCP tool
+- line 47: "takes stills, not video: see assets.)" → footage is an asset
+- line 346: "none, align the audio to the script. Save them as words.json," → generate_narration / align: the studio aligns
+- line 476: "craft/checks/ where it can be one, and a line in" → check_clip and the studio tools measure the checks
+- line 552: "craft/checks/ and craft/CHECKS.md and run it on every future" → check_clip and the studio tools measure the checks
+- (across lines) /draws only the clip's own shape|reformat in\s+src\/core/i → render_clip_frame and frame_hashes take format
+- (across lines) /version numbers differ between\s+libraries/i → export_clip / import_clip keep the refs
+FAIL
