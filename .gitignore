@@ -4,6 +4,8 @@ output/
 *.mp4
 *.mov
 *.webm
+# small screen recordings of the studio (scripts/record-studio.mjs) are source material for clips
+!showcase/footage/*.mp4
 *.db
 *.db-wal
 *.db-shm
