@@ -394,6 +394,26 @@ test('a baked file brings what it was drawn from into the credits', async () => 
   assert.equal(r.sources.find((s) => s.ref === 'nested-photo@1').via, 'baked-frame@1');
 });
 
+test('a bundled font an asset draws without a font parameter naming it is in the credits (the save check saw it drawn)', async () => {
+  const MONO = `asset({
+  description: 'A label drawn in a fixed family, for provenance tests.',
+  tags: ['label', 'test'],
+  params: { text: { type: 'string', default: 'v1.0' } },
+  render(f, p) {
+    const L = f.lib.text.layout(f.ctx, p.text, { font: 'JetBrains Mono', weight: 400, size: f.height * 0.3 });
+    f.lib.text.fill(f.ctx, L, (f.width - L.width) / 2, (f.height - L.height) / 2);
+  },
+})`;
+  await library.createAsset({ slug: 'mono-label', source: MONO, author: AUTHOR });
+  const { checked } = await studio.clips.createClip({ slug: 'drawn-fonts', author: AUTHOR, composition: { width: 320, height: 180, fps: 10, duration: 1, tracks: [{ id: 'v', type: 'visual', items: [{ id: 'm', asset: 'mono-label', start: 0, duration: 1 }] }] } });
+  assert.deepEqual(checked.fontsDrawn, ['JetBrains Mono']);
+  const r = studio.provenance.credits({ clip: 'drawn-fonts' });
+  assert.ok(r.credits.some((c) => /^Fonts: JetBrains Mono \(OFL-1\.1\)$/.test(c)), r.credits.join(' | '));
+  // a save without the check keeps what the parameters name only
+  await studio.clips.updateClip('drawn-fonts', { composition: studio.clips.getClip('drawn-fonts').composition, check: false });
+  assert.ok(!studio.provenance.credits({ clip: 'drawn-fonts' }).credits.some((c) => c.startsWith('Fonts:')));
+});
+
 // ---- final renders -------------------------------------------------------------------------------------
 
 async function fresh(slug, assets, extra = {}) {

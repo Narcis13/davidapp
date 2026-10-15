@@ -1,0 +1,63 @@
+{
+  "ref": "kit-icon@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Icon",
+  "description": "One icon from the Lucide set (ISC licence; vendored in vendor/lucide with its licence and version), about 160 of them for explainers and marketing: arrows, check and x, media, creative tools, goals, people, charts, tech, files, commerce. Drawn as vectors in the theme's accent (or any colour), one stroke weight, optionally traced on over `draw` seconds and popped in. Pair with kit-steps, kit-plate and the charts; takes a theme.",
+  "tags": ["kit", "icon", "lucide", "vector", "draw-on", "marketing"],
+  "duration": 3,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "name": {
+      "type": "enum",
+      "options": ["arrow-right", "arrow-left", "arrow-up", "arrow-down", "arrow-up-right", "arrow-down-right", "chevron-right", "chevron-left", "chevron-up", "chevron-down", "chevrons-right", "external-link", "log-in", "log-out", "check", "circle-check", "circle-x", "x", "plus", "minus", "info", "circle-alert", "triangle-alert", "badge-check", "play", "pause", "film", "video", "clapperboard", "image", "music", "mic", "volume-2", "headphones", "camera", "captions", "subtitles", "languages", "type", "audio-waveform", "palette", "layers", "layout-dashboard", "layout-grid", "sparkles", "wand-sparkles", "paintbrush", "pen-tool", "pencil", "pen", "scissors", "crop", "wand", "zap", "rocket", "star", "heart", "thumbs-up", "flame", "trophy", "target", "flag", "award", "gift", "party-popper", "user", "users", "user-plus", "message-circle", "message-square", "mail", "bell", "share-2", "link", "handshake", "megaphone", "search", "settings", "sliders-horizontal", "filter", "wrench", "key", "lock", "shield", "shield-check", "eye", "globe", "cloud", "cloud-upload", "server", "database", "code", "terminal", "cpu", "git-branch", "package", "box", "bug", "bot", "brain", "workflow", "download", "upload", "folder", "file", "file-text", "clipboard", "clipboard-check", "copy", "save", "trash-2", "list-checks", "clock", "calendar", "timer", "history", "chart-line", "chart-bar", "chart-column", "chart-pie", "trending-up", "activity", "shopping-cart", "shopping-bag", "credit-card", "dollar-sign", "percent", "wallet", "tag", "store", "lightbulb", "book", "book-open", "graduation-cap", "briefcase", "building-2", "house", "map-pin", "phone", "smartphone", "monitor", "laptop", "tablet", "mouse-pointer", "mouse-pointer-click", "hand", "maximize", "minimize", "move", "refresh-cw", "rotate-ccw", "repeat", "shuffle", "accessibility", "sun"],
+      "default": "sparkles",
+      "description": "Which Lucide icon"
+    },
+    "weight": {
+      "type": "number",
+      "default": 2,
+      "min": 0.75,
+      "max": 3,
+      "step": 0.25,
+      "description": "Stroke width on the 24-unit grid (Lucide draws at 2); use one weight for a whole set"
+    },
+    "color": {"type": "string", "default": "", "description": "A CSS colour (empty: the theme's accent)"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "draw": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0,
+      "max": 10,
+      "step": 0.05,
+      "description": "Seconds to trace the icon on (0: drawn from the first frame)"
+    },
+    "pop": {
+      "type": "number",
+      "default": 0.35,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "description": "Seconds of the pop-in (scale and fade); 0: none"
+    },
+    "outDur": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "description": "Seconds of the fade out at the end of the item (0: none)"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:49:35.750Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:49:35.750Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/kit-icon@1.js", "sha1": "e34417eca25e833a8a4d3d3b9eb3d1a6030ce51a"},
+  "hash": "a24c457bf95907b1975d5509942726aa94bb7ad61060b9596a3b9f6314da100a"
+}

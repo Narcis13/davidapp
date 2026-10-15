@@ -35,7 +35,8 @@ try {
   const finals = renders.filter((r) => r.options?.final);
   const final = opt('--final') ? await call('get_render', { id: Number(opt('--final')) }) : finals[0] ? await call('get_render', { id: finals[0].id }) : null;
   if (!final) throw new Error(`no final render of ${clip}`);
-  const all = finals.filter((r) => r.format === final.format || !r.format);
+  // the final first, then the newest final of each other format (a batch renders one per format)
+  const all = [final, ...finals.filter((r) => r.id !== final.id)];
   const formats = (opt('--formats') ?? comp.format).split(',');
 
   // script-lock: the render's captions are the script; the take says the script

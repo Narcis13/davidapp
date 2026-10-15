@@ -301,7 +301,8 @@ function checkSize(width, height) {
  * tightest edge winning across profiles and against the format's own safe zone (engine.js safeZone). A profile made
  * for other formats still applies by its fractions, with a warning. Ties go to the first named profile, then to the format.
  * With { matching: true } only the profiles made for this frame's shape apply (a clip that names youtube and shorts gets
- * youtube's zones in its horizontal render and shorts' in its vertical one); when none is made for it, all of them do.
+ * youtube's zones in its horizontal render and shorts' in its vertical one); when none is made for it, the frame keeps
+ * the format's own safe zone (a square render of a clip made for Reels does not take Reels' vertical insets), with a warning.
  * @param {string | string[]} ids
  * @param {number} width
  * @param {number} height
@@ -320,7 +321,8 @@ export function platformSafe(ids, width, height, { matching = false } = {}) {
   });
   const shape = orientationOf(width, height);
   const fitting = named.filter((p) => p.formats.includes(shape));
-  const profiles = matching && fitting.length ? fitting : named;
+  const profiles = matching ? fitting : named;
+  if (matching && !fitting.length) warnings.push(`none of ${named.map((p) => p.id).join(', ')} is made for ${shape} frames; this ${width}x${height} frame keeps the format's own safe zone`);
   for (const p of profiles) {
     if (!p.formats.includes(shape)) {
       warnings.push(`${p.id} is made for ${p.formats.join(' / ')} frames; applied by its fractions to a ${shape} ${width}x${height} frame`);

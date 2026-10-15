@@ -642,7 +642,9 @@ export function createExchange(ctx, { library, clips, fonts }, { rebake }) {
     // (the studio's own save pins and normalises it once more; it must come out as it went in, and is kept exactly as exported)
     if (!same(clips.prepare(doc.composition).composition, doc.composition)) throw new StudioError(`The composition of ${doc.slug} does not come back the same from this library (the versions were imported; the clip was not): the engine reads it differently than the library that exported it.`, 'rejected');
     let result;
-    const fields = { title: doc.title, description: doc.description ?? '', composition: doc.composition, check: false };
+    // the bundled fonts the exporting library saw the clip draw (no parameter names them, and the save here is not checked)
+    const drawnFonts = (doc.closure ?? []).filter((ref) => { const row = library.versionRow(ref); return row?.type === 'font' && !library.isUploadedFont(row); });
+    const fields = { title: doc.title, description: doc.description ?? '', composition: doc.composition, check: false, drawnFonts };
     if (existingClip) result = await clips.updateClip(doc.slug, { ...fields, by: 'import' });
     else result = await clips.createClip({ slug: doc.slug, author, ...fields });
     db.prepare('UPDATE clips SET composition = ? WHERE slug = ?').run(JSON.stringify(doc.composition), doc.slug);

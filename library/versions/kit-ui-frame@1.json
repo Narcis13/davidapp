@@ -1,0 +1,100 @@
+{
+  "ref": "kit-ui-frame@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "UI frame",
+  "description": "A frame for UI captures: a browser window (three dots, a tab with a title, a URL bar with the url) or a phone or tablet (a body, a rounded screen, a camera or notch), around a picture or a screen recording given as `content`. The chrome takes the theme's colours (light or dark) and casts a soft shadow; the capture is drawn at the size of the viewport (at scale 1 a one-to-one copy of the footage). Chrome text is a share of the frame's short side, with a floor. Pairs with kit-camera, kit-cursor and kit-spotlight. Takes a theme.",
+  "tags": ["kit", "frame", "browser", "phone", "tablet", "device", "mockup", "ui", "screen-recording"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "device": {"type": "enum", "options": ["browser", "phone", "tablet"], "default": "browser"},
+    "content": {
+      "type": "image",
+      "default": null,
+      "description": "The capture: an image asset or footage (empty: a placeholder screen)"
+    },
+    "fit": {
+      "type": "enum",
+      "options": ["cover", "contain", "fill"],
+      "default": "cover",
+      "description": "How the capture fills the viewport or screen"
+    },
+    "url": {
+      "type": "string",
+      "default": "fablecut.studio/library",
+      "description": "Shown in the browser's URL bar"
+    },
+    "title": {"type": "string", "default": "Library", "description": "Shown on the browser's tab"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "chrome": {
+      "type": "enum",
+      "options": ["auto", "light", "dark"],
+      "default": "auto",
+      "description": "auto takes the colours of the theme; light or dark forces a neutral set"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 8,
+      "step": 0.01,
+      "description": "Browser only: 0 fits the window to the box; a number draws the capture at that multiple of its own size (1 = pixel for pixel)"
+    },
+    "aspect": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 4,
+      "step": 0.01,
+      "description": "Width over height of the browser viewport (0: the capture's own, or 16:10 without one)"
+    },
+    "orientation": {
+      "type": "enum",
+      "options": ["auto", "portrait", "landscape"],
+      "default": "auto",
+      "description": "Phone and tablet: auto is portrait for a phone and landscape for a tablet"
+    },
+    "notch": {
+      "type": "enum",
+      "options": ["island", "notch", "none"],
+      "default": "island",
+      "description": "Phone only"
+    },
+    "size": {
+      "type": "number",
+      "default": 2.6,
+      "min": 2.6,
+      "max": 8,
+      "step": 0.1,
+      "description": "Chrome text size in % of the frame's short side (the bars grow with it)"
+    },
+    "shadow": {
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.05,
+      "description": "Strength of the drop shadow (0 = none, and no room is kept for it)"
+    },
+    "inDur": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 3,
+      "step": 0.01,
+      "description": "Seconds it takes to ease in (0: there from the first frame)"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:49:39.664Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:49:39.664Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/kit-ui-frame@1.js", "sha1": "cfcbb72fe85a545f5a660098466579451d8e2924"},
+  "hash": "9407587db2d2a43bfab754fc32f6c463ef3eb82f9d7349284a1f60f21bf787b8"
+}

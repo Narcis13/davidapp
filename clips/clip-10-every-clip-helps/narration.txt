@@ -1,0 +1,4 @@
+Every video you make leaves pieces behind.
+In Fablecut, each one becomes an asset: searchable, versioned, and ready for the next clip.
+Nine clips added eighty-three assets to the library, and two clips needed no new code at all.
+Make your next video with code, in Fablecut.

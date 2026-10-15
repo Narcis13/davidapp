@@ -1,0 +1,78 @@
+{
+  "ref": "kit-plate@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Plate",
+  "description": "A content plate for explainers and marketing videos: a rounded panel in the theme's surface colour with a stacked (blur-free) shadow, a faint top highlight and a hairline border, easing in (scale and fade) and out, with an optional eyebrow and title on it. The base other kit items (charts, steps, icons, callouts) sit on, so their text keeps its contrast over any background. Sizes are a share of the frame's short side, with a floor. Takes a theme.",
+  "tags": ["kit", "plate", "panel", "card", "glass", "overlay", "marketing"],
+  "duration": 4,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "eyebrow": {"type": "string", "default": "Kit", "description": "A small label above the title (empty: none)"},
+    "title": {
+      "type": "string",
+      "default": "A plate for *anything*",
+      "description": "*Asterisks* mark words in the accent colour; \\n breaks a line (empty: a bare panel)"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 5,
+      "min": 2.5,
+      "max": 20,
+      "step": 0.1,
+      "description": "Title size in % of the frame's short side"
+    },
+    "align": {"type": "enum", "options": ["left", "center"], "default": "left"},
+    "valign": {
+      "type": "enum",
+      "options": ["top", "middle", "bottom"],
+      "default": "top",
+      "description": "Where the text sits (the rest of the plate is for the items on it)"
+    },
+    "padding": {
+      "type": "number",
+      "default": 3.2,
+      "min": 0,
+      "max": 15,
+      "step": 0.1,
+      "description": "% of the frame's short side"
+    },
+    "radius": {
+      "type": "number",
+      "default": 2.2,
+      "min": 0,
+      "max": 12,
+      "step": 0.1,
+      "description": "Corner radius, % of the frame's short side"
+    },
+    "fill": {
+      "type": "string",
+      "default": "",
+      "description": "Panel colour, a CSS colour (empty: the theme's surface)"
+    },
+    "border": {"type": "boolean", "default": true, "description": "A hairline border"},
+    "shadow": {"type": "boolean", "default": true},
+    "inDur": {"type": "number", "default": 0.5, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.35, "min": 0, "max": 3, "step": 0.01},
+    "from": {
+      "type": "number",
+      "default": 0.94,
+      "min": 0.2,
+      "max": 1,
+      "step": 0.01,
+      "description": "Scale it eases in from (and out to)"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T17:49:34.496Z",
+  "engine": 2,
+  "madeForClip": "clip-9-your-first-clip",
+  "parent": null,
+  "asset": {"created": "2026-10-15T17:49:34.496Z", "originClip": "clip-9-your-first-clip", "forkedFrom": null},
+  "source": {"file": "sources/kit-plate@1.js", "sha1": "3dd16fb1fdfcf79251f092918053e91fdd5a9a6b"},
+  "hash": "fa4e16615ed46da94f3a1ec323a38ba09b0213116b4931a898f08785cb04b11e"
+}

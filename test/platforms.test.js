@@ -104,3 +104,15 @@ test('captionLane: sits inside the safe zone, on its bottom edge', () => {
   assert.equal(captionLane(safe, 1080, 1920, { laneFraction: 1 }).height, safe.height); // clamped
   assert.throws(() => captionLane(safe, 1080, 1920, { laneFraction: 0 }), /laneFraction/);
 });
+
+test('matching: a shape no named profile is made for keeps the format\'s own safe zone (a square render of a clip made for Reels)', () => {
+  const square = platformSafe(['reels'], 1080, 1080, { matching: true });
+  const own = safeZone(1080, 1080);
+  assert.deepEqual([square.top, square.right, square.bottom, square.left], [own.top, own.right, own.bottom, own.left]);
+  assert.deepEqual(square.platforms, []);
+  assert.match(square.warnings[0], /none of reels is made for square frames/);
+  // the vertical render of the same clip takes Reels' insets
+  assert.ok(platformSafe(['reels'], 1080, 1920, { matching: true }).bottom > safeZone(1080, 1920).bottom);
+  // without matching, a profile still applies by its fractions (with a warning)
+  assert.ok(platformSafe(['reels'], 1080, 1080).bottom > own.bottom);
+});

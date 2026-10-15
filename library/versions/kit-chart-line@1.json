@@ -1,0 +1,113 @@
+{
+  "ref": "kit-chart-line@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Line chart",
+  "description": "An animated line chart: one to four series over named categories, an axis with round tick values, gridlines, lines that draw on over `draw` seconds, dots that pop in as each point is reached, and the last value of every line called out with a label (a legend when there are several). Smooth or straight lines, a soft area under them, a unit prefix or suffix on the values. Sizes are a share of the frame's short side with a floor. Pairs with kit-plate. Takes a theme.",
+  "tags": ["kit", "chart", "line", "data", "graph", "marketing", "explainer"],
+  "duration": 6,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "title": {
+      "type": "string",
+      "default": "Clips made per month",
+      "description": "*Asterisks* mark words in the accent colour (empty: no title)"
+    },
+    "labels": {
+      "type": "array",
+      "of": {"type": "string", "default": ""},
+      "minItems": 2,
+      "maxItems": 24,
+      "default": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+      "description": "The x categories"
+    },
+    "series": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "of": {
+        "type": "object",
+        "fields": {
+          "label": {"type": "string", "default": ""},
+          "values": {
+            "type": "array",
+            "of": {"type": "number", "default": 0},
+            "minItems": 1,
+            "maxItems": 24,
+            "default": [0, 1]
+          },
+          "color": {"type": "string", "description": "A CSS colour (empty: from the theme)", "default": ""}
+        },
+        "default": {"label": "", "values": [0, 1], "color": ""}
+      },
+      "default": [
+        {"label": "New", "values": [4, 9, 14, 26, 41, 63], "color": ""},
+        {"label": "Reused", "values": [1, 3, 8, 12, 20, 29], "color": ""}
+      ]
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "prefix": {"type": "string", "default": "", "description": "Before every value, e.g. $"},
+    "suffix": {"type": "string", "default": "", "description": "After every value, e.g. % or k"},
+    "zero": {
+      "type": "boolean",
+      "default": true,
+      "description": "Start the axis at zero when all values are above it"
+    },
+    "ticks": {"type": "integer", "default": 5, "min": 2, "max": 9, "description": "About this many axis ticks"},
+    "smooth": {
+      "type": "boolean",
+      "default": true,
+      "description": "Curved lines (never overshooting a value) instead of straight ones"
+    },
+    "area": {"type": "boolean", "default": true, "description": "A soft fill under each line"},
+    "highlight": {"type": "boolean", "default": true, "description": "Call out the last value of each line"},
+    "size": {
+      "type": "number",
+      "default": 2.8,
+      "min": 2.5,
+      "max": 8,
+      "step": 0.1,
+      "description": "Axis and label text in % of the frame's short side"
+    },
+    "titleSize": {
+      "type": "number",
+      "default": 4.6,
+      "min": 2.5,
+      "max": 14,
+      "step": 0.1,
+      "description": "Title size in % of the frame's short side"
+    },
+    "delay": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 10,
+      "step": 0.05,
+      "description": "Seconds before the lines start to draw"
+    },
+    "draw": {
+      "type": "number",
+      "default": 1.8,
+      "min": 0.2,
+      "max": 20,
+      "step": 0.05,
+      "description": "Seconds the lines take to draw on"
+    },
+    "outDur": {"type": "number", "default": 0.35, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-15T18:25:53.139Z",
+  "engine": 2,
+  "madeForClip": "clip-10-every-clip-helps",
+  "parent": null,
+  "asset": {
+    "created": "2026-10-15T18:25:53.139Z",
+    "originClip": "clip-10-every-clip-helps",
+    "forkedFrom": null
+  },
+  "source": {"file": "sources/kit-chart-line@1.js", "sha1": "d6c8d658e1c462a37568be6e60200fa5c6f3e5b9"},
+  "hash": "f6b213fc0e197886a81320d793dee0c5653478cf9def616d09310249948d907b"
+}

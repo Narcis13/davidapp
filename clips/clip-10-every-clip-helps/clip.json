@@ -1,0 +1,505 @@
+{
+  "slug": "clip-10-every-clip-helps",
+  "title": "Every clip helps the next",
+  "description": "A marketing video of about 30 s for Fablecut: every video leaves reusable pieces behind, so the next one costs less. Square, with a vertical render from the same composition; its logo as given, icons, a chart of the library growing and an end card with the call to action.",
+  "format": "square",
+  "width": 1080,
+  "height": 1080,
+  "fps": 30,
+  "duration": 27.533333333333335,
+  "composition": {
+    "format": "square",
+    "width": 1080,
+    "height": 1080,
+    "fps": 30,
+    "duration": 27.533333333333335,
+    "seed": 10,
+    "background": "#07111f",
+    "tracks": [
+      {
+        "id": "bg",
+        "name": "Background",
+        "type": "visual",
+        "items": [
+          {
+            "id": "drift",
+            "asset": "bg-gradient-drift@1",
+            "start": 0,
+            "duration": 23.1,
+            "params": {
+              "base": "#07111f",
+              "colors": ["#0c1a2e", "#11233b", "#0c1a2e"],
+              "intensity": 0.4,
+              "speed": 0.3,
+              "beatPulse": 0,
+              "vignette": 0.5
+            },
+            "fadeOut": 1
+          }
+        ]
+      },
+      {
+        "id": "scenes",
+        "name": "Scenes",
+        "type": "visual",
+        "items": [
+          {
+            "id": "browser",
+            "asset": "kit-ui-frame@1",
+            "start": 4.6,
+            "duration": 8.8,
+            "params": {
+              "device": "browser",
+              "content": "studio-library-search@1",
+              "url": "127.0.0.1:8787",
+              "title": "Library",
+              "theme": "theme-tide@1",
+              "inDur": 0
+            },
+            "fadeIn": 0.4,
+            "transform": {"x": 0.5, "y": 0.31, "width": 0.94, "height": 0.5},
+            "formats": {
+              "vertical": {"transform": {"x": 0.5, "y": 0.265, "width": 0.94, "height": 0.25}, "params": {"title": ""}}
+            },
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "plate",
+            "asset": "kit-plate@1",
+            "start": 13,
+            "duration": 9.4,
+            "params": {"eyebrow": "", "title": "", "theme": "theme-tide@1", "inDur": 0.45, "outDur": 0.35},
+            "transform": {"x": 0.5, "y": 0.47, "width": 0.9, "height": 0.6},
+            "formats": {"vertical": {"transform": {"x": 0.5, "y": 0.35, "width": 0.92, "height": 0.29}}},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "end",
+            "asset": "end-card@3",
+            "start": 22.015,
+            "duration": 5.518,
+            "params": {
+              "logo": "fablecut-logo@1",
+              "logoMode": "svg",
+              "title": "Make your next video with *code*",
+              "line": "Every clip helps the next",
+              "cta": "Make your first clip",
+              "url": "github.com/Narcis13/davidapp",
+              "theme": "theme-tide@1",
+              "clipTheme": true,
+              "size": 6.6,
+              "plate": true
+            },
+            "anchor": {"item": "vo-cta", "word": 39, "offset": -0.5},
+            "transform": {"x": 0.5, "y": 0.42, "width": 0.9, "height": 0.66},
+            "formats": {"vertical": {"transform": {"x": 0.5, "y": 0.34, "width": 0.92, "height": 0.36}}}
+          }
+        ]
+      },
+      {
+        "id": "graphics",
+        "name": "Graphics",
+        "type": "visual",
+        "items": [
+          {
+            "id": "icon-film",
+            "asset": "kit-icon@1",
+            "start": 0.79,
+            "duration": 4,
+            "params": {"name": "film", "weight": 2, "draw": 0.6, "pop": 0.35, "outDur": 0.3, "theme": "theme-tide@1"},
+            "anchor": {"item": "vo-outcome", "word": 1, "offset": -0.15},
+            "transform": {"x": 0.3, "y": 0.22, "width": 0.14, "height": 0.14},
+            "formats": {"vertical": {"transform": {"x": 0.3, "y": 0.2, "width": 0.16, "height": 0.07}}},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "icon-layers",
+            "asset": "kit-icon@1",
+            "start": 1.24,
+            "duration": 3.567,
+            "params": {"name": "layers", "weight": 2, "draw": 0.6, "pop": 0.35, "outDur": 0.3, "theme": "theme-tide@1"},
+            "anchor": {"item": "vo-outcome", "word": 3, "offset": -0.15},
+            "transform": {"x": 0.5, "y": 0.22, "width": 0.14, "height": 0.14},
+            "formats": {"vertical": {"transform": {"x": 0.5, "y": 0.2, "width": 0.16, "height": 0.07}}},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "icon-package",
+            "asset": "kit-icon@1",
+            "start": 1.8,
+            "duration": 3,
+            "params": {"name": "package", "weight": 2, "draw": 0.6, "pop": 0.35, "outDur": 0.3, "theme": "theme-tide@1"},
+            "anchor": {"item": "vo-outcome", "word": 5, "offset": -0.15},
+            "transform": {"x": 0.7, "y": 0.22, "width": 0.14, "height": 0.14},
+            "formats": {"vertical": {"transform": {"x": 0.7, "y": 0.2, "width": 0.16, "height": 0.07}}},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "label-icon-0",
+            "asset": "kit-icon@1",
+            "start": 7.867,
+            "duration": 5.533,
+            "params": {"name": "search", "weight": 2, "draw": 0.5, "pop": 0.3, "outDur": 0.3, "theme": "theme-tide@1"},
+            "transform": {"x": 0.2, "y": 0.615, "width": 0.07, "height": 0.07},
+            "formats": {"vertical": {"transform": {"x": 0.2, "y": 0.418, "width": 0.1, "height": 0.04}}}
+          },
+          {
+            "id": "label-icon-1",
+            "asset": "kit-icon@1",
+            "start": 8.567,
+            "duration": 4.833,
+            "params": {"name": "history", "weight": 2, "draw": 0.5, "pop": 0.3, "outDur": 0.3, "theme": "theme-tide@1"},
+            "transform": {"x": 0.5, "y": 0.615, "width": 0.07, "height": 0.07},
+            "formats": {"vertical": {"transform": {"x": 0.5, "y": 0.418, "width": 0.1, "height": 0.04}}}
+          },
+          {
+            "id": "label-icon-2",
+            "asset": "kit-icon@1",
+            "start": 9.467,
+            "duration": 3.933,
+            "params": {"name": "repeat", "weight": 2, "draw": 0.5, "pop": 0.3, "outDur": 0.3, "theme": "theme-tide@1"},
+            "transform": {"x": 0.8, "y": 0.615, "width": 0.07, "height": 0.07},
+            "formats": {"vertical": {"transform": {"x": 0.8, "y": 0.418, "width": 0.1, "height": 0.04}}}
+          },
+          {
+            "id": "chart",
+            "asset": "kit-chart-line@1",
+            "start": 13.477,
+            "duration": 8.933,
+            "params": {
+              "title": "Assets added, running total",
+              "labels": ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+              "series": [{"label": "Assets", "values": [27, 35, 39, 53, 60, 60, 72, 72, 83]}],
+              "theme": "theme-tide@1",
+              "delay": 0.4,
+              "draw": 1.6,
+              "size": 3,
+              "titleSize": 4.4
+            },
+            "anchor": {"item": "vo-proof", "word": 22, "offset": -0.4},
+            "transform": {"x": 0.5, "y": 0.48, "width": 0.82, "height": 0.5},
+            "formats": {"vertical": {"transform": {"x": 0.5, "y": 0.355, "width": 0.82, "height": 0.26}}},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          }
+        ]
+      },
+      {
+        "id": "titles",
+        "name": "Titles",
+        "type": "text",
+        "items": [
+          {
+            "id": "headline",
+            "asset": "title-plate@1",
+            "start": 0,
+            "duration": 4.8,
+            "params": {
+              "text": "Every video leaves *pieces* behind",
+              "theme": "theme-tide@1",
+              "size": 7.6,
+              "align": "center",
+              "inDur": 0,
+              "outDur": 0.3
+            },
+            "transform": {"x": 0.5, "y": 0.5, "width": 0.86, "height": 0.34},
+            "formats": {"vertical": {"transform": {"x": 0.5, "y": 0.34, "width": 0.86, "height": 0.16}}},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          },
+          {
+            "id": "label-0",
+            "asset": "title-plate@1",
+            "start": 7.85,
+            "duration": 5.533,
+            "params": {
+              "text": "Searchable",
+              "theme": "theme-tide@1",
+              "size": 3.4,
+              "align": "center",
+              "font": "body",
+              "weight": 600,
+              "inDur": 0.3,
+              "outDur": 0.3
+            },
+            "anchor": {"item": "vo-product", "word": 14, "offset": -0.2},
+            "transform": {"x": 0.2, "y": 0.698, "width": 0.28, "height": 0.07},
+            "formats": {"vertical": {"transform": {"x": 0.2, "y": 0.462, "width": 0.29, "height": 0.035}}}
+          },
+          {
+            "id": "label-1",
+            "asset": "title-plate@1",
+            "start": 8.575,
+            "duration": 4.833,
+            "params": {
+              "text": "Versioned",
+              "theme": "theme-tide@1",
+              "size": 3.4,
+              "align": "center",
+              "font": "body",
+              "weight": 600,
+              "inDur": 0.3,
+              "outDur": 0.3
+            },
+            "anchor": {"item": "vo-product", "word": 15, "offset": -0.2},
+            "transform": {"x": 0.5, "y": 0.698, "width": 0.28, "height": 0.07},
+            "formats": {"vertical": {"transform": {"x": 0.5, "y": 0.462, "width": 0.29, "height": 0.035}}}
+          },
+          {
+            "id": "label-2",
+            "asset": "title-plate@1",
+            "start": 9.465,
+            "duration": 3.933,
+            "params": {
+              "text": "Reusable",
+              "theme": "theme-tide@1",
+              "size": 3.4,
+              "align": "center",
+              "font": "body",
+              "weight": 600,
+              "inDur": 0.3,
+              "outDur": 0.3
+            },
+            "anchor": {"item": "vo-product", "word": 17, "offset": -0.2},
+            "transform": {"x": 0.8, "y": 0.698, "width": 0.28, "height": 0.07},
+            "formats": {"vertical": {"transform": {"x": 0.8, "y": 0.462, "width": 0.29, "height": 0.035}}}
+          },
+          {
+            "id": "no-new-code",
+            "asset": "title-plate@1",
+            "start": 17.122,
+            "duration": 5.267,
+            "params": {
+              "text": "Clips 6 and 8: *no new code*",
+              "theme": "theme-tide@1",
+              "size": 4,
+              "align": "center",
+              "inDur": 0.35,
+              "outDur": 0.3
+            },
+            "anchor": {"item": "vo-proof", "word": 31, "offset": -0.2},
+            "transform": {"x": 0.5, "y": 0.1, "width": 0.84, "height": 0.08},
+            "formats": {"vertical": {"transform": {"x": 0.5, "y": 0.178, "width": 0.86, "height": 0.04}}},
+            "motions": [
+              {"asset": "motion-drift@1", "params": {"amount": 0.004, "tilt": 0.3, "period": 5}, "phase": "loop"}
+            ]
+          }
+        ]
+      },
+      {
+        "id": "caps",
+        "name": "Captions",
+        "type": "text",
+        "items": [
+          {
+            "id": "cap",
+            "asset": "text-captions@2",
+            "start": 0,
+            "duration": 27.533,
+            "params": {"pill": "rgba(7,17,31,0.94)", "active": "#5ce1e6", "size": 4.6, "floor": 3.2}
+          }
+        ],
+        "role": "captions"
+      },
+      {
+        "id": "voice",
+        "name": "Narration",
+        "type": "audio",
+        "items": [
+          {
+            "id": "vo-outcome",
+            "asset": "clip-10-voice@2",
+            "start": 0.3,
+            "duration": 3,
+            "params": {},
+            "offset": 0
+          },
+          {
+            "id": "vo-product",
+            "asset": "clip-10-voice@2",
+            "start": 5,
+            "duration": 6.233,
+            "params": {},
+            "offset": 3.015
+          },
+          {
+            "id": "vo-proof",
+            "asset": "clip-10-voice@2",
+            "start": 13.4,
+            "duration": 6.1,
+            "params": {},
+            "offset": 9.238
+          },
+          {
+            "id": "vo-cta",
+            "asset": "clip-10-voice@2",
+            "start": 22,
+            "duration": 3.133,
+            "params": {},
+            "offset": 15.345
+          }
+        ],
+        "role": "narration"
+      },
+      {
+        "id": "music",
+        "name": "Music",
+        "type": "audio",
+        "items": [
+          {
+            "id": "bed",
+            "asset": "music-loop@1",
+            "start": 0,
+            "duration": 27.533,
+            "params": {"bpm": 112, "scale": "major"},
+            "fadeOut": 1,
+            "gain": 0.42,
+            "beats": true,
+            "duck": {"by": 18, "attack": 0.15, "release": 0.45, "hold": 0.25, "source": "words"}
+          }
+        ],
+        "role": "music"
+      }
+    ],
+    "markers": [
+      {"t": 0, "label": "the headline is read", "type": "hold", "duration": 0.6},
+      {"t": 4.6, "label": "product", "type": "cut"},
+      {"t": 13, "label": "proof", "type": "cut"},
+      {"t": 21.6, "label": "cta", "type": "cut"},
+      {"t": 22, "label": "end card holds", "type": "hold", "duration": 5.533}
+    ],
+    "theme": "theme-tide@1",
+    "loudness": {"target": -14, "truePeak": -1},
+    "captions": {"burnIn": true},
+    "platforms": ["reels"],
+    "safe": "platform"
+  },
+  "closure": ["bg-gradient-drift@1", "clip-10-voice@2", "drum-hat@1", "drum-kick@1", "drum-snare@1", "easing@1", "end-card@3", "fablecut-logo@1", "fablecut-mark@1", "font-inter@1", "font-jetbrains-mono@1", "font-space-grotesk@1", "kit-chart-line@1", "kit-icon@1", "kit-plate@1", "kit-ui-frame@1", "motion-drift@1", "music-loop@1", "studio-library-search@1", "synth-note@1", "text-captions@2", "theme-tide@1", "title-plate@1"],
+  "files": [
+    {
+      "ref": "clip-10-voice@2",
+      "sha256": "693eef2df1cbd5c03870c3dd3d87da4c47416c767f4bc18eb5109ff5d1b1794e",
+      "bytes": 898364,
+      "ext": "wav",
+      "store": "repo",
+      "license": "Apache-2.0",
+      "sourceUrl": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "creator": "Kokoro-82M (hexgrad), voice af_heart"
+    },
+    {
+      "ref": "fablecut-logo@1",
+      "sha256": "5dfdcf8be3fec06ef08a868e41fbd2332ec8a4cffbd1f3b507e97997fd27aa28",
+      "bytes": 134524,
+      "ext": "png",
+      "store": "repo",
+      "license": "original",
+      "sourceUrl": null,
+      "creator": "Fablecut"
+    },
+    {
+      "ref": "fablecut-logo@1",
+      "role": "sidecar",
+      "sha256": "18f1281ce24e75ed01c17a1b95a30b6921167d79a18cb99dd015ea5615187b86",
+      "bytes": 2426,
+      "ext": "svg",
+      "store": "repo",
+      "license": "original",
+      "sourceUrl": null,
+      "creator": "Fablecut"
+    },
+    {
+      "ref": "fablecut-mark@1",
+      "sha256": "44451f570cc97487bf475c2cdb85c048e1e6a06032dcc2b69c230fc33cf61f80",
+      "bytes": 8904,
+      "ext": "png",
+      "store": "repo",
+      "license": "original",
+      "sourceUrl": null,
+      "creator": null
+    },
+    {"ref": "font-inter@1", "store": "bundled", "family": "Inter", "license": "OFL-1.1"},
+    {
+      "ref": "font-jetbrains-mono@1",
+      "store": "bundled",
+      "family": "JetBrains Mono",
+      "license": "OFL-1.1"
+    },
+    {"ref": "font-space-grotesk@1", "store": "bundled", "family": "Space Grotesk", "license": "OFL-1.1"},
+    {
+      "ref": "studio-library-search@1",
+      "sha256": "d30473b0f6d65717c195dfd47fe08aa20d0926414d09d7bd82eeb976e25b0197",
+      "bytes": 447934,
+      "ext": "mp4",
+      "store": "repo",
+      "license": "original",
+      "sourceUrl": null,
+      "creator": "Fablecut (scripts/record-studio.mjs)"
+    }
+  ],
+  "check": {
+    "machine": "win32-x64",
+    "engine": 2,
+    "frames": {
+      "8": "b5b48f818ad3708773062acc4a0e74318af6e881da2c97cb8de4b6c19ed44eea",
+      "25": "915338ba390d07a669ee469fc48097729acaee15b74ea4191eb126e2035a6342",
+      "43": "a7f78737fb339ce07f08886e6ffb5fc1252d6999cc82d1898aa29d3daeddd57e",
+      "60": "533e84f02e5b34f8eb46e5174fd27411d1d26d1fadb240d966f005dae5b46fdd",
+      "77": "51ef9ca3416f9a9c606244cd1959bcec34dedea025ba510e28a330b406d10c4c",
+      "94": "a31aac35fba1add5c2efeb98270aa440f62def2244f6be4390168fa2587a32c3",
+      "111": "786df9f2f60dfffd355ae3160823c50cb8e952870e054408b0aa3e294834dc29",
+      "129": "54071b419b1becab463535f7712adfcb584b0d06825551c71008a23144bbb0f7",
+      "146": "30a8c1b4d3b95669a682e74ee4f14cc0b22ef46c27bc7475c84392e084139475",
+      "163": "bb3cc78257994b54c6cf23e46c338e5042c2f73ad6f6aaae9f90b76cadec2c86",
+      "180": "b4f6415dc187e2bd5a55f928c339212b97fb4e8b01f1060f1325c0dd5133d4f6",
+      "197": "ea6ac4fca7f66cd97f4e0c3b5f4f4b1c3bd2d8c91fa7bcace78455bac1996152",
+      "215": "8b725c6a32d842975c53b056cb4def963f54b5f7eb72c8f9aa5b66694abbdfb1",
+      "232": "3f671b22998b341bcd32fb443ddf90a63401b27a229695dac7d3b8d65a1d0fd8",
+      "249": "ddc46e3bae62748bf9f15e06ac8958548c6262fd942d5626fd2f735a8d445555",
+      "266": "0019e00a3e2ea9de5ae088651e9f88869e89ef1c9edd5607497f4ba75a12fb84",
+      "283": "dd4f48087aa4860a8fc91123da2068eaca98ea654f87098c3a3c87cb119fddb7",
+      "301": "c9ed2918b0b5bc782193a9422142ab1bc5ce543c79535b3c73e699431da4fbe1",
+      "318": "1dff51d79178faa63351739a1023007e63080dbad76742a8b4d3e74a0545dd49",
+      "335": "fe7eb9780da33e502d9e0dad519e5a24169dd77c02a3a3a8a4f17e9bbf52c9c0",
+      "352": "0f565046af2eaccfb4dcd61aa98339e5c932300598db4e0b2c0def3f591a580b",
+      "369": "8d4989dfa2fa7c831acea4e3e7111c502514512bc9f5540f88f73d8783a27989",
+      "387": "27045b38c6b472d7933a84444b13bf841cab9de3d58fda95d5c18f2e9bec51ba",
+      "404": "2a28cfb448fb1c9dd5f262cdae736912e2d36adac01bda1ddd9b66b97cd47479",
+      "421": "41816f78b5fbd1c6b4b18f0f64a756ae7348c3649c26bdd3e6ef1494b7bcb8e2",
+      "438": "10a72b73a7256f6c7890f2e511cd12e0d30bb4be652d98f57cc96def816f9986",
+      "456": "a4855e92b88df53557130c866ed955e7a8406f9ce8018c2b76e9f9b9e85dd90a",
+      "473": "3f07f486c81ea5490ffe0d905f1b53850922b3531f938bb63fa0b11d16568e58",
+      "490": "6e1edd01882df423897d2e38830c020f3ac3dce230f8608040a631eafdf7df07",
+      "507": "a5dcbdf3e0a4737d8b2294e5cf53afb8dac7f5b90c3668b0aeb0e6bb3a5ecf95",
+      "524": "0650e21e367dbeecfd6593daea41b1144f0c3ca62db5ade50af30906eba124f8",
+      "542": "cf68783a08692464a99b38d17e7e82bbd06cd83d450cd63f65ca3078cfdf415c",
+      "559": "65b2526ff8281d7f370e3d424e0579ea97bef6fce230420a0b6ec9945c1a8e80",
+      "576": "9777ef57cb4820fe2270f2aa5685d26268ddf9ecc0528202b984e4e76d36e80b",
+      "593": "84b8ac27fc99bb66444f1330364d7f2155d1c1dcf392fc16852b9778ab3223cd",
+      "610": "8de86f6bade11bfe73586e226275205f796b07b94a775fa61c35b0b37fae9344",
+      "628": "7180a54c9f12fb9008a0aea3a4cb2538567ec64be68484b286c531fc8fc22432",
+      "645": "362ff9d66642c9939b3a2c06e6f57aee35d55f7040792ffb7d010c8b061bd791",
+      "662": "05ffbacd3768e5c99c2ce932612bed92f2471d3413cedcc4c4aa1890de0399f7",
+      "679": "aa270d2e00741a0824c82e8fdbc62ad71e1cc89d3f544ad8aa62c52875739854",
+      "696": "9ea242dc2c32334402653f350ce673b2fd5147a5ea111a7e67e5bbc4823ba3f3",
+      "714": "3bed0a5fb42311774c8eb5fd6c149c43fc5ff9568b486cc51b978c939b14697e",
+      "731": "cde82212238619fa0c603e93285f73b13fa7b3333bdb4883c93e2f77fc8e4198",
+      "748": "e87182c008e84900863fc2fc854c145a51f12138d80f145e91fd6fe4f60d60c8",
+      "765": "f7136f024e029e2801b4fe64e2f4c24d6f89a1175579e2c3daa9f66c23cedae7",
+      "782": "f7136f024e029e2801b4fe64e2f4c24d6f89a1175579e2c3daa9f66c23cedae7",
+      "800": "f7136f024e029e2801b4fe64e2f4c24d6f89a1175579e2c3daa9f66c23cedae7",
+      "817": "f7136f024e029e2801b4fe64e2f4c24d6f89a1175579e2c3daa9f66c23cedae7"
+    }
+  }
+}

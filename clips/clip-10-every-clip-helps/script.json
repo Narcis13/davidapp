@@ -1,0 +1,34 @@
+{
+  "slug": "clip-10-every-clip-helps",
+  "language": "en",
+  "title": "Every clip helps the next",
+  "beats": [
+    {
+      "id": "outcome",
+      "voice": "Every video you make leaves pieces behind.",
+      "key": "pieces",
+      "screen": { "title": "Every video leaves *pieces* behind" }
+    },
+    {
+      "id": "product",
+      "voice": "In Fablecut, each one becomes an asset: searchable, versioned, and ready for the next clip.",
+      "key": "asset",
+      "screen": { "labels": ["Searchable", "Versioned", "Reusable"], "url": "127.0.0.1:8787", "title": "Library" }
+    },
+    {
+      "id": "proof",
+      "voice": "Nine clips added eighty-three assets to the library, and two clips needed no new code at all.",
+      "key": "eighty-three",
+      "screen": {
+        "chart": { "title": "Assets added, running total", "labels": ["1", "2", "3", "4", "5", "6", "7", "8", "9"], "label": "Assets", "values": [27, 35, 39, 53, 60, 60, 72, 72, 83] },
+        "callout": "Clips 6 and 8: *no new code*"
+      }
+    },
+    {
+      "id": "cta",
+      "voice": "Make your next video with code, in Fablecut.",
+      "key": "Make",
+      "screen": { "title": "Make your next video with *code*", "line": "Every clip helps the next", "cta": "Make your first clip", "url": "github.com/Narcis13/davidapp" }
+    }
+  ]
+}

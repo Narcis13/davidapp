@@ -22,6 +22,10 @@ const noRender = argv.includes('--no-render');
 const until = argv.includes('--until') ? Number(argv[argv.indexOf('--until') + 1]) : Infinity;
 
 const SPEECH_ONLY = new Set(['voice_samples', 'transcribe', 'speech_status']);
+// calls that write into the repo (a clip's export, its import): a rebuild makes the library, it never writes the repo
+const REPO_ONLY = new Set(['export_clip', 'import_clip']);
+/** One key per clip and shape list, so a render of several formats is replaced only by a later render of the same ones. */
+const renderKey = (a) => `${a.clip}|${a.format ?? (a.formats ?? []).join(',')}`;
 
 /**
  * generate_narration as add_narration of the take it made: showcase/voice/<name>.m4a (the audio, AAC) and
@@ -44,7 +48,7 @@ for (const clip of JOURNALS) {
   const entries = readFileSync(join(here, 'journal', `${clip}.jsonl`), 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((e) => e.kind !== 'read' && e.ok);
   // a render a later render of the same clip and format replaced (the first try at a gate) is not made again
   const lastRender = new Map();
-  entries.forEach((e, i) => { if (e.name === 'start_render') lastRender.set(`${e.args.clip}|${e.args.format ?? ''}`, i); });
+  entries.forEach((e, i) => { if (e.name === 'start_render') lastRender.set(renderKey(e.args), i); });
   // an update_clip with "@module:<file>" inlines that file as it is now, so every such save of a clip is the final
   // composition: an earlier one is the same input as a later one, and it can name asset versions the replay has not made
   // yet. It is skipped when a later save of the same clip and module follows with nothing in between that edits the clip.
@@ -63,10 +67,10 @@ for (const clip of JOURNALS) {
     if (e.kind === 'user') steps.push({ user: e.name, args: e.args, clip });
     else if (moduleSave(e) && superseded(i)) return;
     // speech calls that change nothing in the library (voice samples for a gate, a transcription) are not made again
-    else if (SPEECH_ONLY.has(e.name)) return;
+    else if (SPEECH_ONLY.has(e.name) || REPO_ONLY.has(e.name)) return;
     // a narration the voice engine made is replayed from its committed take, so a rebuild needs no voice model
     else if (e.name === 'generate_narration') steps.push({ tool: 'add_narration', args: replayNarration(e.args), journal: true });
-    else if (e.name !== 'start_render' || lastRender.get(`${e.args.clip}|${e.args.format ?? ''}`) === i) steps.push({ tool: e.name, args: e.args, render: e.name === 'start_render', journal: true });
+    else if (e.name !== 'start_render' || lastRender.get(renderKey(e.args)) === i) steps.push({ tool: e.name, args: e.args, render: e.name === 'start_render', journal: true });
   });
 }
 

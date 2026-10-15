@@ -72,7 +72,8 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
     const runs = [];
     try {
       // a frame whose text cannot fit at its size floor throws (TextFloorError): that is an issue at that time, not a failed check
-      const floorError = (e) => /^TextFloorError\b/.test(String(e?.assetStack ?? ''));
+      // the asset's stack names it, or (an asset that draws another's text, a kit frame's chrome) only the message does
+      const floorError = (e) => /^TextFloorError\b/.test(String(e?.assetStack ?? '')) || /\bTextFloorError:/.test(String(e?.message ?? ''));
       const measured = await Promise.all([...frames].sort((x, y) => x - y).map((f) => pool.run('inspectFrame', { frame: f, contrast: want('contrast') }, { bundle, timeout: 120000 })
         .then((r) => ({ f, ...r }), (e) => { if (!floorError(e)) throw e; return { f, floorError: e.message, texts: [], std: 99 }; })));
       let prevFrame = -1;

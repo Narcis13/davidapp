@@ -387,7 +387,21 @@ export function createClips(ctx, library) {
     const out = { framesChecked: picked.length, msPerFrame: Math.round((performance.now() - t0) / Math.max(1, picked.length)) };
     const glyphs = glyphFindings(texts, composition, library);
     if (glyphs.length) out.missingGlyphs = glyphs.map((g) => `${g.char} (${g.codepoints.join(' ')}, ${g.kind}) is not in ${g.family}: it falls back to a system font (items ${g.items.join(', ')})`);
+    // the families the sampled frames drew with: an asset can draw its theme's fonts without a font parameter naming them
+    const drawn = [...new Set(texts.map((t) => t.family).filter(Boolean))].sort();
+    if (drawn.length) out.fontsDrawn = drawn;
     return out;
+  }
+
+  /**
+   * The bundled font assets of the families a check saw drawn, so the clip's closure (and its credits) lists them. An
+   * unchecked save (an import) is given them instead: drawnFonts, the bundled font refs of the exported closure.
+   * @param {any} checked
+   */
+  function drawnFonts(checked) {
+    if (!checked?.fontsDrawn) return [];
+    const catalog = library.fontCatalog();
+    return checked.fontsDrawn.map((family) => catalog.find(family)).filter((f) => f?.bundled).map((f) => f.ref);
   }
 
   // ── storage ───────────────────────────────────────────────────────────────────────────────
@@ -426,7 +440,7 @@ export function createClips(ctx, library) {
   const emptyComposition = ({ format, width, height, fps, duration, background, seed }) => ({ format, width, height, fps: fps ?? 30, duration: duration ?? 30, background, seed, tracks: [] });
 
   /** Create a clip. Without a composition it starts empty, so assets can be created "for" it first. @param {any} o */
-  async function createClip({ slug, title, description = '', author, composition, format, width, height, fps, duration, background, seed, remixedFrom, check: doCheck = true }) {
+  async function createClip({ slug, title, description = '', author, composition, format, width, height, fps, duration, background, seed, remixedFrom, check: doCheck = true, drawnFonts: given = [] }) {
     if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid clip name: use lowercase letters, digits and dashes (2–64 characters)`);
     if (!author) throw new StudioError('author is required');
     if (q('SELECT 1 FROM clips WHERE slug = ?').get(slug)) throw new StudioError(`A clip named "${slug}" already exists. Use update_clip to change it.`, 'conflict');
@@ -438,7 +452,7 @@ export function createClips(ctx, library) {
     try { transaction(db, () => {
       const id = q(`INSERT INTO clips (slug, title, description, format, width, height, fps, duration, composition, revision, remixed_from, author, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`).run(slug, title ?? slug, description, c.format, c.width, c.height, c.fps, c.duration, JSON.stringify(c), from?.id ?? null, author, at, at).lastInsertRowid;
-      writeUsage(id, p.refs, p.fonts);
+      writeUsage(id, p.refs, [...new Set([...p.fonts, ...drawnFonts(checked), ...given])]);
       ctx.events?.emit('clip', slug, 'created', { revision: 1, author, remixedFrom: remixedFrom ?? null });
     }); } catch (e) {
       if (/UNIQUE constraint/i.test(String(e?.message))) throw new StudioError(`A clip named "${slug}" already exists. Use update_clip to change it.`, 'conflict');
@@ -448,7 +462,7 @@ export function createClips(ctx, library) {
   }
 
   /** Replace a clip's composition and/or its title and description. Bumps the revision. @param {string} slug @param {any} [o] */
-  async function updateClip(slug, { title, description, composition, check: doCheck = true, repin, by, revision: base } = {}) {
+  async function updateClip(slug, { title, description, composition, check: doCheck = true, repin, by, revision: base, drawnFonts: given = [] } = {}) {
     const row = clipRow(slug);
     // a save made from an older revision (the editor sends the one it loaded) must not overwrite a newer one
     if (base !== undefined && base !== null && base !== row.revision) throw new StudioError(`Clip "${slug}" is at revision ${row.revision}, not ${base}: it was changed elsewhere. Load it again.`, 'conflict');
@@ -463,7 +477,7 @@ export function createClips(ctx, library) {
       const done = q('UPDATE clips SET title = ?, description = ?, format = ?, width = ?, height = ?, fps = ?, duration = ?, composition = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?')
         .run(title ?? row.title, description ?? row.description, c.format, c.width, c.height, c.fps, c.duration, JSON.stringify(c), now(), row.id, row.revision);
       if (!done.changes) throw new StudioError(`Clip "${slug}" was changed by someone else while this edit was being checked (it was revision ${row.revision}). Load it again and re-apply the edit.`, 'conflict');
-      if (p) writeUsage(row.id, p.refs, p.fonts);
+      if (p) writeUsage(row.id, p.refs, [...new Set([...p.fonts, ...drawnFonts(checked), ...given])]);
       ctx.events?.emit('clip', slug, 'updated', { revision: row.revision + 1, by: by ?? null });
     });
     return { clip: getClip(slug), checked };
