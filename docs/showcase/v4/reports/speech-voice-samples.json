@@ -9,7 +9,7 @@
    "language": "en-us",
    "gender": "female",
    "grade": "A",
-   "path": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\fablecut-speech\\data\\speech\\samples\\e346888e79-af_heart.wav",
+   "path": "<temp>\\claude\\fablecut-speech\\data\\speech\\samples\\e346888e79-af_heart.wav",
    "seconds": 2.45,
    "cached": false
   },
@@ -19,7 +19,7 @@
    "language": "en-gb",
    "gender": "female",
    "grade": "B-",
-   "path": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\fablecut-speech\\data\\speech\\samples\\66a590f356-bf_emma.wav",
+   "path": "<temp>\\claude\\fablecut-speech\\data\\speech\\samples\\66a590f356-bf_emma.wav",
    "seconds": 2.75,
    "cached": false
   },
@@ -29,7 +29,7 @@
    "language": "en-us",
    "gender": "male",
    "grade": "C+",
-   "path": "C:\\Users\\User1\\AppData\\Local\\Temp\\claude\\fablecut-speech\\data\\speech\\samples\\84a5ec8442-am_fenrir.wav",
+   "path": "<temp>\\claude\\fablecut-speech\\data\\speech\\samples\\84a5ec8442-am_fenrir.wav",
    "seconds": 2.35,
    "cached": false
   }

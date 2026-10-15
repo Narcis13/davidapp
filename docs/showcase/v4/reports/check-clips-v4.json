@@ -1,0 +1,82 @@
+[
+ {
+  "clip": "clip-9-your-first-clip",
+  "format": "horizontal",
+  "frames": 111,
+  "seconds": 6.79,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 0,
+   "hold": 0,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 0
+  },
+  "issues": []
+ },
+ {
+  "clip": "clip-10-every-clip-helps",
+  "format": "square",
+  "frames": 56,
+  "seconds": 1.16,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 0,
+   "hold": 0,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 0
+  },
+  "issues": []
+ },
+ {
+  "clip": "clip-10-every-clip-helps",
+  "format": "vertical",
+  "frames": 56,
+  "seconds": 1.27,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 0,
+   "hold": 0,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 0
+  },
+  "issues": []
+ },
+ {
+  "clip": "clip-11-the-kit",
+  "format": "horizontal",
+  "frames": 34,
+  "seconds": 1.36,
+  "counts": {
+   "safe-zone": 0,
+   "clipped": 0,
+   "overlap": 0,
+   "caption-lane": 0,
+   "size": 0,
+   "contrast": 0,
+   "hold": 0,
+   "captions": 0,
+   "glyphs": 0,
+   "first-frame": 0,
+   "last-frame": 0
+  },
+  "issues": []
+ }
+]

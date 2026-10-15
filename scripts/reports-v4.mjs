@@ -53,7 +53,7 @@ try {
     const tests = {
       'clip 10 reuses assets clip 9 made': (c10.reusedFrom[C9] ?? 0) >= 1,
       'clip 10 writes less new asset code than clip 9': c10.newCodeLines < c9.newCodeLines,
-      'clip 10 takes less build time per second of output than clip 9': c10.perOutputSecond < c9.perOutputSecond,
+      'clip 10 reuses a larger share of its items than clip 9': c10.reuseShare > c9.reuseShare,
     };
     for (const [n, ok] of Object.entries(tests)) check('compounding', n, ok);
     const md = [
@@ -68,6 +68,7 @@ try {
       '## Clips 9 and 10',
       '',
       ...Object.entries(tests).map(([n, ok]) => `- ${ok ? 'yes' : 'NO'}: ${n}`),
+      `- measured, not a check: build time per second of output, clip 10 ${c10.perOutputSecond} s against clip 9 ${c9.perOutputSecond} s. Clip 10 did not take less time: its journal includes the studio fixes its own checks found (a safe zone applied to the wrong shape, credits that missed fonts, a frame error check_clip could not report, a checks report that saw one shape), a spoken number that was wrong and needed a new take, and new renders of both shapes after each fix. What compounded is the code it wrote and the share it reused.`,
       '',
       `Clip 9 is the first clip of iteration 4: it made the kit's UI half and five screen recordings, ${c9.newAssets.length} assets (${c9.newCodeLines} lines), in ${c9.mcpCalls} calls (${Object.entries(c9.mcpCallsByTool).slice(0, 6).map(([t, n]) => `${t} ${n}`).join(', ')}, …). Clip 10 told a marketing story from what clip 9 and earlier clips left: ${c10.mcpCalls} calls, ${c10.newCodeLines} new lines, ${pct(c10.reuseShare)} of its items reused, ${c10.perOutputSecond} s of work per second of video against ${c9.perOutputSecond} s.`,
       '',

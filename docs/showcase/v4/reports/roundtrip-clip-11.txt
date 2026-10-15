@@ -1,7 +1,7 @@
 Round trip of 1 clip: clip-11-the-kit
-machine win32-x64, code 114819e, repo a new empty folder (C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\tmp\roundtrip-dKzeA9\repo)
-original library C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\prod
-new library      C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\tmp\roundtrip-dKzeA9\library-data (empty)
+machine win32-x64, code 114819e, repo a new empty folder (<scratch>\tmp\roundtrip-dKzeA9\repo)
+original library <scratch>\prod
+new library      <scratch>\tmp\roundtrip-dKzeA9\library-data (empty)
 
 export clip-11-the-kit: 19 refs in the closure (16 versions, 0 files left out of git), 48 frame hashes, 33 files written, 1.5 s
   the store: 0.6 MB in library/, 0.0 MB in clips/

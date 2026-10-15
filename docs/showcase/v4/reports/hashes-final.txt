@@ -1,0 +1,13 @@
+Frame hashes after iteration 4, against reports/baseline-hashes.json (taken before any code change):
+a fresh npm run showcase into an empty data dir (no voice tools configured), then clips/history-of-ai/compose.mjs --render, then
+node scripts/hashes.mjs out.json --compare docs/showcase/v4/reports/baseline-hashes.json at code f2ac0fe.
+
+✓ clip-1-every-frame: 120 dense frames, 18 render samples identical
+✓ clip-2-compounding: 120 dense frames, 18 render samples identical
+✓ clip-3-release-notes: 120 dense frames, 18 render samples identical
+✓ clip-4-direct-the-studio: 113 dense frames, 18 render samples identical
+✓ clip-5-a-library-in-3d: 225 dense frames, 18 render samples identical
+✓ clip-6-what-the-library-holds: 338 dense frames, 18 render samples identical
+✓ clip-7-a-video-that-checks-itself: 233 dense frames, 18 render samples identical
+✓ clip-8-cuvinte-pe-ritm: 144 dense frames, 18 render samples identical
+✓ history-of-ai: 150 dense frames, 18 render samples identical

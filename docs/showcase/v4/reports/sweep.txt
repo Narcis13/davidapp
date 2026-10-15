@@ -1,0 +1,97 @@
+sweep.sh over every screen in .claude/goal-loop/screens (85 screens, desktop 1440x900 and phone 390x844) on the showcase rebuilt from an empty data dir
+(npm run showcase, clips 1-11) plus dev-seed-v2, dev-seed-v3 and the scripts/workflows-v4.mjs data, port 8803, 2026-10-15, code f2ac0fe.
+Server log: 0 ERROR lines.
+
+library                      ok
+library-filtered             ok
+asset                        ok
+clips                        ok
+editor                       ok
+renders                      ok
+gallery                      ok
+gallery-open                 ok
+    JS null
+lineage                      ok
+library-phone                ok
+asset-phone                  ok
+clips-phone                  ok
+editor-phone                 ok
+renders-phone                ok
+gallery-phone                ok
+gallery-open-phone           ok
+    JS null
+lineage-phone                ok
+requests                     ok
+request-thread               ok
+editor-v2                    ok
+asset-motion                 ok
+asset-3d                     ok
+asset-sequence               ok
+asset-upload                 ok
+asset-proposal               ok
+library-detail               ok
+requests-phone               ok
+request-thread-phone         ok
+editor-v2-phone              ok
+asset-3d-phone               ok
+editor-clip4                 ok
+editor-clip5                 ok
+editor-clip6                 ok
+asset-orb                    ok
+asset-orb-spin               ok
+asset-preset                 ok
+asset-precomp                ok
+asset-svg                    ok
+asset-effect                 ok
+asset-transition             ok
+request-clip                 ok
+library-motion               ok
+editor-clip4-phone           ok
+editor-clip5-phone           ok
+asset-orb-phone              ok
+asset-svg-phone              ok
+request-clip-phone           ok
+editor-clip7                 ok
+editor-clip8                 ok
+asset-narration              ok
+asset-captions               ok
+asset-check-list             ok
+renders-report               ok
+    JS null
+gallery-clip7                ok
+editor-clip7-phone           ok
+editor-clip8-phone           ok
+renders-report-phone         ok
+    JS null
+gallery-clip7-phone          ok
+editor-v3                    ok
+editor-v3-phone              ok
+editor-captions              ok
+    JS {"interrupted":false}
+editor-footage               ok
+asset-footage                ok
+asset-font                   ok
+editor-captions-phone        ok
+editor-footage-phone         ok
+asset-footage-phone          ok
+asset-font-phone             ok
+asset-provenance             ok
+asset-unknown-licence        ok
+editor-credits               ok
+editor-repo                  ok
+render-panel                 ok
+    JS null
+renders-batch                ok
+library-kit                  ok
+library-licence              ok
+asset-kit-callout            ok
+asset-kit-donut              ok
+asset-provenance-phone       ok
+editor-credits-phone         ok
+editor-repo-phone            ok
+render-panel-phone           ok
+    JS null
+renders-batch-phone          ok
+library-kit-phone            ok
+asset-kit-callout-phone      ok
+screens in <sweep>: 0 problem(s)

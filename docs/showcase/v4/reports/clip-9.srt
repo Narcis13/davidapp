@@ -1,0 +1,62 @@
+1
+00:00:01,244 --> 00:00:03,060
+This is a clip made in Fablecut.
+
+2
+00:00:03,919 --> 00:00:06,040
+In the next minute,
+you will make one like it.
+
+3
+00:00:08,954 --> 00:00:10,125
+Start in the library.
+
+4
+00:00:10,969 --> 00:00:13,820
+Search for what you need,
+and every asset shows you
+
+5
+00:00:13,820 --> 00:00:14,620
+what it draws.
+
+6
+00:00:18,401 --> 00:00:19,912
+Open one in the playground.
+
+7
+00:00:20,751 --> 00:00:23,617
+Change a parameter,
+and the preview follows at once.
+
+8
+00:00:27,806 --> 00:00:28,797
+Add it to a clip.
+
+9
+00:00:29,651 --> 00:00:32,162
+Drag it on the timeline,
+and trim it to fit.
+
+10
+00:00:37,929 --> 00:00:38,729
+Then render.
+
+11
+00:00:39,634 --> 00:00:42,450
+The studio checks the file
+it made, from loudness
+
+12
+00:00:42,450 --> 00:00:43,475
+to frozen frames.
+
+13
+00:00:46,794 --> 00:00:48,450
+Find, tune, place, render.
+
+14
+00:00:49,344 --> 00:00:51,565
+Open the studio,
+and make your first clip.
+

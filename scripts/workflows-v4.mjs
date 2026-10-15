@@ -861,14 +861,16 @@ await workflow('render', 'the render panel: a draft with two workers and a poste
   await s.waitFor(`location.pathname === '/renders' && document.querySelectorAll('[data-testid=render-row]').length >= 4`, 'the three renders');
   await s.sleep(500);
   await s.frame();
-  await s.waitFor(`document.querySelectorAll('[data-testid=render-row].in-batch[data-status=done]').length === 3`, 'the three shapes to finish', 240000);
+  // the newest batch is this request's (a library that already has batches, like the showcase, lists those too)
+  const newest = `[...document.querySelectorAll('[data-testid=render-batch]')].sort((a, b) => Number(b.dataset.batch) - Number(a.dataset.batch))[0]`;
+  await s.waitFor(`/3 of 3 done/.test(${newest}?.textContent ?? '')`, 'the three shapes to finish', 240000);
   await s.sleep(500);
-  await s.evaluate(`${q(tid('render-batch'))}.scrollIntoView({ block: 'center' })`);
+  await s.evaluate(`${newest}.scrollIntoView({ block: 'center' })`);
   await s.frame();
   const list = (await get(s, `/api/renders?clip=${REPO_CLIP}`)).renders;
   const batch = list.filter((r) => r.options.batch);
   expect('one request made three renders with one batch id: horizontal, vertical, square', batch.length === 3 && new Set(batch.map((r) => r.options.batch)).size === 1 && batch.map((r) => r.format).sort().join() === 'horizontal,square,vertical', batch.map((r) => `${r.format}#${r.id}`));
-  expect('the queue groups them under one heading', (await s.evaluate(`document.querySelectorAll('[data-testid=render-batch]').length`)) === 1 && /3 shapes/.test(await s.evaluate(`${q(tid('render-batch'))}.textContent`)), await s.evaluate(`${q(tid('render-batch'))}.textContent`));
+  expect('the queue groups them under one heading', (await s.evaluate(`${newest}.dataset.batch`)) === String(batch[0]?.options.batch) && /3 shapes/.test(await s.evaluate(`${newest}.textContent`)), await s.evaluate(`${newest}.textContent`));
   expect('the draft is not part of it', !list.find((r) => r.id === draft.id).options.batch);
   await s.shot(join(out, 'studio', 'v4-render-batch.png'), { full: true });
   await checkLayout(s, expect, 'renders', false);

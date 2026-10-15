@@ -1,7 +1,7 @@
 Round trip of 1 clip: clip-9-your-first-clip
-machine win32-x64, code ea14f22, repo a new empty folder (C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\tmp\roundtrip-6ePLNv\repo)
-original library C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\prod
-new library      C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\tmp\roundtrip-6ePLNv\library-data (empty)
+machine win32-x64, code ea14f22, repo a new empty folder (<scratch>\tmp\roundtrip-6ePLNv\repo)
+original library <scratch>\prod
+new library      <scratch>\tmp\roundtrip-6ePLNv\library-data (empty)
 
 export clip-9-your-first-clip: 27 refs in the closure (26 versions, 0 files left out of git), 48 frame hashes, 53 files written, 4.8 s
   the store: 4.4 MB in library/, 0.1 MB in clips/

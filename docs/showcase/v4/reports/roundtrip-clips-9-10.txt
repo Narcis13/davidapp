@@ -1,7 +1,7 @@
 Round trip of 2 clips: clip-9-your-first-clip, clip-10-every-clip-helps
-machine win32-x64, code c56a1a1, repo a new empty folder (C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\tmp\roundtrip-k8KN1W\repo)
-original library C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\prod
-new library      C:\Users\User1\AppData\Local\Temp\claude\C--newme-davidapp\d5f5070e-530a-4868-a5cc-34a413a2bba3\scratchpad\tmp\roundtrip-k8KN1W\library-data (empty)
+machine win32-x64, code c56a1a1, repo a new empty folder (<scratch>\tmp\roundtrip-k8KN1W\repo)
+original library <scratch>\prod
+new library      <scratch>\tmp\roundtrip-k8KN1W\library-data (empty)
 
 export clip-9-your-first-clip: 29 refs in the closure (26 versions, 0 files left out of git), 48 frame hashes, 53 files written, 4.9 s
 export clip-10-every-clip-helps: 23 refs in the closure (20 versions, 0 files left out of git), 48 frame hashes, 14 files written, 0.9 s

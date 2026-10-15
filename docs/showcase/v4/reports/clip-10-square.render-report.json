@@ -1,0 +1,122 @@
+{
+ "probe": {
+  "duration": 27.533333,
+  "size": 6601795,
+  "video": {
+   "codec": "h264",
+   "width": 1080,
+   "height": 1080,
+   "fps": 30,
+   "pixFmt": "yuv420p",
+   "frames": 826
+  },
+  "audio": {
+   "codec": "aac",
+   "sampleRate": 48000,
+   "channels": 2
+  },
+  "color": {
+   "primaries": "bt709",
+   "transfer": "bt709",
+   "space": "bt709",
+   "range": "tv"
+  },
+  "faststart": true,
+  "frames": 826
+ },
+ "loudness": {
+  "integrated": -14,
+  "range": 2.1,
+  "truePeak": -1.2
+ },
+ "black": [],
+ "freezes": [
+  {
+   "start": 23.533,
+   "end": 24.367,
+   "duration": 0.833,
+   "excused": "hold"
+  },
+  {
+   "start": 24.5,
+   "end": 25,
+   "duration": 0.5,
+   "excused": "hold"
+  },
+  {
+   "start": 25.2,
+   "end": 27.533,
+   "duration": 2.333,
+   "excused": "hold"
+  }
+ ],
+ "jumps": [],
+ "flashes": {
+  "maxPerSecond": 0,
+  "failing": []
+ },
+ "silences": [],
+ "narration": [
+  {
+   "item": "vo-outcome",
+   "first": {
+    "t": 0.615,
+    "frame": 18
+   },
+   "last": {
+    "t": 2.845,
+    "frame": 85
+   },
+   "head": 0.615,
+   "tail": 24.688,
+   "overCuts": [],
+   "outside": []
+  },
+  {
+   "item": "vo-product",
+   "first": {
+    "t": 5.47,
+    "frame": 164
+   },
+   "last": {
+    "t": 10.745,
+    "frame": 322
+   },
+   "head": 5.47,
+   "tail": 16.788,
+   "overCuts": [],
+   "outside": []
+  },
+  {
+   "item": "vo-proof",
+   "first": {
+    "t": 13.877,
+    "frame": 416
+   },
+   "last": {
+    "t": 18.992,
+    "frame": 570
+   },
+   "head": 13.877,
+   "tail": 8.541,
+   "overCuts": [],
+   "outside": []
+  },
+  {
+   "item": "vo-cta",
+   "first": {
+    "t": 22.515,
+    "frame": 675
+   },
+   "last": {
+    "t": 24.945,
+    "frame": 748
+   },
+   "head": 22.515,
+   "tail": 2.588,
+   "overCuts": [],
+   "outside": []
+  }
+ ],
+ "problems": []
+}

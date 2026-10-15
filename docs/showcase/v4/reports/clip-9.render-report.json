@@ -1,0 +1,146 @@
+{
+ "probe": {
+  "duration": 54.566667,
+  "size": 16372053,
+  "video": {
+   "codec": "h264",
+   "width": 1920,
+   "height": 1080,
+   "fps": 30,
+   "pixFmt": "yuv420p",
+   "frames": 1637
+  },
+  "audio": {
+   "codec": "aac",
+   "sampleRate": 48000,
+   "channels": 2
+  },
+  "color": {
+   "primaries": "bt709",
+   "transfer": "bt709",
+   "space": "bt709",
+   "range": "tv"
+  },
+  "faststart": true,
+  "frames": 1637
+ },
+ "loudness": {
+  "integrated": -14,
+  "range": 1.7,
+  "truePeak": -1.4
+ },
+ "black": [],
+ "freezes": [
+  {
+   "start": 50.367,
+   "end": 51.533,
+   "duration": 1.167,
+   "excused": "hold"
+  },
+  {
+   "start": 51.567,
+   "end": 54.567,
+   "duration": 3,
+   "excused": "hold"
+  }
+ ],
+ "jumps": [],
+ "flashes": {
+  "maxPerSecond": 0,
+  "failing": []
+ },
+ "silences": [],
+ "narration": [
+  {
+   "item": "vo-result",
+   "first": {
+    "t": 1.31,
+    "frame": 39
+   },
+   "last": {
+    "t": 6.04,
+    "frame": 181
+   },
+   "head": 1.31,
+   "tail": 48.527,
+   "overCuts": [],
+   "outside": []
+  },
+  {
+   "item": "vo-find",
+   "first": {
+    "t": 9.02,
+    "frame": 271
+   },
+   "last": {
+    "t": 14.475,
+    "frame": 434
+   },
+   "head": 9.02,
+   "tail": 40.092,
+   "overCuts": [],
+   "outside": []
+  },
+  {
+   "item": "vo-tune",
+   "first": {
+    "t": 18.467,
+    "frame": 554
+   },
+   "last": {
+    "t": 23.617,
+    "frame": 709
+   },
+   "head": 18.467,
+   "tail": 30.95,
+   "overCuts": [],
+   "outside": []
+  },
+  {
+   "item": "vo-place",
+   "first": {
+    "t": 27.872,
+    "frame": 836
+   },
+   "last": {
+    "t": 32.162,
+    "frame": 965
+   },
+   "head": 27.872,
+   "tail": 22.405,
+   "overCuts": [],
+   "outside": []
+  },
+  {
+   "item": "vo-render",
+   "first": {
+    "t": 37.995,
+    "frame": 1140
+   },
+   "last": {
+    "t": 43.475,
+    "frame": 1304
+   },
+   "head": 37.995,
+   "tail": 11.092,
+   "overCuts": [],
+   "outside": []
+  },
+  {
+   "item": "vo-next",
+   "first": {
+    "t": 46.86,
+    "frame": 1406
+   },
+   "last": {
+    "t": 51.565,
+    "frame": 1547
+   },
+   "head": 46.86,
+   "tail": 3.002,
+   "overCuts": [],
+   "outside": []
+  }
+ ],
+ "problems": []
+}

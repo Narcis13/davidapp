@@ -1,0 +1,67 @@
+[
+ {
+  "clip": "clip-7-a-video-that-checks-itself",
+  "problems": [],
+  "credits": [
+   "Motion graphics: original, made in Fablecut",
+   "Voice: Kokoro-82M, voice af_heart (Apache-2.0)",
+   "Fonts: Anton, Inter, JetBrains Mono, Space Grotesk (OFL-1.1)"
+  ],
+  "sources": 7,
+  "warnings": []
+ },
+ {
+  "clip": "clip-8-cuvinte-pe-ritm",
+  "problems": [],
+  "credits": [
+   "Motion graphics: original, made in Fablecut",
+   "Fonts: Inter, JetBrains Mono, Space Grotesk (OFL-1.1)"
+  ],
+  "sources": 5,
+  "warnings": []
+ },
+ {
+  "clip": "clip-9-your-first-clip",
+  "problems": [],
+  "credits": [
+   "Motion graphics: original, made in Fablecut",
+   "Footage: studio-editor-place by Fablecut (scripts/record-studio.mjs)",
+   "Footage: studio-gallery-play by Fablecut (scripts/record-studio.mjs)",
+   "Footage: studio-library-search by Fablecut (scripts/record-studio.mjs)",
+   "Footage: studio-playground-param by Fablecut (scripts/record-studio.mjs)",
+   "Footage: studio-render-check by Fablecut (scripts/record-studio.mjs)",
+   "Voice: Kokoro-82M, voice af_heart (Apache-2.0)",
+   "Fonts: Inter, JetBrains Mono, Space Grotesk (OFL-1.1)"
+  ],
+  "sources": 11,
+  "warnings": [
+   "clip-9-voice@1: the licence of the voice \"af_heart\" is not recorded"
+  ]
+ },
+ {
+  "clip": "clip-10-every-clip-helps",
+  "problems": [],
+  "credits": [
+   "Motion graphics: original, made in Fablecut",
+   "Footage: studio-library-search by Fablecut (scripts/record-studio.mjs)",
+   "Fablecut logo",
+   "Voice: Kokoro-82M, voice af_heart (Apache-2.0)",
+   "Fonts: Inter, JetBrains Mono, Space Grotesk (OFL-1.1)"
+  ],
+  "sources": 8,
+  "warnings": [
+   "clip-10-voice@2: the licence of the voice \"af_heart\" is not recorded"
+  ]
+ },
+ {
+  "clip": "clip-11-the-kit",
+  "problems": [],
+  "credits": [
+   "Motion graphics: original, made in Fablecut",
+   "Footage: studio-library-search by Fablecut (scripts/record-studio.mjs)",
+   "Fonts: Inter, JetBrains Mono, Space Grotesk (OFL-1.1)"
+  ],
+  "sources": 5,
+  "warnings": []
+ }
+]
