@@ -13,16 +13,18 @@ export CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe"   # Window
 swift $S/montage.swift out.png 0.5 a.png b.png      # screenshots side by side (macOS only)
 ```
 
-**This machine (iteration 3):** Windows 11 Pro, Intel i9-14900KF (24 cores, 32 threads), 64 GB, about
+**This machine (iterations 3 and 4):** Windows 11 Pro, Intel i9-14900KF (24 cores, 32 threads), 64 GB, about
 1.7 TB free on C:, Node 24.19, npm 11.17, Git Bash for the scripts, Chrome at the path above, Claude Code
-CLI 2.1.295 at `~/.local/bin/claude.exe`, `gh` logged in as Narcis13, no Python (the WindowsApps stub
+CLI 2.1.299 at `~/.local/bin/claude.exe`, `gh` logged in as Narcis13, no Python (the WindowsApps stub
 only), no `caffeinate` (keep the machine awake through the desktop app instead). FFmpeg 9.0.2 (gyan.dev
 full build, from winget, found through `%LOCALAPPDATA%\Microsoft\WinGet\Links`) has `ebur128`,
 `loudnorm`, `sidechaincompress`, `silencedetect`, `blackdetect`, `freezedetect`, `scdet`, and also
 `drawtext`, libass and a `whisper` filter, but the Macs' FFmpeg builds lack those three: the studio must
 not depend on them. No git identity: commit with
-`git -c user.name=Narcis13 -c user.email=Narcis75@gmail.com commit`. The iteration 3 brief described a
-macOS Intel i5 machine with 5.5 GB free; it actually ran here.
+`git -c user.name=Narcis13 -c user.email=Narcis75@gmail.com commit`. The iteration 3 and 4 briefs describe a
+macOS Intel i5 machine with 5.5 GB free; both ran here. The speech tools (Kokoro TTS through kokoro-js,
+whisper.cpp `whisper-cli.exe` with `small.en` and `base.en`) are installed outside the repo in
+`C:/newme/fablecut-voice/` (not on PATH).
 
 Earlier machines: iteration 1 ran on Windows; iteration 2 was built on macOS 15.5 (Intel i5-10600, 12 threads,
 Node 24.21), continued on Windows 11 (i9-14900KF, 32 threads, 64 GB, Node 24.19, FFmpeg from winget,
