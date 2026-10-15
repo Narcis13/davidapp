@@ -2,7 +2,7 @@ Prompt: motion_prompt_fablecut.md
 MCP tools on the server: 59
 Tools the prompt names (25): add_asset_note, add_file_asset, compounding_report, create_clip, create_preset, describe_asset, frame_hashes, get_asset, get_clip, get_render, list_clip_assets, organize_assets, propose_asset_version, propose_clip_edit, propose_new_asset, render_asset_frame, render_clip_frame, save_precomp, search_assets, start_render, studio_guide, suggest_assets, update_clip, upload_image, validate_asset
 Tool options the prompt names (2): for_clip (create_asset, update_asset, fork_asset, …), max_size (render_asset_frame, render_clip_frame)
-Unknown names (2): render_contract (line 420), text_and_captions (line 263)
+Unknown names (0): none
 Workarounds left (19):
 - line 375: "and has no video asset. Moving footage could enter only as a PNG" → footage is an asset (add_footage)
 - line 376: "frame sequence through library.addSequence, which no tool" → footage is an asset (add_footage)

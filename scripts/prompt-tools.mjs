@@ -52,7 +52,8 @@ try {
   const lines = text.split(/\r?\n/);
   const seen = new Map();
   lines.forEach((line, i) => {
-    for (const m of line.matchAll(/(?<![\w./-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![\w-])/g)) {
+    // not inside a section tag (<render_contract>) or a path
+    for (const m of line.matchAll(/(?<![\w./<-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![\w>-])/g)) {
       const w = m[0];
       if (!seen.has(w)) seen.set(w, []);
       seen.get(w).push(i + 1);
