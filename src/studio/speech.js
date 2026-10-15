@@ -205,6 +205,8 @@ export function createSpeech(ctx, { library, audio }) {
     try {
       if (!path) {
         if (!data) throw new StudioError('Give the audio file (path or data_base64) to align');
+        // the extension names the temp file: a short suffix only, never a path
+        if (ext !== undefined && !/^\.[a-z0-9]{1,5}$/i.test(ext)) throw new StudioError(`ext must be a file extension such as ".wav" (got ${JSON.stringify(ext).slice(0, 40)})`);
         tmp = join(ensure(dirs.work), `align-${process.pid}-${Date.now()}${ext ?? '.wav'}`);
         writeFileSync(tmp, data);
       }

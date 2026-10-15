@@ -40,7 +40,8 @@ export function footageTime(params, at, meta) {
   const span = b - a;
   const local = Math.max(0, at) * (params.speed ?? 1);
   // b is exclusive: past the end the frame before the out point holds (0.1 ms back: more than frameAt's slack, less than any frame)
-  if (params.loop) return a + (local % span);
+  // a trim of no length (in at the very end) holds its one frame, looped or not
+  if (params.loop && span > 0) return a + (local % span);
   return a + Math.min(local, span - 1e-4);
 }
 

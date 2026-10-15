@@ -221,7 +221,8 @@ export function createRuntime(host) {
     const want = (raw, time) => {
       const item = forFormat(raw, format);
       const at = Math.max(0, time - item.start) + (item.offset ?? 0);
-      for (const [ref, params] of [[item.asset, item.params], [item.mask?.asset, item.mask?.params]]) {
+      const params0 = item.keyframes ? sampleItem(item, at, easeOf(comp)).params : item.params;
+      for (const [ref, params] of [[item.asset, params0], [item.mask?.asset, item.mask?.params]]) {
         const seq = ref && sequences.get(ref);
         if (seq) out.push({ ref, index: sequenceIndex(seq, at, params?.loop) });
       }
@@ -252,7 +253,9 @@ export function createRuntime(host) {
     const want = (raw, time) => {
       const item = forFormat(raw, format);
       const at = Math.max(0, time - item.start) + (item.offset ?? 0);
-      for (const [ref, params] of [[item.asset, item.params], [item.mask?.asset, item.mask?.params]]) {
+      // the params as the draw path samples them: a keyframed hold, speed or trim picks another frame
+      const params0 = item.keyframes ? sampleItem(item, at, easeOf(comp)).params : item.params;
+      for (const [ref, params] of [[item.asset, params0], [item.mask?.asset, item.mask?.params]]) {
         if (!ref) continue;
         const v = footage.get(ref);
         if (v) { out.push({ ref, index: footageIndex(v.meta, params ?? {}, at) }); continue; }

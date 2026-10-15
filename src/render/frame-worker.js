@@ -61,15 +61,21 @@ async function loadSequenceFrames(rt, comp, frame) {
 /** Decode (through the pool) the footage frames a clip frame needs before it is drawn. */
 async function loadFootageFrames(rt, frame) {
   const comp = state.comp;
+  // every frame this clip frame draws stays until it is drawn, however many there are; older ones go first
+  const needed = new Set();
   for (const { ref, index } of rt.footageFramesAt(comp, frame)) {
     const v = state.videos[ref];
     const key = `${v.path}#${index}`;
+    needed.add(key);
     if (vidCache.has(key)) { const c = vidCache.get(key); vidCache.delete(key); vidCache.set(key, c); continue; }
     const r = await askFrame(v, index);
     const c = createCanvas(r.width, r.height);
     c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(r.buffer), r.width, r.height), 0, 0);
     vidCache.set(key, c);
-    while (vidCache.size > VID_CACHE) vidCache.delete(vidCache.keys().next().value);
+  }
+  for (const key of vidCache.keys()) {
+    if (vidCache.size <= VID_CACHE) break;
+    if (!needed.has(key)) vidCache.delete(key);
   }
 }
 

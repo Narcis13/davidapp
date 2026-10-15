@@ -90,6 +90,11 @@ test('the shape: names, defaults, redistributable by licence, validation with us
   for (const l of ['original', 'CC0-1.0', 'CC-BY-4.0', 'CC-BY-SA-3.0', 'OFL-1.1', 'MIT', 'ISC', 'Apache-2.0']) assert.equal(defaultRedistributable(l), true, l);
   for (const l of [null, '', 'unknown', 'all rights reserved', 'commercial, licensed to us']) assert.equal(defaultRedistributable(l), false, String(l));
   for (const l of [null, undefined, '', '  ', 'unknown', 'Unknown']) assert.equal(isUnknownLicense(l), true);
+  // an unknown licence is never redistributable, even when the caller says so (and it stays out of git on export)
+  assert.equal(buildProvenance({ redistributable: true }).redistributable, false);
+  assert.equal(buildProvenance({ license: 'unknown', redistributable: true }).redistributable, false);
+  assert.equal(provenanceOf({ type: 'image', meta: JSON.stringify({ provenance: { license: null, redistributable: true } }) }).redistributable, false);
+  assert.equal(buildProvenance({ license: 'CC-BY-4.0', redistributable: false }).redistributable, false);
   assert.equal(isUnknownLicense('original'), false);
   // snake_case spellings are accepted, text is trimmed, "" is null
   assert.deepEqual(parseProvenance({ source_url: ' https://example.test/a ', ai_generated: true, creator: '', date: '2025-03-14' }), { sourceUrl: 'https://example.test/a', aiGenerated: true, creator: null, date: '2025-03-14' });

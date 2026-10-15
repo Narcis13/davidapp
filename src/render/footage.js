@@ -211,9 +211,13 @@ class Reader {
     this.meta = meta; this.cache = cache;
     this.index = new Map(meta.table.pts.map((p, i) => [p, i]));
     this.decode = null; this.next = 0; this.queue = Promise.resolve(); this.used = Date.now();
+    this.closed = false;
+    /** @type {Promise<void> | null} */
+    this.closing = null;
   }
 
   get(i) {
+    if (this.closed) return Promise.reject(new FootageError(`The decoder of ${this.meta.path} was closed`));
     const job = this.queue.then(() => this.read(i));
     this.queue = job.catch(() => {});
     return job;
@@ -231,7 +235,7 @@ class Reader {
       const f = await this.decode.next();
       if (!f) {
         const err = this.decode.err.trim();
-        this.close();
+        this.stop();
         throw new FootageError(`Frame ${i} of ${this.meta.path} could not be decoded${err ? `: ${err.split('\n').pop()}` : ' (the file ended first)'}`);
       }
       // a frame with a time the decoder already passed (a duplicate timestamp) is not in the table twice: skip it
@@ -240,7 +244,7 @@ class Reader {
       const at = this.index.get(f.pts);
       if (at === undefined) {
         // a frame the table does not know: the decoder and the table disagree about this file
-        this.close();
+        this.stop();
         throw new FootageError(`The decoder returned a frame at ${f.pts} ticks that the frame table of ${this.meta.path} does not list; import the file again`);
       }
       this.next = at + 1;
@@ -261,7 +265,14 @@ class Reader {
     this.next = from;
   }
 
-  close() { const done = this.decode?.close() ?? Promise.resolve(); this.decode = null; return done; }
+  /** Stop the decoder now (a read that fails); the reader can start it again. */
+  stop() { const done = this.decode?.close() ?? Promise.resolve(); this.decode = null; return done; }
+
+  /**
+   * Close for good: the reads already queued finish first (an evicted or idle reader may be mid-read), then the
+   * decoder stops; resolves once it has exited. A closed reader takes no new reads, so it never starts a decoder again.
+   */
+  close() { this.closed = true; return (this.closing ??= this.queue.then(() => this.stop())); }
 }
 
 /** A map with a byte budget: the least recently used entries go first. */

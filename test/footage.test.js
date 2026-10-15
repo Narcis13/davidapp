@@ -227,3 +227,37 @@ test('MCP over stdio: add_footage and footage_frames', async () => {
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
+
+test('review fixes: a zero-length loop holds its frame; keyframed params preload the frame they draw; a busy decoder closes cleanly; eight frames in one clip frame', async () => {
+  const meta = { duration: 2, fps: 25, table: { tb: [1, 12800], pts: Array.from({ length: 50 }, (_, i) => i * 512) } };
+  // in at the very end with loop: the one frame left holds (it used to be NaN, and frame 0)
+  assert.equal(footageIndex(meta, { in: 2, loop: true }, 0.5), 49);
+  // a keyframed hold: the frame preloaded for a clip frame is the frame the draw picks
+  const { studio } = t;
+  if (!studio.library.versionRow('testsrc@1')) await studio.library.addFootage({ slug: 'testsrc', path: T25, description: 'testsrc2 at 25 fps with a 440 Hz tone, made by FFmpeg.', author: AUTHOR });
+  const ramp = { width: 320, height: 180, fps: 30, duration: 2, background: '#000000', tracks: [{ id: 'v', type: 'visual', items: [
+    { id: 'a', asset: 'testsrc', start: 0, duration: 2, params: { fit: 'fill', hold: 0 }, keyframes: { 'params.hold': [{ t: 0, v: 0 }, { t: 2, v: 1.9 }] } }] }] };
+  const fmeta = { ...studio.library.footageMeta(studio.library.requireVersion('testsrc@1')), path: studio.library.absFile(studio.library.requireVersion('testsrc@1')) };
+  const svc = createFootageService();
+  for (const h of await studio.frameHashes({ composition: ramp, times: [0.5, 1, 1.5] })) {
+    assert.equal(h.hash, sha(await svc.frame(fmeta, footageIndex(fmeta, { hold: (h.frame / 30) * 0.95 }, 0))), `clip frame ${h.frame}`);
+  }
+  await svc.close();
+  // eight footage items, each on another frame: more than the worker keeps, all drawn
+  const wall = { width: 320, height: 180, fps: 30, duration: 1, background: '#000000', tracks: [{ id: 'v', type: 'visual', items: Array.from({ length: 8 }, (_, k) => ({
+    id: `w${k}`, asset: 'testsrc', start: 0, duration: 1, params: { fit: 'fill', hold: k * 0.2 }, transform: { x: 0.125 + (k % 4) * 0.25, y: k < 4 ? 0.25 : 0.75, width: 0.25, height: 0.5 } })) }] };
+  const [w1] = await studio.frameHashes({ composition: wall, times: [0.5] });
+  const [w2] = await studio.frameHashes({ composition: wall, times: [0.5] });
+  assert.equal(w1.hash, w2.hash);
+  // one decoder at most: a second file evicts the first while it is reading, and its queued reads still finish
+  const a = { ...(await probeFootage(T25)), path: T25 }, b = { ...(await probeFootage(VP9)), path: VP9 };
+  const one = createFootageService({ maxReaders: 1 });
+  const reads = [one.frame(a, 40), one.frame(a, 45)];
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  reads.push(one.frame(b, 10), one.frame(a, 3));
+  const got = await Promise.allSettled(reads);
+  assert.deepEqual(got.map((g) => g.status), ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled'], JSON.stringify(got.map((g) => g.status === 'rejected' ? g.reason.message : '')));
+  await one.close();
+  // the files are free again: nothing still holds them open
+  for (const f of [T25, VP9]) { const copy = `${f}.moved`; const { renameSync } = await import('node:fs'); renameSync(f, copy); renameSync(copy, f); }
+});

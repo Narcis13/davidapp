@@ -113,6 +113,7 @@ export function buildProvenance(given, { defaultLicense = null, derivedFrom = nu
     ...defaults, ...g,
   };
   if (g.redistributable === undefined && defaults.redistributable === undefined) record.redistributable = defaultRedistributable(record.license);
+  if (isUnknownLicense(record.license)) record.redistributable = false;
   if (derivedFrom) record.derivedFrom = derivedFrom;
   return record;
 }
@@ -126,6 +127,7 @@ export function applyPatch(meta, current, patch, by) {
   if (!Object.keys(patch).length) throw new StudioError(`Give at least one of ${FIELDS.join(', ')} to change`);
   const next = { ...stored(current), ...patch };
   if (patch.license !== undefined && patch.redistributable === undefined && current.redistributable === defaultRedistributable(current.license)) next.redistributable = defaultRedistributable(next.license);
+  if (isUnknownLicense(next.license)) next.redistributable = false;
   const { recorded: _r, edit: _e, ...clean } = next;
   return { ...meta, license: next.license, provenance: clean, provenanceEdit: { by, at: now() } };
 }
@@ -144,6 +146,8 @@ export function provenanceOf(row) {
   const edit = meta.provenanceEdit ?? null;
   if (meta.provenance) {
     const p = { ...blank(), ...meta.provenance };
+    // a file whose licence nobody knows may not be committed or shared, whatever else was said about it
+    if (isUnknownLicense(p.license)) p.redistributable = false;
     return edit ? { ...p, edit } : p;
   }
   // rows from before provenance existed: a licence string, and for fonts the source text

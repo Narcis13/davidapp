@@ -251,6 +251,14 @@ test('add_narration with align times a recording by transcribing it; without tim
   assert.equal(out.transcript.ok, true);
   const words = JSON.parse(studio.library.versionRow('aligned-take').meta).narration.words;
   assert.equal(words[0].start, 0.2);
+  // the extension of bytes sent inline names a temp file: anything but a short suffix is refused before a byte is written
+  const data = (await import('node:fs')).readFileSync(take.path).toString('base64');
+  for (const ext of ['/../../../escape.txt', '.wav/../../x', '..']) {
+    const bad = await call('add_narration', { name: 'aligned-ext', data_base64: data, ext, script: 'Align this take now please.', align: true, author: AUTHOR });
+    assert.equal(bad.isError, true, ext);
+    assert.match(bad.content[0].text, /extension/, ext);
+    await assert.rejects(speech.timingsFor({ data: Buffer.from(data, 'base64'), ext }), /ext must be a file extension/);
+  }
   const none = await call('add_narration', { name: 'aligned-none', path: take.path, script: 'Align this take now please.', author: AUTHOR });
   assert.equal(none.isError, true);
   assert.match(none.content[0].text, /align: true/);
