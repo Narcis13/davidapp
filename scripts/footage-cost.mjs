@@ -40,7 +40,9 @@ try {
   await studio.library.addFileAsset({ slug: 'cost-still', type: 'image', data: png, ext: '.png', description: 'The first frame of the footage as a still.', author: 'footage-cost' });
   const box = { x: 0.5, y: 0.5, width: m.width / 1920, height: m.height / 1080 };
   const comp = (asset2, params) => ({ width: 1920, height: 1080, fps: 30, duration: Math.min(seconds, m.duration), background: '#101018', tracks: [{ id: 'v', type: 'visual', items: [{ id: 'a', asset: asset2, start: 0, duration: Math.min(seconds, m.duration), params, transform: box }] }] });
-  for (const [slug, c] of [['with-footage', comp('cost-footage', { fit: 'fill' })], ['with-still', comp('cost-still', { fit: 'fill' })]]) {
+  /** @type {[string, any][]} */
+  const both = [['with-footage', comp('cost-footage', { fit: 'fill' })], ['with-still', comp('cost-still', { fit: 'fill' })]];
+  for (const [slug, c] of both) {
     await studio.clips.createClip({ slug, title: slug, author: 'footage-cost', width: 1920, height: 1080, fps: 30, duration: c.duration });
     await studio.clips.updateClip(slug, { composition: c });
   }
