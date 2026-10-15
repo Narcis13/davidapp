@@ -68,20 +68,20 @@ store in `library/`; the working notes are in `work/<clip>/`.
 
 | clip | format | what it adds | what it reuses |
 |---|---|---|---|
-| [**Your first clip**](work/clip-9-your-first-clip/05-final.md) | horizontal 1920×1080, 54.6 s, voiced, captions burned in | five screen recordings of the studio (`scripts/record-studio.mjs`): find, tune, place, render; over them the kit's cursor (from each recording's sidecar), spotlight, camera, callouts and steps; a narration made in the studio (`generate_narration`); end-card@3 | the theme, text-captions@2, the title plate and the music from earlier clips |
-| [**Every clip helps the next**](work/clip-10-every-clip-helps/05-final.md) | square 1080×1080 and vertical 1080×1920 from one request, 27.5 s, voiced | a marketing video: the Fablecut logo as given (an SVG drawn as vectors), kit-ui-frame, kit-icon, kit-chart-line, kit-plate | clip 9's library recording and end card, the theme, captions and music |
-| [**The kit**](work/clip-11-the-kit/README.md) | horizontal 1920×1080, 16.1 s, music only | kit-ui-frame@2 (it scales in at its text floor), kit-chart-donut, and kit-arrow's first use | kit-steps, kit-plate, the library recording, the theme and music |
+| [**Your first clip**](https://github.com/Narcis13/davidapp/releases/download/showcase-v4/clip-9-your-first-clip.mp4) ([notes](work/clip-9-your-first-clip/05-final.md)) | horizontal 1920×1080, 54.6 s, voiced, captions burned in | five screen recordings of the studio (`scripts/record-studio.mjs`): find, tune, place, render; over them the kit's cursor (from each recording's sidecar), spotlight, camera, callouts and steps; a narration made in the studio (`generate_narration`); end-card@3 | the theme, text-captions@2, the title plate and the music from earlier clips |
+| [**Every clip helps the next**](https://github.com/Narcis13/davidapp/releases/download/showcase-v4/clip-10-every-clip-helps.mp4) ([notes](work/clip-10-every-clip-helps/05-final.md)) | square 1080×1080 and [vertical 1080×1920](https://github.com/Narcis13/davidapp/releases/download/showcase-v4/clip-10-every-clip-helps-9x16.mp4) from one request, 27.5 s, voiced | a marketing video: the Fablecut logo as given (an SVG drawn as vectors), kit-ui-frame, kit-icon, kit-chart-line, kit-plate | clip 9's library recording and end card, the theme, captions and music |
+| [**The kit**](https://github.com/Narcis13/davidapp/releases/download/showcase-v4/clip-11-the-kit.mp4) ([notes](work/clip-11-the-kit/README.md)) | horizontal 1920×1080, 16.1 s, music only | kit-ui-frame@2 (it scales in at its text floor), kit-chart-donut, and kit-arrow's first use | kit-steps, kit-plate, the library recording, the theme and music |
 
-The MP4s of clips 1 to 8 are attached to the [`showcase-v1`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v1),
-[`showcase-v2`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v2) and
-[`showcase-v3`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v3) releases (videos
-are never committed). Clips 9 to 11 are not on a release yet; `work/clip-9-your-first-clip/RENDER.md` and
-`work/clip-10-every-clip-helps/RENDER.md` say how to render them from a clean checkout. Contact sheets, ffprobe reports, the reuse report and the verification
+The MP4s are attached to the [`showcase-v1`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v1),
+[`showcase-v2`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v2),
+[`showcase-v3`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v3) and
+[`showcase-v4`](https://github.com/Narcis13/davidapp/releases/tag/showcase-v4) releases (videos
+are never committed); `work/clip-9-your-first-clip/RENDER.md` and `work/clip-10-every-clip-helps/RENDER.md` say how to
+render clips 9 and 10 from a clean checkout. Contact sheets, ffprobe reports, the reuse report and the verification
 results are in [docs/showcase](docs/showcase/INDEX.md) for clips 1 to 3 and in
 [docs/showcase/v2](docs/showcase/v2/INDEX.md) for clips 4 to 6, with the full
-[compounding table](docs/showcase/v2/reports/compounding.md). The checks and sheets of clips 9 to 11 are in
-`work/<clip>/checks/`; the round-trip reports, the prompt check and the speech measurements in
-[docs/showcase/v4/reports](docs/showcase/v4/reports).
+[compounding table](docs/showcase/v2/reports/compounding.md). Iteration 4's evidence (the clean rebuild with identical hashes, the checks, the compounding table with
+clips 9 to 11, the round trips, the sweep, parity, speed) is indexed in [docs/showcase/v4](docs/showcase/v4/INDEX.md).
 
 ## Run it
 
