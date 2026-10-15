@@ -1,0 +1,10 @@
+{
+  "name": "lucide-static",
+  "version": "1.49.0",
+  "license": "ISC",
+  "homepage": "https://lucide.dev",
+  "repository": "https://github.com/lucide-icons/lucide.git",
+  "icons": 155,
+  "packedWith": "npm pack lucide-static@1.49.0",
+  "generatedBy": "node scripts/vendor-icons.mjs --from <unpacked package>"
+}
