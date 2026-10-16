@@ -1,0 +1,81 @@
+{
+  "ref": "text-handwrite@3",
+  "type": "function",
+  "kind": "visual",
+  "title": "Hand-lettered text",
+  "description": "Text written on by hand, glyph by glyph with a pencil at the pen, irregular per-letter angles and baselines that boil. Looks: ink, marker (fill + offset outline) or sketch (outline + hatching). *Emphasised* words get their own colour and a highlighter swipe; an underline, double underline, scribble or circle is drawn after the writing. Fits the safe zone or its box. Measured by the checks; an optional size floor fails loudly.",
+  "tags": ["text", "text-animation", "sketch", "hand-drawn", "handwriting", "write-on"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "text": {"type": "text", "default": "A brief history of *AI*"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-sketchbook"},
+    "look": {"type": "enum", "options": ["ink", "marker", "sketch"], "default": "ink"},
+    "font": {"type": "font", "default": "Space Grotesk"},
+    "weight": {"type": "integer", "default": 700, "min": 100, "max": 900, "step": 100},
+    "size": {
+      "type": "number",
+      "default": 120,
+      "min": 12,
+      "max": 600,
+      "step": 1,
+      "description": "Largest size; shrinks to fit"
+    },
+    "lineHeight": {"type": "number", "default": 1.08, "min": 0.7, "max": 2, "step": 0.01},
+    "uppercase": {"type": "boolean", "default": false},
+    "align": {"type": "enum", "options": ["left", "center", "right"], "default": "center"},
+    "valign": {"type": "enum", "options": ["top", "middle", "bottom"], "default": "middle"},
+    "color": {
+      "type": "enum",
+      "options": ["ink", "accent", "accent2", "accent3", "pencil", "highlight"],
+      "default": "ink"
+    },
+    "emColor": {
+      "type": "enum",
+      "options": ["ink", "accent", "accent2", "accent3", "pencil", "highlight"],
+      "default": "accent"
+    },
+    "highlight": {"type": "boolean", "default": true, "description": "Highlighter swipe behind *emphasis*"},
+    "underline": {"type": "enum", "options": ["none", "line", "double", "scribble", "circle"], "default": "none"},
+    "delay": {"type": "number", "default": 0, "min": 0, "max": 30, "step": 0.05},
+    "writeDur": {
+      "type": "number",
+      "default": 1.2,
+      "min": 0.1,
+      "max": 20,
+      "step": 0.05,
+      "description": "Seconds to write the whole text"
+    },
+    "jitter": {
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "description": "How unsteady the hand is"
+    },
+    "boil": {"type": "number", "default": 8, "min": 0, "max": 24, "step": 1},
+    "pencil": {"type": "boolean", "default": true},
+    "floor": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 20,
+      "step": 0.1,
+      "description": "Smallest size on screen, % of the frame's short side (0: none); a text that cannot fit there throws"
+    },
+    "exit": {"type": "enum", "options": ["none", "fade"], "default": "none"},
+    "outDur": {"type": "number", "default": 0.4, "min": 0.05, "max": 3, "step": 0.05}
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {"sketch-ink": "sketch-ink@2", "easing": "easing@1", "theme-sketchbook": "theme-sketchbook@1"},
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:29:15.341Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "text-handwrite@2",
+  "asset": {"created": "2026-10-16T17:08:45.615Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/text-handwrite@3.js", "sha1": "76dbc330665ccc3e3f33a2b341cf3f84fda8c976"},
+  "hash": "94120160b69aa99224b388f78cf5a3a56ba608409fa40443522bb111b225d587"
+}

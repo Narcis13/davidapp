@@ -1,0 +1,22 @@
+{
+  "ref": "theme-fablecut-doodle@2",
+  "type": "function",
+  "kind": "value",
+  "title": "Theme: Fablecut doodle",
+  "description": "Theme kit for hand-drawn Fablecut videos: warm cream paper with lavender rules and a pink margin, deep indigo ink, the logo's violet as the accent (text-safe on the paper), its pink as the marker, its yellow as the highlighter, green for ticks; Kalam handwriting for headlines and body, JetBrains Mono for code; the shared sketch constants. Same keys as theme-sketchbook, plus bg/bgAlt/surface.",
+  "tags": ["theme", "palette", "sketch", "hand-drawn", "doodle", "brand", "fablecut", "foundation"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {},
+  "uses": {},
+  "deps": {},
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:33:48.299Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "theme-fablecut-doodle@1",
+  "asset": {"created": "2026-10-16T17:12:58.656Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/theme-fablecut-doodle@2.js", "sha1": "b80e11ed743caf4b722362777cf724bdb62495be"},
+  "hash": "5e46e54e947be108181e6b90b70fc0415ad3871771fa1da61f4f151c80fa1a43"
+}

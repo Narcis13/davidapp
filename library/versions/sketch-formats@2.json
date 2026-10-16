@@ -1,0 +1,57 @@
+{
+  "ref": "sketch-formats@2",
+  "type": "function",
+  "kind": "visual",
+  "title": "Sketched formats",
+  "description": "Three hand-drawn frames on one baseline (16:9, 9:16, 1:1), each holding the same blocks re-flowed for its shape: a ball, two scribbled text lines and a button. The frames draw on staggered, the blocks pop in, and the ball bounces in all three in sync (one composition). A handwritten label under each frame. For doodle explainers of multi-format video, responsive layouts, \"one source, every screen\".",
+  "tags": ["sketch", "hand-drawn", "doodle", "formats", "aspect-ratio", "responsive", "explainer", "diagram"],
+  "duration": 8,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "labels": {
+      "type": "array",
+      "of": {"type": "string", "default": ""},
+      "minItems": 3,
+      "maxItems": 3,
+      "default": ["16:9", "9:16", "1:1"]
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-fablecut-doodle"},
+    "size": {
+      "type": "number",
+      "default": 5,
+      "min": 2.5,
+      "max": 12,
+      "step": 0.1,
+      "description": "Label size, % of the frame's short side"
+    },
+    "floor": {"type": "number", "default": 4, "min": 2, "max": 10, "step": 0.1},
+    "delay": {"type": "number", "default": 0.2, "min": 0, "max": 30, "step": 0.05},
+    "stagger": {"type": "number", "default": 0.3, "min": 0, "max": 2, "step": 0.01},
+    "drawDur": {"type": "number", "default": 0.6, "min": 0.1, "max": 3, "step": 0.05},
+    "bounce": {
+      "type": "number",
+      "default": 0.9,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "description": "Seconds per bounce of the ball (0: still)"
+    },
+    "boil": {"type": "number", "default": 8, "min": 0, "max": 24, "step": 1},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.05}
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {
+    "sketch-ink": "sketch-ink@3",
+    "easing": "easing@1",
+    "theme-fablecut-doodle": "theme-fablecut-doodle@1"
+  },
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:31:00.806Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "sketch-formats@1",
+  "asset": {"created": "2026-10-16T17:24:24.464Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-formats@2.js", "sha1": "935f9328165e4a20ccaff1b436c52ce9be44ca4e"},
+  "hash": "ff6c89fa115ca0cf15a0904357126ae294a42e1d0d2e7c45ca6342bad80b1700"
+}

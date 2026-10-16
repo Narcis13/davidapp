@@ -1,0 +1,112 @@
+{
+  "slug": "fablecut-doodle-tour",
+  "title": "Fablecut, sketched",
+  "language": "en",
+  "format": "horizontal",
+  "platforms": ["youtube"],
+  "theme": "theme-fablecut-doodle",
+  "bpm": 120,
+  "takeaway": "Fablecut is a video studio where every frame is code, and every clip makes the next one easier.",
+  "beats": [
+    {
+      "id": "hook",
+      "idea": "the promise in one line: video, written as code",
+      "key": "written",
+      "screen": { "title": "Video, *written*\nin code." }
+    },
+    {
+      "id": "function",
+      "idea": "every frame is a pure function of time: the code and the frames it draws",
+      "key": "function",
+      "screen": {
+        "title": "Every frame is a *function* of time",
+        "file": "ball.js",
+        "code": ["render(f) {", "  const x = f.t * 400;", "  f.ctx.arc(x, 300, 50, 0, 7);", "  f.ctx.fill();", "}"],
+        "highlight": 1,
+        "frames": ["t = 0 s", "t = 1 s", "t = 2 s"]
+      }
+    },
+    {
+      "id": "library",
+      "idea": "a versioned library: every asset a clip makes stays, with its version",
+      "key": "pieces",
+      "screen": {
+        "title": "Every clip leaves *pieces* behind",
+        "notes": [
+          { "label": "sketch-ink", "tag": "@2" },
+          { "label": "trans-wipe", "tag": "@1" },
+          { "label": "end-card", "tag": "@3" },
+          { "label": "music-loop", "tag": "@1" },
+          { "label": "kit-icon", "tag": "@1" },
+          { "label": "word-strip", "tag": "@3" }
+        ]
+      }
+    },
+    {
+      "id": "reuse",
+      "idea": "so the next clip writes less: new asset code fell from 242 lines to 0 over three clips",
+      "key": "less",
+      "screen": {
+        "title": "So the next clip costs *less*",
+        "caption": "new lines of asset code",
+        "bars": [{ "label": "clip 4", "value": 242 }, { "label": "clip 5", "value": 123 }, { "label": "clip 6", "value": 0 }],
+        "source": "README.md, compounding table of clips 4 to 6"
+      }
+    },
+    {
+      "id": "agent",
+      "idea": "you ask in plain words; the agent answers with a proposal you compare and accept",
+      "key": "words",
+      "screen": {
+        "title": "Direct it in plain *words*",
+        "messages": [
+          { "from": "user", "text": "Make the title pop on the beat." },
+          { "from": "ai", "text": "Proposal ready. Compare it, then accept." }
+        ]
+      }
+    },
+    {
+      "id": "shapes",
+      "idea": "one composition re-flows into every shape, never cropped",
+      "key": "three",
+      "screen": { "title": "One composition, *three* shapes", "labels": ["16:9", "9:16", "1:1"] }
+    },
+    {
+      "id": "solid",
+      "idea": "3D drawn by a software rasterizer: no GPU, the same pixels everywhere",
+      "key": "3D",
+      "screen": {
+        "title": "Real *3D*, from plain arithmetic",
+        "word": "3D",
+        "callouts": ["no GPU", "same pixels everywhere"]
+      }
+    },
+    {
+      "id": "checks",
+      "idea": "the studio checks its own video before it ships",
+      "key": "checks",
+      "screen": {
+        "title": "A video that *checks* itself",
+        "items": ["Text inside the safe area", "Contrast of 4.5 : 1", "Long enough to read", "Loudness at -14 LUFS", "Same frames, every render"]
+      }
+    },
+    {
+      "id": "sound",
+      "idea": "music and sound effects are synthesized in code, nothing to license",
+      "key": "synthesized",
+      "screen": { "title": "Music and sound, *synthesized*", "note": "Nothing to license." }
+    },
+    {
+      "id": "cta",
+      "idea": "the takeaway, and how to start",
+      "key": "easier",
+      "screen": {
+        "title": "Every clip makes the next one *easier*",
+        "line": "A video studio you write in code",
+        "cta": "Make your first clip",
+        "url": "npm run studio",
+        "logo": "fablecut-logo"
+      }
+    }
+  ]
+}

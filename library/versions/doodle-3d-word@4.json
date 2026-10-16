@@ -1,0 +1,57 @@
+{
+  "ref": "doodle-3d-word@4",
+  "type": "sequence",
+  "title": "3D word, doodle pink",
+  "description": "\"3D\" in extruded block letters (rounded D) in the doodle theme's marker pink, swinging in and then rocking gently; baked from block-text-3d@4 for fablecut-doodle-tour.",
+  "tags": ["3d", "text", "sequence", "doodle"],
+  "duration": 9,
+  "formats": [],
+  "deps": {},
+  "author": "claude-code",
+  "note": "Baked from block-text-3d@4",
+  "created": "2026-10-16T20:59:15.276Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "doodle-3d-word@3",
+  "asset": {
+    "created": "2026-10-16T17:24:58.703Z",
+    "originClip": "fablecut-doodle-tour",
+    "forkedFrom": "block-text-3d@3",
+    "derivation": "bake"
+  },
+  "mime": "image/png",
+  "meta": {
+    "frames": 270,
+    "fps": 30,
+    "width": 2200,
+    "height": 1240,
+    "duration": 9,
+    "key": "6105093eb6b9e58494b95de964b710687b157db0",
+    "bakedFrom": "block-text-3d@4",
+    "params": {
+      "text": "3D",
+      "color": "#ff5c8a",
+      "useTheme": false,
+      "swing": 70,
+      "swingFor": 1.4,
+      "rock": 24,
+      "rockPeriod": 3.6
+    },
+    "license": "original",
+    "provenance": {
+      "license": "original",
+      "licenseUrl": null,
+      "sourceUrl": null,
+      "creator": null,
+      "credit": null,
+      "date": "2026-10-16",
+      "aiGenerated": false,
+      "contentId": false,
+      "restrictions": null,
+      "placeholder": false,
+      "redistributable": true,
+      "derivedFrom": "block-text-3d@4"
+    }
+  },
+  "hash": "f99b4e7d8c21ad2ff5eb0f10058d197ee8157492974cb7ad7790a115e328dca4"
+}

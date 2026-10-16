@@ -1,0 +1,79 @@
+{
+  "ref": "sketch-chat@2",
+  "type": "function",
+  "kind": "visual",
+  "title": "Sketched chat",
+  "description": "Hand-drawn chat between a person (right, highlighter bubbles) and an AI (left, blue bubbles with a little robot avatar). Bubbles draw on and fill; the person types letter by letter, the AI shows thinking dots then streams its reply word by word. Earlier bubbles scroll up when the box is full.",
+  "tags": ["sketch", "hand-drawn", "chat", "conversation", "ai", "text-animation"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "messages": {
+      "type": "array",
+      "maxItems": 12,
+      "of": {
+        "type": "object",
+        "fields": {
+          "from": {"type": "enum", "options": ["user", "ai"], "default": "user"},
+          "text": {"type": "string", "default": ""}
+        },
+        "default": {"from": "user", "text": ""}
+      },
+      "default": [
+        {"from": "user", "text": "Can you explain AI in one line?"},
+        {
+          "from": "ai",
+          "text": "Machines that learn patterns from examples instead of following hand-written rules."
+        }
+      ]
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-sketchbook"},
+    "delay": {"type": "number", "default": 0, "min": 0, "max": 30, "step": 0.05},
+    "size": {"type": "number", "default": 44, "min": 12, "max": 160, "step": 1},
+    "font": {"type": "font", "default": "Space Grotesk"},
+    "cps": {
+      "type": "number",
+      "default": 30,
+      "min": 4,
+      "max": 200,
+      "step": 1,
+      "description": "Letters per second the person types"
+    },
+    "wps": {
+      "type": "number",
+      "default": 7,
+      "min": 1,
+      "max": 40,
+      "step": 0.5,
+      "description": "Words per second the AI streams"
+    },
+    "think": {
+      "type": "number",
+      "default": 0.7,
+      "min": 0,
+      "max": 4,
+      "step": 0.05,
+      "description": "Seconds of thinking dots before each AI reply"
+    },
+    "gap": {
+      "type": "number",
+      "default": 0.25,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "description": "Pause after each message"
+    },
+    "boil": {"type": "number", "default": 8, "min": 0, "max": 24, "step": 1}
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {"sketch-ink": "sketch-ink@3", "easing": "easing@1", "theme-sketchbook": "theme-sketchbook@1"},
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:32:26.491Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "sketch-chat@1",
+  "asset": {"created": "2026-10-16T17:08:45.765Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-chat@2.js", "sha1": "1a04fe31038babee436540a0e43b4cb5e32f17a0"},
+  "hash": "77abab0b6c604a8d31236e3e4fa93a638e0a85252d04d2435c40297611ba294c"
+}

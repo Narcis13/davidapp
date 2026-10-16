@@ -1,0 +1,66 @@
+{
+  "ref": "sketch-filmstrip@2",
+  "type": "function",
+  "kind": "visual",
+  "title": "Sketched film strip",
+  "description": "A hand-drawn film strip: an ink band with sprocket holes and paper windows, each window a frame of a tiny animation (ball rolling across, bar growing, square spinning) at its moment, a handwritten label per frame. The band draws on, frames pop in staggered, then a playhead ring steps through the frames. Horizontal or vertical. For doodle explainers of \"a video is frames\" or \"a frame is a function of time\".",
+  "tags": ["sketch", "hand-drawn", "doodle", "film", "frames", "animation", "explainer", "diagram"],
+  "duration": 8,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "labels": {
+      "type": "array",
+      "of": {"type": "string", "default": ""},
+      "minItems": 2,
+      "maxItems": 6,
+      "default": ["t = 0 s", "t = 1 s", "t = 2 s"]
+    },
+    "subject": {"type": "enum", "options": ["ball", "bar", "spin"], "default": "ball"},
+    "direction": {"type": "enum", "options": ["horizontal", "vertical"], "default": "horizontal"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-fablecut-doodle"},
+    "labelSize": {
+      "type": "number",
+      "default": 4.4,
+      "min": 2.5,
+      "max": 10,
+      "step": 0.1,
+      "description": "% of the frame's short side"
+    },
+    "floor": {"type": "number", "default": 4, "min": 2, "max": 10, "step": 0.1},
+    "delay": {"type": "number", "default": 0, "min": 0, "max": 30, "step": 0.05},
+    "drawDur": {"type": "number", "default": 0.7, "min": 0.1, "max": 4, "step": 0.05},
+    "stagger": {
+      "type": "number",
+      "default": 0.35,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "description": "Seconds between frames popping in"
+    },
+    "step": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0,
+      "max": 4,
+      "step": 0.05,
+      "description": "Seconds the playhead rests on each frame (0: no playhead)"
+    },
+    "boil": {"type": "number", "default": 8, "min": 0, "max": 24, "step": 1},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.05}
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {
+    "sketch-ink": "sketch-ink@3",
+    "easing": "easing@1",
+    "theme-fablecut-doodle": "theme-fablecut-doodle@1"
+  },
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:31:00.624Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "sketch-filmstrip@1",
+  "asset": {"created": "2026-10-16T17:24:23.979Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-filmstrip@2.js", "sha1": "05c0bffee5a0b40015f4d3ba53c9714efce5e74c"},
+  "hash": "e58d6ea13a04a71b5c5f569b6a8b551caa02b563fd9ea19fbad46b1a81ca576f"
+}

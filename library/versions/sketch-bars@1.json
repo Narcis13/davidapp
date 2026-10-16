@@ -1,0 +1,78 @@
+{
+  "ref": "sketch-bars@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Sketched bar chart",
+  "description": "Hand-drawn bar chart: a pencil baseline, bars growing from it with marker (or hatched) fill inside a wobbly ink outline, values counting up above them, labels written under them and a caption below. A focus bar gets its value circled in the accent with a burst of sparks. 2 to 6 bars; sizes are a share of the frame's short side with a floor. For doodle explainers and marketing: before/after, growth, a drop to zero.",
+  "tags": ["sketch", "hand-drawn", "doodle", "chart", "bars", "data", "counter", "explainer", "marketing"],
+  "duration": 8,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "bars": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "of": {
+        "type": "object",
+        "fields": {"label": {"type": "string", "default": ""}, "value": {"type": "number", "default": 0}},
+        "default": {"label": "", "value": 0}
+      },
+      "default": [{"label": "May", "value": 40}, {"label": "June", "value": 75}, {"label": "July", "value": 120}]
+    },
+    "caption": {"type": "string", "default": "videos made", "description": "A line under the chart (empty: none)"},
+    "prefix": {"type": "string", "default": ""},
+    "suffix": {"type": "string", "default": ""},
+    "focus": {
+      "type": "integer",
+      "default": -1,
+      "min": -1,
+      "max": 5,
+      "description": "The bar to circle and spark (-1: none)"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-fablecut-doodle"},
+    "fill": {"type": "enum", "options": ["marker", "hatch"], "default": "marker"},
+    "color": {
+      "type": "enum",
+      "options": ["accent", "accent2", "accent3", "highlight"],
+      "default": "accent2",
+      "description": "Theme colour of the bars"
+    },
+    "size": {
+      "type": "number",
+      "default": 5,
+      "min": 2.5,
+      "max": 12,
+      "step": 0.1,
+      "description": "Label size, % of the frame's short side (values are 1.5 times it)"
+    },
+    "floor": {"type": "number", "default": 4, "min": 2, "max": 10, "step": 0.1},
+    "delay": {"type": "number", "default": 0.2, "min": 0, "max": 30, "step": 0.05},
+    "stagger": {"type": "number", "default": 0.35, "min": 0, "max": 2, "step": 0.01},
+    "growDur": {"type": "number", "default": 0.9, "min": 0.1, "max": 4, "step": 0.05},
+    "focusAt": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 60,
+      "step": 0.05,
+      "description": "Seconds from the item start for the focus mark (0: right after its bar lands)"
+    },
+    "boil": {"type": "number", "default": 8, "min": 0, "max": 24, "step": 1},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.05}
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {
+    "sketch-ink": "sketch-ink@2",
+    "easing": "easing@1",
+    "theme-fablecut-doodle": "theme-fablecut-doodle@1"
+  },
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:24:24.289Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": null,
+  "asset": {"created": "2026-10-16T17:24:24.289Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-bars@1.js", "sha1": "074412f5d8b6d233e8759bb020a17424b6bc05c0"},
+  "hash": "28775cf57116459ed5c6736b4c3edde01483d50797b9d4270b876c17f394ab31"
+}

@@ -1,0 +1,45 @@
+{
+  "ref": "bg-paper@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Paper sheet",
+  "description": "Background of sketchbook paper: warm tint with soft fibres and specks, ruled lines, grid or dots, a red margin line, optional spiral binding along the top and a faint coffee ring, under a vignette. Colours come from a theme. Any length.",
+  "tags": ["background", "paper", "sketch", "hand-drawn", "texture", "loop"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "theme": {"type": "asset", "kind": "value", "default": "theme-sketchbook"},
+    "pattern": {"type": "enum", "options": ["ruled", "grid", "dots", "blank"], "default": "ruled"},
+    "spacing": {
+      "type": "number",
+      "default": 6.5,
+      "min": 2,
+      "max": 20,
+      "step": 0.1,
+      "description": "Line spacing in vmin"
+    },
+    "margin": {"type": "boolean", "default": true},
+    "rings": {"type": "boolean", "default": true, "description": "Spiral binding along the top edge"},
+    "stain": {"type": "boolean", "default": true, "description": "A faint coffee ring"},
+    "grainBoil": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "description": "Re-scatter the specks this many times a second (0 = still)"
+    },
+    "vignette": {"type": "number", "default": 0.22, "min": 0, "max": 0.8, "step": 0.01}
+  },
+  "uses": {},
+  "deps": {"theme-sketchbook": "theme-sketchbook@1"},
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:08:45.349Z",
+  "engine": 2,
+  "madeForClip": null,
+  "parent": null,
+  "asset": {"created": "2026-10-16T17:08:45.349Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/bg-paper@1.js", "sha1": "6473f11ab79531621c2387afe9de4946f0627865"},
+  "hash": "142dfd2d29034962a29e09697af1e7345f9f769235d529f4e6894d62e7529203"
+}

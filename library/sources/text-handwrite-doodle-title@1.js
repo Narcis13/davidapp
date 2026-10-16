@@ -1,0 +1,77 @@
+// A preset of text-handwrite@3: "Doodle title, handwritten". Made in the studio from parameters chosen in the playground.
+// Its parameters are text-handwrite@3's, with these values as defaults; it draws by handing them to text-handwrite@3.
+asset({
+  kind: 'visual',
+  title: 'Doodle title, handwritten',
+  description: 'A one-line title that writes itself in Kalam Bold with a highlighter on its *key* word, tuned on fablecut-doodle-tour: 92 px on 1080, floor 7 %, left aligned, written in 1.1 s after a 0.4 s pause (so it starts after a scribble cut). Pair with a theme whose fonts.headline is Kalam.',
+  tags: ['text', 'title', 'handwritten', 'doodle', 'sketch', 'preset'],
+  formats: ['vertical', 'horizontal', 'square'],
+  uses: { base: 'text-handwrite@3' },
+  params: {
+    text: { type: 'text', default: 'A brief history of *AI*' },
+    theme: { type: 'asset', kind: 'value', default: 'theme-sketchbook' },
+    look: { type: 'enum', options: ['ink', 'marker', 'sketch'], default: 'ink' },
+    font: { type: 'font', default: 'Space Grotesk' },
+    weight: { type: 'integer', default: 700, min: 100, max: 900, step: 100 },
+    size: {
+      type: 'number',
+      default: 92,
+      min: 12,
+      max: 600,
+      step: 1,
+      description: 'Largest size; shrinks to fit',
+    },
+    lineHeight: { type: 'number', default: 1.08, min: 0.7, max: 2, step: 0.01 },
+    uppercase: { type: 'boolean', default: false },
+    align: { type: 'enum', options: ['left', 'center', 'right'], default: 'left' },
+    valign: { type: 'enum', options: ['top', 'middle', 'bottom'], default: 'middle' },
+    color: {
+      type: 'enum',
+      options: ['ink', 'accent', 'accent2', 'accent3', 'pencil', 'highlight'],
+      default: 'ink',
+    },
+    emColor: {
+      type: 'enum',
+      options: ['ink', 'accent', 'accent2', 'accent3', 'pencil', 'highlight'],
+      default: 'accent',
+    },
+    highlight: { type: 'boolean', default: true, description: 'Highlighter swipe behind *emphasis*' },
+    underline: {
+      type: 'enum',
+      options: ['none', 'line', 'double', 'scribble', 'circle'],
+      default: 'none',
+    },
+    delay: { type: 'number', default: 0.4, min: 0, max: 30, step: 0.05 },
+    writeDur: {
+      type: 'number',
+      default: 1.1,
+      min: 0.1,
+      max: 20,
+      step: 0.05,
+      description: 'Seconds to write the whole text',
+    },
+    jitter: {
+      type: 'number',
+      default: 0.8,
+      min: 0,
+      max: 3,
+      step: 0.05,
+      description: 'How unsteady the hand is',
+    },
+    boil: { type: 'number', default: 8, min: 0, max: 24, step: 1 },
+    pencil: { type: 'boolean', default: true },
+    floor: {
+      type: 'number',
+      default: 7,
+      min: 0,
+      max: 20,
+      step: 0.1,
+      description: 'Smallest size on screen, % of the frame\'s short side (0: none); a text that cannot fit there throws',
+    },
+    exit: { type: 'enum', options: ['none', 'fade'], default: 'none' },
+    outDur: { type: 'number', default: 0.4, min: 0.05, max: 3, step: 0.05 },
+  },
+  render(f, p) {
+    return f.use('base', p);
+  },
+});

@@ -1,0 +1,102 @@
+{
+  "ref": "sketch-code@3",
+  "type": "function",
+  "kind": "visual",
+  "title": "Sketched code card",
+  "description": "A hand-drawn card with code typing itself in: the card draws on with a wobbly ink outline and a hard offset shadow, a header with three marker dots and a file name, then each line types in a mono face with keywords and calls in the accent and comments muted (colours that stay readable on the card), a caret at the end. One line can be swiped with a highlighter at its time. Sizes are a share of the frame's short side with a floor. For doodle and whiteboard explainers of code.",
+  "tags": ["sketch", "hand-drawn", "doodle", "code", "typing", "card", "explainer", "scene"],
+  "duration": 8,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "lines": {
+      "type": "array",
+      "of": {"type": "string", "default": ""},
+      "minItems": 1,
+      "maxItems": 14,
+      "default": ["render(f) {", "  const k = f.t / f.duration;", "  draw(f.ctx, k);", "}"]
+    },
+    "file": {"type": "string", "default": "scene.js", "description": "File name in the header (empty: none)"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-fablecut-doodle"},
+    "size": {
+      "type": "number",
+      "default": 4.2,
+      "min": 2.5,
+      "max": 10,
+      "step": 0.1,
+      "description": "Code size, % of the frame's short side (shrinks to fit, never under the floor)"
+    },
+    "floor": {
+      "type": "number",
+      "default": 4,
+      "min": 2,
+      "max": 10,
+      "step": 0.1,
+      "description": "Smallest code size on screen, % of the frame's short side"
+    },
+    "delay": {
+      "type": "number",
+      "default": 0.2,
+      "min": 0,
+      "max": 30,
+      "step": 0.05,
+      "description": "Seconds before the card starts to draw"
+    },
+    "drawDur": {
+      "type": "number",
+      "default": 0.6,
+      "min": 0.1,
+      "max": 3,
+      "step": 0.05,
+      "description": "Seconds the card takes to draw on"
+    },
+    "cps": {
+      "type": "number",
+      "default": 32,
+      "min": 4,
+      "max": 200,
+      "step": 1,
+      "description": "Characters typed per second"
+    },
+    "linePause": {
+      "type": "number",
+      "default": 0.12,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "description": "Pause at the end of each line"
+    },
+    "highlight": {
+      "type": "integer",
+      "default": -1,
+      "min": -1,
+      "max": 13,
+      "description": "Line to swipe with the highlighter (-1: none)"
+    },
+    "highlightAt": {
+      "type": "number",
+      "default": 3,
+      "min": 0,
+      "max": 60,
+      "step": 0.05,
+      "description": "Seconds from the item start when the swipe happens"
+    },
+    "shadow": {"type": "enum", "options": ["ink", "accent", "accent2", "none"], "default": "ink"},
+    "boil": {"type": "number", "default": 8, "min": 0, "max": 24, "step": 1},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.05}
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {
+    "sketch-ink": "sketch-ink@3",
+    "easing": "easing@1",
+    "theme-fablecut-doodle": "theme-fablecut-doodle@1"
+  },
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:31:00.449Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "sketch-code@2",
+  "asset": {"created": "2026-10-16T17:24:23.800Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-code@3.js", "sha1": "9ba0e4885cb71d28dab0877a3682cf9610d5049d"},
+  "hash": "0c0c3747d46a4abcc02393bb83ceab6e0f9229199353aed9c5e767b0df0f394a"
+}

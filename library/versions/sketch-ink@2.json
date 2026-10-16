@@ -1,0 +1,29 @@
+{
+  "ref": "sketch-ink@2",
+  "type": "function",
+  "kind": "value",
+  "title": "Sketch ink",
+  "description": "Hand-drawn stroke engine shared by the sketch assets. stroke(g, points, { width, color, style: ink|pen|pencil|marker, progress, wobble, boil, seed }) draws a wobbly, pressure-tapered ribbon and returns the pen tip; strokes(g, list, o) draws several in sequence with pen lifts. Shape helpers (line, arc, circle, bez, spline, rect, arrow, hatch, scribble, fit, path), boil(g, fps) for the hand-drawn \"boil\", and pencil(g, tip) draws a pencil cursor at the tip. Version 2 adds roundBox (a rounded box as one closed outline), tick (a check mark) and card(g, x, y, w, h, { progress, fill, color, shadow }) for a hand-drawn card with a hard offset shadow that draws on.",
+  "tags": ["sketch", "hand-drawn", "ink", "stroke", "foundation", "draw-on"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "style": {
+      "type": "enum",
+      "options": ["ink", "pen", "pencil", "marker"],
+      "default": "ink",
+      "description": "Stroke style shown in the preview"
+    }
+  },
+  "uses": {},
+  "deps": {},
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:15:50.788Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "sketch-ink@1",
+  "asset": {"created": "2026-10-16T17:08:45.363Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-ink@2.js", "sha1": "268ca87ac1a53ff10ac1504f91efb79d5fa32fdd"},
+  "hash": "903373ec2188a197139592465a35d6bb5cef98b33cdaf44d83871e08552339a3"
+}

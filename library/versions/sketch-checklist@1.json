@@ -1,0 +1,79 @@
+{
+  "ref": "sketch-checklist@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Sketched checklist",
+  "description": "A hand-written checklist: rows slide in staggered, each with a wobbly hand-drawn box; then a marker tick is drawn into each box on its cue (evenly from tickStart, or per row) with a small pop, and the row darkens from pencil to ink. Optional handwritten heading. Left aligned, sizes a share of the frame's short side with a floor. For doodle explainers: checks passed, steps done, features ticked off.",
+  "tags": ["sketch", "hand-drawn", "doodle", "checklist", "list", "tick", "explainer", "marketing", "scene"],
+  "duration": 8,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "items": {
+      "type": "array",
+      "of": {"type": "string", "default": ""},
+      "minItems": 1,
+      "maxItems": 8,
+      "default": ["Write the script", "Draw the frames", "Check every shot", "Ship it"]
+    },
+    "heading": {
+      "type": "string",
+      "default": "",
+      "description": "A handwritten heading above the rows (empty: none)"
+    },
+    "ticks": {
+      "type": "array",
+      "of": {"type": "number", "min": 0, "default": 0},
+      "maxItems": 8,
+      "default": [],
+      "description": "Seconds from the item start for each row's tick (empty: tickStart + i × tickEvery)"
+    },
+    "tickStart": {"type": "number", "default": 1.2, "min": 0, "max": 60, "step": 0.05},
+    "tickEvery": {"type": "number", "default": 0.6, "min": 0.05, "max": 10, "step": 0.05},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-fablecut-doodle"},
+    "tickColor": {"type": "enum", "options": ["accent", "accent2", "accent3", "ink"], "default": "accent3"},
+    "size": {
+      "type": "number",
+      "default": 5,
+      "min": 2.5,
+      "max": 12,
+      "step": 0.1,
+      "description": "Row text size, % of the frame's short side"
+    },
+    "floor": {"type": "number", "default": 4, "min": 2, "max": 10, "step": 0.1},
+    "spacing": {
+      "type": "number",
+      "default": 1.85,
+      "min": 1.2,
+      "max": 3,
+      "step": 0.05,
+      "description": "Row pitch, in row text sizes"
+    },
+    "delay": {"type": "number", "default": 0.1, "min": 0, "max": 30, "step": 0.05},
+    "stagger": {
+      "type": "number",
+      "default": 0.1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "description": "Seconds between rows arriving"
+    },
+    "inDur": {"type": "number", "default": 0.45, "min": 0.1, "max": 2, "step": 0.01},
+    "boil": {"type": "number", "default": 8, "min": 0, "max": 24, "step": 1},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.05}
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {
+    "sketch-ink": "sketch-ink@2",
+    "easing": "easing@1",
+    "theme-fablecut-doodle": "theme-fablecut-doodle@1"
+  },
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:24:24.582Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": null,
+  "asset": {"created": "2026-10-16T17:24:24.582Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-checklist@1.js", "sha1": "4853f5298a4245f84a5693ae7e39d3711b86e114"},
+  "hash": "dcdce7ee34e80b70950a5f16ca87af7a08fc8db38dbcb411611a9093aa28eb19"
+}

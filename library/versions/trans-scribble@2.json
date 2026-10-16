@@ -1,0 +1,78 @@
+{
+  "ref": "trans-scribble@2",
+  "type": "function",
+  "kind": "transition",
+  "title": "Scribble wipe",
+  "description": "Hand-drawn transition: a fat, wobbly marker stroke zigzags across the frame and paints the next layer in where it passes: a highlighter band rides just behind its head (the theme's highlight) and a thin marker rim in the theme's accent2 edges it. Rows, tilt, rim, band and colours are params; deterministic, so the same transition on several tracks lines up (give the band and rim to one of them). For doodle, sketchbook and whiteboard videos.",
+  "tags": ["transition", "scribble", "marker", "wipe", "sketch", "hand-drawn", "doodle"],
+  "duration": 0.7,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "rows": {
+      "type": "integer",
+      "default": 4,
+      "min": 2,
+      "max": 10,
+      "description": "Zigzag passes across the frame"
+    },
+    "angle": {
+      "type": "number",
+      "default": -10,
+      "min": -45,
+      "max": 45,
+      "step": 1,
+      "description": "Tilt of each pass, degrees"
+    },
+    "rim": {
+      "type": "number",
+      "default": 1.6,
+      "min": 0,
+      "max": 8,
+      "step": 0.1,
+      "description": "Width of the coloured rim, % of the frame's short side"
+    },
+    "color": {
+      "type": "string",
+      "default": "",
+      "description": "Rim colour, a CSS colour (empty: the theme's accent2, else a marker pink)"
+    },
+    "body": {
+      "type": "number",
+      "default": 0.6,
+      "min": 0,
+      "max": 1,
+      "step": 0.05,
+      "description": "Opacity of the marker band behind the stroke's head (0: none); on one track only when several share the cut"
+    },
+    "bodyColor": {
+      "type": "string",
+      "default": "",
+      "description": "Band colour, a CSS colour (empty: the theme's highlight, else a marker yellow)"
+    },
+    "tail": {
+      "type": "number",
+      "default": 0.22,
+      "min": 0.02,
+      "max": 1,
+      "step": 0.01,
+      "description": "Length of the band, as a share of the whole stroke"
+    },
+    "wobble": {"type": "number", "default": 0.35, "min": 0, "max": 2, "step": 0.05},
+    "ease": {
+      "type": "enum",
+      "options": ["inOutCubic", "outCubic", "inOutQuad", "linear"],
+      "default": "inOutCubic"
+    }
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {"sketch-ink": "sketch-ink@2", "easing": "easing@1"},
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:29:15.902Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "trans-scribble@1",
+  "asset": {"created": "2026-10-16T17:15:51.239Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/trans-scribble@2.js", "sha1": "3b816d4aa1381fe0680f1f5398d353ed25c0f6ed"},
+  "hash": "15d73a32f42538e9f2fa9b8e8236de0024383affa659400fd0371888d445c867"
+}

@@ -1,0 +1,102 @@
+{
+  "ref": "sketch-doodle@2",
+  "type": "function",
+  "kind": "visual",
+  "title": "Self-drawing doodle",
+  "description": "Hand-drawn doodles that draw themselves stroke by stroke with a pencil riding the pen tip, then get coloured in with marker or hatching, then keep boiling and bobbing. Shapes: robot, brain, lightbulb, computer, head, turing (a person and a computer), chess-king, snowflake, cat, chat, question, rocket, star, heart, clapper, speaker, notes. Idles by bobbing, swaying or pulsing on the music's beats. Optional detector-style label box. Exits by fading or un-drawing.",
+  "tags": ["sketch", "hand-drawn", "doodle", "icon", "draw-on", "illustration"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "shape": {
+      "type": "enum",
+      "options": ["robot", "brain", "lightbulb", "computer", "head", "turing", "chess-king", "snowflake", "cat", "chat", "question", "rocket", "star", "heart", "clapper", "speaker", "notes"],
+      "default": "robot"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-sketchbook"},
+    "delay": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 30,
+      "step": 0.05,
+      "description": "Seconds before the pen starts"
+    },
+    "drawDur": {
+      "type": "number",
+      "default": 1.8,
+      "min": 0.2,
+      "max": 10,
+      "step": 0.05,
+      "description": "Seconds to draw the outlines and colour in"
+    },
+    "weight": {
+      "type": "number",
+      "default": 1.3,
+      "min": 0.3,
+      "max": 4,
+      "step": 0.05,
+      "description": "Stroke width in viewBox units"
+    },
+    "style": {"type": "enum", "options": ["ink", "pen", "pencil"], "default": "ink"},
+    "fill": {"type": "boolean", "default": true},
+    "fillMode": {"type": "enum", "options": ["marker", "hatch"], "default": "marker"},
+    "fillRole": {
+      "type": "enum",
+      "options": ["auto", "ink", "accent", "accent2", "accent3", "highlight"],
+      "default": "auto",
+      "description": "Recolour every fill with one theme colour"
+    },
+    "boil": {
+      "type": "number",
+      "default": 8,
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "description": "Line boil, re-jitters per second"
+    },
+    "wobble": {"type": "number", "default": 1, "min": 0, "max": 4, "step": 0.05},
+    "pencil": {"type": "boolean", "default": true, "description": "Show a pencil at the pen tip while drawing"},
+    "idle": {
+      "type": "enum",
+      "options": ["bob", "sway", "beat", "none"],
+      "default": "bob",
+      "description": "Once drawn: bob, sway, beat (a pulse on every beat of the clip's music, f.clip.beats), or still"
+    },
+    "beatScale": {
+      "type": "number",
+      "default": 0.07,
+      "min": 0,
+      "max": 0.3,
+      "step": 0.01,
+      "description": "How much the beat pulse grows the drawing"
+    },
+    "flip": {"type": "boolean", "default": false, "description": "Mirror horizontally"},
+    "label": {
+      "type": "string",
+      "default": "",
+      "description": "Detector-style label boxed around the drawing, e.g. \"cat 0.98\""
+    },
+    "exit": {"type": "enum", "options": ["none", "fade", "undraw"], "default": "none"},
+    "outDur": {"type": "number", "default": 0.5, "min": 0.05, "max": 3, "step": 0.05},
+    "pad": {
+      "type": "number",
+      "default": 0.06,
+      "min": 0,
+      "max": 0.4,
+      "step": 0.01,
+      "description": "Padding around the drawing, as a fraction of the box"
+    }
+  },
+  "uses": {"sketch-ink": "sketch-ink"},
+  "deps": {"sketch-ink": "sketch-ink@2", "theme-sketchbook": "theme-sketchbook@1"},
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:24:24.837Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": "sketch-doodle@1",
+  "asset": {"created": "2026-10-16T17:08:45.519Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-doodle@2.js", "sha1": "ee26f83a0aff1260a9991e70c1af54f4b3461aa9"},
+  "hash": "3043eb505a76d860930c2726602cd5571d7b929381df4222ff2f495aea558a84"
+}

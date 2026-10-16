@@ -1,0 +1,79 @@
+{
+  "ref": "sketch-callouts@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Sketched callouts",
+  "description": "Handwritten notes with curved hand-drawn arrows pointing at targets: each callout is a label placed at a point of the box (fractions) and an arrow from the label to a target point; they draw on staggered (label, then the arrow swooping in, its head landing with an overshoot), then the ink boils. Labels can be underlined in the accent. Sizes are a share of the frame's short side with a floor. For annotating a product, a 3D object, a chart or a diagram in doodle style.",
+  "tags": ["sketch", "hand-drawn", "doodle", "callout", "arrow", "annotation", "label", "overlay", "explainer"],
+  "duration": 6,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "callouts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "of": {
+        "type": "object",
+        "fields": {
+          "text": {"type": "string", "default": ""},
+          "x": {"type": "number", "default": 0},
+          "y": {"type": "number", "default": 0},
+          "tx": {"type": "number", "default": 0},
+          "ty": {"type": "number", "default": 0}
+        },
+        "default": {"text": "", "x": 0, "y": 0, "tx": 0, "ty": 0}
+      },
+      "default": [
+        {"text": "hand-drawn", "x": 0.15, "y": 0.2, "tx": 0.42, "ty": 0.45},
+        {"text": "boils", "x": 0.85, "y": 0.8, "tx": 0.58, "ty": 0.55}
+      ]
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-fablecut-doodle"},
+    "arrowColor": {"type": "enum", "options": ["ink", "accent", "accent2", "accent3"], "default": "accent2"},
+    "underline": {"type": "boolean", "default": true, "description": "A quick accent underline under each label"},
+    "bend": {
+      "type": "number",
+      "default": 0.25,
+      "min": -0.6,
+      "max": 0.6,
+      "step": 0.01,
+      "description": "How much each arrow curves (sign: which side)"
+    },
+    "size": {
+      "type": "number",
+      "default": 5,
+      "min": 2.5,
+      "max": 12,
+      "step": 0.1,
+      "description": "Label size, % of the frame's short side"
+    },
+    "floor": {"type": "number", "default": 4, "min": 2, "max": 10, "step": 0.1},
+    "delay": {"type": "number", "default": 0.3, "min": 0, "max": 30, "step": 0.05},
+    "stagger": {"type": "number", "default": 0.7, "min": 0, "max": 4, "step": 0.05},
+    "drawDur": {
+      "type": "number",
+      "default": 0.55,
+      "min": 0.1,
+      "max": 3,
+      "step": 0.05,
+      "description": "Seconds an arrow takes to draw"
+    },
+    "boil": {"type": "number", "default": 8, "min": 0, "max": 24, "step": 1},
+    "outDur": {"type": "number", "default": 0.3, "min": 0, "max": 3, "step": 0.05}
+  },
+  "uses": {"sketch-ink": "sketch-ink", "easing": "easing"},
+  "deps": {
+    "sketch-ink": "sketch-ink@2",
+    "easing": "easing@1",
+    "theme-fablecut-doodle": "theme-fablecut-doodle@1"
+  },
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:24:24.685Z",
+  "engine": 2,
+  "madeForClip": "fablecut-doodle-tour",
+  "parent": null,
+  "asset": {"created": "2026-10-16T17:24:24.685Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/sketch-callouts@1.js", "sha1": "432b582418051fc29afd1676c855348ecec1ac81"},
+  "hash": "25de009c0630547be57b174ca070540c4eb206b05de4ede53c10a3d0264cc26f"
+}

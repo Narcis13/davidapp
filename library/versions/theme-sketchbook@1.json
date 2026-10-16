@@ -1,0 +1,22 @@
+{
+  "ref": "theme-sketchbook@1",
+  "type": "function",
+  "kind": "value",
+  "title": "Theme: Sketchbook",
+  "description": "Theme kit for hand-drawn clips: cream paper with blue rules and a red margin, blue-black ink, red marker, blue pen, green and a yellow highlighter, plus the shared sketch constants (stroke weight, wobble, boil rate). Pass it to any scene that takes a theme.",
+  "tags": ["theme", "palette", "sketch", "hand-drawn", "foundation"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {},
+  "uses": {},
+  "deps": {},
+  "author": "mcp-client",
+  "note": "Synced from assets/",
+  "created": "2026-10-16T17:08:45.174Z",
+  "engine": 2,
+  "madeForClip": null,
+  "parent": null,
+  "asset": {"created": "2026-10-16T17:08:45.174Z", "originClip": "fablecut-doodle-tour", "forkedFrom": null},
+  "source": {"file": "sources/theme-sketchbook@1.js", "sha1": "7d592be3c011377b9a2a180c7ca5f16013f0e835"},
+  "hash": "e3ee52cf80e7db7d0190751a9b1db95a05cd89c6df2691589bde1613aeaee8ce"
+}

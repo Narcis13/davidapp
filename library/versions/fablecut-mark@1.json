@@ -35,20 +35,6 @@
     "bakedFrom": "logo-mark@1",
     "params": {"animate": false},
     "license": "original",
-    "provenance": {
-      "license": "original",
-      "licenseUrl": null,
-      "sourceUrl": null,
-      "creator": null,
-      "credit": null,
-      "date": "2026-10-15",
-      "aiGenerated": false,
-      "contentId": false,
-      "restrictions": null,
-      "placeholder": false,
-      "redistributable": true,
-      "derivedFrom": "logo-mark@1"
-    },
     "bytes": 8904,
     "width": 512,
     "height": 512
