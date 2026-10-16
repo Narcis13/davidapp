@@ -25,6 +25,7 @@ strips. Report "measured" or "viewed", never "sounds good" or "feels smooth".
 S=<this skill's base directory>          # references/, scripts/push-clip.mjs, templates/
 clips/<slug>/                            # compose.mjs, timing.mjs, script.json, clip.json (export_clip)
 work/<slug>/                             # NOTES.md (brief, look, decisions, checks), frames/, checks/, out/
+                                         # (its stills, sheets and renders are git-ignored: no media in git)
 assets/                                  # every function asset's source; npm run sync-assets pushes it
 ```
 
@@ -219,7 +220,11 @@ fix what a hand layout still needs. `check_clip { format }` for each.
 - `work/<slug>/NOTES.md` complete: brief, look, decisions and their defaults, the check table, and *Render*
   with the exact commands that rebuild the clip from a clean checkout (`import_clip` / `scripts/library.mjs
   import`, then `start_render`).
-- Commit `clips/<slug>/`, `library/`, `assets/`, `work/<slug>/` (no video, no `out/`, no `.env`). Never push.
+- Commit `clips/<slug>/`, `library/`, `assets/`, `work/<slug>/` as code and text only: no media in git. Stills,
+  sheets, strips, voice samples, posters and renders stay on disk (`.gitignore` covers `work/`); only `library/`
+  (fonts, logos, uploads a clip needs to re-render) and `assets/` may hold binary files. After `git add`, run
+  `node $S/scripts/check-no-media.mjs`; it must pass before `git commit` (it prints the `git rm --cached` for
+  anything that slipped in). No `out/`, no `.env`. Never push.
 - Report to the user in one short message: the MP4 paths, the clip URL, what was reused and what is new in the
   library (with their names, so the next brief can ask for them), the checks table's open lines if any, and
   the clip's row of `compounding_report` (calls, new lines of asset code, reuse share).

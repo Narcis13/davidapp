@@ -18,6 +18,7 @@ every shape → draft, checks, final → export and leave the library richer.
 | `references/checks.md` | every check, the tool that measures it, the number it must give |
 | `references/voice-and-sound.md` | narration, word anchors, captions, ducking, loudness |
 | `scripts/push-clip.mjs` | `clips/<slug>/compose.mjs` → the studio (create, sync assets, update, optionally render) |
+| `scripts/check-no-media.mjs` | before every commit: fails if a picture, sound or video outside `library/` and `assets/` is staged |
 | `templates/` | `compose.mjs`, `timing.mjs`, `script.json`, `NOTES.md` to copy into `clips/<slug>/` and `work/<slug>/` |
 
 The repo's own conventions it builds on: `docs/ASSET_CONTRACT.md`, `docs/COOKBOOK.md`, `craft/CHECKS.md`,

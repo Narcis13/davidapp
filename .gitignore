@@ -22,3 +22,16 @@ work/*/out/
 
 # the voice helper (tools/voice): its node_modules and the Kokoro model cache are never committed
 tools/voice/cache/
+
+# media a clip's work leaves (stills, sheets, cut strips, voice samples): local only, rebuilt from the clip.
+# Git holds the code and the asset store (library/); .claude/skills/new-video/scripts/check-no-media.mjs guards it.
+work/**/*.png
+work/**/*.jpg
+work/**/*.jpeg
+work/**/*.gif
+work/**/*.webp
+work/**/*.wav
+work/**/*.mp3
+work/**/*.m4a
+work/**/*.ogg
+work/**/*.flac
