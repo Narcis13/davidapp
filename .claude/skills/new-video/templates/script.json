@@ -1,0 +1,33 @@
+{
+  "slug": "<slug>",
+  "title": "<Title of the video>",
+  "language": "en",
+  "format": "horizontal",
+  "platforms": ["youtube"],
+  "theme": "theme-tide",
+  "bpm": 120,
+  "takeaway": "<the one sentence the viewer leaves with>",
+  "beats": [
+    {
+      "id": "hook",
+      "idea": "<the question or outcome the viewer already cares about>",
+      "voice": "",
+      "key": "",
+      "screen": { "eyebrow": "", "title": "<Headline with the *key* word marked>" }
+    },
+    {
+      "id": "body",
+      "idea": "<the thing doing the thing, or the model built piece by piece>",
+      "voice": "",
+      "key": "",
+      "screen": { "eyebrow": "", "title": "<What is on the plate>", "icons": ["sparkles", "layers", "package"] }
+    },
+    {
+      "id": "cta",
+      "idea": "<the takeaway in the brief's own words, and what to do next>",
+      "voice": "",
+      "key": "",
+      "screen": { "title": "<Closing line>", "line": "<a support line>", "cta": "<Button text>", "url": "<example.com>" }
+    }
+  ]
+}
