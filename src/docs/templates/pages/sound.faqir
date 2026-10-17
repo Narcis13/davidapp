@@ -1,0 +1,134 @@
+//- Sound, voice and captions. Params: d.
+div(data-ui="prose")
+  raw p("A video's sound is made of audio items on audio tracks: music and effects made by audio assets, sound files, the sound of footage, and a **narration**. The studio mixes them itself, so the preview plays exactly the mix the render encodes.")
+
+  h2#music Music and sound effects
+  raw p("Add an audio asset (such as `music-loop`, `sfx-whoosh`) or a sound file to an audio track with **Add item** in the editor. The beats found in the **first** audio item reach every asset as `f.clip.beats`, so backgrounds can pulse and cuts can land on the beat; the timeline snaps to them too.")
+
+  h2#mix The mix: gain, volume and fades
+  raw p("The loudness of an audio item at any moment is its **gain** (linear, 0 to 4; 1 is as made) times its **volume** keyframes (in decibels, from −90 to +24) times its fades times the ducking. In the editor these are **Gain**, **Fade in**, **Fade out** and **Volume over time**; for Claude:")
+  pre
+    code
+      | { id: 'bed', asset: 'music-loop', start: 0, duration: 30, gain: 0.5,
+      |   keyframes: { volume: [{ t: 0, v: -12 }, { t: 1.2, v: 0, ease: 'outCubic' }] },
+      |   duck: { by: 18, attack: 0.15, release: 0.45, hold: 0.25, source: 'words' } }
+  raw p("Volume keys ease with `linear` (the default), `hold`, `smooth`, or `in`/`out`/`inOut` with `Sine`, `Quad` or `Cubic`.")
+
+  h2#ducking Ducking under the voice
+  raw p("**Ducking** turns the music down while the narration speaks and back up in the pauses. Turn on **Duck under the narration** on the music item, or give it `duck`:")
+  div(role="region" aria-label="Ducking settings" tabindex="0")
+    table
+      thead
+        tr
+          th Setting
+          th Default
+          th Meaning
+      tbody
+        tr
+          td
+            raw md("`by`")
+          td 12 dB
+          td How far down (0 to 60)
+        tr
+          td
+            raw md("`attack`")
+          td 0.12 s
+          td How long the dip takes; it is complete when the speech starts
+        tr
+          td
+            raw md("`release`")
+          td 0.4 s
+          td How long it takes to come back up
+        tr
+          td
+            raw md("`hold`")
+          td 0.25 s
+          td How long it stays down after the speech
+        tr
+          td
+            raw md("`source`")
+          td words
+          td
+            raw md("`words` (the narration's word times) or `envelope` (the actual sound of the tracks in `under`, louder than `threshold`, default −40 dBFS)")
+
+  h2#loudness Loudness target
+  raw p("Streaming platforms play everything at a similar loudness, so a video should arrive near their level. Turn on **Normalise to a target** in the clip settings, or set `loudness: true` (−14 LUFS with true peaks at most −1 dBTP), or `loudness: { target, truePeak }` (target −40 to −5, peak −9 to 0).")
+  raw p("The render reaches the target with **one** gain, limits the loudest peaks first only when it must (and says so), measures the encoded file (EBU R128) and corrects it once more if the AAC encoding moved it. A render report says **Target met** when it is within 1 LU. Without a target, a safety limiter only keeps peaks from clipping.")
+
+  h2#narration A narration: a voice with its words
+  raw p("A **narration** is a sound asset that knows its **script** and the time of every word. Word number 12 is the same word in every take, so when you record a better take, everything tied to the words follows. There are three ways to make one:")
+  dl
+    dt Spoken by the studio from a script
+    dd
+      raw md("`generate_narration { script, voice, name }`: the studio speaks the script with a local voice, transcribes the take, aligns the words to the script and checks the transcript. `voice_samples { line, count }` lets you hear a line in a few voices first.")
+    dt A recording you made
+    dd
+      raw md("`add_narration { name, path, script, align: true, license: 'original' }`: the studio times your recording against the script.")
+    dt From another service
+    dd
+      raw md("`add_narration` with the timings a voice service or an aligner returned (a word list, ElevenLabs character alignment, or whisper.cpp JSON).")
+  raw p("Put the narration on an audio track whose role is `narration`. Every asset can then read the words as `f.clip.words`, and the timeline shows them under the track.")
+  raw p("The **transcript check** compares what was heard with the script and names slips, dropped words and inserted words (case, punctuation and how numbers are written do not count). With two independent transcriptions, a word counts as wrong only when both say so. `check_transcript { narration, transcribe: true }` checks a take again.")
+
+  h2#voice-setup Set up voice and transcription
+  raw p("Nothing paid is needed: the voice is **Kokoro-82M** and the transcription **whisper.cpp**, both running on your computer. A hosted voice (ElevenLabs) is used only if you set its key. Settings come from the environment or a git-ignored `.env` file at the repository root, and `speech_status` says what is set up and what to set for each missing piece.")
+  div(role="region" aria-label="Voice settings" tabindex="0")
+    table
+      thead
+        tr
+          th Setting
+          th Meaning
+      tbody
+        tr
+          td
+            raw md("`STUDIO_KOKORO_DIR`")
+          td
+            raw md("A folder holding `tts/say.mjs` with `kokoro-js` installed: `tools/voice` in this repository. Install it once with `npm ci --prefix tools/voice/tts`. The model (about 90 MB) downloads on first use into `tools/voice/cache/`.")
+        tr
+          td
+            raw md("`STUDIO_WHISPER_CLI`")
+          td
+            raw md("whisper.cpp's `whisper-cli` program (a release build), unless it is on your `PATH`.")
+        tr
+          td
+            raw md("`STUDIO_WHISPER_MODEL`")
+          td
+            raw md("A ggml model file. Use `ggml-small.en.bin` for good word times (`base.en` starts words up to 350 ms early).")
+        tr
+          td
+            raw md("`STUDIO_WHISPER_MODEL_2`")
+          td
+            raw md("Optional second model (`ggml-base.en.bin`): the transcript check then calls a word wrong only when both models do.")
+        tr
+          td
+            raw md("`STUDIO_TTS`")
+          td
+            raw md("`kokoro`, `elevenlabs` or `none`. Default: `kokoro` when `STUDIO_KOKORO_DIR` is set, else `elevenlabs` when its key is.")
+        tr
+          td
+            raw md("`ELEVENLABS_API_KEY`")
+          td The hosted voice, used only when set.
+  raw p("`node tools/voice/tts/say.mjs --list` prints the voices (`<id> <language> <gender> grade <grade>`). Models are never committed to the repository.")
+
+  h2#anchors Visuals that stay on their word
+  raw p("Pin an item's start, a keyframe or a marker to a word: `anchor: { item: 'vo', word: 12, offset: -0.1 }` (word 12 of the narration item `vo`, a tenth of a second early). In the editor, **Start on a word** does it for an item. Every save sets the time from the word, so after a new take (`add_narration` or `generate_narration` with the same name, then `repin_clip { only: ['<narration>'] }`) every anchored visual moves with its word. `anchor_report` gives each one's distance from its word, in frames.")
+
+  h2#captions Captions from the words
+  raw p("Turn on **Captions from the narration** in the clip settings (or `composition.captions: {}`), and put `text-captions@2` on a track whose role is `captions`. The studio builds caption **pages** from the words by these rules:")
+  ul
+    li
+      raw md("At most `maxLines` lines (default 2) of about `maxChars` characters: 32 in a horizontal clip, 20 otherwise.")
+    li Lines break at phrases; a number stays with its unit, and names (capitalised runs, and any you list in names) stay whole.
+    li
+      raw md("A page starts on its first word, or up to `lead` frames before it (default 2), and lasts at least `minDuration` (0.8 s). Gaps shorter than `closeGap` (0.3 s) are closed; a pause of `pauseBreak` (0.6 s) or more always starts a new page.")
+  raw p("`text-captions@2` lights each word at its real time, inside the **caption lane**, a band at the bottom of the safe zone that nothing else should use. Change where pages break in the editor's **Caption pages** panel ([The clip editor](/docs/editor#captions)) or with the `caption_*` operations; the words' times never change. `caption_pages` lists the pages and any rule they break.")
+  raw p("Every render writes the captions as **SRT** and **WebVTT**, and the words as JSON. **Burn into the video** off (`burnIn: false`) keeps them in the files only, for platforms that show their own captions. A clip with no narration can still get an SRT file from an asset that has a `cues` parameter.")
+
+  h2#reports Measure the sound
+  ul
+    li
+      raw md("`audio_report` (before rendering): loudness, loudness range, true peak, where the speech is, how far the music sits under the voice while it speaks (in LU), silences and clipping. In the showcase's voiced clip the music sits 16.8 LU under the voice.")
+    li
+      raw md("`export_stems { groups: { voice: ['voice'], music: ['music'] } }`: 16-bit WAV files of groups of tracks, for a sound editor.")
+    li
+      raw md("After a render, the render report measures the encoded file: loudness, silences and where the narration sits. See [Checks and quality](/docs/quality#render-report).")

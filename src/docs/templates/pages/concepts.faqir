@@ -1,0 +1,104 @@
+//- The big ideas. Params: d.
+div(data-ui="prose")
+  p Five ideas explain almost everything in Fablecut. Once they click, every screen and every tool is a variation on them.
+
+  h2#assets 1. An asset is a function that draws a frame
+  raw p("An **asset** is a small JavaScript program with one job: given a moment in time, draw that frame. A word that rises into place, a gradient that drifts, a bar chart that grows, a whoosh sound, an easing curve: each is an asset. Because a frame depends only on the time and the asset's **parameters** (its settings, such as text, colour and size), the studio can draw any frame in any order, on many processor cores at once, and get exactly the same picture every time.")
+  p Assets come in six kinds. Most are visual; the others attach to visual items or feed values to them.
+  div(role="region" aria-label="Asset kinds" tabindex="0")
+    table
+      thead
+        tr
+          th Kind
+          th What it does
+          th Example
+      tbody
+        tr
+          td
+            strong visual
+          td Draws pictures. Sits on a track, inside another asset, or acts as a mask.
+          td A title, a background, a chart, a 3D orb
+        tr
+          td
+            strong value
+          td Returns a value instead of drawing.
+          td Easing curves, a colour theme
+        tr
+          td
+            strong audio
+          td Makes sound samples.
+          td A music loop, a whoosh
+        tr
+          td
+            strong motion
+          td Moves an item without redrawing it: in, out, emphasis or loop.
+          td Slide in from the left, pop
+        tr
+          td
+            strong transition
+          td Turns one layer into the next.
+          td Push, iris, glitch
+        tr
+          td
+            strong effect
+          td Processes the pixels of a layer, a track or the whole frame.
+          td Glow, grain, vignette, colour grade
+  raw p("Besides function assets, the library holds **file assets**: images (PNG, JPEG, WebP, SVG), sounds, fonts, video footage and baked frame sequences. They are versioned the same way.")
+
+  h2#versions 2. Every save is a new version, and versions never change
+  raw p("When an asset is saved, the studio checks it (it runs it in a sandbox and draws test frames), then stores it as an immutable **version**: `text-word-reveal@1`, then `text-word-reveal@2` after an edit, and so on. Old versions are never overwritten. Small things such as a better title, description or tags are kept beside the asset and do **not** make a new version.")
+
+  h2#clips 3. A clip is a composition that pins versions
+  raw p("A **clip** is a recipe for a video: a format (vertical, horizontal or square), a frame rate, a duration, and **tracks** of **items**. Each item places an asset at a time, for a duration, with its parameters, and can carry a layout, keyframes, motions, effects, a transition and a mask. Tracks draw from bottom to top, so the last track is in front.")
+  raw p("When a clip is saved, every asset it names is **pinned** to the exact version it uses (`text-word-reveal` becomes `text-word-reveal@2`). From then on the clip draws the same frames forever, whatever happens to its assets later. Moving a clip to newer versions is a deliberate step (**Upgrade** in the editor, or `repin_clip` for Claude).")
+  div(role="region" aria-label="Formats" tabindex="0")
+    table
+      thead
+        tr
+          th Format
+          th Size in pixels
+          th Safe zone (top / right / bottom / left)
+      tbody
+        each f in d.live.formats
+          tr
+            td
+              strong {{ f.label }}
+              |  ({{ f.name }})
+            td {{ f.size }}
+            td {{ f.safe }} px
+  raw p("The **safe zone** is the part of the frame that platform buttons and captions do not cover. Text belongs inside it. See [Checks and quality](/docs/quality#zones).")
+
+  h2#preview-is-render 4. What you see is what you render
+  p The preview in your browser runs the very same code as the renderer that writes the MP4: there is no separate preview engine. Effects and 3D are plain arithmetic on pixels rather than browser filters or WebGL, so the browser and the renderer produce the same picture. When you want to be sure, the playground's Exact frame button asks the renderer for the frame you are looking at.
+
+  h2#compounding 5. The library compounds
+  p Every clip leaves reusable pieces behind, and every new clip starts by looking for them. This is the habit that makes the studio faster over time:
+  ol
+    li
+      raw md("**Search before you make.** The library ranks assets by how well they match your words and boosts the ones marked featured, the favourites and the ones many clips use.")
+    li
+      raw md("**Keep a tweak without code.** Tuned parameters become a **preset**; a group of layers becomes a **precomp** (one asset that draws several layers).")
+    li
+      raw md("**Share a look.** A **theme** asset holds a palette and fonts; every asset in a clip can read it, so new pieces match by default.")
+    li
+      raw md("**Leave notes.** Notes on an asset, and real examples from the clips that use it, help the next person, or the next Claude session, use it well.")
+  raw p("The **Lineage** screen shows which clip produced which asset and which later clips reused it. See [Render, gallery and lineage](/docs/renders#lineage).")
+
+  h2#two-ways Two ways to work, one studio
+  div(data-ui="grid" data-cols="1" data-cols-sm="2" data-gap="4")
+    +card(title="By hand, in the studio")
+      @body
+        raw p("Browse the library, tune an asset in the playground, place it on the timeline in the clip editor, render. Everything has a button. Start with [The library](/docs/library).")
+    +card(title="With Claude, over MCP")
+      @body
+        raw p("Claude Code calls the studio's tools: it searches, writes assets, composes clips, looks at frames, checks and renders. You can also **ask the agent** from inside the studio. See [Claude Code and the studio](/docs/claude).")
+  p Both work on the same database. A change made by one appears on the other's screen within a moment, without a reload.
+
+  h2#rules The few rules that keep it working
+  ul
+    li
+      raw md("An asset may depend only on the time, its parameters and its own seeded random numbers. The clock, `Math.random()`, timers and the network are refused when it is saved. See [Writing assets](/docs/assets#rules).")
+    li
+      raw md("Text should be drawn through the studio's text library (`f.lib.text`), so it can be measured, checked and kept at a readable size.")
+    li
+      raw md("Every file you add should say where it came from and under which licence. A **final** render refuses files whose licence is unknown. See [Licences and credits](/docs/provenance).")

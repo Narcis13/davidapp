@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.5",
+    "@faqir-ui/core": "1.2.5",
+    "@faqir-ui/template": "1.2.5",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "@napi-rs/canvas": "^1.0.10",
     "acorn": "^8.18.0",
@@ -24,6 +26,7 @@
     "@fontsource/space-grotesk": "^5.3.0",
     "@types/node": "^26.6.4",
     "eslint": "^10.11.0",
+    "faqir-ui-cli": "1.2.5",
     "globals": "^17.13.0",
     "typescript": "^7.0.2"
   },

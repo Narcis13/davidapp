@@ -1,0 +1,64 @@
+//- The frame of every page of the manual: the top bar with search, the navigation, the page's title and
+//- summary, its body (block content), the previous and next pages, and the "On this page" list.
+doctype html
+html(lang="en" data-theme="dark")
+  head
+    meta(charset="utf-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1")
+    meta(name="color-scheme" content="dark")
+    meta(name="theme-color" content="#0b0b10")
+    meta(name="description" content=d.page.summary)
+    title {{ d.page.title }} · Fablecut manual
+    link(rel="icon" href="/ui/favicon.svg" type="image/svg+xml")
+    link(rel="stylesheet" href="/vendor/@faqir-ui/core/dist/faqir.default.css")
+    link(rel="stylesheet" href="/ui/css/docs.css")
+  body
+    a(href="#content" data-docs="skip") Skip to the page
+    header(data-docs="topbar")
+      a(href="/docs" data-docs="brand" aria-label="Fablecut manual, first page")
+        svg(viewBox="0 0 32 32" width="24" height="24" aria-hidden="true")
+          rect(width="32" height="32" rx="7" fill="#ffd166")
+          path(d="M11 8.5v15l13-7.5z" fill="#0b0b10")
+        span Fablecut
+        span(data-docs="brand-sub") manual
+      form(action="/docs/search" method="get" role="search" data-docs="search")
+        label(for="docs-q" data-docs="sr") Search the manual
+        input#docs-q(data-ui="input" data-size="sm" type="search" name="q" placeholder="Search the manual" value=d.query ?? "" autocomplete="off")
+      a(href="/" data-ui="button" data-variant="primary" data-size="sm" data-docs="studio") Open the studio
+    div(data-docs="frame")
+      nav(data-docs="sidebar" aria-label="Manual")
+        include "partials/nav.faqir" (nav=d.nav)
+      main#content(tabindex="-1" data-docs="main")
+        +collapsible(data-docs="compact-nav")
+          @trigger
+            | Browse the manual
+          @content
+            nav(aria-label="Manual, compact")
+              include "partials/nav.faqir" (nav=d.nav)
+        article(data-docs="page")
+          header(data-docs="page-head")
+            p(data-ui="text" data-variant="eyebrow") {{ d.page.group }}
+            h1 {{ d.page.title }}
+            p(data-ui="text" data-size="lg" data-variant="muted") {{ d.page.summary }}
+          // docs:content
+          block content
+          // docs:end
+          if d.page.prev || d.page.next
+            nav(data-docs="pager" aria-label="Previous and next page")
+              if d.page.prev
+                a(href=d.page.prev.href rel="prev" data-docs="prev")
+                  span(data-docs="pager-label") ← Previous
+                  span {{ d.page.prev.title }}
+              if d.page.next
+                a(href=d.page.next.href rel="next" data-docs="next")
+                  span(data-docs="pager-label") Next →
+                  span {{ d.page.next.title }}
+      aside(data-docs="toc" aria-label="On this page")
+        if d.toc.length > 1
+          p(data-ui="text" data-variant="eyebrow") On this page
+          ul
+            each h in d.toc
+              li
+                a(href="#{{ h.id }}") {{ h.text }}
+    footer(data-docs="foot")
+      p(data-ui="text" data-size="sm" data-variant="muted") Fablecut {{ d.site.version }} · This manual is drawn on the server by the studio, with Faqir UI templates, from what the studio knows right now.

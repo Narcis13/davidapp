@@ -1,0 +1,111 @@
+//- The library screen. Params: d.
+div(data-ui="prose")
+  raw p("The **Library** is the first screen of the studio (the address `/`). It shows every asset you have: the functions that draw, the uploaded pictures, sounds, footage, fonts and baked sequences. The count next to the title says how many there are, or how many match what you searched.")
+
+  h2#search Search and sort
+  raw p("Type in the search box (“Search titles, descriptions, tags, source”). The search looks at an asset's name first, then its title and tags, then its description, and a little at its source code. Several words narrow the search; each word also matches the start of longer words, so `grad` finds `gradient`.")
+  p Results are ranked by how well they match, then boosted by what has proven useful: assets marked Featured rise most, then your favourites, then the ones used in many clips. Without a search, featured assets come first, then favourites, then the most used, then the newest.
+  div(role="region" aria-label="Sort orders" tabindex="0")
+    table
+      thead
+        tr
+          th Sort
+          th Order
+      tbody
+        tr
+          td Relevance
+          td The best match first (the default).
+        tr
+          td Newest
+          td The most recently changed first.
+        tr
+          td Most used
+          td The assets that the most clips use first.
+        tr
+          td Name
+          td Alphabetical.
+  raw p("**Comfortable**, **Compact** and **List** change how dense the grid is; the studio remembers your choice. Every search, filter and sort is kept in the page address, so you can bookmark a view or send it to someone.")
+
+  h2#filters Filters
+  p The filter panel on the left (the Filters button on a narrow screen) narrows what you see. Each group shows how many assets each value would give you.
+  ul
+    li
+      raw md("**Quick views**: **Favourites**, **Featured**, **Needs description** (uploads waiting for a description), **Recently used** and **Kit** (the motion-graphics kit, below).")
+    li
+      raw md("**Collections**: your own named groups of assets. Make one from the detail panel or the bulk bar.")
+    li
+      raw md("**Type** (function, image, sound, font, sequence, video), **Kind** (visual, value, audio, motion, transition, effect), **Tags**, **Format**, **Author**, **Made for clip** (the clip an asset was created for) and **Used by clip**.")
+  raw p("Active filters appear as chips above the grid; click a chip to remove it, or **Clear filters** to remove them all.")
+
+  h2#cards Cards and the detail panel
+  raw p("Each card shows a moving preview (a filmstrip) of the asset, its name and version, how many clips use it, and flags such as **Featured**, **Needs description**, **Placeholder** or **Licence unknown**. The star on a card adds it to your favourites.")
+  ul
+    li
+      raw md("**Click** a card to open the **detail panel** on the side: its palette, suggested uses, facts (type, author, duration, formats, size, licence, parameters, the clip it was made for, lineage, creation date), the clips that use it and its last versions.")
+    li
+      raw md("**Double-click** a card, or press **Open in playground** in the panel, to open it in the [playground](/docs/playground).")
+    li
+      raw md("**Add to …** in the panel puts the asset into the clip you last opened in the editor, at its playhead. Until you open a clip it says “No clip open”.")
+    li
+      raw md("**Feature** marks an asset as a good starting point. Featured assets rank highest in searches, for you and for Claude.")
+
+  h2#select Select many and act on them
+  raw p("Tick the box on a card, or [[Ctrl]]-click it ([[⌘]]-click on a Mac), to select it. [[Shift]]-click selects a range. While anything is selected, a plain click also adds or removes a card instead of opening it, and a **bulk bar** appears:")
+  ul
+    li Add or remove a tag on every selected asset (type the tag, then Add tag or Remove tag).
+    li Put them in a collection, favourite or unfavourite them all.
+    li Add them all to the open clip.
+  raw p("[[Ctrl+A]] selects every card that is loaded; [[Escape]] clears the selection. The full list of keys is in [Keyboard and mouse](/docs/shortcuts#library).")
+
+  h2#add-files Add your own pictures, videos and fonts
+  raw p("**Drop files anywhere on the Library page**, or press **Upload**. The studio reads each file's real type from its contents, not its name.")
+  div(role="region" aria-label="What you can drop on the library" tabindex="0")
+    table
+      thead
+        tr
+          th What
+          th File types
+          th Largest file
+          th Becomes
+      tbody
+        tr
+          td Pictures
+          td PNG, JPEG, WebP, SVG
+          td 25 MB
+          td An image asset
+        tr
+          td Video
+          td MP4, MOV, M4V, WebM, MKV
+          td 2 GB (in the browser)
+          td A footage asset
+        tr
+          td Fonts
+          td TTF, OTF, WOFF2
+          td 25 MB
+          td A font asset (a short form asks for its licence)
+  p A file that is already in the library (the same bytes) is not added twice. Each row of the upload list says how it went: Added, Added as version N, Already in the library, or Failed with the reason.
+  +callout(variant="warning")
+    @content
+      raw p("**Say where a file came from before you drop it.** Press **Licence** next to **Upload** and pick or type the licence (for example `original`, `CC0-1.0` or `CC-BY-4.0`); the button then reads “Licence: …” and applies to the next pictures and videos you drop. A file dropped without one is recorded as **Licence unknown**, and a final render will refuse it until you set the licence on its page. Fonts always ask for their own licence. See [Licences and credits](/docs/provenance).")
+  raw p("Uploaded pictures wait on the **Needs description** list until someone (you, or Claude with `list_undescribed` and `describe_asset`) gives them a title, a description and tags. From then on, searches find them by those words. Details on images, SVG logos, footage and fonts are in [Pictures, video and fonts](/docs/media).")
+
+  h2#kit The kit
+  p The kit is a set of assets for explainers, onboarding videos and marketing: browser and phone frames around a screen recording, a cursor that follows the recording, a spotlight, a camera move, callouts, arrows, steps, charts, icons and an end card. They share one convention: positions are in the recording's own pixels, sizes are a share of the frame's short side, and text never shrinks below a readable floor.
+  if d.live.kit.length > 0
+    div(role="region" aria-label="Kit assets in this library" tabindex="0")
+      table
+        thead
+          tr
+            th Asset
+            th What it does
+        tbody
+          each a in d.live.kit
+            tr
+              td
+                a(href="/assets/{{ a.slug }}") {{ a.ref }}
+              td {{ a.description }}
+  else
+    raw p("This library has no kit assets yet. They are in the `assets/` folder of the repository: `npm run sync-assets` adds them.")
+
+  h2#large-libraries A library with thousands of assets
+  p The library is built for size: the search runs inside the database, and the grid only draws the cards on screen. On a test library of about five thousand assets a search answers in a few milliseconds. Use tags, collections and the featured flag to keep it easy to browse as it grows.

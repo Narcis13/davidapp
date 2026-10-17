@@ -1,0 +1,44 @@
+//- The MCP tool reference, read from the running studio. Params: d (d.live.tools: the tools by group).
+div(data-ui="prose")
+  raw p("The studio's MCP server offers **" + d.live.tools.count + " tools**. This list is read from the studio that drew this page, so it is always current. Each entry has the tool's description and its parameters; open one to read it. A parameter marked optional may be left out.")
+  raw p("Tools marked **read-only** look without changing anything. A reference to an asset is `name` (its latest version) or `name@3` (that version). Results come back as JSON text, with PNG images wherever seeing the frame helps.")
+  +callout(variant="info")
+    @content
+      raw p("**Where to start:** `studio_guide` first, then `suggest_assets` with a sentence about the clip. Search before you create: every clip should reuse what earlier clips left behind.")
+  h2#groups The groups
+  ul
+    each g in d.live.tools.groups
+      li
+        a(href="#{{ g.id }}") {{ g.title }}
+        |  · {{ g.tools.length }} tools
+  each g in d.live.tools.groups
+    h2(id=g.id) {{ g.title }}
+    each tool in g.tools
+      +collapsible(id="tool-{{ tool.name }}")
+        @trigger
+          span
+            code {{ tool.name }}
+            |  {{ tool.title }}
+            if tool.readOnly
+              |  · read-only
+        @content
+          p {{ tool.description }}
+          if tool.params.length > 0
+            div(role="region" aria-label="Parameters of {{ tool.name }}" tabindex="0")
+              table
+                thead
+                  tr
+                    th Parameter
+                    th Type
+                    th Meaning
+                tbody
+                  each param in tool.params
+                    tr
+                      td
+                        code {{ param.name }}
+                        if param.optional
+                          |  optional
+                      td {{ param.type }}
+                      td {{ param.description }}
+          else
+            p No parameters.

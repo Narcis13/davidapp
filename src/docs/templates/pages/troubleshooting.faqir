@@ -1,0 +1,138 @@
+//- Troubleshooting and FAQ. Params: d.
+div(data-ui="prose")
+  p Open a question to read the answer. If something is not here, search the manual from the box at the top, or ask Claude in the repository folder: it can read the studio's state through its tools.
+
+  h2#starting Starting the studio
+  +collapsible
+    @trigger
+      | “The studio server is not reachable. Is it still running?”
+    @content
+      raw p("The page cannot reach the studio's server. Check the terminal where you ran `npm run studio`: if it stopped (or you closed it), start it again. Screens update themselves when the server comes back.")
+  +collapsible
+    @trigger
+      | The port is already in use
+    @content
+      raw p("Another program (or another studio) uses port 8787. Start on another port, `PORT=8800 npm run studio`, and open `http://127.0.0.1:8800`. Two studios on the **same** data directory share the same queue and library; give a second one its own `STUDIO_DATA` unless that is what you want.")
+  +collapsible
+    @trigger
+      | “This studio answers only to localhost, 127.0.0.1, [::1]”
+    @content
+      raw p("For safety the studio refuses requests addressed to any other name. Open it as `http://127.0.0.1:8787` or `http://localhost:8787`. Serving it on a network on purpose takes `HOST=0.0.0.0`, which opens it to anyone who can reach your computer.")
+  +collapsible
+    @trigger
+      | Renders fail at once, or FFmpeg is not found
+    @content
+      raw p("Install FFmpeg and check that `ffmpeg -version` works in a new terminal, or set `FFMPEG_PATH` to the program. The render's FFmpeg log is kept with the render; Claude reads it with `get_render`.")
+
+  h2#editing Editing
+  +collapsible
+    @trigger
+      | I lost my changes after pressing the browser's Back button
+    @content
+      raw p("The browser's Back and Forward buttons leave the clip editor without the “Leave without saving?” question that the studio's own links, a reload and closing the tab ask. Save often with the **Save** button: the editor has no save shortcut, and [[Ctrl+S]] opens the browser's own “Save page” dialog. Undo history is lost on reload, but every **saved** revision is kept.")
+  +collapsible
+    @trigger
+      | My parameter changes in the playground disappeared
+    @content
+      raw p("Parameter values in the playground are a scratchpad. Keep them with **Save as new version** or **Save as preset** before you leave. Only an unsaved source draft makes the page ask before leaving.")
+  +collapsible
+    @trigger
+      | “Add to …” says “No clip open”
+    @content
+      raw p("The library adds assets to the clip you last opened in the editor. Open the clip once (from **Clips**), then come back to the library.")
+  +collapsible
+    @trigger
+      | I cannot move or edit an item
+    @content
+      raw p("Its track is locked: unlock it with **Lock** on the track's head. Items anchored to a narration word go back to their word when you save; use **Detach** to keep a start you set by hand.")
+  +collapsible
+    @trigger
+      | Space does not play
+    @content
+      raw p("A button or a text field has the keyboard focus, and Space presses or types instead. Click the preview or the timeline first.")
+  +collapsible
+    @trigger
+      | “This clip was changed elsewhere”
+    @content
+      raw p("Someone else saved the clip while you were editing: another tab, Claude, or an accepted proposal. **Reload** takes the saved clip (your unsaved edits go); **Keep mine** saves yours over it.")
+  +collapsible
+    @trigger
+      | Saving an asset is refused
+    @content
+      raw p("The message says why, usually with a line number. The common causes: using `Math.random()` or the clock (use `f.rng` and `f.t`), drawing differently when the same frame is drawn twice (keep no state between calls), a parameter default outside its `min`–`max`, a missing `description` or `tags`, or calling `f.use` on an asset that is not in `uses`. See [Writing assets](/docs/assets#rules).")
+  +collapsible
+    @trigger
+      | A text throws “cannot be drawn at its size floor”
+    @content
+      raw p("The text does not fit its box at the smallest size it is allowed. Give the item a larger box, shorten the text, or lower the asset's floor if the text does not need to be read. The studio refuses to shrink it further or cut it off.")
+
+  h2#rendering Rendering
+  +collapsible
+    @trigger
+      | “… has nothing on its visual tracks yet; add items before rendering”
+    @content
+      raw p("A clip needs at least one item on a visual or text track before it can be rendered. Use **Add item** in the editor, then render again.")
+  +collapsible
+    @trigger
+      | A final render is refused
+    @content
+      raw p("The clip uses a placeholder or a file with no licence. The message (and the editor's **Credits** panel) lists each one with a link: open it and set its licence in **Source and licence**, or replace the placeholder. Normal and draft renders are not checked, so you can still review the cut. See [Licences and credits](/docs/provenance#final).")
+  +collapsible
+    @trigger
+      | Rendering is slow
+    @content
+      raw p("Pixel effects on the whole frame, 3D and long footage cost the most. Render a **Draft** while you work, bake 3D into a sequence, put effects on the items that need them rather than the whole clip, and check that **Workers** is not set to 1. A render's report includes its timings.")
+  +collapsible
+    @trigger
+      | A render failed after the studio was closed
+    @content
+      raw p("A render belongs to the process that was running it. If that process stops, the render is marked failed after about 45 seconds. Start it again. Short-lived MCP servers set `STUDIO_RUNNER=0` so they never take a render down with them.")
+  +collapsible
+    @trigger
+      | The report says “Target missed” for loudness
+    @content
+      raw p("The clip has a loudness target the encoded file did not reach within 1 LU, usually because the mix is very quiet or has a few very loud peaks. Look at `audio_report` for the master stage and the peaks, lower the loudest item, and render again.")
+  +collapsible
+    @trigger
+      | The render report lists a frozen picture or brightness jump I meant
+    @content
+      raw p("Tell the studio: add a **hold** marker over a still you intended, and a **cut** marker at a scene change. They are not reported after that.")
+
+  h2#voice Voice and Claude
+  +collapsible
+    @trigger
+      | generate_narration or transcribe says something is missing
+    @content
+      raw p("Run `speech_status` (ask Claude, or `node scripts/mcp.mjs call speech_status '{}'`): it says what is set up and what to set for each missing piece. See [Set up voice and transcription](/docs/sound#voice-setup).")
+  +collapsible
+    @trigger
+      | Claude does not see the studio's tools
+    @content
+      raw p("Start Claude Code **in the repository folder**, where `.mcp.json` lives, and approve the `studio` server. If you declined it once, re-enable it in Claude Code's MCP settings.")
+  +collapsible
+    @trigger
+      | My request stays “Open”
+    @content
+      raw p("No Claude Code session is working the queue. Start one in the repository folder and say “Work the studio's request queue”, or press **Run now** on the request if it is shown. A claimed request that gets no answer opens again after 15 minutes.")
+  +collapsible
+    @trigger
+      | There is no Run now button
+    @content
+      raw p("The studio did not find the `claude` command when it started. Install Claude Code, or set `STUDIO_CLAUDE_BIN` to its full path, and restart the studio.")
+
+  h2#files Files and fonts
+  +collapsible
+    @trigger
+      | An upload was refused
+    @content
+      raw p("Pictures may be PNG, JPEG, WebP or SVG up to 25 MB and 16,384 pixels a side; video MP4, MOV, M4V, WebM or MKV, not HDR, at most 4096 pixels a side and 20 minutes; fonts TTF, OTF or WOFF2 up to 25 MB, with a licence. An SVG with a DOCTYPE or an entity declaration is refused. See [Pictures, video and fonts](/docs/media).")
+  +collapsible
+    @trigger
+      | My logo's colours changed after upload
+    @content
+      raw p("The SVG cleaner could not keep one of its style rules. Read the upload's list of dropped items; simplify the SVG (plain fill and stroke attributes instead of complex CSS) and upload it again.")
+  +collapsible
+    @trigger
+      | Frames differ on another computer
+    @content
+      raw p("Emoji and some system fonts are drawn by the operating system. Use the bundled fonts or added fonts for anything that must match, and verify imported clips on the computer that exported them.")

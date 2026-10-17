@@ -1,0 +1,187 @@
+//- How a clip is built. Params: d.
+div(data-ui="prose")
+  raw p("Everything you do in the clip editor ends up in one piece of data, the clip's **composition**. You never have to write it by hand, but knowing its shape helps you understand the editor, read what Claude does, and fix things precisely. Claude edits compositions with `create_clip`, `update_clip` and `edit_clip`.")
+
+  h2#shape The shape of a composition
+  pre
+    code
+      | {
+      |   format: 'vertical', fps: 30, duration: 12, background: '#0b0b12',
+      |   theme: 'theme-ember',                      // optional: a value asset every asset reads as f.theme
+      |   tracks: [
+      |     { id: 'bg', type: 'visual', items: [
+      |       { id: 'bg', asset: 'bg-gradient-drift', start: 0, duration: 12 } ] },
+      |     { id: 'titles', type: 'text', items: [
+      |       { id: 'hook', asset: 'text-kinetic', start: 0, duration: 4, params: { words: ['HELLO', 'WORLD'] } },
+      |       { id: 'line', asset: 'text-word-reveal', start: 4, duration: 8,
+      |         params: { text: 'Made with *code*' }, fadeOut: 0.4 } ] },
+      |     { id: 'music', type: 'audio', items: [
+      |       { id: 'music', asset: 'music-loop', start: 0, duration: 12, gain: 0.8 } ] },
+      |   ],
+      | }
+  div(role="region" aria-label="Composition fields" tabindex="0")
+    table
+      thead
+        tr
+          th Field
+          th Meaning
+      tbody
+        tr
+          td
+            raw md("`format`")
+          td
+            raw md("`vertical` (1080×1920), `horizontal` (1920×1080) or `square` (1080×1080). Or give `width` and `height` (even numbers from 16 to 3840) for a custom size, which gets a 5 % safe margin.")
+        tr
+          td
+            raw md("`fps`")
+          td Frames a second, a whole number from 1 to 60 (default 30).
+        tr
+          td
+            raw md("`duration`")
+          td
+            raw md("Seconds, at most " + d.live.maxClipSeconds + ".")
+        tr
+          td
+            raw md("`background`, `seed`")
+          td
+            raw md("The colour behind everything (default black), and the number every random sequence starts from (default 1).")
+        tr
+          td
+            raw md("`theme`, `easing`, `fonts`")
+          td
+            raw md("A theme asset; the easing asset that keyframe curves come from; the uploaded fonts the clip pins. The studio fills `easing` and `fonts` in when you save.")
+        tr
+          td
+            raw md("`effects`")
+          td Effects on the whole frame, after every track.
+        tr
+          td
+            raw md("`markers`")
+          td
+            raw md("`{ t, type, label, duration? }` with type `cut`, `hold`, `beat`, `word` or `note`.")
+        tr
+          td
+            raw md("`loudness`, `captions`, `platforms`, `safe`, `checks`")
+          td
+            raw md("Sound and quality settings: see [Sound, voice and captions](/docs/sound) and [Checks and quality](/docs/quality).")
+        tr
+          td
+            raw md("`tracks`")
+          td
+            raw md("`{ id, name, type: visual | text | audio, hidden, locked, solo, muted, effects, role, items }`. Tracks draw bottom to top: the last is in front. A soloed visual track hides the others; `muted` silences an audio track. `role` marks a `narration`, `music`, `sfx` or `captions` track.")
+
+  h2#items Items
+  raw p("An item is `{ id, asset, start, duration, params }`: which asset, from when, for how long, with which parameter values. Saving **pins** `asset` to a version (`text-word-reveal` → `text-word-reveal@2`) and checks every parameter against the asset's schema. Visual and text items also take `opacity`, `blend`, `fadeIn` and `fadeOut`, and the layout fields below. Audio items take `gain`, volume keyframes and ducking ([Sound, voice and captions](/docs/sound#mix)).")
+  raw p("An image, a baked sequence or footage can sit on a visual track directly, with `params.fit`: `contain` (the default), `cover` (cropped to fill the box) or `fill` (stretched).")
+
+  h2#layout Layout: transform
+  pre
+    code
+      | transform: { space: 'safe', x: 0.42, y: 0.5, width: 0.8, height: 0.75, rotation: -3 }
+  ul
+    li
+      raw md("`x`, `y`, `width` and `height` are **fractions** of the frame (or of the safe zone, with `space: 'safe'`), so a layout means the same in every format.")
+    li
+      raw md("The asset draws into a `width` × `height` **box**. The box's anchor (`anchorX`, `anchorY`, fractions of the box, default the centre) sits at (`x`, `y`).")
+    li
+      raw md("`scale`, `scaleX`, `scaleY` and `rotation` (degrees, clockwise) turn the box about its anchor. It is a canvas transform, not a resample, so vector drawings stay sharp at any size.")
+    li
+      raw md("Defaults: `x`, `y`, `anchorX`, `anchorY` 0.5; `width`, `height` and the scales 1; `rotation` 0. A box that is exactly the frame keeps the frame's safe zone; in any other box the asset's safe zone is the whole box.")
+  raw p("The older `box: { x, y, width, height }` (top-left corner, fractions of the frame) still works and is read as a transform.")
+
+  h2#keyframes Keyframes
+  pre
+    code
+      | keyframes: {
+      |   rotation: [{ t: 0, v: -5, ease: 'outBack' }, { t: 0.8, v: 0 }],
+      |   'params.size': [{ t: 0, v: 120 }, { t: 2, v: 180, ease: 'inOutCubic' }],
+      | }
+  ul
+    li
+      raw md("Animate `x`, `y`, `width`, `height`, `anchorX`, `anchorY`, `scale`, `scaleX`, `scaleY`, `rotation`, `opacity`, and number or colour parameters as `params.<name>`.")
+    li
+      raw md("`t` is in seconds from the item's start. Before the first key the first value holds; after the last, the last.")
+    li
+      raw md("`ease` shapes the segment that leaves a key: `linear` (default), `hold`, or a curve: `inQuad`, `outQuad`, `inOutQuad`, `inCubic`, `outCubic`, `inOutCubic`, `outQuart`, `outQuint`, `inExpo`, `outExpo`, `inOutExpo`, `inBack`, `outBack`, `outElastic`, `outBounce`. Colours blend channel by channel.")
+
+  h2#formats One clip, every shape: formats
+  pre
+    code
+      | formats: {
+      |   vertical: { transform: { x: 0.5, y: 0.42, width: 1, height: 0.5 } },
+      |   square:   { params: { size: 110 }, hidden: false },
+      | }
+  raw p("`formats` overrides the `transform`, `keyframes`, `params`, `opacity` or `hidden` of an item for one format. Transforms and params merge key by key; keyframes replace per property. Render the clip in another shape with the render panel's **Shapes** (or `start_render { format | formats }`); the overrides of that format apply. **Remix** instead makes a separate clip in the new format.")
+  p Assets lay themselves out from the frame they are given, so most of a clip re-flows to a new shape by itself. Overrides are for what a hand-tuned layout still needs.
+
+  h2#attachments Motions, effects, transitions and masks
+  pre
+    code
+      | { id: 'orb', asset: 'orb-3d', start: 7, duration: 8,
+      |   motions:    [{ asset: 'motion-pop', phase: 'out', duration: 0.5 }],
+      |   effects:    [{ asset: 'fx-glow', params: { strength: 0.7 } }],
+      |   transition: { asset: 'trans-iris', duration: 0.9 },
+      |   mask:       { asset: 'mask-iris', mode: 'alpha', params: { open: 1.1 } } }
+  dl
+    dt Motions
+    dd
+      raw md("Move an item without redrawing it. `phase`: `in` (the item's first seconds), `out` (its last), `emphasis` (from `at`), `loop` (the whole item). Several motions stack. Duration: the motion asset's own, else 0.6 s.")
+    dt Effects
+    dd
+      raw md("Process the pixels: on one item (`item.effects`), on a whole track like an adjustment layer (`track.effects`), or on the whole frame (`composition.effects`). They run in order. On an item: content, then effects, then the mask, then opacity and blend.")
+    dt Transition
+    dd
+      raw md("Goes on the **incoming** item and runs from its start: the latest earlier item on the same track turns into it. Duration: the asset's own, else 0.5 s, never longer than the item.")
+    dt Mask
+    dd
+      raw md("Any visual asset, image, sequence or footage. `mode`: `alpha` (keep where the mask is opaque), `alpha-inverted`, `luma` (where it is bright) or `luma-inverted`. It moves with the item unless it has its own `transform`.")
+  raw p("Search for them by kind: in the library filter by Kind, or `search_assets { kind: 'motion' }`. Names follow families: `motion-*`, `trans-*`, `fx-*`, `mask-*`.")
+
+  h2#split Split items
+  raw p("A split leaves two items that play on as one. The second part gets `offset` (where it starts inside the asset), `assetDuration` (the length it was cut from) and `seedId` (the first part's id, so its random numbers match). Animations, keyframes, motions and effects run on the whole item's time, so nothing restarts at the cut. Each part keeps its own fades; the second part has no transition.")
+
+  h2#anchors Anchored to a word
+  raw p("An item's start, a keyframe or a marker can be pinned to a word of the narration with `anchor: { item, word, edge, offset }` (`edge`: `start` or `end` of the word; `offset` in seconds). Saving sets the time from the word, so a new take of the voice keeps every visual on its word. See [Sound, voice and captions](/docs/sound#anchors).")
+
+  h2#edit-operations Editing with operations
+  raw p("Claude changes a clip with `edit_clip { clip, operations }`, a list of small edits, instead of resending the whole composition. A clip proposal from the agent is the same list, re-applied to the clip as it is when you accept. The operations:")
+  div(role="region" aria-label="edit_clip operations" tabindex="0")
+    table
+      thead
+        tr
+          th Operation
+          th Does
+      tbody
+        tr
+          td
+            raw md("`set`")
+          td
+            raw md("Clip settings: `duration`, `fps`, `background`, `seed`, `format`, `markers`, `loudness`, `captions`, `platforms`, `safe`, `checks` (`null` removes one).")
+        tr
+          td
+            raw md("`add_track`, `remove_track`, `move_track`, `update_track`")
+          td
+            raw md("Tracks. `move_track { id, index }` changes the drawing order; `update_track` patches `name`, `hidden`, `locked`, `solo`, `muted`.")
+        tr
+          td
+            raw md("`add_item`, `update_item`, `remove_item`, `move_item`, `duplicate_item`, `split_item`")
+          td
+            raw md("Items. `update_item { id, patch }` changes anything on an item (params merge; `null` removes one).")
+        tr
+          td
+            raw md("`set_transform`, `set_override`")
+          td
+            raw md("Layout, merged into what is there; with `format`, that format's override.")
+        tr
+          td
+            raw md("`add_keyframe`, `remove_keyframe`, `set_keyframes`")
+          td Keyframes of one property, optionally for one format.
+        tr
+          td
+            raw md("`add_marker`, `update_marker`, `remove_marker`")
+          td Markers, by index.
+        tr
+          td
+            raw md("`caption_split`, `caption_merge`, `caption_break`, `caption_move`, `caption_auto`")
+          td Where the caption pages break; the times stay those of the words.
+  raw p("A theme, track effects and clip effects have no operation of their own: change them with `update_clip`.")

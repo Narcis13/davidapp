@@ -1,0 +1,63 @@
+//- Claude Code and the studio. Params: d.
+div(data-ui="prose")
+  raw p("Claude Code can do everything you do in the studio, and more, through the studio's **MCP server**: " + d.live.tools.count + " tools to search the library, write and edit assets, compose clips, look at frames, check, narrate and render. It works on the same data as the studio in your browser, so you see its work appear as it goes, and can take over by hand at any moment.")
+
+  h2#connect Connect
+  raw p("The repository's `.mcp.json` registers the server, so **Claude Code started in the repository folder gets it automatically**: run `claude` there and approve the `studio` server. The server opens the same data directory as the studio (`STUDIO_DATA`, default `./data`) and records `claude-code` as the author of what it makes. The studio web page does not need to be running for Claude to work, but it is the best way to watch.")
+  raw p("From a shell, the same tools are available over the same protocol, which is handy for scripts:")
+  pre
+    code
+      | node scripts/mcp.mjs tools
+      | node scripts/mcp.mjs call search_assets '{"tags":["text-animation"]}'
+      | node scripts/mcp.mjs call render_clip_frame '{"clip":"my-first-clip","t":3}' --out frame.png
+
+  h2#what-to-ask What to ask for
+  p Ask for an outcome, give the shape and the length, and say what to reuse. Some prompts that work well:
+  div(data-ui="grid" data-cols="1" data-cols-md="2" data-gap="4")
+    +card(title="A new short video")
+      @body
+        raw p("“Call `studio_guide`, then `suggest_assets` for a 15-second square clip announcing our release. Reuse what exists. Show me a contact sheet before you render.”")
+    +card(title="The full process")
+      @body
+        raw p("“`/new-video` a 45-second vertical explainer of our onboarding, voiced, with captions, for Reels.” The **new-video** skill takes Claude from the brief through a script, style frames and an animatic to a checked final render.")
+    +card(title="Work the requests")
+      @body
+        raw p("“Work the studio's request queue.” Claude answers what you typed into **Ask the agent** with proposals for you to accept. See [Ask the agent](/docs/agent).")
+    +card(title="Fix and polish")
+      @body
+        raw p("“Run `check_clip` on `launch-teaser` and fix every issue, then render a draft.” Or: “Make a vertical version of `launch-teaser` and fix what does not fit.”")
+
+  h2#how-claude-works How Claude builds a clip
+  ol
+    li
+      raw md("**Reads the guide.** `studio_guide` returns the asset contract, the cookbook, the workflows and what the library holds now.")
+    li
+      raw md("**Starts from the library.** `suggest_assets` ranks the library against the brief and returns a few candidates per kind with their parameters, notes and a contact sheet; `get_asset` shows how earlier clips used each one.")
+    li
+      raw md("**Writes only what is missing.** `validate_asset` dry-runs a draft and returns a filmstrip; `create_asset`, `update_asset` or `fork_asset` save it. Tuned parameters become presets, groups of layers become precomps.")
+    li
+      raw md("**Composes.** `create_clip`, then small changes with `edit_clip` operations.")
+    li
+      raw md("**Looks.** `render_clip_frame` returns frames and contact sheets as images, so Claude sees its work.")
+    li
+      raw md("**Checks.** `check_clip`, `audio_report`, `caption_pages`, `check_provenance`.")
+    li
+      raw md("**Renders.** `start_render` (a draft first, then every shape, then `final: true`), and reads `render_report`.")
+    li
+      raw md("**Leaves the library better.** `add_asset_note` on what it learned, `organize_assets` to feature good starting points, `export_clip` to write the clip to the repository.")
+
+  h2#watch Watching and stepping in
+  ul
+    li
+      raw md("New assets appear in the **Library**, the clip in **Clips**, renders in **Renders**, all live, without a reload.")
+    li Open the clip in the editor at any time and change it by hand. If Claude saves while you have unsaved edits, the editor offers to reload theirs or keep yours.
+    li
+      raw md("Everything Claude saves is a new version, so nothing it does can destroy earlier work. Clips keep their pinned versions until someone upgrades them.")
+  raw p("Claude cannot hear and sees motion only as stills, so the studio gives it measurements instead: loudness and ducking figures, the text layout, the checks. Judge the sound and the motion yourself in the preview before you publish.")
+
+  h2#safety Trust and safety
+  raw p("Asset code runs in separate worker threads, each asset in its own sandbox without the host's globals, and a watchdog stops a frame that runs too long. That protects the studio from buggy assets; it is not a sandbox for hostile code, so **connect only clients you trust**. The web server answers only to loopback addresses and refuses writes from other web pages.")
+  raw p("Two settings limit an MCP server process: `STUDIO_TOOLS` (a comma-separated list: only these tools are offered) and `STUDIO_RUNNER=0` (it does not pick up queued renders). The studio's **Run now** uses both: see [Ask the agent](/docs/agent#run-now-safety).")
+
+  h2#measure Measuring the compounding
+  raw p("Every MCP call is logged with the clip it served. `compounding_report` gives, per clip, the number of calls, the new lines of asset code, the share of timeline items that reuse existing assets, and the build time; `reuse_report` lists what each clip created and reused. The **Lineage** screen draws the same story.")

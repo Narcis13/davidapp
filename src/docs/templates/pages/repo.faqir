@@ -1,0 +1,52 @@
+//- Clips in the repo. Params: d.
+div(data-ui="prose")
+  raw p("Your library lives in the data directory, which git ignores. To keep a finished clip with the code, share it, or rebuild it on another computer, **write it to the repository**. The clip and everything it pins travel as plain files, and can be rebuilt in any library, an empty one included, with the same references and the same frames.")
+
+  h2#what-is-written What is written
+  div(role="region" aria-label="Files written to the repository" tabindex="0")
+    table
+      thead
+        tr
+          th Where
+          th What
+      tbody
+        tr
+          td
+            raw md("`clips/<clip>/clip.json`")
+          td The composition, every asset version it pins (at their version numbers), the files, and the hashes of up to 48 frames.
+        tr
+          td
+            raw md("`library/versions/`, `library/sources/`")
+          td The shared store of asset versions and their source code. Clips share it, so an asset used by ten clips is stored once.
+        tr
+          td
+            raw md("`library/files/<sha256>`")
+          td The files (pictures, sounds, fonts, footage), named by their SHA-256.
+  raw p("Writing an unchanged clip changes no file, and nothing is ever deleted from the store. Files that may not be redistributed (an unknown licence counts) or are over 50 MB stay out of git: `clip.json` lists them by SHA-256, licence and source.")
+
+  h2#write Write a clip
+  ul
+    li
+      raw md("**In the studio:** the clip editor's **Repo** panel says whether `clips/<clip>/` matches the saved clip (“Up to date”, or how many files are new and changed, and which are kept out of git). Press **Write to repo**. **Check again** refreshes it.")
+    li
+      raw md("**Claude:** `export_clip { clip, dry_run: true }` says what would be written; `export_clip { clip }` writes it.")
+    li
+      raw md("**A shell:** `node scripts/library.mjs export <clip>` (with `STUDIO_DATA` set).")
+  raw p("Then commit the folder with git as usual. The repository the studio writes to is this checkout, unless `STUDIO_REPO` names another.")
+
+  h2#import Rebuild it in another library
+  pre
+    code
+      | npm ci
+      | export STUDIO_DATA=/path/to/an/empty/folder
+      | node scripts/library.mjs import clips/<clip> --verify --files /path/to/kept-out
+  raw p("`STUDIO_DATA` is required for the import, so your own `./data` is never touched by accident. `--files` names folders to look in for the files that were kept out of git; any file the import cannot find is named with its licence and source. Claude does the same with `import_clip { folder, verify: true, files: [...] }` on a studio whose data directory is the new library.")
+  raw p("Every version comes back with its number (a clip that pinned `foo@3` gets `foo@3`), so the references and the frames are the same. `--verify` draws the frames again and compares them with the hashes taken when the clip was written.")
+  +callout(variant="warning")
+    @content
+      raw p("**Verify on the computer that exported the clip.** Emoji and a few system fonts draw differently from one operating system to another, so the frame hashes can differ elsewhere even though nothing is wrong.")
+  raw p("`scripts/roundtrip.mjs <clip>…` checks the whole trip (export, import into an empty library, compare references and frames) for several clips at once.")
+
+  h2#sync-assets Keep assets/ and the library in step
+  raw p("The `assets/` folder holds the source of every function asset, one flat folder (`name.v2.js` is version 2 of `name`). `npm run sync-assets` pushes it into the library: only new or changed files, each as a new version.")
+  raw p("It **never undoes a change made in the studio.** When the library's newest version of an asset did not come from the files (an accepted proposal, a save in the playground), it stops and names the conflict. Then either `npm run sync-assets -- --pull <name>` writes the library's version into `assets/`, or `--force` pushes the file anyway.")

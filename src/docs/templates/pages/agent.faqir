@@ -1,0 +1,86 @@
+//- Ask the agent. Params: d.
+div(data-ui="prose")
+  raw p("You do not have to write code to change an asset or a clip. Write what you want in plain words, and Claude answers with a **proposal**: a new version, a new asset or a list of edits to the clip. A proposal changes nothing until you look at it and **accept** it.")
+
+  h2#where Where to ask
+  div(role="region" aria-label="Where to ask" tabindex="0")
+    table
+      thead
+        tr
+          th Where
+          th About
+          th What the request carries
+      tbody
+        tr
+          td
+            raw md("**Ask the agent** panel in the [playground](/docs/playground)")
+          td That asset
+          td The version, the parameter values on screen and the current time
+        tr
+          td
+            raw md("**Ask the agent** panel in the [clip editor](/docs/editor)")
+          td That clip
+          td The playhead and the selected items
+        tr
+          td
+            raw md("**Requests** screen, **Ask about the library**")
+          td The whole library
+          td Just your words
+  p Good requests say what to change and how it should feel: “make the headline arrive faster and settle with a small bounce”, “add a lower third at 0:03 with the name Ana Pop”, “a neon title for the library, in the clip's theme colours”. Press Send (or Ctrl+Enter).
+
+  h2#flow What happens next
+  pre
+    code
+      | open ── claimed ──▶ working ── proposal ──▶ review ── accept ──▶ done
+      |   ▲                                            │
+      |   └────── reply, or reject with a reason ◀─────┘
+  ol
+    li
+      raw md("Your request is **Open**: a row in the studio's database, waiting. The panel says “Waiting for the agent. Claude Code picks it up over MCP.”")
+    li
+      raw md("Claude **claims** it and it becomes **Working**. A claim lasts 15 minutes; if nothing comes back in that time the request is open again.")
+    li
+      raw md("Claude sends a **proposal**. It is checked (the code compiles, frames are drawn) but nothing is changed yet. The request is now in **Review**, and the proposal appears in your open page without a reload.")
+    li
+      raw md("You decide: **Accept**, **Reject** (with an optional reason) or write a **Reply**. Rejecting or replying sends the request back to Claude.")
+    li
+      raw md("Accepting applies it: an asset proposal becomes a new version or a new asset, a clip proposal becomes a new revision of the clip. The request is **Done**.")
+  raw p("**Cancel request** withdraws a request at any time.")
+
+  h2#preview Preview before you accept
+  ul
+    li
+      raw md("In the playground, **Preview** shows the proposal side by side with the current version, playing together.")
+    li
+      raw md("In the clip editor, **Preview** puts a proposal bar over the preview: switch between **Show proposal** and **Show current**, scrub, and play. The editing handles are hidden while you look.")
+  +callout(variant="info")
+    @content
+      raw p("**When the asset or clip changed in the meantime.** If you (or someone else) saved a new version after the proposal was made, accepting says so. For an asset you can **Accept anyway** (it becomes the next version) or **Ask to rebase** (Claude redoes it on the latest version). A clip proposal is a list of edits, so it is re-applied to the clip as it is now; if that is not possible, ask to rebase.")
+
+  h2#who-answers Who answers: Claude Code
+  raw p("Requests are answered by Claude Code over the studio's MCP server. There are two ways to have one working:")
+  div(data-ui="grid" data-cols="1" data-cols-sm="2" data-gap="4")
+    +card(title="A Claude Code session you run")
+      @body
+        raw p("Start `claude` in the repository folder and say **“Work the studio's request queue.”** Claude lists the requests, claims one, looks at the frames it needs, and proposes. Leave it running to keep answering.")
+    +card(title="Run now, from the studio")
+      @body
+        raw p("Press **Run now** on a request: the studio starts a short Claude Code session just for it and streams its progress into the thread (**Run log**). **Cancel run** stops it.")
+  if d.live.runNow
+    raw p("**Run now is available** in this studio: it found the `claude` command.")
+  else
+    raw p("**Run now is not available** in this studio right now: it did not find the `claude` command. Install Claude Code, or set `STUDIO_CLAUDE_BIN` to its path, and restart the studio. The queue still works from any Claude Code session.")
+  h3#run-now-safety What a Run now session may do
+  raw p("A Run now session gets only the studio's MCP server, and only the tools that read the studio and answer requests: it can search, read, validate, draw frames and propose, but it cannot save assets, change clips or render. Whatever it does arrives as a proposal for you to accept. It stops after 10 minutes unless `STUDIO_AGENT_TIMEOUT` says otherwise. The prompt is sent to it on its input, never on the command line.")
+
+  h2#requests-screen The Requests screen
+  raw p("**Requests** in the top bar is the inbox of everything you asked, newest first, with a badge counting the requests that are open, being worked on or waiting for your review. Filter by **Open**, **Working**, **Review**, **Done** or **Cancelled**. A row with **Proposal waiting** needs you. Open a request to see its whole thread, preview and accept from there, or jump to its playground or clip.")
+
+  h2#good-requests Writing good requests
+  ul
+    li One change per request. Two unrelated changes are easier to review as two proposals.
+    li
+      raw md("Say where and when: “the title at 0:04”, “the second card”. In the editor, select the items you mean first and put the playhead on the moment: both travel with the request.")
+    li Describe the result, not the code: “slower and softer” is enough.
+    li
+      raw md("If the first proposal is not right, **Reject** it with a reason (“too bouncy”) rather than starting a new request: the reason goes to Claude with the thread.")

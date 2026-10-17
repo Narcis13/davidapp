@@ -1,0 +1,91 @@
+//- Your first clip. Params: d.
+div(data-ui="prose")
+  p This walk takes about fifteen minutes. You make a ten-second square clip with a moving background, a headline and music, look at it, and render it to an MP4. Then you see how to ask Claude for the same thing in one sentence.
+  +callout(variant="info")
+    @content
+      raw p("The steps use assets from the showcase library, such as `bg-gradient-drift`, `text-word-reveal` and `music-loop`. If your library is empty, run `npm run seed` first ([Install and run](/docs/install#showcase)), or pick any similar asset you have.")
+
+  h2#create 1. Create the clip
+  ol
+    li
+      raw md("Open **Clips** in the top bar and press **New clip**.")
+    li
+      raw md("Fill in **Name** with `my-first-clip` (lowercase letters, digits and dashes, 2 to 64 of them), a **Title** such as “My first clip”, the **Format** “Square 1:1 · 1080×1080” and a **Duration in seconds** of `10`.")
+    li
+      raw md("Press **Create clip**. The clip editor opens with an empty timeline.")
+  p The editor has three areas: the preview at the top, the timeline below it, and a side column with the agent panel, the inspector and other panels. The clip editor page explains each one.
+
+  h2#background 2. Add a background
+  ol
+    li
+      raw md("Click the start of the ruler above the timeline so the **playhead** (the line that marks the current time) is at 0:00.")
+    li
+      raw md("Press **Add item**. A picker opens with a search box and the kinds **All**, **Visual**, **Audio** and **Footage**.")
+    li
+      raw md("Type `gradient`, choose `bg-gradient-drift` and confirm. The item is placed at the playhead.")
+    li
+      raw md("On the timeline, drag the item's right edge to the end of the clip so it lasts the full ten seconds. Moves and trims snap to the playhead, the beats and other items; hold [[Alt]] to move freely.")
+  raw p("The background now plays in the preview. Press [[Space]] (with the preview or the timeline focused, not a button) to play and pause, and [[←]] [[→]] to step one frame.")
+
+  h2#headline 3. Add a headline
+  ol
+    li
+      raw md("Move the playhead to about 0:01, press **Add item** again and choose `text-word-reveal`.")
+    li
+      raw md("With the item selected, look at the **Inspector** in the side column. Under **Parameters**, change the text to `Made with *code*`. Words between asterisks are drawn as emphasis by this asset.")
+    li
+      raw md("Under **Timing**, set **Duration** to `8` and **Fade out** to `0.4`.")
+    li
+      raw md("Drag the headline's box on the preview to move it, or drag a corner to scale it. Hold [[Shift]] on a corner to keep the proportions. The box snaps to the centre, the safe zone and other layers.")
+  +callout(variant="success")
+    @content
+      raw p("**Tip.** Turn on **Safe areas** in the **Overlays** bar above the preview. Text inside the safe zone is never covered by a platform's buttons or captions.")
+
+  h2#music 4. Add music
+  ol
+    li
+      raw md("Press **Add item**, choose the kind **Audio**, and pick `music-loop`. Make it last the whole clip.")
+    li
+      raw md("In the inspector, **Gain** sets its loudness (1 is as made; 0.8 is a little quieter). **Fade out** of `1` ends it gently.")
+  raw p("Audio items are mixed by the studio, and the preview plays the same mix the render will encode. While the mix is being made, the timeline shows a **Mixing audio** badge.")
+
+  h2#save 5. Save, and check it
+  ol
+    li
+      raw md("Press **Save** at the top. The **Unsaved changes** badge goes and the header says which revision was saved (“Saved as revision 2”, for example). Saving pins every asset to its version.")
+    li
+      raw md("Open the **Issues** panel in the side column and press **Check the clip**. The studio samples frames and lists anything a careful editor would point at: text too small, low contrast, text outside the safe zone, a last frame that does not hold still for two seconds, and more. Click an issue to jump to it.")
+  raw p("Fixing what the check finds is explained in [Checks and quality](/docs/quality#check-clip). For a first clip, a warning about the last frame is normal: a clip should end on a still picture held for about two seconds.")
+
+  h2#render 6. Render the MP4
+  ol
+    li
+      raw md("Press **Render**. The **Render this clip** panel opens (it saves the clip first if needed).")
+    li
+      raw md("Leave **Shapes** on square and **Quality** on **Normal**. **Draft** is a smaller, faster look; **Final** checks every file's licence and writes the credits.")
+    li
+      raw md("Press **Render**. You are taken to **Renders**, where the progress shows frame by frame.")
+    li
+      raw md("When it is done, press **Open in gallery**. The **Gallery** plays the video and has **Download MP4**, the captions, the report and the credits.")
+  raw p("The MP4 is also in the `renders` folder of the data directory. Each render keeps its poster image and a report of what the studio measured on the encoded file: see [Render, gallery and lineage](/docs/renders#outputs).")
+
+  h2#with-claude The same clip, with Claude
+  raw p("If Claude Code is connected ([Install and run](/docs/install#claude-setup)), start `claude` in the repository folder and ask in plain words:")
+  pre
+    code
+      | Call studio_guide, then suggest_assets for a 10-second square clip:
+      | a drifting gradient, the headline "Made with code" and soft music.
+      | Reuse what exists. Show me a contact sheet before you render.
+  raw p("Claude searches the library, composes the clip, looks at frames to check its work and starts the render. The clip appears in **Clips** while it works, and you can open it in the editor and change anything by hand. With the **new-video** skill (`/new-video` followed by your brief) Claude goes further: script, style frames, animatic, checks and a final render.")
+  raw p("You can also stay in the studio and type a request into **Ask the agent** in the editor, such as “make the headline slower”. Claude answers with a proposal you can preview and accept: see [Ask the agent](/docs/agent).")
+
+  h2#next Where to go next
+  ul
+    li
+      raw md("[The clip editor](/docs/editor): every panel of the editor in detail.")
+    li
+      raw md("[The playground](/docs/playground): tune an asset on its own and keep your tweak as a preset.")
+    li
+      raw md("[Sound, voice and captions](/docs/sound): add a narration and captions that follow the words.")
+    li
+      raw md("[How a clip is built](/docs/compositions): what the editor writes when you save.")

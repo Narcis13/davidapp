@@ -24,7 +24,8 @@ const ROUTES = [
   { re: /^\/lineage\/?$/, screen: lineage, nav: 'lineage' },
   { re: /^\/requests(?:\/(\d+))?\/?$/, screen: requests, nav: 'requests' },
 ];
-const NOT_APP = /^\/(api|media|fonts|core|ui|vendor)\//;
+// the manual (/docs) is drawn by the server, so its links load a page instead of a screen
+const NOT_APP = /^\/(api|media|fonts|core|ui|vendor)\/|^\/docs(\/|$)/;
 
 const main = document.getElementById('main');
 let current = null;   // { cleanups, alive, guard }

@@ -1,0 +1,149 @@
+//- Checks and quality. Params: d.
+div(data-ui="prose")
+  p A video can look fine on your screen and still fail on a phone: a caption under the app's buttons, a grey title on a grey photo, a word on screen too briefly to read, music that drowns the voice. The studio measures these things for you, before the render and again on the finished file.
+
+  h2#zones Safe zones, platforms and the caption lane
+  raw p("Every format has a **safe zone**, the part of the frame no platform covers. The checks use the tightest of three areas: **title-safe** (the frame minus 5 % on each side), the **format's safe zone**, and the **platform zone** of any platforms you chose.")
+  div(role="region" aria-label="Format safe zones" tabindex="0")
+    table
+      thead
+        tr
+          th Format
+          th Size
+          th Safe zone, top / right / bottom / left
+      tbody
+        each f in d.live.formats
+          tr
+            td {{ f.label }}
+            td {{ f.size }}
+            td {{ f.safe }} px
+  raw p("**Platform profiles** add each platform's own zones. Choose them in the clip settings (**Platforms**) or with `platforms: ['youtube', 'shorts']`. A profile applies only to the shapes it is made for: YouTube to horizontal renders, the vertical platforms to vertical renders, so one clip can carry both. Turn on **Keep assets inside the platforms' safe zone** (`safe: 'platform'`) to make assets lay out inside them.")
+  div(role="region" aria-label="Platform profiles" tabindex="0")
+    table
+      thead
+        tr
+          th Profile
+          th For
+          th Zones at 1080p, top / right / bottom / left
+          th Longest video
+      tbody
+        each p in d.live.platforms
+          tr
+            td
+              strong {{ p.name }}
+              |  ({{ p.id }})
+            td {{ p.formats }}
+            td {{ p.zones }} px
+            td {{ p.maxDuration }}
+  raw p("Only Meta publishes exact margins (for Reels); the other zones are careful estimates, and each profile in `src/core/platforms.js` names its sources. The **feed** profile is the union of Shorts, Reels and TikTok: use it when one vertical video goes to all three.")
+  raw p("The **caption lane** is a band across the bottom of the tightest safe zone (15 % of the frame's height in vertical clips, 20 % otherwise). Captions go there and nothing else does.")
+
+  h2#check-clip Check the clip
+  raw p("Press **Check the clip** in the editor's **Issues** panel (Claude: `check_clip`). The studio draws frames every half second, measures every text the assets drew, and lists each problem with its item, its time, the numbers and a still. Click one to jump there. A problem seen on only one sampled frame of many (a text passing through) is not reported.")
+  div(role="region" aria-label="What the clip check finds" tabindex="0")
+    table
+      thead
+        tr
+          th Check
+          th Reported when
+          th Usual fix
+      tbody
+        tr
+          td Safe zone
+          td A text box is not inside the safe zone (captions are exempt).
+          td Move or shrink the item; lay it out relative to the safe zone.
+        tr
+          td Clipped
+          td A text box goes more than a pixel past the frame's edge.
+          td Give it a larger box or fewer words.
+        tr
+          td Overlap
+          td Texts of different items overlap by more than 4 % of the smaller one.
+          td Move one, or shorten the time they share.
+        tr
+          td Caption lane
+          td A text that is not a caption sits in the caption lane.
+          td Move it up, out of the band.
+        tr
+          td Size
+          td
+            raw md("A text is smaller on screen than 2.5 % of the frame's short side (or its asset's own floor).")
+          td Make it larger, or use fewer words so it fits larger.
+        tr
+          td Contrast
+          td The text's contrast against the darkest or lightest 5 % of the pixels behind it is under 4.5 : 1.
+          td Put the text on a solid plate or pill, darken the background, change the colour.
+        tr
+          td Hold
+          td
+            raw md("A text is on screen for less than (its words ÷ 3) + 1 seconds: too short to read.")
+          td Lengthen the item, or cut words.
+        tr
+          td Captions
+          td A caption page breaks a rule: too many lines or characters, starting late, too short, split names or units.
+          td
+            raw md("Adjust the pages in the **Caption pages** panel.")
+        tr
+          td Glyphs
+          td A character is missing from the font and would fall back to a system font (a warning for emoji).
+          td Choose a font that has it, or add one.
+        tr
+          td First frame
+          td The first frame is one flat colour.
+          td Start with something on screen: a platform shows the first frame as a preview.
+        tr
+          td Last frame
+          td The last frame is held still for less than 2 seconds.
+          td End on a still picture (an end card is in within a second, then holds).
+  raw p("Change the thresholds for one clip with `checks: { minTextSize: 2.5, contrast: 4.5 }`. Texts drawn with the raw canvas `fillText` are not measured: assets should draw text with `f.lib.text`.")
+  +callout(variant="success")
+    @content
+      raw p("**Most issues have the same few fixes.** Text on a solid plate passes contrast; a text that fits at a larger size passes size; keeping titles in the middle of the safe zone avoids the platform zones and the caption lane; and ending on a still card held for two seconds satisfies the last-frame check.")
+
+  h2#look Looking closely
+  ul
+    li
+      raw md("The editor's **Overlays** bar draws the grid, the safe areas, the platform zones, the caption lane and the measured text boxes over the preview.")
+    li
+      raw md("`layout_report` lists every text in a frame with its box in frame pixels, its font, its size in the asset and on screen, its colour and its item.")
+    li
+      raw md("`render_clip_frame { clip, t, overlays: true }` draws one frame with the zones; `isolate: { only: [ids] }` draws some items alone.")
+    li
+      raw md("Check another format, a time range or an unsaved draft: `check_clip` takes `format`, `from`, `to` and a `composition`.")
+
+  h2#render-report After the render: the render report
+  raw p("Every render is measured from the encoded MP4 itself. Open **View report** on the **Renders** screen, or the **Report** in the gallery (Claude: `render_report { id, sheets: true }`).")
+  div(role="region" aria-label="What the render report measures" tabindex="0")
+    table
+      thead
+        tr
+          th Measure
+          th Flagged when
+      tbody
+        tr
+          td The file
+          td Not H.264 and yuv420p with BT.709 colour, AAC at 48 kHz, fast start, the exact size, frame rate, duration and frame count.
+        tr
+          td Loudness
+          td The loudness target is missed by more than 1 LU, or the peaks are too high.
+        tr
+          td Black frames
+          td Even a single frame is (nearly) all black.
+        tr
+          td Frozen picture
+          td
+            raw md("The picture does not change for half a second or more, outside a **hold** marker.")
+        tr
+          td Brightness jumps
+          td
+            raw md("The average brightness jumps from one frame to the next, away from a **cut** marker.")
+        tr
+          td Flashing
+          td More than 3 flashes in any second, on the whole frame or a quarter of it: a risk for people with photosensitive epilepsy.
+        tr
+          td Silence
+          td Sound under −50 dB for a second or more.
+  raw p("The report also shows where the narration sits and **frame sheets**: one frame per second and the middle of each cut, with the times drawn in. Use **markers** to tell the studio what you meant: a **hold** where a still picture is intended, a **cut** where a scene changes.")
+
+  h2#determinism Same input, same frames
+  raw p("Because assets are pure functions, a clip draws the same pixels every time. The studio uses this: `frame_hashes` gives the SHA-256 of chosen frames, so you can prove that an old clip did not change, that a draft's frames equal the final's, or that a clip imported into another library renders identically. `npm run verify` checks pinning and determinism for the showcase.")

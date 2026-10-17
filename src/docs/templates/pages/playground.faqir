@@ -1,0 +1,72 @@
+//- The playground. Params: d.
+div(data-ui="prose")
+  raw p("The **playground** shows one asset on its own, at the address `/assets/<name>`. Open it by double-clicking a card in the library, or with **Open in playground** in the detail panel. It is where you see what an asset can do, tune it, keep your tweak, and read or edit its code.")
+
+  h2#header The header
+  raw p("Next to the title you see the asset's reference (such as `text-word-reveal@2`), its kind, and badges: **Preset**, **Precomp**, **Fork** or **Baked sequence** say how it was made; **edited** means its title or description were changed after it was saved; **latest is vN** means you are looking at an older version. **Favourite** and **Featured** toggle those flags.")
+
+  h2#preview Preview and transport
+  ul
+    li
+      raw md("The play button (or [[Space]]) plays and pauses; the scrub bar moves through time; [[←]] and [[→]] step one frame.")
+    li
+      raw md("The **format** buttons (vertical, horizontal, square) show the asset in each frame shape it supports.")
+    li
+      raw md("**Safe zone** shades the area outside the safe zone, where platform buttons sit.")
+    li
+      raw md("**Duration** sets how long the preview plays (0.1 to 60 seconds).")
+    li
+      raw md("**Exact frame** asks the renderer, the one that writes the MP4, for the frame you are on and shows it beside the live preview. They should match; this is how you can be sure.")
+    li
+      raw md("Audio assets have **Play audio**. Motions, transitions and effects are shown on a built-in demo scene.")
+  +callout(variant="muted")
+    @content
+      raw p("[[Space]] does nothing while a text field or a button has the keyboard focus (a focused button is pressed instead). Click the preview first.")
+
+  h2#parameters Parameters
+  p The Parameters panel has a control for every parameter the asset declares: sliders and number boxes for numbers, colour pickers, text boxes, menus, switches, font menus, and lists you can add to and reorder. Changes show at once in the preview. Reset puts every value back to the asset's defaults.
+  p Changed values are not kept when you leave the page. To keep them, use one of the two buttons under Keep these values:
+  div(data-ui="grid" data-cols="1" data-cols-sm="2" data-gap="4")
+    +card(title="Save as new version")
+      @body
+        p Makes your values the defaults of a new version of the same asset. Only the default values in its source change. Works on the latest version, and not while a source draft is open.
+    +card(title="Save as preset")
+      @body
+        p Makes a new, separate asset (a preset) that is this asset with your values as its defaults. It keeps a link to this exact version and gets its own thumbnail. Name it in lowercase letters, digits and dashes.
+  raw p("Presets are the cheapest way to grow the library: a tuned lower third, a brand-coloured title, a slower transition. Claude does the same with `save_defaults` and `create_preset`.")
+
+  h2#source The source and new versions
+  raw p("The **Source** panel shows the asset's code. **Edit source** opens an editor:")
+  ol
+    li
+      raw md("Change the code, and write a short note of what changed in the version-note box.")
+    li
+      raw md("Press **Validate** (or [[Ctrl+S]], [[⌘S]] on a Mac). The studio compiles the draft in its sandbox and draws test frames. If it is valid the preview shows the draft; if not, the message says which line is wrong and marks it.")
+    li
+      raw md("Press **Save as new version**. The version number goes up; clips that pinned the old version keep it.")
+  raw p("**Cancel** throws the draft away. If you try to leave with an unsaved draft, the studio asks first. The rules every asset must follow are in [Writing assets](/docs/assets).")
+
+  h2#about About, versions and comparing them
+  ul
+    li
+      raw md("**About** → **Edit** changes the title, description and tags. These are kept on the asset for every version and do not make a new one. **Reset to source** goes back to what the code says.")
+    li
+      raw md("**Versions** lists every version with its note and author. **Compare versions** (when there are two or more) shows the code differences and the same frame from both versions side by side.")
+    li
+      raw md("**Details** and lineage say which clip the asset was made for and what it was forked from.")
+
+  h2#file-assets Pictures, video, sequences and fonts
+  p File assets have their own playground:
+  ul
+    li
+      raw md("**Images** show their facts, a five-colour palette, the cleaned-up SVG (for an SVG) and suggested uses.")
+    li
+      raw md("**Footage** has play, a scrubber and **◀ Frame** / **Frame ▶** buttons, with a filmstrip and the sound's waveform. Click either to jump there.")
+    li
+      raw md("**Sequences** (baked frames) play with a frame scrubber.")
+    li
+      raw md("**Fonts** have **Try your own text** with a size slider, and the font's facts.")
+  raw p("Every file asset has a **Source and licence** panel: press **Edit** to record its licence, source, creator and credit line. This does not make a new version. See [Licences and credits](/docs/provenance).")
+
+  h2#ask Ask the agent about this asset
+  raw p("The **Ask the agent** panel sends a request about this asset, together with the values on screen and the current time, to Claude: “make it slower”, “add a glow option”. The answer comes back as a proposal you can preview next to the current version and accept as a new version. See [Ask the agent](/docs/agent).")

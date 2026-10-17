@@ -1,0 +1,150 @@
+//- The clip editor. Params: d.
+div(data-ui="prose")
+  raw p("The **clip editor** (`/clips/<name>`) is where a clip is put together. Open it from **Clips** by clicking a clip's card, or make a new clip there with **New clip** (a name, a title, a format and a duration from 1 to " + d.live.maxClipSeconds + " seconds).")
+  p The screen has four parts: the header with Save, Remix and Render; the preview; the timeline; and a side column with the agent panel, the inspector, the issues, the assets in the clip, the credits and the repo.
+
+  h2#header Header: save, remix, render
+  ul
+    li
+      raw md("**Save** is enabled once you have changed something; the **Unsaved changes** badge shows until you save. Each save is a new **revision** of the clip and pins every asset to its version.")
+    li
+      raw md("**Remix** makes a **new clip** with the same timeline in another format (for example a vertical copy of a horizontal clip). The assets re-lay themselves out for the new frame. A remix copies the **saved** clip: unsaved changes are not included.")
+    li
+      raw md("**Render** saves the clip, then opens the render panel. See [Render, gallery and lineage](/docs/renders#render-panel).")
+  +callout(variant="warning")
+    @content
+      raw p("**Save before you use the browser's Back button.** Leaving through the studio's own links asks “Leave without saving?”, and so do reloading and closing the tab, but the browser's Back and Forward buttons leave without asking, and unsaved edits are lost.")
+  raw p("If someone else (another tab, or Claude) saved the clip while you were editing, saving says “This clip was changed elsewhere”, with **Reload** (take theirs) and **Keep mine** (save yours over it).")
+
+  h2#preview The preview
+  raw p("The preview plays the clip with its sound. **Laying out: Vertical / Horizontal / Square** switches which format you see and edit. A clip has one main format; editing it in another format makes a **per-format override** for the selected item (the label then says “(override)”), so one composition can be laid out by hand for every shape.")
+  p Click a layer on the preview to select it, then:
+  ul
+    li Drag the box to move it. It snaps to the frame's centre and edges, the safe zone, and the edges and centres of other layers, and guide lines show where.
+    li Drag a corner to scale it (the opposite corner stays put). Hold Shift to keep the proportions.
+    li Drag the knob above the box to rotate it. Hold Shift for 15° steps.
+    li Use the arrow keys to nudge the selected layer by one pixel, or ten with Shift.
+    li Hold Alt while dragging to turn snapping off, and Shift while moving to move along one axis only.
+  raw p("The **Overlays** bar draws guides over the preview: **Grid**, **Safe areas** (title-safe and action-safe), **Platform** (the zones of the platforms you chose in the clip settings), **Caption lane** (the band reserved for captions) and **Text boxes** (the measured box of every text). **Safe zone** and **Guides** in the transport row add the format's safe zone and, for vertical clips, the zones where platforms put their header and their buttons.")
+
+  h2#timeline The timeline
+  raw p("Each row is a **track**; the coloured blocks on it are **items**. Visual tracks draw from bottom to top, so a track higher in the list is in front. The ruler at the top shows time; click or drag it to move the **playhead**.")
+  ul
+    li
+      raw md("**Add item** opens a picker (search, and the kinds All, Visual, Audio, Footage) and places the asset at the playhead.")
+    li
+      raw md("**Drag** an item to move it, also onto another track of the same type. **Drag its edges** to trim it (an item is at least 0.1 s long). Moves snap to the clip's start and end, the playhead, the beats found in the music, other items' edges and markers; hold [[Alt]] to move freely (times still round to 0.05 s).")
+    li
+      raw md("**Footage** shows a filmstrip of the frames it plays. Dragging its edges trims the video file itself (its `in` and `out` points), and the picture stays where it was.")
+    li
+      raw md("**Split** ([[S]]) cuts the selected items at the playhead. The two parts play on as one: the second continues the animation where the first stopped, with the same random seed.")
+    li
+      raw md("**Copy**, **Paste** (at the playhead), **Duplicate**, **Undo** and **Redo** work on items. Each action is one undo step, a drag or typing in one field counts as one, and up to 200 steps are kept. Undo history survives a save but starts again after a reload.")
+    li
+      raw md("**Zoom** (4 to 240 pixels a second) and **Fit** change the scale. The **+ Track** button adds a Visual, Text or Audio track.")
+  raw p("Each track's head has a grip to drag it up or down, its name (click to rename), **Lock** (nothing on it can be moved or edited), **Hide**, **Solo** (show only this visual track) and, on audio tracks, **Mute**. Deleting a track that has items asks first.")
+  h3#markers Markers
+  raw p("Markers are notes on the timeline with a type: **cut** (a scene change), **hold** (a stretch where a still picture is intended), **beat**, **word** (pinned to a word of the narration) and **note**. Pick the type next to **Add marker**, or press [[M]] for a note at the playhead. The checks read them: a brightness jump on a cut, or a frozen picture inside a hold, is not reported as a problem. Drag a marker to move it; word markers stay on their word.")
+
+  h2#inspector The inspector
+  p The inspector edits whatever is selected.
+  h3#clip-settings Nothing selected: the clip's settings
+  ul
+    li
+      raw md("**Clip duration** (no shorter than the last item, at most " + d.live.maxClipSeconds + " s) and **Background colour**.")
+    li
+      raw md("**Loudness**: **Normalise to a target** makes the render reach a loudness (default −14 LUFS, the common streaming level) with peaks at most −1 dBTP. See [Sound, voice and captions](/docs/sound#loudness).")
+    li
+      raw md("**Captions**: **Captions from the narration**, **Burn into the video**, and the most characters in a line.")
+    li
+      raw md("**Platforms**: YouTube (16:9), YouTube Shorts, Instagram Reels, TikTok and a generic vertical feed. Their zones feed the checks and the Platform overlay; **Keep assets inside the platforms' safe zone** makes assets lay out inside them.")
+  h3#item-settings One item
+  ul
+    li
+      raw md("The asset and its pinned version. When a newer version exists it says so, and **Upgrade** moves this item to it. **Change asset** swaps it for another; **Delete item** removes it.")
+    li
+      raw md("**Timing**: **Start**, **Duration**, **Fade in**, **Fade out**, and **Gain** for sound. **Start on a word** pins the start to a word of the narration (**Detach** frees it).")
+    li
+      raw md("**Layout**: X, Y, Width, Height, Scale, Rotation, Scale X and Y, Anchor X and Y, Opacity, **Relative to** (the frame or the safe zone) and **Blend** (normal, screen, multiply, overlay, lighter, soft-light, difference). Values are fractions of the frame, so a layout means the same in every format.")
+    li
+      raw md("**Keyframes**: press ◆ beside a field to add a key at the playhead; each key has an easing curve. The list shows every key of the item.")
+    li
+      raw md("**Parameters** of the asset, with **Reset**.")
+    li
+      raw md("**Motions** (an entrance, an exit, an emphasis or a loop), **Effects** (glow, grain, …), **Transition in** (from the item before it on the same track) and **Mask** (alpha, alpha-inverted, luma or luma-inverted).")
+  h3#audio-settings Sound, footage and markers
+  ul
+    li
+      raw md("A sound item adds **Volume over time** (keys in decibels with an easing) and **Ducking**: **Duck under the narration** turns the music down while the voice speaks (by how much, hold, attack, release, and whether speech is found from the words or the sound).")
+    li
+      raw md("A footage item adds **Fit** (contain, cover, fill), **In**, **Out**, **Speed** (0.05× to 16×), **Freeze on one frame**, **Loop** and **Play its sound**.")
+    li
+      raw md("A marker shows its type, label, time, how long it holds, and **Go to marker** and **Delete marker**.")
+  raw p("Several items selected show “N items selected” with **Delete**. An item on a locked track cannot be edited until you unlock the track.")
+
+  h2#layers Layers at the playhead
+  raw p("Under the timeline, **Layers at the playhead** lists what is drawn at the current time, front to back. Drag a row onto another to change the order, or select one and press [[Alt+↑]] / [[Alt+↓]].")
+
+  h2#captions Caption pages
+  raw p("When the clip has captions, the **Caption pages** panel and a **Captions** lane under the narration show how the words are split into pages. The words and their times never change; only where the pages break does:")
+  ul
+    li Drag a page's left edge onto another word to move the break.
+    li Click a word to start a new page there.
+    li
+      raw md("Select two neighbouring pages and press **Merge pages** ([[J]]), or put the playhead on a word and press **Split at the playhead** ([[B]]).")
+    li
+      raw md("**Automatic pages** goes back to the pages the studio builds by its rules. The panel also shows the SRT the next render will write.")
+
+  h2#save-as-asset Save as asset
+  raw p("Select some layers and press **Save as asset**: they become **one asset** in the library (a **precomp**) with their timing, layout and attachments. Give it a name and a title; **Replace the selected layers with it** puts the new asset in their place (the clip is saved as a new revision, and undo starts again from there). The next clip can then use your intro, stat scene or lower-third block as one piece.")
+
+  h2#side-panels The side panels
+  dl
+    dt Ask the agent
+    dd
+      raw md("A request about this clip, with the playhead and the selected items, for Claude. See [Ask the agent](/docs/agent).")
+    dt Issues
+    dd
+      raw md("**Check the clip** samples frames and lists every problem with its item, time and a still: safe zone, clipped, overlap, caption lane, size, contrast, hold, captions, glyphs, first frame, last frame. Click one to jump there. See [Checks and quality](/docs/quality).")
+    dt Assets in this clip
+    dd Every asset the saved clip uses, directly or inside other assets, with where it came from.
+    dt Credits
+    dd
+      raw md("The credit lines and sources of every file in the clip, and what would stop a **final** render (a placeholder, a file with no licence), with links to fix each. **Download as Markdown** saves the credits. See [Licences and credits](/docs/provenance).")
+    dt Repo
+    dd
+      raw md("Whether the clip's folder in the repository matches the saved clip, and **Write to repo** to update it. See [Clips in the repo](/docs/repo).")
+
+  h2#shortcuts-summary The keys you will use most
+  div(role="region" aria-label="Most used editor keys" tabindex="0")
+    table
+      thead
+        tr
+          th Key
+          th Does
+      tbody
+        tr
+          td
+            raw md("[[Space]]")
+          td Play or pause
+        tr
+          td
+            raw md("[[←]] [[→]]")
+          td One frame back or forward
+        tr
+          td
+            raw md("[[S]]")
+          td Split the selected items at the playhead
+        tr
+          td
+            raw md("[[Ctrl+Z]] / [[Ctrl+Shift+Z]]")
+          td Undo / redo (⌘ on a Mac)
+        tr
+          td
+            raw md("[[Delete]]")
+          td Delete the selected items or marker
+        tr
+          td
+            raw md("[[?]]")
+          td Show every shortcut
+  raw p("The full list is in [Keyboard and mouse](/docs/shortcuts#editor).")

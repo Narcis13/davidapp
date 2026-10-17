@@ -1,0 +1,30 @@
+//- The search page. Params: d (d.query, the words typed; d.results, the sections found, best first).
+div(data-ui="prose")
+  form(action="/docs/search" method="get" role="search" data-docs="search-big")
+    label(for="docs-q-page") Search every page of the manual
+    div(data-ui="cluster" data-gap="2")
+      input#docs-q-page(data-ui="input" type="search" name="q" value=d.query placeholder="For example: final render licence")
+      button(data-ui="button" data-variant="primary" type="submit") Search
+  if d.query
+    if d.results.length > 0
+      ol(data-docs="results")
+        each r in d.results
+          li
+            a(href=r.href) {{ r.title }}
+            p(data-docs="snippet")
+              raw marked(r.snippet)
+    else
+      +callout(variant="muted")
+        @content
+          p Nothing in the manual holds all of those words. Try fewer words, or another word for the same thing: “render” instead of “export”, “asset” instead of “template”.
+  else
+    p A few words work best. Every word you type must appear in a section for it to be shown, and sections whose title holds your words come first.
+  h2#browse Or browse by topic
+  ul
+    each group in d.nav
+      li
+        strong {{ group.title }}
+        ul
+          each item in group.pages
+            li
+              a(href=item.href) {{ item.title }}

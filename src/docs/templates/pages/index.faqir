@@ -1,0 +1,65 @@
+//- The first page of the manual. Params: d.
+div(data-ui="prose")
+  raw p("**Fablecut is a studio for making short videos with code.** Every picture you see in a Fablecut video is drawn by a small JavaScript function, called an **asset**, that knows how to draw one frame at any moment in time. You arrange assets on a timeline to make a **clip**, and the studio renders the clip, frame by frame, into an MP4 file you can publish.")
+  p The twist is that nothing you make is thrown away. Every asset you write or tune stays in a searchable library, with every version kept, so the next video starts from everything the last one left behind. That is why the studio calls itself a library that compounds: each clip is cheaper to make than the one before it.
+  raw p("You can work in two ways, and mix them freely: **by hand**, in the studio's screens in your browser, and **by asking Claude**, which drives the same studio through its MCP tools and can answer requests you type into the studio.")
+
+  h2#right-now The studio right now
+  p These numbers come from the studio that drew this page, so they are always current.
+  div(data-ui="grid" data-cols="1" data-cols-sm="3" data-gap="4")
+    +stat(variant="card")
+      @value
+        | {{ d.live.counts.assets }}
+      @label
+        | assets in the library
+    +stat(variant="card")
+      @value
+        | {{ d.live.counts.clips }}
+      @label
+        | clips
+    +stat(variant="card")
+      @value
+        | {{ d.live.counts.renders }}
+      @label
+        | renders made
+  raw p("Your work is kept in the data folder `" + d.live.dataDir + "`. See [Settings and folders](/docs/config) for what is in it.")
+
+  h2#where-to-start Where to start
+  div(data-ui="grid" data-cols="1" data-cols-sm="2" data-gap="4")
+    +card(title="New here?")
+      @body
+        raw p("Read [The big ideas](/docs/concepts) (five minutes), then follow [Your first clip](/docs/first-clip). You will have a rendered video at the end.")
+    +card(title="Setting it up")
+      @body
+        raw p("[Install and run](/docs/install) lists what you need (Node 24 and FFmpeg) and the three commands that start the studio.")
+    +card(title="Using the screens")
+      @body
+        raw p("Start with [The library](/docs/library) and [The clip editor](/docs/editor). [Keyboard and mouse](/docs/shortcuts) has every shortcut on one page.")
+    +card(title="Working with Claude")
+      @body
+        raw p("[Claude Code and the studio](/docs/claude) shows what to ask for, and the [MCP tool reference](/docs/mcp-tools) lists every tool Claude can call.")
+
+  h2#what-it-is-good-at What Fablecut is good at
+  ul
+    li Motion graphics: kinetic titles, lower thirds, charts that draw themselves, logo stings, end cards.
+    li Explainers and product tours: screen recordings in a browser frame, with a cursor, a spotlight and callouts.
+    li Voiced videos with captions: a narration with the time of every word, captions built from those words, and music that ducks under the voice.
+    li The same video in several shapes: one composition laid out for vertical (9:16), horizontal (16:9) and square (1:1).
+    li Videos that must be right: the studio checks text size, contrast, safe zones, captions, loudness and licences before you publish.
+  raw p("It is not a camera-footage editor: it can place and trim video files ([Pictures, video and fonts](/docs/media)), but its strength is everything drawn by code. A clip is at most " + d.live.maxClipSeconds + " seconds long.")
+
+  h2#how-this-manual-works How this manual is organised
+  dl
+    dt Start here
+    dd What Fablecut is, how to install it, the ideas behind it, and a guided first clip.
+    dt The studio
+    dd One page per screen of the studio, plus every shortcut and the request flow for asking the agent.
+    dt Making videos
+    dd How a clip is built, how to write assets, media, sound and captions, the checks, licences and the repository.
+    dt Working with Claude
+    dd How Claude Code drives the studio, and the reference of every MCP tool.
+    dt Reference
+    dd Settings, folders, commands, troubleshooting and a glossary.
+  +callout(variant="info")
+    @content
+      raw p("**Looking for something specific?** Use the search box at the top of every page. It searches every section of the manual and takes you straight to the one that matches.")

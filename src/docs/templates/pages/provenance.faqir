@@ -1,0 +1,68 @@
+//- Licences and credits. Params: d.
+div(data-ui="prose")
+  p Publishing a video means you may use everything in it. Fablecut keeps a record of where every file came from, writes the credits for you, and refuses a final render when something's licence is unknown, so a placeholder picture never slips into a published video.
+  raw p("**Function assets** (the code that draws) are the studio's own and need no licence. **File assets** do: pictures, sounds, footage, fonts, narrations and sequences.")
+
+  h2#fields What is recorded
+  div(role="region" aria-label="Provenance fields" tabindex="0")
+    table
+      thead
+        tr
+          th Field
+          th Meaning
+      tbody
+        tr
+          td Licence
+          td
+            raw md("An SPDX id such as `CC0-1.0`, `CC-BY-4.0`, `OFL-1.1`, `Apache-2.0` or `MIT`; `original` (made for this studio); or your own words (“licensed to us for social media”).")
+        tr
+          td Licence URL, source URL
+          td Where the licence and the file can be found.
+        tr
+          td Creator, credit line
+          td Who made it, and the line the credits should show (“Photo: Jane Doe”).
+        tr
+          td Date
+          td When it was made or obtained (YYYY-MM-DD).
+        tr
+          td AI-generated
+          td Whether it was made by an AI model. Listed apart in the credits.
+        tr
+          td Content ID
+          td Whether it is registered with a content-ID system, so a platform may claim a video that uses it. A warning, not a refusal.
+        tr
+          td Restrictions
+          td Anything the licence limits. A warning, not a refusal.
+        tr
+          td Placeholder
+          td A stand-in for the real file. A final render refuses it.
+        tr
+          td May be committed to a public repo
+          td
+            raw md("Whether the file may go into git. It defaults to yes for `original`, CC0, CC BY, public domain, OFL, MIT, ISC, Apache, BSD, MPL-2.0 and Unlicense, and to no for anything else, an unknown licence included.")
+  raw p("**What you leave out is recorded as unknown, never guessed.**")
+
+  h2#set-it How to set it
+  ul
+    li
+      raw md("**Before uploading:** press **Licence** next to **Upload** in the library and fill in the licence (and, under “More about the source”, the rest). It applies to the next pictures and videos you drop. Fonts always ask for their own licence, which is required.")
+    li
+      raw md("**After uploading:** open the asset's playground; the **Source and licence** panel has **Edit**. Saving does not make a new version, and the change is recorded with who made it and when.")
+    li
+      raw md("**Claude:** every tool that adds a file (`upload_image`, `add_file_asset`, `add_footage`, `add_font`, `add_narration`, `generate_narration`) takes `license`, `license_url`, `source_url`, `creator`, `credit`, `date`, `ai_generated`, `content_id`, `restrictions`, `placeholder`, `redistributable`. `set_asset_metadata { name, provenance }` corrects one later.")
+
+  h2#placeholders Placeholders
+  raw p("While you work, it is fine to use a stand-in picture. Mark it as a **Placeholder** (the switch in the licence form, `placeholder: true`, or the tag `placeholder`). The library shows a **Placeholder** badge on its card, and the clip's **Credits** panel lists it as something to replace.")
+
+  h2#final What a final render checks
+  raw p("Choose **Final** in the render panel (Claude: `start_render { final: true }`). Before anything is drawn, the studio looks at every file the clip uses, including the files used inside other assets, and refuses the render if any of them is a **placeholder** or has **no licence** (an empty licence, “unknown”, “n/a”, “none” or “?”). The refusal names each one with a link and what to do. **Normal** and **Draft** renders are never refused for this, so you can always review the cut.")
+  raw p("The editor's **Credits** panel says the same at any time: “Ready for a final render”, or the list of problems. Claude asks with `check_provenance`.")
+
+  h2#credits The credits
+  raw p("A final render writes `<render>.credits.md` next to the MP4, built from everything the clip uses: footage, pictures, sound and music, voice and fonts, each with its credit line, creator, licence and source, with AI-generated and content-ID material listed apart. Open it from the **Renders** screen or the **Gallery**, or download it from the editor's **Credits** panel (**Download as Markdown**). Claude gets the same text with `clip_credits { clip, format: 'markdown' }`.")
+  +callout(variant="info")
+    @content
+      raw p("**Fonts count too.** The five bundled families are font assets licensed under the SIL Open Font License 1.1, and a save pins the ones a clip draws, so the credits list every font the video shows, even one chosen by a theme.")
+
+  h2#repo Licences and the repository
+  raw p("When a clip is written to the repository ([Clips in the repo](/docs/repo)), a file that may not be redistributed (an unknown licence counts) or is larger than 50 MB is **not** copied into git: it is listed by its SHA-256 with its licence and source, so it can be found again.")

@@ -1,0 +1,234 @@
+//- Keyboard and mouse. Params: d.
+div(data-ui="prose")
+  raw p("On a Mac, read [[⌘]] where this page says [[Ctrl]]. In the clip editor, press [[?]] at any time for the same list. Shortcuts never fire while you are typing in a text field or while a dialog is open.")
+
+  h2#everywhere Everywhere
+  div(role="region" aria-label="Keys everywhere" tabindex="0")
+    table
+      thead
+        tr
+          th Key
+          th Does
+      tbody
+        tr
+          td
+            raw md("[[Escape]]")
+          td Closes a dialog (so does clicking outside it)
+        tr
+          td
+            raw md("[[Ctrl+Enter]]")
+          td Sends what you typed in an agent panel or a reply box
+        tr
+          td
+            raw md("[[Tab]]")
+          td Moves to the next control (Shift+Tab: the one before)
+
+  h2#library Library
+  div(role="region" aria-label="Library keys" tabindex="0")
+    table
+      thead
+        tr
+          th Key or action
+          th Does
+      tbody
+        tr
+          td
+            raw md("[[←]] [[→]] [[↑]] [[↓]], [[Home]] [[End]], [[PageUp]] [[PageDown]]")
+          td Move between cards
+        tr
+          td
+            raw md("[[Enter]]")
+          td Opens the detail panel of the card
+        tr
+          td
+            raw md("[[Space]] / [[Shift+Space]]")
+          td Selects the card / selects a range
+        tr
+          td
+            raw md("[[↓]] in the search box")
+          td Jumps to the first card
+        tr
+          td
+            raw md("[[Ctrl+A]]")
+          td Selects every loaded card
+        tr
+          td
+            raw md("[[Escape]]")
+          td Closes the filter sheet, then the detail panel, then clears the selection
+        tr
+          td Click · double-click
+          td Opens the detail panel · opens the playground
+        tr
+          td
+            raw md("[[Ctrl]]-click · [[Shift]]-click")
+          td Adds or removes a card from the selection · selects a range
+        tr
+          td Drop files on the page
+          td Uploads pictures, videos and fonts
+
+  h2#playground Playground
+  div(role="region" aria-label="Playground keys" tabindex="0")
+    table
+      thead
+        tr
+          th Key
+          th Does
+      tbody
+        tr
+          td
+            raw md("[[Space]]")
+          td Play or pause (not while a field or a button has the focus)
+        tr
+          td
+            raw md("[[←]] [[→]]")
+          td One frame back or forward
+        tr
+          td
+            raw md("[[Ctrl+S]] in the source editor")
+          td Validates the draft and previews it
+  raw p("The source editor has the usual editing keys (undo, search and replace, indentation) of its code editor.")
+
+  h2#editor Clip editor
+  div(role="region" aria-label="Clip editor keys" tabindex="0")
+    table
+      thead
+        tr
+          th Key
+          th Does
+      tbody
+        tr
+          td
+            raw md("[[Space]]")
+          td Play or pause
+        tr
+          td
+            raw md("[[←]] / [[→]]")
+          td One frame back or forward
+        tr
+          td
+            raw md("[[S]]")
+          td Split the selected items at the playhead
+        tr
+          td
+            raw md("[[M]]")
+          td Add a note marker at the playhead
+        tr
+          td
+            raw md("[[J]]")
+          td Merge the selected caption pages (two neighbours, or one with the next)
+        tr
+          td
+            raw md("[[B]]")
+          td Break the caption page at the word under the playhead
+        tr
+          td
+            raw md("[[Ctrl+Z]]")
+          td Undo
+        tr
+          td
+            raw md("[[Ctrl+Shift+Z]] or [[Ctrl+Y]]")
+          td Redo (on a Mac, [[⇧⌘Z]])
+        tr
+          td
+            raw md("[[Ctrl+C]] · [[Ctrl+V]] · [[Ctrl+D]]")
+          td Copy the selected items · paste at the playhead · duplicate
+        tr
+          td
+            raw md("[[Delete]] or [[Backspace]]")
+          td Delete the selected items or marker
+        tr
+          td
+            raw md("[[Escape]]")
+          td Clear the selection
+        tr
+          td
+            raw md("Arrow keys on the preview")
+          td
+            raw md("Nudge the selected layer one pixel ([[Shift]]: ten)")
+        tr
+          td
+            raw md("[[↑]] / [[↓]] on a track's grip")
+          td Move the track forward or back
+        tr
+          td
+            raw md("[[Alt+↑]] / [[Alt+↓]] on a layer")
+          td Move the layer forward or back
+        tr
+          td
+            raw md("[[?]]")
+          td Show the list of shortcuts
+  raw p("[[J]] and [[B]] work while the Caption pages panel is shown. [[Ctrl+C]] copies items only when an item is selected and no text is highlighted.")
+
+  h2#mouse Mouse and modifier keys in the editor
+  div(role="region" aria-label="Mouse in the editor" tabindex="0")
+    table
+      thead
+        tr
+          th Where
+          th Action
+          th Does
+      tbody
+        tr
+          td Timeline
+          td Click · Shift/Ctrl-click
+          td Select an item · add or remove it from the selection
+        tr
+          td Timeline
+          td Drag an item · drag its edge
+          td Move it (also to another track of the same type) · trim it
+        tr
+          td Timeline
+          td
+            raw md("[[Alt]] while dragging")
+          td Do not snap (times still round to 0.05 s)
+        tr
+          td Ruler
+          td Click or drag
+          td Move the playhead
+        tr
+          td Ruler
+          td Click a keyframe diamond or a narration word
+          td Jump to it
+        tr
+          td Preview
+          td Drag the box · a corner · the top knob
+          td Move · scale · rotate
+        tr
+          td Preview
+          td
+            raw md("[[Shift]] on a corner · while rotating · while moving")
+          td Keep proportions · 15° steps · move on one axis
+        tr
+          td Preview
+          td
+            raw md("[[Alt]] while dragging")
+          td Do not snap
+        tr
+          td Caption lane
+          td Drag a page's left edge · click a word
+          td Move the page break · start a new page there
+        tr
+          td Layers panel
+          td Drag a row onto another
+          td Put it in front of (above) or behind that layer
+  raw p("Locked tracks show their items but cannot be dragged or edited. On a touch screen, an item drags only once it is selected.")
+
+  h2#footage-keys Footage in the playground
+  div(role="region" aria-label="Footage keys" tabindex="0")
+    table
+      thead
+        tr
+          th Key or action
+          th Does
+      tbody
+        tr
+          td
+            raw md("[[Space]]")
+          td Play or pause
+        tr
+          td
+            raw md("[[←]] [[→]], or **◀ Frame** / **Frame ▶**")
+          td One frame of the file back or forward
+        tr
+          td Click the filmstrip or the waveform
+          td Jump to that time

@@ -1,0 +1,87 @@
+//- Glossary. Params: d.
+div(data-ui="prose")
+  dl
+    dt#anchor Anchor
+    dd An item's start, a keyframe or a marker pinned to a word of the narration, so it stays on that word when the take changes.
+    dt#asset Asset
+    dd
+      raw md("A reusable building block in the library: a function that draws, returns a value, makes sound, moves, transitions or processes pixels, or a file (picture, sound, font, footage, sequence). See [Writing assets](/docs/assets).")
+    dt#bake Bake
+    dd Render an asset once into a file: a frame sequence, one picture, or a WAV, so it costs nothing to draw again.
+    dt#caption-lane Caption lane
+    dd The band at the bottom of the safe zone reserved for captions.
+    dt#clip Clip
+    dd A composition: a format, a frame rate, a duration and tracks of items. What you render into a video.
+    dt#composition Composition
+    dd
+      raw md("The data that describes a clip. See [How a clip is built](/docs/compositions).")
+    dt#draft Draft render
+    dd A quick, smaller, faster-encoded render for checking the cut. Its frames are the same as the full render's, scaled down.
+    dt#ducking Ducking
+    dd Turning the music down automatically while the narration speaks.
+    dt#effect Effect
+    dd An asset that processes the pixels of an item, a track or the whole frame: glow, grain, blur, colour grade.
+    dt#final-render Final render
+    dd A full-size render for publishing, refused while any file in the clip is a placeholder or has no licence, and written with its credits.
+    dt#floor Floor
+    dd The smallest size a text may be drawn at, as a share of the frame's short side. Text that would need to be smaller fails loudly.
+    dt#footage Footage
+    dd A video file in the library, placed and trimmed like a picture layer.
+    dt#format Format
+    dd The shape of the frame: vertical 9:16 (1080 × 1920), horizontal 16:9 (1920 × 1080) or square 1:1 (1080 × 1080).
+    dt#item Item
+    dd One asset placed on a track, from a start time for a duration, with its parameters and layout.
+    dt#keyframe Keyframe
+    dd A value of a layout field or a parameter at a moment; the studio eases between keyframes.
+    dt#kit Kit
+    dd The assets for explainers and marketing: device frames, cursor, spotlight, camera, callouts, arrows, steps, charts, icons, end card.
+    dt#lineage Lineage
+    dd Which clip produced an asset, what it was forked from, and which later clips reused it.
+    dt#loudness LUFS, LU and dBTP
+    dd Units of loudness. Streaming platforms aim at about −14 LUFS; LU is a difference in loudness; dBTP is the true peak level.
+    dt#marker Marker
+    dd A typed note on the timeline: cut, hold, beat, word or note. The checks read them.
+    dt#mask Mask
+    dd A visual asset, picture, sequence or footage that decides where an item shows.
+    dt#mcp MCP
+    dd The Model Context Protocol, how Claude Code calls the studio's tools.
+    dt#motion Motion
+    dd An asset that moves an item without redrawing it: an entrance, an exit, an emphasis or a loop.
+    dt#narration Narration
+    dd A voice recording with its script and the time of every word.
+    dt#override Override
+    dd A change to an item's layout, keyframes or parameters for one format only.
+    dt#parameter Parameter
+    dd A setting of an asset (text, colour, size, speed) with its type, default and limits; the studio builds its controls from them.
+    dt#pin Pin
+    dd Fix a reference to an exact version (name@3). Saving a clip pins every asset it uses.
+    dt#placeholder Placeholder
+    dd A stand-in file, marked as such, that a final render refuses.
+    dt#playhead Playhead
+    dd The current time on the timeline, shown as a vertical line.
+    dt#precomp Precomp
+    dd An asset that draws several layers, made from layers of a clip with Save as asset.
+    dt#preset Preset
+    dd An asset that is another asset with chosen parameter values as its defaults.
+    dt#proposal Proposal
+    dd Claude's answer to a request: a new version, a new asset or clip edits, applied only when you accept it.
+    dt#provenance Provenance
+    dd Where a file came from: its licence, source, creator and credit.
+    dt#remix Remix
+    dd A new clip made from an existing one in another format.
+    dt#request Request
+    dd What you ask the agent in plain words, about an asset, a clip or the library.
+    dt#revision Revision
+    dd A saved state of a clip. Each save makes a new revision.
+    dt#safe-zone Safe zone
+    dd The part of the frame no platform button or caption covers. Text belongs inside it.
+    dt#sequence Sequence
+    dd Frames baked from an asset (PNG with transparency), used as a layer.
+    dt#theme Theme
+    dd A value asset with a palette and fonts that every asset in a clip can read.
+    dt#track Track
+    dd A row of the timeline: visual, text or audio. Visual tracks draw from bottom to top.
+    dt#transition Transition
+    dd An asset that turns one layer into the next.
+    dt#version Version
+    dd An immutable saved state of an asset (name@1, name@2, …). Editing makes a new version; old ones never change.

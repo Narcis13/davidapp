@@ -1,0 +1,19 @@
+//- The page shown for a /docs address that has no page. Params: d.
+div(data-ui="prose")
+  +callout(variant="warning")
+    @content
+      p The address may be mistyped, or the page may have been renamed. Search for what you were looking for, or pick a topic below.
+  form(action="/docs/search" method="get" role="search")
+    label(for="docs-q-missing") Search the manual
+    div(data-ui="cluster" data-gap="2")
+      input#docs-q-missing(data-ui="input" type="search" name="q" placeholder="What were you looking for?")
+      button(data-ui="button" data-variant="primary" type="submit") Search
+  h2#topics Every page
+  ul
+    each group in d.nav
+      li
+        strong {{ group.title }}
+        ul
+          each item in group.pages
+            li
+              a(href=item.href) {{ item.title }}

@@ -1,0 +1,129 @@
+//- Commands and scripts. Params: d.
+div(data-ui="prose")
+  raw p("Run these in a terminal in the repository folder. Scripts that read or write a library use `STUDIO_DATA` to choose it; usage notes are at the top of each file.")
+
+  h2#npm npm scripts
+  div(role="region" aria-label="npm scripts" tabindex="0")
+    table
+      thead
+        tr
+          th Command
+          th Does
+      tbody
+        tr
+          td
+            raw md("`npm run studio`")
+          td Starts the studio (web screens, the API and a render runner) on port 8787.
+        tr
+          td
+            raw md("`npm run mcp`")
+          td Starts the MCP server on standard input and output (Claude Code does this for you).
+        tr
+          td
+            raw md("`npm run seed`")
+          td Builds the showcase library and clips without rendering.
+        tr
+          td
+            raw md("`npm run showcase`")
+          td Builds the showcase and renders every clip. Needs several gigabytes free.
+        tr
+          td
+            raw md("`npm run sync-assets`")
+          td
+            raw md("Pushes `assets/` into the library (new or changed files only). `-- --pull <name>` writes the library's version into `assets/`; `-- --force` overrides a conflict.")
+        tr
+          td
+            raw md("`npm test`")
+          td The whole test suite: the asset contract, compositions, uploads, requests, the render pipeline, the HTTP API, MCP, this manual and more.
+        tr
+          td
+            raw md("`npm run typecheck`, `npm run lint`")
+          td TypeScript checking and ESLint.
+        tr
+          td
+            raw md("`npm run verify`")
+          td Version pinning and determinism, checked by frame hash through MCP.
+        tr
+          td
+            raw md("`npm run report:reuse`")
+          td Which clip created what, and what later clips reused.
+        tr
+          td
+            raw md("`npm run evidence`")
+          td Probes, audio levels and contact sheets of the showcase renders, into `output/`.
+        tr
+          td
+            raw md("`npm run fonts`")
+          td Copies the bundled font files from their packages into `fonts/`.
+
+  h2#mcp-shell MCP from a shell
+  pre
+    code
+      | node scripts/mcp.mjs tools                                   # list the tools
+      | node scripts/mcp.mjs call <tool> '<json>' [--out frame.png]  # call one
+  raw p("`node scripts/prompt-tools.mjs [prompt.md]` checks that every tool and option a prompt names exists on the server.")
+
+  h2#clips-and-library Clips and the library
+  div(role="region" aria-label="Library scripts" tabindex="0")
+    table
+      thead
+        tr
+          th Command
+          th Does
+      tbody
+        tr
+          td
+            raw md("`node scripts/library.mjs export <clip>`")
+          td
+            raw md("Writes a clip to `clips/<clip>/` and `library/`.")
+        tr
+          td
+            raw md("`node scripts/library.mjs import <folder> [--verify] [--files <dir>]`")
+          td Builds a clip from the repository into the library STUDIO_DATA names (required).
+        tr
+          td
+            raw md("`node scripts/roundtrip.mjs <clip>… [--clone]`")
+          td Export, import into an empty library, compare references and frames.
+        tr
+          td
+            raw md("`node scripts/act.mjs <clip> <tool> '<json>'`")
+          td
+            raw md("One MCP call recorded in `showcase/journal/<clip>.jsonl`; `--user` records what a person does in the studio.")
+        tr
+          td
+            raw md("`node scripts/synth-library.mjs <data-dir> [--count 5000]`")
+          td A synthetic library of thousands of assets, for testing at scale.
+
+  h2#measuring Measuring
+  div(role="region" aria-label="Measuring scripts" tabindex="0")
+    table
+      thead
+        tr
+          th Command
+          th Does
+      tbody
+        tr
+          td
+            raw md("`node scripts/hashes.mjs out.json [--compare base.json]`")
+          td Frame hashes of the first showcase clips; with a baseline, every hash must match.
+        tr
+          td
+            raw md("`node scripts/speed.mjs out.json [--runs 3] [clip …]`")
+          td The median render time of clips.
+        tr
+          td
+            raw md("`node scripts/parity.mjs [out-dir]`")
+          td The same frames from the browser preview (headless Chrome) and from Node, with difference images.
+        tr
+          td
+            raw md("`node scripts/bench-library.mjs <url> [out.json]`")
+          td Search speed and the library screen's size while scrolling.
+        tr
+          td
+            raw md("`node scripts/record-studio.mjs <url> <workflow> <out.mp4>`")
+          td
+            raw md("A studio workflow recorded in headless Chrome: an MP4 and a sidecar with the cursor, clicks and element boxes. See [Screen recordings](/docs/media#recordings).")
+        tr
+          td
+            raw md("`node scripts/workflows-v2.mjs <url> [out-dir]`")
+          td The studio's workflows driven with real input and written as GIFs. It changes the data: run it on a copy.

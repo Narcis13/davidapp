@@ -1,0 +1,107 @@
+//- Install and run. Params: d.
+div(data-ui="prose")
+  p Fablecut runs on your own computer. The studio is a small web server that you open in your browser; nothing is uploaded anywhere, and no account is needed.
+
+  h2#requirements What you need
+  div(role="region" aria-label="Requirements" tabindex="0")
+    table
+      thead
+        tr
+          th Software
+          th Why
+          th How to check
+      tbody
+        tr
+          td
+            strong Node.js 24 or newer
+          td Runs the studio, the renderer and the MCP server.
+          td
+            raw md("`node --version` prints v24 or higher")
+        tr
+          td
+            strong FFmpeg
+          td Encodes the frames into MP4 and mixes the sound.
+          td
+            raw md("`ffmpeg -version` prints a version")
+        tr
+          td
+            strong A modern browser
+          td Chrome, Edge, Firefox or Safari, for the studio's screens.
+          td Open any page of the studio
+        tr
+          td Claude Code (optional)
+          td Lets Claude build clips for you and answer your requests.
+          td
+            raw md("`claude --version`")
+  raw p("FFmpeg is found on your `PATH`. If it lives somewhere else, set `FFMPEG_PATH` to the program's full path. On Windows an FFmpeg installed with **winget** is found automatically.")
+  +callout(variant="info")
+    @content
+      raw p("**Voice and transcription are optional.** The studio can speak a script and time every word with free local tools (Kokoro and whisper.cpp). You can skip them until you want a narrated video: see [Set up voice and transcription](/docs/sound#voice-setup).")
+
+  h2#start Start the studio
+  p Open a terminal in the folder where you have Fablecut (the repository), then run:
+  pre
+    code
+      | npm install
+      | npm run studio
+  raw p("The first command installs what the studio needs (once). The second starts the studio and prints its address, `http://127.0.0.1:8787`. Open that address in your browser. Leave the terminal open: closing it, or pressing [[Ctrl+C]] in it, stops the studio.")
+  raw p("To change the port or the address, set `PORT` and `HOST` before starting, for example `PORT=8800 npm run studio`. The studio answers only to `localhost`, `127.0.0.1` and `::1` unless you bind another address on purpose.")
+
+  h2#showcase Fill the library with the showcase (optional)
+  p A fresh studio has an empty library apart from its fonts. The repository holds the recipe of eleven showcase clips that build a large library of reusable assets. To rebuild them:
+  div(role="region" aria-label="Showcase commands" tabindex="0")
+    table
+      thead
+        tr
+          th Command
+          th What it does
+      tbody
+        tr
+          td
+            raw md("`npm run seed`")
+          td Builds the library and the showcase clips without rendering any video. Takes a few minutes. Start here.
+        tr
+          td
+            raw md("`npm run showcase`")
+          td The same, and renders every showcase clip to MP4. Leave a few gigabytes of disk free: some renders are 180 to 600 MB.
+        tr
+          td
+            raw md("`npm run sync-assets`")
+          td
+            raw md("Pushes every asset in the `assets/` folder into the library (only new or changed ones). See [Keep assets/ and the library in step](/docs/repo#sync-assets).")
+
+  h2#where-work-goes Where your work is kept
+  raw p("Everything you make lives in one folder, the **data directory**: `./data` by default (this studio uses `" + d.live.dataDir + "`). It holds the database (`studio.db`), thumbnails, uploaded files, baked sequences, cached audio and your renders. Git ignores it.")
+  ul
+    li
+      raw md("To keep two separate libraries, start the studio with another data directory: `STUDIO_DATA=/path/to/other npm run studio`.")
+    li
+      raw md("To back up your work, stop the studio and copy the data directory.")
+    li
+      raw md("Exports and evidence from the command-line scripts go to `./output`, also ignored by git.")
+  raw p("Every setting the studio reads is listed in [Settings and folders](/docs/config).")
+
+  h2#claude-setup Connect Claude Code (optional)
+  raw p("The repository registers the studio's MCP server in its `.mcp.json`, so **Claude Code started in this folder gets the studio's tools automatically**: run `claude` in the repository folder and approve the `studio` server when it asks. Claude then works on the same data directory as the studio in your browser, and what it makes appears on your screen at once.")
+  raw p("Read [Claude Code and the studio](/docs/claude) next if you want Claude to build videos for you.")
+
+  h2#check-it-works Check that it works
+  ol
+    li
+      raw md("Open `http://127.0.0.1:8787`. You see **Library** with a search box. An empty library says so; that is fine.")
+    li
+      raw md("Open **Clips** and press **New clip**. Give it a name such as `hello`, pick a format and press **Create clip**. The clip editor opens.")
+    li
+      raw md("Press **Add item** and pick any visual asset (a clip with nothing on its visual tracks cannot be rendered).")
+    li
+      raw md("Press **Render**, keep **Normal**, and press **Render**. The **Renders** screen shows the progress, and the finished video appears in the **Gallery**.")
+  raw p("If a step fails, [Troubleshooting](/docs/troubleshooting) lists the usual causes: a missing FFmpeg, a port in use, a stopped server.")
+
+  h2#run-the-tests For developers: the checks
+  pre
+    code
+      | npm test              # the whole test suite
+      | npm run typecheck     # TypeScript over the JavaScript sources
+      | npm run lint          # ESLint
+      | npm run verify        # version pinning and determinism, checked by frame hash
+  raw p("More commands are in [Commands and scripts](/docs/scripts).")

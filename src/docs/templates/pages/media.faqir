@@ -1,0 +1,117 @@
+//- Pictures, video and fonts. Params: d.
+div(data-ui="prose")
+  raw p("Besides the assets that draw, a clip can use files: pictures, logos, sounds, video footage, fonts and frame sequences baked from other assets. Each is a versioned asset in the library like any other, and each records where it came from ([Licences and credits](/docs/provenance)).")
+
+  h2#images Pictures
+  raw p("Drop PNG, JPEG, WebP or SVG files on the [library](/docs/library#add-files), or have Claude call `upload_image`. Each upload gets its size, a five-colour palette and a thumbnail. The same file twice (the same bytes) is stored once.")
+  ul
+    li A picture is at most 25 MB.
+    li A picture whose header says it is more than 16,384 pixels on a side, or more than 64 megapixels, is refused before it is decoded.
+    li
+      raw md("On a visual track, a picture is a layer by itself: set `fit` to `contain` (the whole picture, the default), `cover` (fills the box, cropped) or `fill` (stretched). In an asset, a parameter of type `image` hands it to the code: `f.image(p.photo)`.")
+  raw p("New uploads wait on the **Needs description** list. Describe each one (title, description, tags, suggested uses), in its playground or through Claude (`list_undescribed`, then `describe_asset`): from then on the search finds it by those words.")
+
+  h2#svg SVG logos
+  raw p("An SVG is cleaned up before it is stored, so a file cannot run code in the studio. It is rebuilt from a list of allowed drawing elements and attributes:")
+  ul
+    li Scripts, event handlers, foreignObject, embedded images, animation and links to outside files are dropped, and the upload reports what was dropped.
+    li A DOCTYPE or an entity declaration rejects the whole file.
+    li
+      raw md("An internal `<style>` sheet is read: its simple rules (by element, class or id) are applied to the shapes, then the sheet goes. Linear and radial gradients are kept, so a logo looks as it was drawn.")
+    li
+      raw md("Limits: 2 MB, 20,000 elements, 64 levels deep; a file whose `<use>` references multiply the drawing too much is refused.")
+  raw p("The cleaned SVG is stored next to a PNG (at most 2048 pixels on its long side), which the preview and the render both draw. Its vector drawing is also kept: `f.svg(name).draw(ctx, { width, height, progress, fill, stroke, colors })` draws it on stroke by stroke (`progress` from 0 to 1) or recolours it. The `svg-draw-on` and `end-card` assets use this. Read the upload's dropped list: a rule the studio could not keep can change a colour.")
+
+  h2#footage Video footage
+  raw p("Video files are footage assets: drop an MP4, MOV, M4V, WebM or MKV on the library, or have Claude call `add_footage`. The file is kept as it is; the time of every frame is read once, when it is added.")
+  +callout(variant="warning")
+    @content
+      raw p("**Refused:** HDR video (PQ or HLG), a picture larger than 4096 pixels on a side, more than 20 minutes, a file with no video or with frames that cannot be decoded. Convert HDR video to standard range first.")
+  p On a visual track, footage is a layer with these parameters:
+  div(role="region" aria-label="Footage parameters" tabindex="0")
+    table
+      thead
+        tr
+          th Parameter
+          th Default
+          th Meaning
+      tbody
+        tr
+          td
+            raw md("`fit`")
+          td contain
+          td contain, cover or fill, as for a picture
+        tr
+          td
+            raw md("`in`")
+          td 0
+          td Seconds into the file where the item starts
+        tr
+          td
+            raw md("`out`")
+          td 0
+          td Seconds into the file where it stops (0 is the end of the file)
+        tr
+          td
+            raw md("`speed`")
+          td 1
+          td 0.05 to 16; 2 plays twice as fast
+        tr
+          td
+            raw md("`loop`")
+          td off
+          td Play the trimmed range again from the start when it ends; otherwise the last frame holds
+        tr
+          td
+            raw md("`hold`")
+          td −1
+          td Freeze on this time of the file for the whole item; −1 plays
+  ul
+    li
+      raw md("**Frame-exact.** Each frame of the clip shows the last frame of the file at or before its time, never a blend, and the preview and the render show the same one. A 25 fps file in a 30 fps clip shows real frames, some twice.")
+    li
+      raw md("**Sharp at 1:1.** At its own size with no scale or rotation, a frame is copied without smoothing, so a screen recording stays as sharp as it was recorded.")
+    li
+      raw md("**Its sound.** Put the same footage on an audio track to play its sound, with the audio item's `offset` equal to the picture's `in` to keep them together. In the editor, **Play its sound** on the footage item does this.")
+    li
+      raw md("**Pick trim points by looking.** The footage playground steps frame by frame; Claude uses `footage_frames` to see the file's own frames labelled with their time.")
+  raw p("Each process decodes a file once and shares the frames with every render worker from a memory cache of 512 MB (`STUDIO_FOOTAGE_CACHE_MB`).")
+
+  h2#recordings Screen recordings of the studio
+  raw p("`scripts/record-studio.mjs` records a studio workflow in a headless Chrome with real input (a mouse that moves in arcs, typed keys, drags) and writes an MP4 plus a sidecar JSON file with the cursor path, the clicks, the keys and the boxes of the elements it touched. The kit's `kit-cursor`, `kit-spotlight` and `kit-camera` take those numbers as they are, so the cursor lands exactly on the button in the video. A recording changes the data it runs on, so point it at a studio on a scratch data directory:")
+  pre
+    code
+      | STUDIO_DATA=/tmp/scratch PORT=8796 npm run studio
+      | node scripts/record-studio.mjs http://127.0.0.1:8796/ library-search showcase/footage/library-search.mp4
+  raw p("The workflows are in `scripts/recordings/`. A live capture is not repeatable, so commit the MP4 and its sidecar: every clip made from them then uses the same bytes. `kit-ui-frame@2` puts a recording in a browser, phone or tablet frame; the recipe with exact numbers is in `docs/COOKBOOK.md`.")
+
+  h2#sequences Baked sequences
+  raw p("Anything heavy (3D, many particles, big blurs) can be **baked** once into a **sequence**: PNG frames with transparency, at most 60 seconds, stored as an asset. A sequence is a layer like a picture, with `fit` and `loop` (by default its last frame holds), and can be a mask. Claude bakes with `bake_sequence { ref, name, params, format, fps, duration }`; the result is cached by version, parameters, size, frame rate and length. `bake_asset` bakes a single frame into a picture, or an audio asset into a WAV.")
+
+  h2#sounds Sounds made elsewhere
+  raw p("Sound files (WAV, MP3, M4A, OGG) and pictures made in other programs come in with `add_file_asset`, with their licence. A narration is a sound with its words: see [Sound, voice and captions](/docs/sound#narration).")
+
+  h2#fonts Fonts
+  p Five families come with the studio, each with Latin Extended characters (ă, â, î, ș, ț and the rest). Here is every family a font parameter can name right now:
+  div(role="region" aria-label="Font families" tabindex="0")
+    table
+      thead
+        tr
+          th Family
+          th Weights
+          th Licence
+          th From
+      tbody
+        each f in d.live.fonts
+          tr
+            td {{ f.family }}
+            td {{ f.weights }}
+            td {{ f.license }}
+            td {{ f.source }}
+  raw p("**Add your own:** drop a TTF, OTF or WOFF2 file (at most 25 MB) on the library, or have Claude call `add_font`. A short form shows what the file says (family, weight, style, glyphs) and asks for a name in the library and a **licence**, which is required. The family, weight and style are read from the file, and its character coverage is reported. The font works at once, in the preview and in renders, with no restart: name its family in any font parameter.")
+  ul
+    li Add each weight or style as its own asset with the same family; the weight and italic settings of the text pick the face.
+    li WOFF (version 1) and font collections (TTC) are refused; convert them to WOFF2 or TTF. A family cannot reuse the name of a bundled one.
+    li
+      raw md("A clip pins the font files it uses (`composition.fonts`), so a new version of a font does not change an old clip until you move it with `repin_clip`.")
+    li Emoji are drawn with your system's emoji font, so they can look different on another computer. The checks warn about any character no bundled font has.

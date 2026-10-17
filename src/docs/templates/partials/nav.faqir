@@ -1,0 +1,7 @@
+//- The manual's pages by group. Params: nav (the groups, each with its pages and which one is open).
+each group in nav
+  p(data-ui="text" data-variant="eyebrow") {{ group.title }}
+  ul
+    each item in group.pages
+      li
+        a(href=item.href aria-current=item.current ? "page" : false) {{ item.title }}

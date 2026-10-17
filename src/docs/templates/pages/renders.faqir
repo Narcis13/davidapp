@@ -1,0 +1,81 @@
+//- Render, gallery and lineage. Params: d.
+div(data-ui="prose")
+  p Rendering turns a saved clip into an MP4. The studio draws the frames in parallel on several processor cores, hands them in order to FFmpeg, mixes the sound, and then measures the finished file.
+
+  h2#render-panel The render panel
+  raw p("In the clip editor, press **Render**. The clip is saved first (if the save fails, the panel does not open), then **Render this clip** asks:")
+  dl
+    dt Shapes
+    dd
+      raw md("One or more of horizontal, vertical and square. Several shapes are one request: each is drawn from the same saved clip, with that format's overrides. Pick at least one.")
+    dt Quality
+    dd
+      raw md("**Normal**: full size, with the clip's own settings; the sources are not checked. **Draft**: a quick look at two thirds of the size (or a half, or a third, whichever gives whole, even pixel sizes: 1920×1080 becomes 1280×720), encoded fast and labelled a draft; its frames are the final's, just smaller. **Final**: full size for publishing; every file is checked for a licence first, and the credits are written next to the video.")
+    dt Workers
+    dd
+      raw md("How many processor threads draw frames, 1 to 16. Leave it empty for the studio's own count (the number of CPU cores minus two, at most 8, or `STUDIO_RENDER_WORKERS`). The pictures do not depend on it.")
+    dt Poster time
+    dd The moment used for the poster image, in seconds. It starts at the playhead; empty lets the studio pick (40 % of the way through).
+  raw p("The button says what will happen (“Render”, “Render 2 shapes”, “Render draft”, “Render final”). After queuing, you are taken to **Renders**.")
+  +callout(variant="warning")
+    @content
+      raw p("**A final render can be refused.** If the clip uses a placeholder or a file with no licence, the panel lists each one with a link to fix it. Drafts and normal renders are never refused for this. See [Licences and credits](/docs/provenance).")
+
+  h2#queue The render queue
+  raw p("**Renders** in the top bar is the queue (its badge counts what is queued or rendering). Each render shows its status (**Queued**, **Rendering**, **Done**, **Failed** or **Cancelled**), its progress in frames, and **Cancel** while it runs. A cancelled render stops within about a second and its files are deleted. Renders of several shapes are grouped under one heading. **Render a clip** at the top starts a normal render of any clip with the default options.")
+  p Both the studio and Claude's MCP server can run the queue; if both are running, either picks up the next job. A render whose process stops (for example because the studio was closed mid-render) is marked failed after about 45 seconds.
+  raw p("When a render is done, it shows the loudness (**Target met**, **Target missed** or **No target**), **No problems** or how many things to look at, and the buttons **Open in gallery**, **Credits** and **View report**.")
+
+  h2#outputs What a render writes
+  raw p("The files go to the `renders` folder of the data directory, named after the clip and the render number (for example `my-first-clip-r12.mp4`, or `…-r13-vertical-draft.mp4`):")
+  div(role="region" aria-label="Files of a render" tabindex="0")
+    table
+      thead
+        tr
+          th File
+          th What it is
+      tbody
+        tr
+          td
+            raw md("`.mp4`")
+          td The video: H.264 (yuv420p, BT.709) with AAC sound at 48 kHz stereo, 192 kbit/s, ready to stream (fast start).
+        tr
+          td
+            raw md("`.png`")
+          td The poster image.
+        tr
+          td
+            raw md("`.srt`, `.vtt`")
+          td The captions, when the clip has them.
+        tr
+          td
+            raw md("`.words.json`")
+          td Every narration word with its time, when the clip has a narration.
+        tr
+          td
+            raw md("`.report.json`, `.sheet-N.png`")
+          td What the studio measured on the encoded file, and sheets of frames with their times.
+        tr
+          td
+            raw md("`.credits.md`")
+          td The credits of every source, for a final render.
+  raw p("Normal and final renders use high quality (x264 `medium`, CRF 18); drafts use a faster, lighter setting. After encoding, the studio checks that the file really is H.264 and AAC at the right size and length, and fails the render if not.")
+
+  h2#report The render report
+  raw p("**View report** opens what the studio measured on the MP4 itself: its technical facts, the loudness, black frames, frozen pictures (outside **hold** markers), sudden brightness jumps (outside **cut** markers), flashing that could be unsafe, silences, where the narration sits, and frame sheets. Claude reads the same with `render_report`. How to act on it is in [Checks and quality](/docs/quality#render-report).")
+
+  h2#gallery The gallery
+  raw p("**Gallery** shows finished renders, newest first, with their posters. Open one to play it and download the **MP4**, the captions (**SRT**, **VTT**), the **words** (JSON), the **report** and the **credits** (Markdown). The page also lists the render's facts (video, audio, render time, frames) and **Assets it used**, grouped into those made for this clip, those from the library, and fonts.")
+
+  h2#lineage Lineage
+  raw p("**Lineage** shows how the library grew: for each clip, how many assets it created and how many it reused from earlier clips, and a matrix of which clip uses which asset. The legend tells apart an asset **created for** a clip, **reused as-is**, given a **new version** for a clip, **forked** from an earlier asset, or from the library with no origin clip. Hover or tap a row to follow one asset across clips; click to keep it highlighted. **Most reused** and the reuse report as text are at the bottom.")
+
+  h2#speed How long it takes
+  p Plain 2D motion graphics usually render faster than real time on a recent computer with several cores: a 32-second 1080p clip takes seconds. Pixel effects (grain, glow, blur), 3D and long footage are slower, sometimes slower than real time. To keep previews and renders quick:
+  ul
+    li
+      raw md("Render a **Draft** while you are still deciding.")
+    li
+      raw md("Bake heavy 3D into a frame sequence once and use the sequence as a layer ([Pictures, video and fonts](/docs/media#sequences)).")
+    li
+      raw md("Use clip-wide effects sparingly; an effect on one item costs less than one on the whole frame.")

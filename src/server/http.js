@@ -15,6 +15,8 @@ import { json as parseJson } from '../db/db.js';
 import { zonesOf } from '../studio/inspect.js';
 import { moreRoutes } from './routes/index.js';
 import { fromQuery } from '../studio/provenance.js';
+import { createDocs } from '../docs/docs.js';
+import { createTools } from '../mcp/tools.js';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -23,8 +25,10 @@ const TYPES = {
 };
 const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501, too_large: 413 };
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
-/** Packages the studio page may load from node_modules (CodeMirror 6 and what it imports). */
-const VENDOR = new Set(['codemirror', '@codemirror/state', '@codemirror/view', '@codemirror/commands', '@codemirror/language', '@codemirror/lang-javascript', '@codemirror/search', '@codemirror/autocomplete', '@codemirror/lint',
+/** The manual's pages draw no script and no inline style, so they are served under a policy that allows neither. */
+const DOCS_CSP = "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+/** Packages the studio page may load from node_modules (Faqir UI's stylesheets for the manual, CodeMirror 6 and what it imports). */
+const VENDOR = new Set(['@faqir-ui/core', 'codemirror','@codemirror/state', '@codemirror/view', '@codemirror/commands', '@codemirror/language', '@codemirror/lang-javascript', '@codemirror/search', '@codemirror/autocomplete', '@codemirror/lint',
   '@lezer/common', '@lezer/highlight', '@lezer/lr', '@lezer/javascript', 'style-mod', 'w3c-keyname', 'crelt', '@marijn/find-cluster-break']);
 
 /**
@@ -372,6 +376,15 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     return { asset: r.asset, duplicate: r.duplicate, removed: r.removed, svg: r.svg };
   }
 
+  // the manual is compiled on its first visit, so a mistake in a template never stops the studio from starting
+  let docs = null, toolList = null;
+  function docsPage(res, slug, url) {
+    if (slug === 'index' && url.pathname !== '/docs') return send(res, 301, '', { location: '/docs' });
+    docs ??= createDocs(studio, { tools: () => (toolList ??= createTools(studio).tools), runNow: () => runs.available() });
+    const { status, html } = slug === 'search' ? docs.search(url.searchParams.get('q') ?? '') : docs.page(slug);
+    return send(res, status, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': DOCS_CSP, 'x-content-type-options': 'nosniff' });
+  }
+
   async function handle(req, res) {
     guard(req);
     const url = new URL(req.url, 'http://localhost');
@@ -402,6 +415,9 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     if (vendor && VENDOR.has(vendor[1])) return file(req, res, join(ROOT, 'node_modules', vendor[1]), vendor[2], { cache: 'max-age=86400' });
     if (path.startsWith('/ui/')) return file(req, res, UI, path.slice(4));
     if (path === '/favicon.ico') return file(req, res, UI, 'favicon.svg');
+    // the manual: pages drawn here, on the server, from src/docs/templates
+    const doc = /^\/docs(?:\/([a-z0-9-]+))?\/?$/.exec(path);
+    if (doc) return docsPage(res, doc[1] ?? 'index', url);
     // every other path is a screen of the single-page app
     return file(req, res, UI, 'index.html');
   }

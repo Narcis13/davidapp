@@ -1,0 +1,166 @@
+//- Settings and folders. Params: d.
+div(data-ui="prose")
+  raw p("The studio reads its settings from environment variables when it starts. Set one for a single run by putting it before the command (`PORT=8800 npm run studio`), or in your shell's profile. Voice settings may also go in a git-ignored `.env` file at the repository root. After changing a setting, restart the studio.")
+
+  h2#settings Environment variables
+  div(role="region" aria-label="Environment variables" tabindex="0")
+    table
+      thead
+        tr
+          th Variable
+          th Default
+          th Meaning
+      tbody
+        tr
+          td
+            raw md("`STUDIO_DATA`")
+          td
+            raw md("`./data`")
+          td The data directory: the database, thumbnails, files, caches and renders. This studio uses the folder shown below.
+        tr
+          td
+            raw md("`PORT`, `HOST`")
+          td 8787, 127.0.0.1
+          td
+            raw md("Where the studio listens. Binding another address (`HOST=0.0.0.0`) opens it to anyone who can reach that address.")
+        tr
+          td
+            raw md("`FFMPEG_PATH`")
+          td
+            raw md("`ffmpeg` on the `PATH`")
+          td FFmpeg, when it is not on the PATH. On Windows a winget install is found automatically.
+        tr
+          td
+            raw md("`STUDIO_RENDER_WORKERS`")
+          td CPU cores − 2, at most 8
+          td
+            raw md("Threads that draw frames. A single render can ask for its own (1 to 16).")
+        tr
+          td
+            raw md("`STUDIO_FOOTAGE_CACHE_MB`")
+          td 512
+          td Memory for decoded footage frames, per process.
+        tr
+          td
+            raw md("`STUDIO_AUTHOR`")
+          td
+            raw md("`studio-user` (web), `mcp-client` (MCP)")
+          td
+            raw md("Recorded as the author of what a process writes. The repository's `.mcp.json` sets `claude-code`.")
+        tr
+          td
+            raw md("`STUDIO_TOOLS`")
+          td all tools
+          td For an MCP server process: a comma-separated list of the only tools it offers.
+        tr
+          td
+            raw md("`STUDIO_RUNNER`")
+          td on
+          td
+            raw md("For an MCP server process: `0` means it does not pick up queued renders.")
+        tr
+          td
+            raw md("`STUDIO_REPO`")
+          td this checkout
+          td
+            raw md("The repository `export_clip` writes to and `import_clip` reads from.")
+        tr
+          td
+            raw md("`STUDIO_CLAUDE_BIN`")
+          td
+            raw md("`claude` on the `PATH`")
+          td The Claude Code command that Run now starts. Without one, the Run now button is hidden.
+        tr
+          td
+            raw md("`STUDIO_AGENT_TIMEOUT`")
+          td 600
+          td Seconds a Run now session may take.
+        tr
+          td
+            raw md("`STUDIO_KOKORO_DIR`, `STUDIO_TTS`, `STUDIO_WHISPER_CLI`, `STUDIO_WHISPER_MODEL`, `STUDIO_WHISPER_MODEL_2`, `ELEVENLABS_API_KEY`")
+          td
+          td
+            raw md("Voice and transcription: see [Set up voice and transcription](/docs/sound#voice-setup).")
+        tr
+          td
+            raw md("`CHROME`")
+          td found automatically
+          td The Chrome program for the browser parity test and the recording and measuring scripts.
+
+  h2#data-directory The data directory
+  raw p("This studio keeps its data in `" + d.live.dataDir + "`. Git ignores it. Inside:")
+  div(role="region" aria-label="Data directory" tabindex="0")
+    table
+      thead
+        tr
+          th Path
+          th Holds
+      tbody
+        tr
+          td
+            raw md("`studio.db`")
+          td The library, clips, renders, requests and events: one SQLite database.
+        tr
+          td
+            raw md("`thumbs/`, `files/`")
+          td Asset thumbnails and filmstrips; uploaded files, fonts, footage and baked sequences.
+        tr
+          td
+            raw md("`cache/`, `frames/`")
+          td Mixed audio and other caches; stills drawn for the checks and for Claude.
+        tr
+          td
+            raw md("`renders/`")
+          td Every render's MP4, poster, captions, report, sheets and credits.
+  raw p("To back up your work, stop the studio and copy this folder. To start a fresh library, point `STUDIO_DATA` at an empty folder. Never edit `studio.db` by hand while a studio or an MCP server is using it.")
+
+  h2#repository The repository
+  div(role="region" aria-label="Repository folders" tabindex="0")
+    table
+      thead
+        tr
+          th Folder
+          th Holds
+      tbody
+        tr
+          td
+            raw md("`assets/`")
+          td
+            raw md("The source of every function asset, one flat folder (`name.v2.js` is version 2 of `name`).")
+        tr
+          td
+            raw md("`clips/<clip>/`")
+          td
+            raw md("One folder per clip: `compose.mjs` builds its composition, `clip.json` is its export.")
+        tr
+          td
+            raw md("`library/`")
+          td
+            raw md("The content store exported clips share: `versions/`, `sources/`, `files/<sha256>`.")
+        tr
+          td
+            raw md("`showcase/`")
+          td The recipe and the recorded steps that rebuild the eleven showcase clips, with their pictures, recordings and voice takes.
+        tr
+          td
+            raw md("`work/<clip>/`")
+          td Notes, checks and sheets of clips made through the motion process. Its pictures and sounds stay out of git.
+        tr
+          td
+            raw md("`fonts/`, `vendor/lucide/`")
+          td The bundled fonts with their licences; the icon set kit-icon draws.
+        tr
+          td
+            raw md("`src/`")
+          td
+            raw md("The studio: `core` (the asset runtime shared by Node and the browser), `render`, `studio`, `mcp`, `server`, `ui`, and `docs` (this manual).")
+        tr
+          td
+            raw md("`docs/`")
+          td
+            raw md("`ASSET_CONTRACT.md`, `COOKBOOK.md` and the showcase evidence.")
+        tr
+          td
+            raw md("`output/`")
+          td Exports and evidence from the scripts (ignored by git).
+  raw p("No video is ever committed: renders go on GitHub releases. The pages of this manual are templates in `src/docs/templates/`, drawn by the studio's server with Faqir UI.")
