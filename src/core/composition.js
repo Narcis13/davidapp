@@ -18,6 +18,7 @@ import { FORMATS, MAX_CLIP_SECONDS, REF_RE, formatOf } from './engine.js';
 import { isColor } from './schema.js';
 import { PLATFORMS } from './platforms.js';
 import { FORMAT_NAMES, boxToTransform, checkAnchor, checkKeyframes, checkTransform } from './transform.js';
+import { checkWhen, normalizeInteractive } from './interactive.js';
 
 export const TRACK_TYPES = ['visual', 'text', 'audio'];
 export const BLEND_MODES = ['source-over', 'screen', 'multiply', 'overlay', 'lighter', 'soft-light', 'difference'];
@@ -181,6 +182,9 @@ export function normalizeComposition(input) {
 
   const ids = new Set();
   const tracks = [];
+  // v5: interactive compositions; an item's `when` is checked once the variables and scenes are known
+  const interactive = input.interactive !== undefined && input.interactive !== null;
+  const whens = [];
   if (!Array.isArray(input.tracks)) err('tracks', 'tracks must be an array');
   else input.tracks.forEach((tr, ti) => {
     const tp = `tracks[${ti}]`;
@@ -226,7 +230,15 @@ export function normalizeComposition(input) {
       if (item.assetDuration !== undefined && item.assetDuration + 1e-6 < (item.offset ?? 0) + item.duration) err(`${ip}.assetDuration`, `assetDuration (${item.assetDuration}s) is shorter than offset + duration (${round((item.offset ?? 0) + item.duration)}s)`);
       // the later part of a split item keeps the seed of the item it was cut from, so random layouts carry on over the cut
       if (it.seedId !== undefined) { if (typeof it.seedId !== 'string' || !it.seedId) err(`${ip}.seedId`, 'seedId is the id of the item this one was split from (a non-empty string); its random seed comes from that id'); else item.seedId = it.seedId; }
+      if (it.when !== undefined) {
+        if (!interactive) err(`${ip}.when`, 'when only works in an interactive composition (one with an interactive section)');
+        else if (type === 'audio') err(`${ip}.when`, 'an audio item takes no when (play it with a play action, and mark it cue: true)');
+        else { item.when = it.when; whens.push([it.when, `${ip}.when`]); }
+      }
       if (type === 'audio') {
+        if (it.cue !== undefined) { if (!interactive) err(`${ip}.cue`, 'cue only works in an interactive composition'); else if (it.cue) item.cue = true; }
+        // v5: an interactive clip's audio item that loops while the playhead is inside it (a scene that holds keeps its music)
+        if (it.loop !== undefined) { if (!interactive) err(`${ip}.loop`, 'loop only works in an interactive composition'); else if (it.loop) item.loop = true; }
         if (it.gain !== undefined) { if (!num(it.gain) || it.gain < 0 || it.gain > 4) err(`${ip}.gain`, 'gain must be between 0 and 4'); else item.gain = it.gain; }
         if (it.beats !== undefined) item.beats = !!it.beats;
         // v3: gain automation in dB and ducking under the narration
@@ -345,6 +357,14 @@ export function normalizeComposition(input) {
     else checks = { ...input.checks };
   }
 
+  let inter;
+  if (interactive) {
+    const visual = new Set(tracks.filter((t) => t.type !== 'audio').flatMap((t) => t.items.map((i) => i.id)));
+    const audio = new Set(tracks.filter((t) => t.type === 'audio').flatMap((t) => t.items.map((i) => i.id)));
+    inter = normalizeInteractive(input.interactive, { duration: num(duration) ? duration : 0, fps: Number.isInteger(fps) ? fps : 30, visual, audio }, err);
+    if (inter) for (const [w, path] of whens) checkWhen(w, path, err, inter.vars, new Set(inter.scenes.map((x) => x.id)));
+  }
+
   if (errors.length) return { composition: null, errors };
   const composition = { format: formatOf(width, height), width, height, fps, duration, seed, background, tracks };
   if (markers) composition.markers = markers;
@@ -357,6 +377,7 @@ export function normalizeComposition(input) {
   if (safe) composition.safe = safe;
   if (checks) composition.checks = checks;
   if (fonts) composition.fonts = fonts;
+  if (inter) composition.interactive = inter;
   return { composition, errors };
 }
 

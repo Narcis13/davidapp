@@ -73,6 +73,7 @@ aliases (`{ base: 'lower-third@2' }`).
 | `f.offscreen(w, h)` | A cleared scratch layer `{ canvas, ctx, width, height }` for masks and group effects; draw it back with `ctx.drawImage(layer.canvas, x, y)`. |
 | `f.layers(list, values)` | Draw clip-style layers inside this asset's box (a precomp): see "Presets and precomps". |
 | `f.phase` · `f.from`, `f.to` · `f.source` | Only for motions · transitions · effects: see "Kinds". `null` elsewhere. |
+| `f.ui` | Interactive clips: the viewer's pointer and keys as they reach this item, the hit regions it declares (`f.ui.hit`), what the clip sent it, and session time. Still (nobody playing) in a video, a check or the playground. See "Interactive assets". |
 | `f.lib` | The standard library, below. |
 
 `f.use` timing: the child's time is `f.t - at`; it is drawn only while `0 ≤ t < duration` unless
@@ -443,6 +444,64 @@ example, and `get_asset` shows a note on each. A new kit piece keeps their conve
   larger box or fewer words.
 - Each takes a theme (`theme`, a value asset); a colour param left empty (`''`) takes the theme's.
 
+## Interactive assets: events and `f.ui`
+
+An interactive clip (see "Interactive compositions" below) is played in a browser, not rendered: the viewer taps,
+clicks, drags and presses keys, and the clip answers. Its assets stay pure. What the viewer did reaches an asset
+as `f.ui`, which the runtime derives from the composition and the input log at that frame; the asset never keeps
+anything between frames. An asset says which events it can fire and which it reacts to:
+
+```js
+asset({
+  description: 'A button that fires press when it is tapped, clicked or its key is pressed.',
+  tags: ['ui', 'interactive'],
+  events: { emits: { press: 'when it is tapped' }, accepts: { shake: 'shakes once (a wrong answer)' } },
+  params: { label: { type: 'string', default: 'Play' } },
+  render(f, p) {
+    const s = f.ui.hit('press', 0, 0, f.width, f.height, { keys: ['Enter'], label: p.label });
+    const k = Math.max(0, 1 - f.ui.since('shake') / 0.4);
+    const wobble = k ? Math.sin(f.ui.since('shake') * 40) * k : 0;
+    f.ctx.translate(wobble * f.vmin, 0);
+    f.ctx.fillStyle = s.down ? '#223' : s.hover ? '#446' : '#335';
+    f.ctx.fillRect(0, 0, f.width, f.height);
+    if (s.focus) { f.ctx.strokeStyle = '#fc0'; f.ctx.lineWidth = f.vmin * 0.6; f.ctx.strokeRect(0, 0, f.width, f.height); }
+  },
+});
+```
+
+| | |
+|---|---|
+| `f.ui.hit(name, x, y, w, h, o)` | Declare a hit region where the asset draws it: a box in the current canvas transform (rotated and scaled items hit where they show). `name` must be in `events.emits`. Returns `{ hover, down, focus, pressed, hoverFor }`: `pressed` is seconds since it last fired (Infinity if never), `hoverFor` seconds the pointer has been on it, `focus` true when the keyboard put focus on it (draw a ring then). `o`: `id` (tells regions with the same name apart: menu options), `value` (sent with the event), `range: { min, max, step, value, axis }` (a slider: the value under the pointer while it drags, ± step with the arrow keys when focused), `keys: ['Enter', 'h']` (hotkeys), `shape: 'circle'`, `press: 'down'` (fire on press, not release: games), `focus: false` (not reached with Tab), `label` (its name for checks and screen readers), `disabled: true` (drawn, its state reported, not hittable), `modal: true` (a dialog's scrim: what was drawn before it takes no taps, focus or hotkeys, and checks do not read the text behind it). |
+| `f.ui.since(event)`, `f.ui.received(event)` | Seconds since the clip last sent this item `event` (a `send` action), and `{ since, value, count }` of the last one (or null). `event` must be in `events.accepts`. |
+| `f.ui.changed(param)` | For a param bound to a variable (`{ "$var": "score" }`): `{ from, since }` after the variable changed, else null. Tick a counter up from `from`. |
+| `f.ui.live`, `f.ui.now`, `f.ui.scene`, `f.ui.sceneT` | Whether a session is playing (false in a video, a still and the design-timeline frames of a check: draw the resting state; the states a check crawls are drawn as a session would), seconds since the session started, the scene and seconds in it. A scene that waits for input holds its last frame, so `f.t` stops: animate idle motion with `f.ui.now`. |
+| `f.ui.pointer` | The pointer in this asset's own coordinates `{ x, y, down, type: mouse|touch|pen }`, or null. |
+
+What makes input deterministic: an input event is stamped with a session frame and read against the hit regions
+that frame drew. The player draws a frame, then reads the events stamped with it; a replay draws the same frame
+again and reads them the same way. The same log always reaches the same states and the same pixels
+(`play_clip` replays one; tests hash a replay twice). Rules that follow:
+
+- **Declare regions while drawing, every frame they exist.** No region, nothing to hit: a button that is fading
+  in can skip `hit` until it is readable. Several regions with one name take an `id`.
+- **Draw state from `f.ui`, never remember it.** A target already caught is one whose region fired after it
+  came into reach: `f.ui.hit(name, …, { id, disabled: true }).pressed <= f.t - appearedAt` (see `beat-lanes`).
+- **Tap targets are big.** `check_clip` measures each region at the size the clip shows on a phone: under
+  24 CSS px is an error, under 44 px a note (44 is advised). Size controls from the frame's short side.
+- **Keyboard first-class.** Tab moves focus through the regions in drawing order, Enter or Space fires the
+  focused one, arrows move a focused range; `keys` adds hotkeys. Draw `focus`.
+- A transition between scenes is a `transition` asset (`f.from`, `f.to`, `f.progress`); `f.ui.pointer` there is
+  where the viewer last pointed (an iris that opens from the tap). `f.from` is the scene it leaves, held as its last
+  frame showed it and drawn once per transition: read it, never draw into it. The frame the scene changes on still
+  shows that held frame (progress 0); the asset draws from the next frame, so the first `f.progress` it sees is one
+  frame in. Keep a dim (a translucent fill over the
+  whole frame) in whole 8-bit steps of alpha, or leave it out: a fraction of a step rounds one level apart in Chrome
+  and in the renderer, over the whole frame.
+
+The UI set (`ui-button`, `ui-card`, `ui-menu`, `ui-toggle`, `ui-slider`, `ui-progress`, `ui-score`, `ui-dialog`,
+`ui-hotspot`, `ui-toast` and the `ui-tx-*` transitions) follows the kit's conventions (theme, sizes from the
+short side, text with a floor, a usage example in each source) and declares its events; `get_asset` shows them.
+
 ## Provenance of file assets
 
 Every version of a file asset (image, sound, footage, font, sequence) carries `meta.provenance`:
@@ -567,6 +626,54 @@ fields below is drawn exactly as before they existed, so old clips keep their pi
   `reels`, `tiktok` and `feed` to vertical ones. A clip that names `youtube` and `shorts` gets YouTube's zones in
   its horizontal render and Shorts' in its vertical one; a shape that no named profile is made for (a square
   render of a clip made for Reels) keeps the format's own safe zone.
+
+### Interactive compositions (iteration 5)
+
+A composition with an `interactive` section is a second kind of clip: it is played in a browser (the studio's
+editor, a share page), never rendered to MP4 (`start_render` refuses it). Its tracks are the **design timeline**:
+every scene is a time range of it, so the editor, stills, contact sheets, the layout report and the checks read it
+like any clip (with the variables at their first values).
+
+```js
+interactive: {
+  start: 'title',                                       // the first scene (default: the first listed)
+  vars: { score: 0, help: false, speed: 1 },            // numbers, booleans, strings
+  scenes: [
+    { id: 'title', start: 0, duration: 4, end: 'hold' }, // end: hold | loop | next | <scene id>
+    { id: 'game', start: 4, duration: 28.5, end: 'next' },
+    { id: 'results', start: 32.5, duration: 3, end: 'hold', final: true },
+  ],
+  transition: { asset: 'ui-tx-iris', duration: 0.6 },   // between scenes, unless a go names its own (false = cut)
+  wires: [
+    { on: 'play.press', do: [{ play: 'click' }, { set: { score: 0 } }, { go: 'game' }] },
+    { on: 'field.perfect', do: [{ add: { score: 100, combo: 1 } }, { if: { var: 'combo', eq: 10 }, then: [{ send: 'toast', event: 'show', value: '10 combo' }] }] },
+    { on: 'key:Escape', scene: 'game', do: { go: 'title' } },
+  ],
+  music: ['bed'],                                       // audio items that loop for the whole session (optional)
+}
+```
+
+- **Scenes.** The playhead runs through a scene from its start; at its end it holds the last frame (`hold`),
+  starts it again (`loop`), or moves to the next scene (`next`, or a scene id). Items and their keyframes play on
+  the playhead, as in a video; a scene that holds keeps its assets alive through `f.ui.now`.
+- **Events** (`on`): `<item>.<event>` (a region the item's asset declared), `key:<key>` (`KeyboardEvent.key`: `ArrowRight`,
+  `Enter`, `" "`, `h`; `key:any`), `tap` (a press on no region), `start`, `enter:<scene>`, `end:<scene>`. A wire may
+  listen only in some scenes (`scene: 'game'` or a list) and only `if` a condition holds.
+- **Actions** (`do`, one or a list): `{ go: <scene> | 'next' | 'back', transition }`, `{ set: { var: value } }`,
+  `{ add: { var: n }, min, max, wrap }`, `{ toggle: var }`, `{ send: <item>, event, value }` (the item reacts through
+  `f.ui.since`), `{ play: <audio item> }`, `{ if: condition, then: [...], else: [...] }`, `{ restart: true }`.
+  A value is a literal, `{ $var: 'name' }` or `'$value'` (the event's value). A condition is
+  `{ var, eq | ne | gt | gte | lt | lte: value }`, `{ scene: id }`, `{ all: [...] }`, `{ any: [...] }`, `{ not: … }`.
+- **Bindings.** A number, text, colour, choice or on/off param may be `{ "$var": "score" }`: the item draws the
+  variable's value, and `f.ui.changed(param)` reports a change. A visual item with `when: <condition>` is drawn
+  (and hittable) only while it holds.
+- **Sound.** Audio items play as the playhead enters them; `loop: true` keeps one looping while the playhead is
+  inside it (a title that waits); `cue: true` plays only on a `play` action (a hit, a click). Sound starts on the
+  viewer's first tap (browsers' autoplay rules).
+- **Checks.** `prepare` checks every wire against the events the items' assets declare, and every binding
+  against the param's type; `check_clip` checks interactive clips across their states (reachable scenes, dead
+  ends, tap target sizes, a crawl of the states with the frame checks in each); `play_clip` plays scripted steps
+  (`{ tap: 'play' }`, `{ key: 'd' }`, `{ wait: 0.5 }`) or a recorded log and reports states, stills and hashes.
 
 ## Conventions
 

@@ -1,0 +1,45 @@
+{
+  "ref": "beat-results@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Beat results",
+  "description": "The results card of a music game or quiz: an eyebrow, a rank letter from S to D with a neon split, the score counting up, up to three stars popping in, and stats (perfect, good, missed, best combo, accuracy) on a panel. Numbers are params to bind to an interactive clip's variables; it animates in, then breathes while the scene waits. Takes a theme.",
+  "tags": ["game", "results", "score", "interactive", "ui", "neon"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "eyebrow": {"type": "string", "default": "SONG CLEAR"},
+    "retry": {"type": "string", "default": "KEEP PRACTISING", "description": "The eyebrow for a D"},
+    "score": {"type": "number", "default": 0, "min": 0},
+    "hits": {"type": "number", "default": 0, "min": 0, "description": "Notes caught"},
+    "perfects": {"type": "number", "default": 0, "min": 0, "description": "Notes caught right on the beat"},
+    "best": {"type": "number", "default": 0, "min": 0, "description": "Best combo"},
+    "total": {"type": "number", "default": 1, "min": 1, "description": "Notes in the song"},
+    "strays": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "description": "Presses that caught nothing: they count against the accuracy, so mashing every key does not pay"
+    },
+    "top": {
+      "type": "number",
+      "default": 0.08,
+      "min": 0,
+      "max": 0.5,
+      "step": 0.01,
+      "description": "Where the card starts, as a share of the height"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"}
+  },
+  "uses": {},
+  "deps": {"theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:39:27.532Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:39:27.532Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/beat-results@1.js", "sha1": "d6550091bfd9cc3bdca023cc08a1b05a6f6d36de"},
+  "hash": "93f90ceec8931416523c9d6c4a179dd027582f3d28a060ed79027bb3cc42d3b6"
+}

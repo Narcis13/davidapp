@@ -1,0 +1,1275 @@
+{
+ "clip": "clip-12-tap-the-beat",
+ "format": "vertical",
+ "from": 0,
+ "to": 35.48,
+ "step": 0.5,
+ "frames": 114,
+ "seconds": 2.24,
+ "thresholds": {
+  "minTextSize": 2.5,
+  "contrast": 4.5,
+  "step": 0.5,
+  "lastHold": 2,
+  "overlapShare": 0.04,
+  "hitSize": 24,
+  "hitAdvised": 44,
+  "hitOverlapShare": 0.1,
+  "backdrop": 0.6,
+  "maxStates": 40
+ },
+ "issues": [
+  {
+   "check": "inert-region",
+   "item": "help",
+   "scene": "title",
+   "severity": "info",
+   "message": "Nothing listens to \"help.block\" in scene \"title\": pressing it does nothing. Add a wire { on: \"help.block\", scene: \"title\", do: [...] } or take the hit region out.",
+   "numbers": {
+    "event": "help.block"
+   },
+   "frame": 60,
+   "t": 1,
+   "until": 1,
+   "frames": 1,
+   "still": "check-clip-12-tap-the-beat-01-inert-region.png"
+  },
+  {
+   "check": "hit-size",
+   "scene": "title",
+   "item": "speed",
+   "region": "speed:change:",
+   "box": {
+    "x": 118.8,
+    "y": 1738.4,
+    "width": 842.4,
+    "height": 118.8
+   },
+   "severity": "info",
+   "message": "speed.change (\"Note speed\") is 304.2×42.9 CSS px on a phone (390×844); a tap target is at least 24×24 (WCAG 2.5.8) and 44×44 is advised.",
+   "numbers": {
+    "css": {
+     "width": 304.2,
+     "height": 42.9
+    },
+    "frame": {
+     "width": 842.4,
+     "height": 118.8
+    },
+    "scale": 0.361,
+    "needs": 24,
+    "advised": 44
+   },
+   "frame": 90,
+   "t": 1.5,
+   "until": 3.98,
+   "frames": 6,
+   "still": "check-clip-12-tap-the-beat-02-hit-size.png"
+  }
+ ],
+ "counts": {
+  "safe-zone": 0,
+  "clipped": 0,
+  "overlap": 0,
+  "caption-lane": 0,
+  "size": 0,
+  "contrast": 0,
+  "hold": 0,
+  "captions": 0,
+  "glyphs": 0,
+  "first-frame": 0,
+  "last-frame": 0,
+  "unreachable-scene": 0,
+  "dead-end": 0,
+  "no-target": 0,
+  "inert-region": 1,
+  "unused-variable": 0,
+  "hit-size": 1,
+  "hit-bounds": 0,
+  "hit-overlap": 0,
+  "hit-label": 0,
+  "no-path-to-final": 0,
+  "state-error": 0
+ },
+ "interactive": {
+  "start": "title",
+  "phone": {
+   "viewport": {
+    "width": 390,
+    "height": 844
+   },
+   "scale": 0.3611111111111111
+  },
+  "scenes": [
+   {
+    "id": "title",
+    "start": 0,
+    "duration": 4,
+    "end": "hold",
+    "reachable": true,
+    "frames": 9
+   },
+   {
+    "id": "game",
+    "start": 4,
+    "duration": 28.5,
+    "end": "next",
+    "reachable": true,
+    "frames": 58
+   },
+   {
+    "id": "results",
+    "start": 32.5,
+    "duration": 3,
+    "end": "hold",
+    "final": true,
+    "reachable": true,
+    "frames": 7
+   }
+  ],
+  "crawl": {
+   "max": 40,
+   "truncated": true,
+   "states": [
+    {
+     "id": "s0",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s1",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s2",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": true,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s3",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s4",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s5",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s6",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s7",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s8",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s9",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": true,
+      "keys": false,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s10",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s11",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s12",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s13",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": true,
+      "keys": true,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s14",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s15",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": true,
+      "keys": true,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s16",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 2,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s17",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s18",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s19",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s20",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s21",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": true,
+      "keys": false,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s22",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s23",
+     "scene": "title",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": true,
+      "keys": false,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s24",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s25",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s26",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s27",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s28",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 3,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s29",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 2,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s30",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 2,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s31",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1
+     }
+    },
+    {
+     "id": "s32",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s33",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s34",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s35",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 0,
+      "lane": 0,
+      "help": false,
+      "keys": false,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s36",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 2,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s37",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 0.6
+     }
+    },
+    {
+     "id": "s38",
+     "scene": "game",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 2,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1.6
+     }
+    },
+    {
+     "id": "s39",
+     "scene": "results",
+     "vars": {
+      "score": 0,
+      "combo": 0,
+      "best": 0,
+      "hits": 0,
+      "perfects": 0,
+      "strays": 1,
+      "lane": 0,
+      "help": false,
+      "keys": true,
+      "speed": 1.6
+     }
+    }
+   ],
+   "edges": [
+    {
+     "from": "s0",
+     "action": "tap play.press",
+     "to": "s1"
+    },
+    {
+     "from": "s0",
+     "action": "tap how.press",
+     "to": "s2"
+    },
+    {
+     "from": "s0",
+     "action": "tap keys.change",
+     "to": "s3"
+    },
+    {
+     "from": "s0",
+     "action": "drag speed.change to min",
+     "to": "s4"
+    },
+    {
+     "from": "s0",
+     "action": "drag speed.change to max",
+     "to": "s5"
+    },
+    {
+     "from": "s1",
+     "action": "tap field.miss#0",
+     "to": "s6"
+    },
+    {
+     "from": "s1",
+     "action": "tap field.miss#1",
+     "to": "s6"
+    },
+    {
+     "from": "s1",
+     "action": "tap field.miss#2",
+     "to": "s6"
+    },
+    {
+     "from": "s1",
+     "action": "tap field.miss#3",
+     "to": "s6"
+    },
+    {
+     "from": "s1",
+     "action": "wait",
+     "to": "s7"
+    },
+    {
+     "from": "s2",
+     "action": "tap help.cancel#scrim",
+     "to": "s0"
+    },
+    {
+     "from": "s2",
+     "action": "tap help.block#panel",
+     "to": "s2"
+    },
+    {
+     "from": "s2",
+     "action": "tap help.confirm",
+     "to": "s0"
+    },
+    {
+     "from": "s3",
+     "action": "tap play.press",
+     "to": "s8"
+    },
+    {
+     "from": "s3",
+     "action": "tap how.press",
+     "to": "s9"
+    },
+    {
+     "from": "s3",
+     "action": "tap keys.change",
+     "to": "s0"
+    },
+    {
+     "from": "s3",
+     "action": "drag speed.change to min",
+     "to": "s10"
+    },
+    {
+     "from": "s3",
+     "action": "drag speed.change to max",
+     "to": "s11"
+    },
+    {
+     "from": "s4",
+     "action": "tap play.press",
+     "to": "s12"
+    },
+    {
+     "from": "s4",
+     "action": "tap how.press",
+     "to": "s13"
+    },
+    {
+     "from": "s4",
+     "action": "tap keys.change",
+     "to": "s10"
+    },
+    {
+     "from": "s4",
+     "action": "drag speed.change to max",
+     "to": "s5"
+    },
+    {
+     "from": "s5",
+     "action": "tap play.press",
+     "to": "s14"
+    },
+    {
+     "from": "s5",
+     "action": "tap how.press",
+     "to": "s15"
+    },
+    {
+     "from": "s5",
+     "action": "tap keys.change",
+     "to": "s11"
+    },
+    {
+     "from": "s5",
+     "action": "drag speed.change to min",
+     "to": "s4"
+    },
+    {
+     "from": "s6",
+     "action": "tap field.miss#0",
+     "to": "s16"
+    },
+    {
+     "from": "s6",
+     "action": "tap field.miss#1",
+     "to": "s16"
+    },
+    {
+     "from": "s6",
+     "action": "tap field.miss#2",
+     "to": "s16"
+    },
+    {
+     "from": "s6",
+     "action": "tap field.miss#3",
+     "to": "s16"
+    },
+    {
+     "from": "s6",
+     "action": "wait",
+     "to": "s17"
+    },
+    {
+     "from": "s8",
+     "action": "tap field.miss#0",
+     "to": "s18"
+    },
+    {
+     "from": "s8",
+     "action": "tap field.miss#1",
+     "to": "s18"
+    },
+    {
+     "from": "s8",
+     "action": "tap field.miss#2",
+     "to": "s18"
+    },
+    {
+     "from": "s8",
+     "action": "tap field.miss#3",
+     "to": "s18"
+    },
+    {
+     "from": "s8",
+     "action": "wait",
+     "to": "s19"
+    },
+    {
+     "from": "s9",
+     "action": "tap help.cancel#scrim",
+     "to": "s3"
+    },
+    {
+     "from": "s9",
+     "action": "tap help.block#panel",
+     "to": "s9"
+    },
+    {
+     "from": "s9",
+     "action": "tap help.confirm",
+     "to": "s3"
+    },
+    {
+     "from": "s10",
+     "action": "tap play.press",
+     "to": "s20"
+    },
+    {
+     "from": "s10",
+     "action": "tap how.press",
+     "to": "s21"
+    },
+    {
+     "from": "s10",
+     "action": "tap keys.change",
+     "to": "s4"
+    },
+    {
+     "from": "s10",
+     "action": "drag speed.change to max",
+     "to": "s11"
+    },
+    {
+     "from": "s11",
+     "action": "tap play.press",
+     "to": "s22"
+    },
+    {
+     "from": "s11",
+     "action": "tap how.press",
+     "to": "s23"
+    },
+    {
+     "from": "s11",
+     "action": "tap keys.change",
+     "to": "s5"
+    },
+    {
+     "from": "s11",
+     "action": "drag speed.change to min",
+     "to": "s10"
+    },
+    {
+     "from": "s12",
+     "action": "tap field.miss#0",
+     "to": "s24"
+    },
+    {
+     "from": "s12",
+     "action": "tap field.miss#1",
+     "to": "s24"
+    },
+    {
+     "from": "s12",
+     "action": "tap field.miss#2",
+     "to": "s24"
+    },
+    {
+     "from": "s12",
+     "action": "tap field.miss#3",
+     "to": "s24"
+    },
+    {
+     "from": "s12",
+     "action": "wait",
+     "to": "s25"
+    },
+    {
+     "from": "s13",
+     "action": "tap help.cancel#scrim",
+     "to": "s4"
+    },
+    {
+     "from": "s13",
+     "action": "tap help.block#panel",
+     "to": "s13"
+    },
+    {
+     "from": "s13",
+     "action": "tap help.confirm",
+     "to": "s4"
+    },
+    {
+     "from": "s14",
+     "action": "tap field.miss#0",
+     "to": "s26"
+    },
+    {
+     "from": "s14",
+     "action": "tap field.miss#1",
+     "to": "s26"
+    },
+    {
+     "from": "s14",
+     "action": "tap field.miss#2",
+     "to": "s26"
+    },
+    {
+     "from": "s14",
+     "action": "tap field.miss#3",
+     "to": "s26"
+    },
+    {
+     "from": "s14",
+     "action": "wait",
+     "to": "s27"
+    },
+    {
+     "from": "s15",
+     "action": "tap help.cancel#scrim",
+     "to": "s5"
+    },
+    {
+     "from": "s15",
+     "action": "tap help.block#panel",
+     "to": "s15"
+    },
+    {
+     "from": "s15",
+     "action": "tap help.confirm",
+     "to": "s5"
+    },
+    {
+     "from": "s16",
+     "action": "tap field.miss#0",
+     "to": "s28"
+    },
+    {
+     "from": "s16",
+     "action": "tap field.miss#1",
+     "to": "s28"
+    },
+    {
+     "from": "s16",
+     "action": "tap field.miss#2",
+     "to": "s28"
+    },
+    {
+     "from": "s16",
+     "action": "tap field.miss#3",
+     "to": "s28"
+    },
+    {
+     "from": "s16",
+     "action": "wait",
+     "to": "s29"
+    },
+    {
+     "from": "s18",
+     "action": "tap field.miss#0",
+     "to": "s30"
+    },
+    {
+     "from": "s18",
+     "action": "tap field.miss#1",
+     "to": "s30"
+    },
+    {
+     "from": "s18",
+     "action": "tap field.miss#2",
+     "to": "s30"
+    },
+    {
+     "from": "s18",
+     "action": "tap field.miss#3",
+     "to": "s30"
+    },
+    {
+     "from": "s18",
+     "action": "wait",
+     "to": "s31"
+    },
+    {
+     "from": "s20",
+     "action": "tap field.miss#0",
+     "to": "s32"
+    },
+    {
+     "from": "s20",
+     "action": "tap field.miss#1",
+     "to": "s32"
+    },
+    {
+     "from": "s20",
+     "action": "tap field.miss#2",
+     "to": "s32"
+    },
+    {
+     "from": "s20",
+     "action": "tap field.miss#3",
+     "to": "s32"
+    },
+    {
+     "from": "s20",
+     "action": "wait",
+     "to": "s33"
+    },
+    {
+     "from": "s21",
+     "action": "tap help.cancel#scrim",
+     "to": "s10"
+    },
+    {
+     "from": "s21",
+     "action": "tap help.block#panel",
+     "to": "s21"
+    },
+    {
+     "from": "s21",
+     "action": "tap help.confirm",
+     "to": "s10"
+    },
+    {
+     "from": "s22",
+     "action": "tap field.miss#0",
+     "to": "s34"
+    },
+    {
+     "from": "s22",
+     "action": "tap field.miss#1",
+     "to": "s34"
+    },
+    {
+     "from": "s22",
+     "action": "tap field.miss#2",
+     "to": "s34"
+    },
+    {
+     "from": "s22",
+     "action": "tap field.miss#3",
+     "to": "s34"
+    },
+    {
+     "from": "s22",
+     "action": "wait",
+     "to": "s35"
+    },
+    {
+     "from": "s23",
+     "action": "tap help.cancel#scrim",
+     "to": "s11"
+    },
+    {
+     "from": "s23",
+     "action": "tap help.block#panel",
+     "to": "s23"
+    },
+    {
+     "from": "s23",
+     "action": "tap help.confirm",
+     "to": "s11"
+    },
+    {
+     "from": "s24",
+     "action": "tap field.miss#0",
+     "to": "s36"
+    },
+    {
+     "from": "s24",
+     "action": "tap field.miss#1",
+     "to": "s36"
+    },
+    {
+     "from": "s24",
+     "action": "tap field.miss#2",
+     "to": "s36"
+    },
+    {
+     "from": "s24",
+     "action": "tap field.miss#3",
+     "to": "s36"
+    },
+    {
+     "from": "s24",
+     "action": "wait",
+     "to": "s37"
+    },
+    {
+     "from": "s26",
+     "action": "tap field.miss#0",
+     "to": "s38"
+    },
+    {
+     "from": "s26",
+     "action": "tap field.miss#1",
+     "to": "s38"
+    },
+    {
+     "from": "s26",
+     "action": "tap field.miss#2",
+     "to": "s38"
+    },
+    {
+     "from": "s26",
+     "action": "tap field.miss#3",
+     "to": "s38"
+    },
+    {
+     "from": "s26",
+     "action": "wait",
+     "to": "s39"
+    }
+   ],
+   "errors": 0
+  }
+ }
+}

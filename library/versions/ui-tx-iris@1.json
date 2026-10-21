@@ -1,0 +1,75 @@
+{
+  "ref": "ui-tx-iris@1",
+  "type": "function",
+  "kind": "transition",
+  "title": "Iris from the tap",
+  "description": "A circular reveal for interactive compositions: the next scene opens inside a circle growing from the viewer's last tap (f.ui.pointer), the centre or a set point, edged with a glowing accent ring; the old scene dims and leans in, the new one settles from a slight zoom. Without a tap (a key, a timer, a video) it opens from x, y. Blur-free, cheap at 60 fps. Takes a theme for the ring.",
+  "tags": ["ui", "interactive", "transition", "iris", "circle", "reveal", "scene", "tap"],
+  "duration": 0.7,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "origin": {
+      "type": "enum",
+      "options": ["tap", "center", "point"],
+      "default": "tap",
+      "description": "Where the circle grows from: the last tap (else x, y), the centre, or x, y"
+    },
+    "x": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Across the frame (0 left, 1 right)"
+    },
+    "y": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "Down the frame (0 top, 1 bottom)"
+    },
+    "ring": {
+      "type": "string",
+      "default": "",
+      "description": "Ring colour, a CSS colour (empty: the theme's accent; \"none\": no ring)"
+    },
+    "ringWidth": {
+      "type": "number",
+      "default": 1.1,
+      "min": 0,
+      "max": 6,
+      "step": 0.05,
+      "description": "% of the frame's short side"
+    },
+    "dim": {
+      "type": "number",
+      "default": 0.4,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "How dark the old scene gets"
+    },
+    "zoom": {
+      "type": "number",
+      "default": 0.06,
+      "min": 0,
+      "max": 0.4,
+      "step": 0.005,
+      "description": "How much the old scene leans in and the new one settles"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:39:36.715Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:39:36.715Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/ui-tx-iris@1.js", "sha1": "d68ab7d19f96a21d5ca330713876bd0f7a35f117"},
+  "hash": "24149bde45c7f2eeb92d077c608ef130e073f6685217fadd24fa6f6787cf090f"
+}

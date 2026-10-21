@@ -1,0 +1,81 @@
+{
+  "ref": "ui-toast@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Toast",
+  "description": "Feedback for interactive compositions: a toast that drops in, holds and leaves when the clip sends it show (the value is its text: \"Correct\", \"Try again\"). The tone (success green with a tick, error red with a cross that shakes, info, warn) comes from the tone param, the event (success, error) or a prefix of the text (\"ok: …\", \"error: …\", ✓, ✗). The icon pops, a thin line counts the hold down, a success sparkles; the latest message replaces the one showing. With `text` set it shows from the item's start without an event (videos, stills). Sits at the top, middle or bottom of its box. Text has a size floor; takes a theme.",
+  "tags": ["ui", "interactive", "toast", "feedback", "notification", "badge", "quiz", "game"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "text": {
+      "type": "string",
+      "default": "",
+      "description": "A message shown from the item's start without any event (empty: wait for one)"
+    },
+    "tone": {
+      "type": "enum",
+      "options": ["auto", "info", "success", "error", "warn", "neutral"],
+      "default": "auto",
+      "description": "auto: from the event name or the text's prefix, else info"
+    },
+    "hold": {
+      "type": "number",
+      "default": 1.8,
+      "min": 0,
+      "max": 30,
+      "step": 0.1,
+      "description": "Seconds it stays before it leaves (0: it stays)"
+    },
+    "edge": {
+      "type": "enum",
+      "options": ["top", "center", "bottom"],
+      "default": "top",
+      "description": "Where it sits in the box's safe area"
+    },
+    "icon": {"type": "boolean", "default": true, "description": "The tone's icon in a circle at the left"},
+    "timer": {
+      "type": "boolean",
+      "default": true,
+      "description": "A thin line along the bottom counting the hold down"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 3.8,
+      "min": 2.6,
+      "max": 10,
+      "step": 0.1,
+      "description": "Text size in % of the frame's short side"
+    },
+    "width": {
+      "type": "number",
+      "default": 82,
+      "min": 20,
+      "max": 100,
+      "step": 1,
+      "description": "Widest it gets, in % of the frame's short side (never wider than the box)"
+    },
+    "delay": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 30,
+      "step": 0.05,
+      "description": "Seconds into the item before `text` shows"
+    },
+    "inDur": {"type": "number", "default": 0.42, "min": 0.05, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0.3, "min": 0.05, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:07:09.825Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:07:09.825Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/ui-toast@1.js", "sha1": "e4c7ef60f6d789a67a7146f530c0947570939131"},
+  "hash": "f144e2a4dddb3cf3430676d753d472657fb192b04c946063f3cce92b24083b81"
+}

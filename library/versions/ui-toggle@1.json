@@ -1,0 +1,75 @@
+{
+  "ref": "ui-toggle@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Toggle",
+  "description": "A labelled switch for interactive compositions (settings, options, sound on/off): a row with a label, an optional muted detail and an iOS-like switch. The whole row is the hit region; a tap, its hotkey or Tab + Enter emits change with the new boolean. Bind `on` to a variable and the thumb slides with a slight overshoot, stretches while held, the track fills with the accent and a tick or cross rides in the thumb. Focus ring, hover and press feedback; the row is at least a thumb tall on a phone. Takes a theme.",
+  "tags": ["ui", "interactive", "toggle", "switch", "checkbox", "settings", "control"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "label": {"type": "string", "default": "Sound", "description": "The setting's name"},
+    "detail": {"type": "string", "default": "", "description": "A muted second line (empty: none)"},
+    "on": {
+      "type": "boolean",
+      "default": true,
+      "description": "Its state: bind it to a boolean variable ({ \"$var\": \"sound\" })"
+    },
+    "hotkey": {"type": "string", "default": "", "description": "A key that toggles it (m, s…; empty: none)"},
+    "disabled": {"type": "boolean", "default": false, "description": "Dimmed and not switchable"},
+    "plate": {
+      "type": "boolean",
+      "default": true,
+      "description": "Sit on a surface row (off: bare, over the background)"
+    },
+    "side": {
+      "type": "enum",
+      "options": ["right", "left"],
+      "default": "right",
+      "description": "Which end of the row the switch sits at"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 6.2,
+      "min": 3,
+      "max": 14,
+      "step": 0.1,
+      "description": "Switch height in % of the frame's short side (the row is at least 11)"
+    },
+    "textSize": {
+      "type": "number",
+      "default": 3.8,
+      "min": 2.6,
+      "max": 9,
+      "step": 0.1,
+      "description": "Label size in % of the frame's short side"
+    },
+    "color": {
+      "type": "string",
+      "default": "",
+      "description": "Track colour when on, a CSS colour (empty: the theme's accent)"
+    },
+    "delay": {"type": "number", "default": 0, "min": 0, "max": 10, "step": 0.05},
+    "inDur": {"type": "number", "default": 0.45, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 3,
+      "step": 0.01,
+      "description": "Seconds of the exit at the item's end (0 while a scene holds for input)"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:07:05.969Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:07:05.969Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/ui-toggle@1.js", "sha1": "4383e35ac915299e0b6a0cc63703e5101fa694cb"},
+  "hash": "35a926ded20df705475b990c5c03994db233f300c0343567d8c9b71f35c5af63"
+}

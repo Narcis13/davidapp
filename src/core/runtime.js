@@ -17,11 +17,12 @@
 import { createLib } from './lib/index.js';
 import { createRng, hashSeed } from './rng.js';
 import { normalizeSchema, resolveParams, SchemaError } from './schema.js';
-import { safeZone, formatOf, REF_RE, FORMATS, SAMPLE_RATE } from './engine.js';
+import { safeZone, screenSafe, formatOf, REF_RE, FORMATS, SAMPLE_RATE } from './engine.js';
 import { forFormat, isV2Item, layerGeometry, sampleItem, spaceRect, TRANSFORM_DEFAULTS } from './transform.js';
 import { drawDemo } from './demo.js';
 import { platformSafe } from './platforms.js';
 import { footageIndex, frameAt } from './footage.js';
+import { bindComposition, staticUi } from './interactive.js';
 
 /**
  * visual draws; value returns a value; audio returns samples; motion returns a transform delta for
@@ -45,7 +46,7 @@ const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 /** Validate what a source passed to asset({...}) and return the normalized definition. */
 export function normalizeDefinition(raw) {
   if (!isPlain(raw)) throw new AssetError('asset() takes one object: asset({ description, tags, params, render(f, p) { … } })');
-  const known = ['kind', 'title', 'description', 'tags', 'duration', 'formats', 'params', 'uses', 'render', 'preview', 'floor'];
+  const known = ['kind', 'title', 'description', 'tags', 'duration', 'formats', 'params', 'uses', 'render', 'preview', 'floor', 'events'];
   for (const k of Object.keys(raw)) if (!known.includes(k)) throw new AssetError(`asset(): unknown key "${k}" (known: ${known.join(', ')})`);
   const kind = raw.kind ?? 'visual';
   if (!KINDS.includes(kind)) throw new AssetError(`asset(): kind must be one of ${KINDS.join(', ')}; got ${JSON.stringify(raw.kind)}`);
@@ -72,8 +73,21 @@ export function normalizeDefinition(raw) {
     if (typeof spec !== 'string' || !REF_RE.test(spec)) throw new AssetError(`asset(): uses entry ${JSON.stringify(spec)} is not an asset reference ("name" or "name@version")`);
     uses[alias] = spec;
   }
+  // v5: the events an asset emits from its hit regions (f.ui.hit) and the ones it reacts to (f.ui.since), for interactive clips
+  let events = null;
+  if (raw.events !== undefined) {
+    const shape = 'asset(): events is { emits: { press: "when it is tapped" }, accepts: { reset: "…" } } (or lists of names)';
+    if (!isPlain(raw.events) || Object.keys(raw.events).some((k) => k !== 'emits' && k !== 'accepts')) throw new AssetError(shape);
+    const names = (v) => {
+      const map = Array.isArray(v) ? Object.fromEntries(v.map((n) => [n, ''])) : isPlain(v) ? v : null;
+      if (!map || !Object.entries(map).every(([n, d]) => /^[A-Za-z][\w-]*$/.test(n) && typeof d === 'string')) throw new AssetError(shape);
+      return { ...map };
+    };
+    events = { emits: names(raw.events.emits ?? {}), accepts: names(raw.events.accepts ?? {}) };
+  }
   return {
     kind,
+    events,
     title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : null,
     description: raw.description.trim(),
     tags: [...new Set(tags)],
@@ -177,6 +191,12 @@ export function createRuntime(host) {
   const inspect = lib.inspect;
   let cur = null, curTrack = null, inTransition = false;
   const assetCanvases = new Set();
+  // v5, interactive: the frame's view of the session (renderClipFrame sets it), the item being drawn (the outermost:
+  // a precomp's layers belong to its item) with the params it binds to variables, and the hit regions the frame records
+  let frameUi = null, uiItem = null, uiVars = null, uiLinks = null, uiDepth = 0, regions = null;
+  // the scene a transition leaves, drawn once and held (it does not change while the transition runs)
+  let held = null;
+  const regionKeys = new Map();
 
   function compile(ref, source, deps = {}) {
     let raw;
@@ -313,13 +333,91 @@ export function createRuntime(host) {
     return layer;
   }
 
+  const STILL = Object.freeze({ live: false, vars: {}, changed: {}, pointer: null, capture: null, focus: null, focusVisible: false, hover: null, pressed: {}, inbox: {} });
+  const round4 = (v) => Math.round(v * 1e4) / 1e4;
+  /** @param {number[]} m @param {number} x @param {number} y */
+  const toLocal = (m, x, y) => { const [a, b, c, d, e, f] = m; const det = a * d - b * c || 1e-12, dx = x - e, dy = y - f; return [(d * dx - c * dy) / det, (a * dy - b * dx) / det]; };
+
+  /** f.ui for one call of an asset: pure, from the frame's view of the session (or a still one). */
+  function makeUi(e, env, ctx) {
+    const v = frameUi ?? { ...STILL, now: env.clip?.t ?? env.t, frame: env.clip?.frame ?? Math.round(env.t * env.fps), scene: null, sceneT: env.clip?.t ?? env.t };
+    const item = uiItem, links = uiVars;
+    const emits = e.def.events?.emits ?? {}, accepts = e.def.events?.accepts ?? {};
+    const matrix = () => { const m = ctx.getTransform(); return [m.a, m.b, m.c, m.d, m.e, m.f]; };
+    const heard = (event, what) => {
+      if (typeof event !== 'string' || !Object.hasOwn(accepts, event)) throw new AssetError(`f.ui.${what}("${event}"): declare the event in events.accepts (declared: ${Object.keys(accepts).join(', ') || 'none'})`, [e.ref]);
+      return item ? v.inbox[item]?.[event] ?? null : null;
+    };
+    return Object.freeze({
+      live: v.live, now: v.now, frame: v.frame, scene: v.scene, sceneT: v.sceneT,
+      /** The pointer in this asset's own coordinates (the context's current transform), or null. */
+      get pointer() {
+        if (!v.pointer) return null;
+        const [x, y] = toLocal(matrix(), v.pointer.x, v.pointer.y);
+        return { x, y, down: v.pointer.down, type: v.pointer.type };
+      },
+      /**
+       * Declare a hit region where the asset draws it (x, y, w, h in the current transform) and get its state:
+       * { hover, down, focus, pressed (seconds since it last fired, Infinity if never), hoverFor }.
+       * o: { id (tells regions with the same name apart), value, range: { min, max, step, value, axis }, keys: ['Enter'],
+       *      shape: 'rect' | 'circle', press: 'up' | 'down', focus: false (skip it when tabbing), label,
+       *      disabled: true (drawn but not hittable this frame: the state is still reported, e.g. a target already caught),
+       *      modal: true (a dialog's scrim: what was drawn before it takes no taps, focus or hotkeys while it is there) }.
+       */
+      hit(name, x, y, w, h, o = {}) {
+        if (!Object.hasOwn(emits, name)) throw new AssetError(`f.ui.hit("${name}"): declare the event in events.emits (declared: ${Object.keys(emits).join(', ') || 'none'})`, [e.ref]);
+        if (![x, y, w, h].every((n) => typeof n === 'number' && Number.isFinite(n)) || w <= 0 || h <= 0) throw new AssetError(`f.ui.hit("${name}", x, y, w, h): give a box with a positive width and height`, [e.ref]);
+        const m = matrix();
+        let key = `${item}:${name}:${o.id ?? ''}`;
+        if (regions && !o.disabled) {
+          const n = regionKeys.get(key) ?? 0;
+          regionKeys.set(key, n + 1);
+          if (n) key += `#${n}`;
+        }
+        const range = o.range ? { min: Number(o.range.min ?? 0), max: Number(o.range.max ?? 1), step: o.range.step ? Number(o.range.step) : 0, value: Number(o.range.value ?? o.range.min ?? 0), axis: o.range.axis === 'y' ? 'y' : 'x' } : undefined;
+        // a region on an asset's own offscreen canvas has no place in the frame: it is drawn, not hit
+        if (regions && item && !o.disabled && !assetCanvases.has(ctx.canvas)) {
+          regions.push({
+            key, item, name, ...(o.id !== undefined ? { id: o.id } : {}), m: m.map(round4), x, y, w, h,
+            ...(o.shape === 'circle' ? { shape: 'circle' } : {}), value: o.value ?? null, ...(range ? { range } : {}),
+            ...(o.keys ? { keys: [].concat(o.keys).map(String) } : {}), ...(o.press === 'down' ? { press: 'down' } : {}),
+            ...(o.focus === false ? { focus: false } : {}), ...(typeof o.label === 'string' ? { label: o.label } : {}), ...(o.modal ? { modal: true } : {}),
+          });
+        }
+        let over = false;
+        if (v.pointer) {
+          const [lx, ly] = toLocal(m, v.pointer.x, v.pointer.y);
+          if (o.shape === 'circle') { const nx = (lx - x - w / 2) / (w / 2), ny = (ly - y - h / 2) / (h / 2); over = nx * nx + ny * ny <= 1; } else over = lx >= x && lx <= x + w && ly >= y && ly <= y + h;
+        }
+        // the topmost region under the pointer at its last move has the hover (a region under a scrim does not)
+        const hover = over && (!v.hover || v.hover.key === key) && (v.pointer.type !== 'touch' || v.pointer.down);
+        return {
+          hover, down: v.capture === key && !!v.pointer?.down, focus: v.focus === key && v.focusVisible,
+          pressed: v.pressed[key] ?? Infinity, hoverFor: hover ? (v.hover?.key === key ? v.hover.since : Infinity) : 0,
+        };
+      },
+      /** Seconds since the clip last sent this item `event` (Infinity if never). */
+      since(event) { return heard(event, 'since')?.since ?? Infinity; },
+      /** The last time the clip sent this item `event`: { since, value, count }, or null. */
+      received(event) { const x = heard(event, 'received'); return x ? { ...x } : null; },
+      /** For a param bound to a variable ({ $var }): { from (the value before), since (seconds) } after it changed, else null. */
+      changed(param) { const name = links?.[param]; const c = name ? v.changed[name] : null; return c ? { ...c } : null; },
+    });
+  }
+
+  /** Run fn as the drawing of a clip item: f.ui inside it (and inside its precomp layers) belongs to that item. */
+  function asItem(item, fn) {
+    if (uiDepth++ === 0) { uiItem = item.id; uiVars = uiLinks?.get(item.id) ?? null; }
+    try { return fn(); } finally { if (--uiDepth === 0) { uiItem = null; uiVars = null; } }
+  }
+
   function invoke(e, rawParams, env, fn = e.def.render) {
     if (env.depth > MAX_DEPTH) throw new AssetError(`Assets are nested more than ${MAX_DEPTH} levels deep: is an asset passed to itself?`, [e.ref]);
     const { values: p, errors } = resolveParams(e.def.schema, rawParams ?? {});
     if (errors.length) throw new AssetError(`bad parameters: ${errors.map((x) => `${x.path}: ${x.message}`).join('; ')}`, [e.ref]);
     const { ctx, width, height, t, duration } = env;
     const counts = {};
-    let rng = null;
+    let rng = null, ui = null;
     const f = {
       ctx, t, duration, fps: env.fps,
       progress: duration > 0 ? Math.min(1, Math.max(0, t / duration)) : 1,
@@ -339,6 +437,8 @@ export function createRuntime(host) {
       ref: e.ref,
       /** The clip's theme (a value asset's value), or null: read colours and fonts from it by default. */
       theme: env.clip?.theme ?? null,
+      /** v5: the viewer's input in an interactive clip, and what the clip sent this item; still (nobody playing) in a video. */
+      get ui() { return (ui ??= makeUi(e, env, ctx)); },
       /** motion: in | out | emphasis | loop. */
       phase: env.phase ?? null,
       /** effect: the layer to process; transition: the outgoing and incoming layers ({ canvas, ctx, width, height } or null). */
@@ -595,15 +695,17 @@ export function createRuntime(host) {
 
   /**
    * Draw one frame of a clip composition (already validated and pinned).
-   * extra: { beats, markers, words, captions, lane, fonts (family → alias of the uploaded fonts the clip pins; see fontAliases), record (collect what f.lib.text and f.lib.solid draw), suppressText (draw everything but text) }.
-   * Returns { texts } when recording (one entry per drawn word, in frame pixels), else undefined.
+   * extra: { beats, markers, words, captions, lane, fonts (family → alias of the uploaded fonts the clip pins; see fontAliases), record (collect what f.lib.text and f.lib.solid draw), suppressText (draw everything but text),
+   *   ui (v5: an interactive session's view at this frame, from viewOf in core/interactive.js; without it an interactive clip draws its design timeline, nobody playing),
+   *   transition (v5: a scene transition in progress: { asset, params, t, duration, from: the playhead frame it leaves }) }.
+   * Returns { texts } when recording (one entry per drawn word, in frame pixels), and for an interactive composition
+   * { regions } (the hit regions the frame drew, in frame pixels); else undefined.
    */
   function renderClipFrame(ctx, comp, frame, extra = {}) {
     track(ctx);
     layerIndex = 0;
     resetState(ctx);
-    const { width, height, fps } = comp;
-    const t = frame / fps;
+    const { width, height } = comp;
     const texts = extra.record ? [] : null;
     inspect.record = texts ? recorder(texts) : null;
     inspect.suppress = !!extra.suppressText;
@@ -612,95 +714,173 @@ export function createRuntime(host) {
     inspect.fonts = extra.fonts ?? null;
     assetCanvases.clear();
     cur = null; inTransition = false;
+    // v5: an interactive composition draws one state of its session: params bound to its variables, items shown `when` they hold
+    const source = comp;
+    if (comp.interactive || extra.ui) {
+      frameUi = extra.ui ?? staticUi(comp, frame);
+      comp = bindComposition(comp, frameUi.vars, frameUi.scene);
+      uiLinks = comp.links ?? null;
+      regions = [];
+      regionKeys.clear();
+    }
+    const found = regions;
     ctx.save();
     try {
-      ctx.fillStyle = comp.background ?? '#000000';
-      ctx.fillRect(0, 0, width, height);
-      const clip = { t, frame, duration: comp.duration, fps, width, height, format: formatOf(width, height), beats: extra.beats ?? comp.beats ?? [], markers: extra.markers ?? comp.markers ?? [] };
-      // v2: the clip's theme, read by every asset as f.theme (only set when the clip has one)
-      if (comp.theme) clip.theme = themeOf(comp.theme);
-      // v3: the narration's words and the caption pages in clip time, and the caption lane (only set when the clip has them)
-      if (extra.words?.length) clip.words = extra.words;
-      if (extra.captions) clip.captions = extra.captions;
-      if (extra.lane) clip.lane = extra.lane;
-      const format = formatOf(width, height);
-      const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
-      // captions that are file only are not drawn
-      const fileOnly = comp.captions && comp.captions.burnIn === false;
-      for (const tr of comp.tracks) {
-        if (tr.type === 'audio' || tr.hidden || (solo && !tr.solo) || (fileOnly && tr.role === 'captions')) continue;
-        curTrack = tr.id;
-        // v2: a track with effects is drawn on its own layer first, then processed (an adjustment layer)
-        if (tr.effects?.length) { drawTrackWithEffects(ctx, comp, tr, frame, t, clip, format); continue; }
-        const handoff = transitionsAt(tr, frame, fps);
-        for (const item of tr.items) {
-          if (handoff.outgoing.has(item)) continue;
-          const tx = handoff.incoming.get(item);
-          if (tx) { drawTransition(ctx, comp, tx, t, clip, format); continue; }
-          if (!activeAt(item, frame, fps)) continue;
-          // composition v2 (transforms, keyframes, formats…) and image layers take the new path;
-          // everything else is drawn exactly as in v1, so old clips keep their pixels
-          if (isV2Item(item) || images.has(item.asset) || sequences.has(item.asset) || footage.has(item.asset)) { drawLayer(ctx, comp, forFormat(item, format), t, clip); continue; }
-          const lt = Math.max(0, t - item.start);
-          let opacity = item.opacity ?? 1;
-          if (item.fadeIn > 0) opacity *= Math.min(1, lt / item.fadeIn);
-          if (item.fadeOut > 0) opacity *= Math.min(1, (item.duration - lt) / item.fadeOut);
-          if (opacity <= 0) continue;
-          const e = entry(item.asset);
-          if (e.def.kind !== 'visual') throw new AssetError(`item "${item.id}": ${item.asset} is a ${e.def.kind} asset and cannot sit on a visual track`);
-          const box = item.box ? { x: item.box.x * width, y: item.box.y * height, width: item.box.width * width, height: item.box.height * height } : null;
-          const layered = opacity < 1 || (item.blend && item.blend !== 'source-over');
-          const target = layered ? offscreen(width, height).ctx : ctx;
-          const depth = target.__saveDepth();
-          target.save();
-          const floor = target.__floor(depth + 1);
-          try {
-            target.beginPath();
-            if (box) target.translate(box.x, box.y);
-            const w = box ? box.width : width, h = box ? box.height : height;
-            drawingItem(item.id, layered ? opacity : 1, () => invoke(e, item.params, {
-              ctx: target, width: w, height: h, fps, t: lt, duration: item.duration, depth: 0,
-              seed: hashSeed(comp.seed ?? 1, item.id), format: formatOf(w, h), clip,
-              safe: box ? { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: w, height: h } : clipSafe(comp),
-            }));
-          } catch (err) {
-            if (err instanceof AssetError) err.message = `item "${item.id}" at ${t.toFixed(3)}s: ${err.message}`;
-            throw err;
-          } finally {
-            target.__floor(floor);
-            while (target.__saveDepth() > depth) target.restore();
-          }
-          if (layered) {
-            ctx.save();
-            ctx.globalAlpha = opacity;
-            ctx.globalCompositeOperation = item.blend ?? 'source-over';
-            ctx.drawImage(target.canvas, 0, 0);
-            ctx.restore();
-          }
-        }
-      }
-      // v2: effects on the whole clip, after every track
-      if (comp.effects?.length) {
-        const out = applyEffects({ canvas: ctx.canvas, ctx, width, height }, comp.effects, comp, { t, duration: comp.duration }, clip, 'clip');
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalCompositeOperation = 'copy';
-        ctx.drawImage(out.canvas, 0, 0);
-        ctx.restore();
-      }
+      if (extra.transition && comp.interactive) drawScenes(ctx, comp, frame, extra, source);
+      else drawClip(ctx, comp, frame, extra);
     } finally {
       while (ctx.__saveDepth() > 0) ctx.restore();
       inspect.record = null;
       inspect.suppress = false;
       inspect.fonts = null;
       cur = null; curTrack = null; inTransition = false;
+      frameUi = null; regions = null; uiItem = null; uiVars = null; uiLinks = null; uiDepth = 0;
     }
-    return texts ? { texts } : undefined;
+    if (texts || found) return { ...(texts ? { texts } : {}), ...(found ? { regions: found } : {}) };
+    return undefined;
+  }
+
+  /** What assets read as f.clip at a frame. */
+  function clipOf(comp, frame, extra) {
+    const { width, height, fps } = comp;
+    const t = frame / fps;
+    const clip = { t, frame, duration: comp.duration, fps, width, height, format: formatOf(width, height), beats: extra.beats ?? comp.beats ?? [], markers: extra.markers ?? comp.markers ?? [] };
+    // v2: the clip's theme, read by every asset as f.theme (only set when the clip has one)
+    if (comp.theme) clip.theme = themeOf(comp.theme);
+    // v3: the narration's words and the caption pages in clip time, and the caption lane (only set when the clip has them)
+    if (extra.words?.length) clip.words = extra.words;
+    if (extra.captions) clip.captions = extra.captions;
+    if (extra.lane) clip.lane = extra.lane;
+    return clip;
+  }
+
+  /** The background, every visual track and the clip's effects, at one frame of the timeline. */
+  function drawClip(ctx, comp, frame, extra) {
+    const { width, height, fps } = comp;
+    const t = frame / fps;
+    ctx.fillStyle = comp.background ?? '#000000';
+    ctx.fillRect(0, 0, width, height);
+    const clip = clipOf(comp, frame, extra);
+    const format = formatOf(width, height);
+    const solo = comp.tracks.some((tr) => tr.type !== 'audio' && tr.solo);
+    // captions that are file only are not drawn
+    const fileOnly = comp.captions && comp.captions.burnIn === false;
+    for (const tr of comp.tracks) {
+      if (tr.type === 'audio' || tr.hidden || (solo && !tr.solo) || (fileOnly && tr.role === 'captions')) continue;
+      curTrack = tr.id;
+      // v2: a track with effects is drawn on its own layer first, then processed (an adjustment layer)
+      if (tr.effects?.length) { drawTrackWithEffects(ctx, comp, tr, frame, t, clip, format); continue; }
+      const handoff = transitionsAt(tr, frame, fps);
+      for (const item of tr.items) {
+        if (handoff.outgoing.has(item)) continue;
+        const tx = handoff.incoming.get(item);
+        if (tx) { drawTransition(ctx, comp, tx, t, clip, format); continue; }
+        if (!activeAt(item, frame, fps)) continue;
+        // composition v2 (transforms, keyframes, formats…) and image layers take the new path;
+        // everything else is drawn exactly as in v1, so old clips keep their pixels
+        if (isV2Item(item) || images.has(item.asset) || sequences.has(item.asset) || footage.has(item.asset)) { drawLayer(ctx, comp, forFormat(item, format), t, clip); continue; }
+        // v5: an interactive item whose `when` fails
+        if (item.hidden) continue;
+        const lt = Math.max(0, t - item.start);
+        let opacity = item.opacity ?? 1;
+        if (item.fadeIn > 0) opacity *= Math.min(1, lt / item.fadeIn);
+        if (item.fadeOut > 0) opacity *= Math.min(1, (item.duration - lt) / item.fadeOut);
+        if (opacity <= 0) continue;
+        const e = entry(item.asset);
+        if (e.def.kind !== 'visual') throw new AssetError(`item "${item.id}": ${item.asset} is a ${e.def.kind} asset and cannot sit on a visual track`);
+        const box = item.box ? { x: item.box.x * width, y: item.box.y * height, width: item.box.width * width, height: item.box.height * height } : null;
+        const layered = opacity < 1 || (item.blend && item.blend !== 'source-over');
+        const target = layered ? offscreen(width, height).ctx : ctx;
+        const depth = target.__saveDepth();
+        target.save();
+        const floor = target.__floor(depth + 1);
+        try {
+          target.beginPath();
+          if (box) target.translate(box.x, box.y);
+          const w = box ? box.width : width, h = box ? box.height : height;
+          drawingItem(item.id, layered ? opacity : 1, () => asItem(item, () => invoke(e, item.params, {
+            ctx: target, width: w, height: h, fps, t: lt, duration: item.duration, depth: 0,
+            seed: hashSeed(comp.seed ?? 1, item.id), format: formatOf(w, h), clip,
+            safe: box ? { top: 0, right: 0, bottom: 0, left: 0, x: 0, y: 0, width: w, height: h } : clipSafe(comp),
+          })));
+        } catch (err) {
+          if (err instanceof AssetError) err.message = `item "${item.id}" at ${t.toFixed(3)}s: ${err.message}`;
+          throw err;
+        } finally {
+          target.__floor(floor);
+          while (target.__saveDepth() > depth) target.restore();
+        }
+        if (layered) {
+          ctx.save();
+          ctx.globalAlpha = opacity;
+          ctx.globalCompositeOperation = item.blend ?? 'source-over';
+          ctx.drawImage(target.canvas, 0, 0);
+          ctx.restore();
+        }
+      }
+    }
+    // v2: effects on the whole clip, after every track
+    if (comp.effects?.length) {
+      const out = applyEffects({ canvas: ctx.canvas, ctx, width, height }, comp.effects, comp, { t, duration: comp.duration }, clip, 'clip');
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'copy';
+      ctx.drawImage(out.canvas, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  /**
+   * v5: a scene transition of an interactive clip: the scene it leaves (held on the frame it left) turning into the
+   * one it enters, through a transition asset (f.from, f.to). What the viewer can hit is the scene coming in.
+   */
+  function drawScenes(ctx, comp, frame, extra, source) {
+    const tx = extra.transition;
+    const e = entry(tx.asset);
+    if (e.def.kind !== 'transition') throw new AssetError(`the scene transition ${tx.asset} is a ${e.def.kind} asset, not a transition`);
+    const { width, height, fps } = comp;
+    const to = offscreen(width, height);
+    drawClip(to.ctx, comp, frame, extra);
+    // the scene it leaves, as its last frame showed it (its own ui and variables): the same pixels every frame of the
+    // transition, so it is drawn once and held (not while text is being recorded: the checks read what each frame draws)
+    const fromUi = tx.fromUi ?? frameUi;
+    const key = `${tx.fromScene}|${tx.from}|${JSON.stringify(fromUi)}`;
+    if (!held || held.key !== key || held.comp !== source || held.width !== width || held.height !== height || inspect.record) {
+      if (!held || held.width !== width || held.height !== height) {
+        const canvas = host.createCanvas(width, height);
+        held = { canvas, ctx: track(canvas.getContext('2d', { willReadFrequently: true })), width, height };
+      }
+      resetState(held.ctx);
+      const kept = regions, ui = frameUi, was = inTransition;
+      regions = null; frameUi = fromUi; inTransition = true;
+      const fromComp = bindComposition(source, fromUi.vars, fromUi.scene), links = uiLinks;
+      uiLinks = fromComp.links ?? null;
+      try { drawClip(held.ctx, fromComp, tx.from, extra); } finally { regions = kept; frameUi = ui; inTransition = was; uiLinks = links; }
+      held.key = inspect.record ? null : key; held.comp = source;
+    }
+    const from = held;
+    // the frame the scene changes on still shows the scene it leaves (the transition at progress 0); the asset draws
+    // from the next frame, so the one frame that draws the held scene does not also run the transition
+    if (tx.t === 0) { composite(ctx, from.canvas); return; }
+    const out = offscreen(width, height);
+    try {
+      invoke(e, tx.params ?? {}, {
+        ctx: out.ctx, width, height, fps, t: tx.t, duration: tx.duration, depth: 0,
+        seed: hashSeed(comp.seed ?? 1, 'scene', tx.fromScene ?? ''), clip: clipOf(comp, frame, extra), from, to,
+        format: formatOf(width, height), safe: clipSafe(comp),
+      });
+    } catch (err) {
+      if (err instanceof AssetError) err.message = `scene transition at frame ${frame}: ${err.message}`;
+      throw err;
+    }
+    composite(ctx, out.canvas);
   }
 
   /** The safe zone a clip's full-frame items see as f.safe: the format's, or (opt-in, safe: 'platform') the tightest edge of its platform profiles. */
   const safes = new Map();
   function clipSafe(comp) {
+    // v5: an interactive clip's page shows the whole frame
+    if (comp.interactive) return screenSafe(comp.width, comp.height);
     if (comp.safe !== 'platform' || !comp.platforms?.length) return safeZone(comp.width, comp.height);
     const key = `${comp.platforms.join(',')}|${comp.width}x${comp.height}`;
     if (!safes.has(key)) { const p = platformSafe(comp.platforms, comp.width, comp.height, { matching: true }); safes.set(key, { top: p.top, right: p.right, bottom: p.bottom, left: p.left, x: p.x, y: p.y, width: p.width, height: p.height }); }
@@ -872,6 +1052,10 @@ export function createRuntime(host) {
    */
   function drawLayer(ctx, comp, item, t, clip) {
     if (item.hidden) return;
+    return asItem(item, () => drawLayerAs(ctx, comp, item, t, clip));
+  }
+
+  function drawLayerAs(ctx, comp, item, t, clip) {
     try {
       const st = layerState(comp, item, t, clip);
       if (!st) return;

@@ -690,7 +690,7 @@ export function createLibrary(ctx) {
       const versionId = q(`INSERT INTO asset_versions (asset_id, version, kind, title, description, tags, duration, formats, schema, uses, deps, source, source_hash, meta, thumb, author, note, parent_version, clip_id, engine, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         assetId, version, m.kind, m.title, m.description, JSON.stringify(m.tags), m.duration, JSON.stringify(m.formats), JSON.stringify(m.schema), JSON.stringify(m.uses), JSON.stringify(v.deps),
-        source, hash, JSON.stringify({ test: v.frames, warnings: v.warnings, strip: strip ? { file: strip, frames: 8 } : undefined }), thumb, author, note ?? null, prev?.version_id ?? forkOf?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at).lastInsertRowid;
+        source, hash, JSON.stringify({ test: v.frames, warnings: v.warnings, strip: strip ? { file: strip, frames: 8 } : undefined, events: m.events ?? undefined }), thumb, author, note ?? null, prev?.version_id ?? forkOf?.version_id ?? null, clip?.id ?? null, ENGINE_VERSION, at).lastInsertRowid;
       for (const [alias, dep] of Object.entries(v.deps)) q('INSERT INTO asset_deps (version_id, dep_version_id, alias) VALUES (?, ?, ?)').run(versionId, versionRow(dep).version_id, alias);
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
       reindex(assetId, { slug, title: m.title, description: m.description, tags: m.tags, source });

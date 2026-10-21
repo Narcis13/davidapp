@@ -6,6 +6,8 @@
 //   await pv.showClip({ composition, bundle, audioUrl });                   // clip editor
 //   pv.setParams(p)  pv.setComposition(c)  pv.seek(t)  pv.play()  pv.pause()  pv.toggle()  pv.destroy()
 //   pv.setRecord(true)   // clip frames also report the measured text (frame pixels) through onTexts(texts, frame)
+//   pv.lock(true)        // an interactive session owns the canvas: the design timeline stops drawing and playing
+//   await pv.drawView({ frame, ui, transition })   // one frame of a session → its hit regions (needs a clip shown)
 
 const WATCHDOG_MS = 5000;
 let fontsPromise = null;
@@ -23,6 +25,7 @@ export class Preview {
     this.time = 0; this.playing = false; this.inflight = false; this.dirty = false;
     this.audio = null; this.raf = 0; this.error = null; this.destroyed = false;
     this.loop = true;
+    this.locked = false;
   }
 
   get duration() { return this.mode === 'clip' ? this.view.composition.duration : this.view?.duration ?? 0; }
@@ -113,12 +116,42 @@ export class Preview {
   }
 
   request() {
+    if (this.locked) return;
     if (this.inflight) { this.dirty = true; return; }
     this.draw();
   }
 
+  /** While locked an interactive session draws the canvas (drawView): the design timeline neither draws nor plays. */
+  lock(on) {
+    if (!!on === this.locked) return;
+    if (on) this.pause();
+    this.locked = !!on;
+    if (!on) this.request();
+  }
+
+  /**
+   * Draw one frame of an interactive session: { frame (the playhead on the design timeline), ui, transition } as
+   * viewOf in core/interactive.js makes it. Resolves with the frame's hit regions; rejects with the draw error
+   * (and the watchdog's: a worker stuck in asset code is restarted, so the next call starts again).
+   * @param {{ frame: number, ui?: any, transition?: any }} v
+   * @returns {Promise<any[]>}
+   */
+  async drawView({ frame, ui, transition }) {
+    if (this.destroyed || this.mode !== 'clip') throw new Error('No clip is shown');
+    // a design frame still in flight is allowed to land first, so two frames never race for the canvas
+    while (this.inflight) await new Promise((r) => setTimeout(r, 3));
+    await this.ensureLoaded();
+    const r = await this.send({ op: 'clipFrame', frame, composition: this.view.composition, ui, transition, fast: true });
+    // the session ended while this frame was being drawn: the design timeline owns the canvas again
+    if (this.destroyed || !this.locked) { r.bitmap.close?.(); return []; }
+    if (this.canvas.width !== r.bitmap.width || this.canvas.height !== r.bitmap.height) { this.canvas.width = r.bitmap.width; this.canvas.height = r.bitmap.height; }
+    this.out.transferFromImageBitmap(r.bitmap);
+    this.canvas.dataset.frame = String(frame);
+    return r.regions ?? [];
+  }
+
   async draw() {
-    if (this.destroyed || !this.view) return;
+    if (this.destroyed || !this.view || this.locked) return;
     this.inflight = true; this.dirty = false;
     const t = this.time;
     try {
@@ -145,6 +178,7 @@ export class Preview {
   }
 
   seek(t) {
+    if (this.locked) return;
     this.time = Math.max(0, Math.min(t, this.duration));
     if (this.audio && this.playing) this.audio.currentTime = this.time;
     this.onTime(this.time);
@@ -152,7 +186,7 @@ export class Preview {
   }
 
   play() {
-    if (this.playing || !this.view) return;
+    if (this.playing || !this.view || this.locked) return;
     if (this.time >= this.duration - 1 / this.fps) this.time = 0;
     this.playing = true;
     this.onState(true);

@@ -1,0 +1,243 @@
+/* The share page: one clip, fitted to the viewport and letterboxed, with its own controls. No external resources:
+   system fonts, inline icons. The frame's size comes from the clip's shape (--w, --h on .share) and the viewport. */
+
+:root {
+  --bg: #0b0b10;
+  --text: #ececf4;
+  --muted: #a0a2ba;
+  --faint: #6f7190;
+  --accent: #ffd166;
+  --glass: rgba(14, 14, 20, 0.62);
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); overflow: hidden; }
+body { color: var(--text); font: 400 15px/1.45 var(--font); -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+h1, p { margin: 0; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg { display: block; fill: currentColor; }
+
+/* ── layout: the frame and the details under it form one centred group ─────────────────────── */
+.share {
+  --pad-x: 32px; --pad-y: 24px; --reserve: 132px;
+  --avail-w: calc(100vw - 2 * var(--pad-x));
+  --avail-h: calc(100vh - 2 * var(--pad-y) - var(--reserve));
+  --frame-h: min(calc(var(--avail-w) * var(--h) / var(--w)), var(--avail-h));
+  --frame-w: calc(var(--frame-h) * var(--w) / var(--h));
+  height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  padding: var(--pad-y) var(--pad-x);
+  background: radial-gradient(120% 80% at 50% 0%, #15151f 0%, var(--bg) 60%);
+}
+@supports (height: 100dvh) {
+  .share { --avail-h: calc(100dvh - 2 * var(--pad-y) - var(--reserve)); height: 100dvh; }
+}
+.stage-area { flex: none; }
+.frame {
+  position: relative; width: var(--frame-w); height: var(--frame-h);
+  border-radius: 14px; overflow: hidden; background: #000; isolation: isolate;
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  container-type: inline-size; user-select: none; -webkit-user-select: none;
+}
+.poster, .screen { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.poster { object-fit: contain; transition: opacity 0.35s ease; }
+.screen { opacity: 0; outline: none; }
+.share[data-drawn] .screen { opacity: 1; }
+.share[data-drawn] .poster { opacity: 0; }
+.share[data-interactive] .screen { touch-action: none; cursor: default; }
+
+/* ── centre: loading ring, big play/replay, buffering, messages ───────────────────────────────── */
+.center { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 3; }
+.center > * { grid-area: 1 / 1; pointer-events: auto; }
+.loading { position: relative; width: 72px; height: 72px; display: grid; place-items: center; border-radius: 50%; background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.loading svg { position: absolute; inset: 6px; width: 60px; height: 60px; transform: rotate(-90deg); fill: none; stroke-width: 4; }
+.loading .track { stroke: rgba(255, 255, 255, 0.14); }
+.loading .bar { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: calc(100 - var(--p, 0)); transition: stroke-dashoffset 0.25s ease; }
+.loading-text { font: 600 13px/1 var(--font); font-variant-numeric: tabular-nums; color: var(--text); }
+.share:not([data-state=loading]) .loading { display: none; }
+
+.big {
+  width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.28), 0 12px 40px rgba(0, 0, 0, 0.45);
+  color: #fff; transition: transform 0.18s ease, background 0.18s ease;
+}
+.big svg { width: 38px; height: 38px; }
+.big .i-play { margin-left: 4px; }
+.big .i-replay, .share[data-state=ended] .big .i-play { display: none; }
+.share[data-state=ended] .big .i-replay { display: block; }
+
+.spinner { width: 44px; height: 44px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.18); border-top-color: #fff; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.message { max-width: min(86%, 440px); padding: 14px 18px; border-radius: 12px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); text-align: center; font-size: 14px; color: var(--text); }
+
+/* ── controls over the bottom of the frame ─────────────────────────────────────────────────── */
+.scrim { position: absolute; left: 0; right: 0; bottom: 0; height: min(140px, 55%); z-index: 1; pointer-events: none;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.32) 55%, transparent); transition: opacity 0.25s ease; }
+.controls {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  display: flex; align-items: center; gap: 4px; padding: 6px 10px 8px;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.ctl { flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; color: #fff; transition: background 0.15s ease; }
+.ctl svg { width: 22px; height: 22px; }
+.ctl .i-pause, .ctl .i-off, .ctl .i-exit { display: none; }
+.share[data-state=playing] .ctl .i-play { display: none; }
+.share[data-state=playing] .ctl .i-pause { display: block; }
+.share[data-muted] [data-testid=sound] .i-on { display: none; }
+.share[data-muted] [data-testid=sound] .i-off { display: block; }
+.share[data-full] [data-testid=fullscreen] .i-full { display: none; }
+.share[data-full] [data-testid=fullscreen] .i-exit { display: block; }
+.time { flex: none; padding: 0 6px; font: 600 13px/1 var(--font); font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); white-space: nowrap; }
+.time .sep, .time .total { color: rgba(255, 255, 255, 0.72); }
+
+.scrub { flex: 1 1 auto; min-width: 40px; height: 28px; margin: 0 6px; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; touch-action: none; }
+.scrub::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--p, 0%), rgba(255, 255, 255, 0.28) var(--p, 0%)); }
+.scrub::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); }
+.scrub::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); transition: transform 0.15s ease; }
+.scrub::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; }
+.scrub:active::-webkit-slider-thumb { transform: scale(1.2); }
+.share[data-interactive] .scrub, .share[data-interactive] .time { display: none; }
+.share[data-interactive] .controls { justify-content: flex-end; }
+
+/* hidden while it plays and nothing moves; the cursor too */
+.share[data-chrome=off] .controls { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.share[data-chrome=off] .scrim, .share[data-chrome=off] .topline { opacity: 0; }
+.share[data-chrome=off] .frame { cursor: none; }
+.share[data-state=loading] .controls, .share[data-state=loading] .scrim, .share[data-state=error] .controls, .share[data-state=error] .scrim { display: none; }
+
+
+/* sound: a clear way to turn it on while the clip plays without it */
+.sound-hint {
+  position: absolute; top: 12px; right: 12px; z-index: 4;
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px 8px 11px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94); color: #111118; font: 600 13px/1 var(--font);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); animation: rise 0.35s ease both;
+}
+.sound-hint svg { width: 18px; height: 18px; }
+@keyframes rise { from { opacity: 0; transform: translateY(-6px); } }
+
+.topline { position: absolute; top: 0; left: 0; right: 0; z-index: 1; padding: 14px 16px 30px; pointer-events: none; display: none;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent); transition: opacity 0.25s ease; }
+.topline-title { font: 650 15px/1.3 var(--font); color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding-right: 150px; }
+
+/* ── details under the frame ───────────────────────────────────────────────────────────────── */
+.details { width: var(--frame-w); max-width: 100%; display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'about made' 'keys keys' 'rotate rotate'; gap: 6px 24px; align-items: start; }
+.about { grid-area: about; min-width: 0; }
+h1 { font: 700 21px/1.25 var(--font); letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.description { margin-top: 4px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.made { grid-area: made; padding-top: 4px; font-size: 12.5px; color: var(--faint); text-decoration: none; white-space: nowrap; transition: color 0.15s ease; }
+.keys { grid-area: keys; display: none; font-size: 12px; color: var(--faint); }
+.keys kbd { display: inline-block; min-width: 20px; margin: 0 2px; padding: 1px 5px; border-radius: 5px; border: 1px solid #2b2b3c; background: #15151f; font: 600 11px/1.5 var(--font); color: var(--muted); text-align: center; }
+.keys kbd + kbd { margin-left: 0; }
+.rotate-hint { grid-area: rotate; display: none; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--muted); }
+.rotate-hint svg { width: 20px; height: 20px; flex: none; }
+/* hover styles only where there is hover: on a phone a tapped button would keep them */
+@media (hover: hover) {
+  .big:hover { transform: scale(1.06); background: rgba(14, 14, 20, 0.78); }
+  .ctl:hover { background: rgba(255, 255, 255, 0.12); }
+  .made:hover { color: var(--muted); }
+  .scrub:hover::-webkit-slider-thumb { transform: scale(1.2); }
+}
+@media (hover: hover) and (pointer: fine) { .keys { display: block; } }
+
+/* ── phones ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* the group sits a little above the middle, where the eye expects it */
+  .share { --pad-x: 16px; --pad-y: 16px; --reserve: calc(190px + 6vh); gap: 16px; padding-bottom: calc(var(--pad-y) + 6vh); }
+  .share[data-shape=wide] { --pad-x: 0px; }
+  .share[data-shape=wide] .frame { border-radius: 0; }
+  .share[data-shape=wide] .details { padding: 0 16px; }
+  .details { grid-template-areas: 'about' 'rotate' 'made'; grid-template-columns: 1fr; }
+  h1 { font-size: 18px; }
+  .description { -webkit-line-clamp: 3; font-size: 14px; }
+  .made { padding-top: 6px; }
+  .big { width: 72px; height: 72px; }
+  .big svg { width: 32px; height: 32px; }
+}
+@media (orientation: portrait) and (pointer: coarse) { .share[data-shape=wide] .rotate-hint { display: flex; } }
+@media (pointer: coarse) { .ctl { width: 44px; height: 44px; } .scrub { height: 36px; } }
+
+/* a small frame (a wide clip on a phone held upright): the scrubber gets a row of its own, the full width */
+@container (max-width: 560px) {
+  .controls { flex-wrap: wrap; padding: 0 6px 2px; gap: 0 2px; }
+  .scrub { order: -1; flex: 1 0 calc(100% - 16px); height: 26px; margin: 0 8px; }
+  .time { margin-right: auto; }
+  .sound-hint { top: 8px; right: 8px; gap: 6px; padding: 7px 12px 7px 9px; font-size: 12px; }
+  .sound-hint svg { width: 16px; height: 16px; }
+  .big { width: 64px; height: 64px; }
+  .big svg { width: 28px; height: 28px; }
+}
+
+/* a phone held sideways, and full screen: the frame takes the whole screen, the title moves onto it */
+@media (orientation: landscape) and (max-height: 520px) {
+  .share { --pad-x: 0px; --pad-y: 0px; --reserve: 0px; gap: 0; padding: 0; background: #000; }
+  .share .frame { border-radius: 0; box-shadow: none; }
+  .details { display: none; }
+  .topline { display: block; }
+}
+.share[data-full] { --pad-x: 0px; --pad-y: 0px; --reserve: 0px; gap: 0; padding: 0; background: #000; }
+.share[data-full] .frame { border-radius: 0; box-shadow: none; }
+.share[data-full] .details { display: none; }
+/* full screen on a phone held upright, with a wide clip: only the hint to turn it stays, under the picture */
+@media (orientation: portrait) and (pointer: coarse) {
+  .share[data-full][data-shape=wide] { padding-bottom: 0; }
+  .share[data-full][data-shape=wide] .details { display: grid; grid-template-areas: 'rotate'; justify-items: center; padding-top: 18px; }
+  .share[data-full] .about, .share[data-full] .made, .share[data-full] .keys { display: none; }
+}
+.share[data-full] .topline { display: block; }
+/* iPhone Safari has no full screen for a page element: the page covers the screen itself */
+.share[data-full=page] { position: fixed; inset: 0; z-index: 10; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  .spinner { animation: none; border-top-color: rgba(255, 255, 255, 0.7); }
+}
+
+/* ── an interactive clip: the frame is the game (nothing over its edges), the controls sit under it ───────────── */
+.share[data-interactive] .scrim, .share[data-interactive] .topline { display: none !important; }
+.share[data-interactive] { --reserve: 104px; }
+.share[data-interactive] .details .controls {
+  position: static; display: flex; justify-content: flex-start; gap: 2px; padding: 0; margin: 2px 0 0 -8px;
+  opacity: 1 !important; transform: none !important; pointer-events: auto !important;
+}
+.share[data-interactive] .details .ctl { color: var(--text); }
+.share[data-interactive] .details { grid-template-areas: 'about made' 'controls keys'; align-items: center; }
+.share[data-interactive] .details .controls { grid-area: controls; }
+.share[data-interactive] .keys { justify-self: end; }
+.share[data-interactive] .description { -webkit-line-clamp: 1; }
+.share[data-interactive][data-state=paused] .big, .share[data-interactive][data-state=ready] .big { animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.5), 0 0 0 14px rgba(255, 255, 255, 0.06), 0 12px 40px rgba(0, 0, 0, 0.45); } }
+@media (max-width: 640px) {
+  /* a phone: the frame as large as the screen allows, the title and controls in one short row under it */
+  .share[data-interactive] { --pad-x: 0px; --pad-y: 0px; --reserve: 60px; gap: 6px; padding-bottom: 0; }
+  .share[data-interactive] .frame { border-radius: 0; box-shadow: none; }
+  .share[data-interactive] .details { grid-template-areas: 'about controls'; grid-template-columns: 1fr auto; padding: 0 12px; }
+  .share[data-interactive] .description, .share[data-interactive] .made, .share[data-interactive] .rotate-hint { display: none; }
+  .share[data-interactive] h1 { font-size: 16px; }
+}
+/* full screen, or a phone held sideways: the details are gone, the controls stay as a small pill in a corner */
+.share[data-interactive][data-full] .details,
+.share[data-interactive][data-full] .details .about, .share[data-interactive][data-full] .details .keys, .share[data-interactive][data-full] .details .made { display: none; }
+.share[data-interactive][data-full] .details:has(.controls) { display: block; position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); z-index: 12; width: auto; padding: 0; }
+.share[data-interactive][data-full] .details .controls { margin: 0; padding: 2px; border-radius: 12px; background: rgba(10, 10, 16, 0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+@media (orientation: landscape) and (max-height: 520px) {
+  .share[data-interactive] .details:has(.controls) { display: block; position: fixed; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); z-index: 12; width: auto; padding: 0; }
+  .share[data-interactive] .details .about, .share[data-interactive] .details .keys, .share[data-interactive] .details .made, .share[data-interactive] .details .rotate-hint { display: none; }
+  .share[data-interactive] .details .controls { margin: 0; padding: 2px; border-radius: 12px; background: rgba(10, 10, 16, 0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+}
+/* full screen and a phone held sideways give the frame everything: no room kept for the details (their controls float) */
+.share[data-interactive][data-full] { --pad-x: 0px; --pad-y: 0px; --reserve: 0px; gap: 0; padding: 0; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .share[data-interactive] { --pad-x: 0px; --pad-y: 0px; --reserve: 0px; gap: 0; padding: 0; }
+}
+/* paused: the frame steps back under the resume button */
+.share[data-interactive] .screen { transition: filter 0.2s ease; }
+.share[data-interactive][data-state=paused] .screen { filter: brightness(0.5) saturate(0.7); }
+/* a phone: the controls a little away from the frame, so a thumb on the lowest lanes does not reach them */
+@media (max-width: 640px) { .share[data-interactive] .details { margin-top: 10px; } }

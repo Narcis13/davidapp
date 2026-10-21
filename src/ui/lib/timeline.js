@@ -7,7 +7,9 @@
 // the page. Since iteration 4: footage items show a filmstrip of the frames they play (and the file's
 // own waveform on an audio track), and their edges trim the file (`params.in` / `out`, the picture
 // stays put); the caption pages are a lane under the narration: drag a page's start edge to another
-// word, click a word to start a new page there, select pages to merge them.
+// word, click a word to start a new page there, select pages to merge them. Since iteration 5: an interactive
+// composition shows its scenes as bands in a row under the ruler (a click selects the scene; the playhead's scene
+// and the scene a play session is in are marked).
 
 import { footageIndex } from '/core/footage.js';
 import { frameUrl, trimIn, trimOut } from '/ui/lib/footage.js';
@@ -51,23 +53,29 @@ const glyph = (name) => { const el = s('svg', { viewBox: '0 0 20 20', width: 16,
  *   onCaptionSelect?: (pages: number[]) => void,
  *   onCaptionMove?: (page: number, key: string) => void,
  *   onCaptionSplit?: (key: string) => void,
+ *   onSceneSelect?: (id: string) => void,
  * }} o
  */
-export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange, onMoveItem = () => {}, onTrack = () => {}, onReorderTracks = () => {}, onAddTrack = () => {}, onDeleteTrack = () => {}, keyframesOf = () => [], onSelectMarker = () => {}, onMoveMarker = () => {}, footageOf = () => null, onCaptionSelect = () => {}, onCaptionMove = () => {}, onCaptionSplit = () => {} }) {
+export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange, onMoveItem = () => {}, onTrack = () => {}, onReorderTracks = () => {}, onAddTrack = () => {}, onDeleteTrack = () => {}, keyframesOf = () => [], onSelectMarker = () => {}, onMoveMarker = () => {}, footageOf = () => null, onCaptionSelect = () => {}, onCaptionMove = () => {}, onCaptionSplit = () => {}, onSceneSelect = () => {} }) {
   let comp = null, beats = [], pps = 40, time = 0, fitted = false, peaks = null;
   let selected = new Set(), primary = null, selectedTrack = null, selectedMarker = null;
   let itemEls = new Map(), markerEls = [];
   let words = [], wordBase = new Map(), anchors = new Map();
   // caption pages (the studio's, built from the words): the lane, and the pages selected in it
   let captions = [], capSel = new Set(), capEls = [];
+  // the scenes of an interactive composition: their bands, the selected one, the one a session is in
+  let sceneEls = [], selectedScene = null, liveScene = null;
 
   const ruler = h('div.tl-ruler', { 'data-testid': 'ruler' });
   const playhead = h('div.tl-playhead', { 'data-testid': 'playhead' });
   const snapLine = h('div.tl-snap', { 'data-testid': 'time-snap', hidden: true });
   const rows = h('div.tl-rows');
   const markerLane = h('div.tl-lane.tl-marker-lane', { 'data-testid': 'marker-lane', role: 'group', 'aria-label': 'Markers' });
+  const sceneLane = h('div.tl-lane.tl-scene-lane', { 'data-testid': 'scene-lane', role: 'group', 'aria-label': 'Scenes' });
+  const sceneRow = h('div.tl-row.tl-scene-row', { hidden: true }, h('div.tl-head', h('span.muted', 'Scenes')), sceneLane);
   const inner = h('div.tl-inner',
     h('div.tl-row.tl-ruler-row', h('div.tl-head', h('span.muted', 'Tracks')), ruler),
+    sceneRow,
     h('div.tl-row.tl-marker-row', h('div.tl-head', h('span.muted', 'Markers')), markerLane),
     rows, playhead, snapLine);
   const el = h('div.timeline', { 'data-testid': 'timeline', tabIndex: 0, role: 'group', 'aria-label': 'Timeline' }, inner);
@@ -160,7 +168,48 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     if (bar) bar.style.width = `${Math.max(2, (m.duration ?? 0) * pps)}px`;
   }
   function placeMarkers() { for (const [i, node] of markerEls.entries()) if (comp.markers?.[i]) placeMarker(node, comp.markers[i]); }
-  function movePlayhead() { playhead.style.transform = `translateX(${time * pps}px)`; }
+  function movePlayhead() { playhead.style.transform = `translateX(${time * pps}px)`; markScenes(); }
+
+  // ── scenes (interactive compositions) ────────────────────────────────────────────────────
+  const sceneHue = (i) => (210 + i * 67) % 360;
+
+  function drawScenes() {
+    sceneLane.replaceChildren();
+    sceneEls = [];
+    const I = comp?.interactive;
+    sceneRow.hidden = !I;
+    if (!I) return;
+    for (const [i, sc] of I.scenes.entries()) {
+      const range = `${round(sc.start)} to ${round(sc.start + sc.duration)} s`;
+      const node = h('div.tl-scene', { 'data-testid': 'scene-band', 'data-scene': sc.id, 'data-start': String(sc.start), 'data-end': String(round(sc.start + sc.duration)), tabIndex: 0, role: 'button', 'aria-pressed': 'false',
+        'aria-label': `Scene ${sc.id}, ${range}`, title: `Scene ${sc.id} · ${range} · ${sc.end === 'hold' ? 'holds' : sc.end === 'loop' ? 'loops' : `goes to ${sc.end === 'next' ? 'the next scene' : sc.end}`}${sc.final ? ' · final' : ''}${sc.id === I.start ? ' · starts here' : ''}` },
+      h('b', sc.id), h('span.tl-scene-range', range));
+      node.style.setProperty('--sc', `hsl(${sceneHue(i)} 62% 62%)`);
+      if (sc.id === I.start) node.classList.add('start');
+      if (sc.final) node.classList.add('final');
+      node.addEventListener('click', (e) => { e.stopPropagation(); onSceneSelect(sc.id); });
+      node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSceneSelect(sc.id); } });
+      sceneEls.push(node);
+      placeScene(node);
+      sceneLane.append(node);
+    }
+    markScenes();
+  }
+  function placeScene(node) {
+    const start = Number(node.dataset.start), end = Number(node.dataset.end);
+    node.style.left = `${start * pps}px`;
+    node.style.width = `${Math.max(6, (end - start) * pps - 2)}px`;
+  }
+  /** The band the playhead is in, the selected one, and the one a session is in. */
+  function markScenes() {
+    for (const node of sceneEls) {
+      const start = Number(node.dataset.start), end = Number(node.dataset.end);
+      node.classList.toggle('here', time >= start - 1e-9 && time < end - 1e-9);
+      node.classList.toggle('selected', node.dataset.scene === selectedScene);
+      node.classList.toggle('live', node.dataset.scene === liveScene);
+      node.setAttribute('aria-pressed', String(node.dataset.scene === selectedScene));
+    }
+  }
 
   function layout() {
     if (!comp) return;
@@ -168,6 +217,7 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     drawRuler();
     for (const { item } of items()) { const node = itemEls.get(item.id); if (node) place(node, item); }
     for (const node of capEls) placeCaption(node);
+    for (const node of sceneEls) placeScene(node);
     placeMarkers();
     movePlayhead();
   }
@@ -270,6 +320,7 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
       if (track.id === narration) rows.append(captionRow());
     }
     drawMarkers();
+    drawScenes();
     mark();
     layout();
   }
@@ -714,6 +765,9 @@ export function createTimeline({ onSeek, onSelect, onBegin = () => {}, onChange,
     setCaptionSelection(list) { capSel = new Set(list); markCaptions(); },
     /** The index of the marker the inspector shows, or null. */
     setSelectedMarker(i) { selectedMarker = i ?? null; markMarkers(); },
+    /** The scene (id) selected in the Interactive panel or on its band, or null; and the one a play session is in. */
+    setSelectedScene(id) { selectedScene = id ?? null; markScenes(); },
+    setLiveScene(id) { liveScene = id ?? null; markScenes(); },
     /** Something changed in the draft (timing, keyframes, flags): rebuild the rows. */
     refresh() { build(); },
     /** Audio peaks of the clip's mix ({ peaks, rate }) for the waveforms. */

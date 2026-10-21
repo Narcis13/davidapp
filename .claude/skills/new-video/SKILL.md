@@ -1,6 +1,6 @@
 ---
 name: new-video
-description: Make a new short video (10 to 120 s) in Fablecut, the video studio in this repo, through its `studio` MCP tools, from a brief to a checked, rendered MP4 plus the clip and assets that re-render it. Starts from the library (suggest_assets, presets, precomps), writes new reusable asset code whenever the result is better for it, and polishes motion, type, sound and every shape with the studio's own checks. Use it whenever the user asks for a video, clip, teaser, promo, explainer, intro, reel, short, title sequence, animated announcement, lower third or any motion graphics, or runs /new-video, even when they do not say "Fablecut" or "studio".
+description: Make a new short video (10 to 120 s) in Fablecut, the video studio in this repo, through its `studio` MCP tools, from a brief to a checked, rendered MP4 plus the clip and assets that re-render it (or, for something people play rather than watch, an interactive clip delivered as a share page). Starts from the library (suggest_assets, presets, precomps), writes new reusable asset code whenever the result is better for it, and polishes motion, type, sound and every shape with the studio's own checks. Use it whenever the user asks for a video, clip, teaser, promo, explainer, intro, reel, short, title sequence, animated announcement, lower third or any motion graphics, or runs /new-video, even when they do not say "Fablecut" or "studio".
 argument-hint: "<topic, audience, length, shape, voiced or not>  |  path/to/brief.md  |  resume <slug>"
 ---
 
@@ -228,6 +228,40 @@ fix what a hand layout still needs. `check_clip { format }` for each.
 - Report to the user in one short message: the MP4 paths, the clip URL, what was reused and what is new in the
   library (with their names, so the next brief can ask for them), the checks table's open lines if any, and
   the clip's row of `compounding_report` (calls, new lines of asset code, reuse share).
+
+## Share links
+
+Every clip can be shared as a page that plays it in the viewer's browser on canvas (no MP4): `/share/<slug>` on the
+running studio, or `share_clip { clip, base_url? }`, which writes one self-contained folder (`output/share/<slug>/`:
+the page, the player, the core modules it imports, fonts, images, footage frames as WebP, sound as AAC, a poster and
+a 1200×630 card with Open Graph tags for link previews). Pass `base_url` when the user says where it will be
+published, so the preview card's URLs are absolute. Check it with the studio stopped:
+`node scripts/serve-static.mjs output/share/<slug>` and `node scripts/share-check.mjs` (video) or
+`scripts/play-check.mjs` (interactive). Publishing the folder anywhere is the user's step: never deploy it.
+
+## An interactive clip (a game, a deck, a little app)
+
+When the brief asks for something people click, tap or play rather than watch, make an interactive clip: it is
+played (on its share page and in the editor), never rendered. `create_clip { interactive: true }` starts it with
+one scene; the tracks are a *design timeline* and each scene is a time range of it (`end: hold | loop | next |
+<id>`). Read "Interactive assets" and "Interactive compositions" in the asset contract first.
+
+- **Assets react, they do not remember.** UI comes from the `ui-*` set (button, card, menu, toggle, slider,
+  progress, score, dialog, hotspot, toast, `ui-tx-*` scene transitions) or new assets that declare
+  `events: { emits, accepts }`, draw their hit regions with `f.ui.hit(...)`, read what the clip sent them with
+  `f.ui.since(...)`, and move while a scene waits on `f.ui.now`. State lives in `interactive.vars`; params bind
+  to it with `{ "$var": "score" }`, items show `when` a condition holds, wires (`on` → `do`) change it.
+- **Build with `edit_clip`**: `set_interactive`, `add_scene`, `add_wire`, `set_vars`; a save checks every wire
+  against the events the assets declare.
+- **Play it before you look at it**: `play_clip { clip, steps: [{ tap: "play" }, { wait: 0.5 }, { key: "Enter" }],
+  stills: true }` gives the states, hashes and stills along the way; the same `log` played again must give the same
+  hashes. `check_clip` crawls the states (reachable scenes, dead ends, tap targets ≥ 24 CSS px on a phone, the
+  frame checks in every state): 0 errors before you share it.
+- **Every input works**: a mouse, a finger and a keyboard alone (Tab, Enter, the keys the clip shows) can reach
+  every scene. Sound starts on the first tap; `cue: true` audio items play on `play` actions, `loop: true` ones
+  loop while a scene waits.
+- Deliver the share folder instead of an MP4, with a GIF of a playthrough (`scripts/play-check.mjs --gif`) and the
+  frame timings it reports (60 fps at phone width: no skipped frames).
 
 ## When the user sends notes
 

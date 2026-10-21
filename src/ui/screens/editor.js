@@ -3,7 +3,8 @@
 // keyframes and per-format overrides, parameters, attachments), undo and redo, clipboard, split,
 // saving layers as one asset, the agent panel, and save / render / remix. Since iteration 3: the
 // narration's words and the markers on the timeline, items that start on a word, gain automation
-// and ducking, the clip's loudness, captions and platforms, the issues panel, and overlays on the preview.
+// and ducking, the clip's loudness, captions and platforms, the issues panel, and overlays on the preview. Since iteration 5: an interactive clip shows its scenes on the timeline and in the
+// Interactive panel, and a play mode runs it on the preview as a viewer would (lib/play.js); it is played, not rendered.
 // Edits go to a local draft composition that the preview draws live; changes to the set of assets
 // are pinned and bundled by the server first.
 
@@ -15,7 +16,9 @@ import { createCanvasHandles } from '/ui/lib/canvas-handles.js';
 import { createHistory } from '/ui/lib/history.js';
 import { anchorSection, attachmentsSection, audioSection, captionsSection, footageSection, itemTime, keyMarks, keyframesSection, loudnessSection, markerSection, paramsSection, platformsSection, prune, sampled, setProp, transformSection } from '/ui/lib/inspector.js';
 import { mountCredits } from '/ui/lib/credits.js';
+import { mountInteractivePanel } from '/ui/lib/interactive.js';
 import { mountIssues } from '/ui/lib/issues.js';
+import { createPlay } from '/ui/lib/play.js';
 import { mountRepo } from '/ui/lib/repo.js';
 import { openRenderPanel } from '/ui/lib/render-panel.js';
 import { live as liveEvents } from '/ui/lib/live.js';
@@ -24,7 +27,7 @@ import { pickAsset } from '/ui/lib/picker.js';
 import { createStage } from '/ui/lib/stage.js';
 import { createTimeline } from '/ui/lib/timeline.js';
 import { loadPeaks } from '/ui/lib/waveform.js';
-import { MARKER_TYPES } from '/core/composition.js';
+import { MARKER_TYPES, normalizeComposition } from '/core/composition.js';
 import { buildPages, mergePages, movePageStart, splitPage, structureOf, toSrt } from '/core/captions.js';
 import { footageAsset } from '/ui/lib/footage.js';
 import { assetHref, clamp, clone, debounce, errorBlock, fill, fmtDuration, fmtTime, h, icon, nextId, notice, plural, splitRef } from '/ui/lib/util.js';
@@ -101,6 +104,7 @@ export async function mount(view, ctx) {
   const fonts = status.fonts.map((f) => f.family);
 
   let draft = clone(clip.composition);
+  const isInteractive = !!draft.interactive;
   let bundle = clip.bundle, beats = clip.beats, info = clip.assets;
   // what the studio measured about the draft: the narration's words (clip time), caption pages, anchors, zones in frame pixels
   let words = clip.words ?? [], captionPages = clip.captions ?? null, anchors = clip.anchors ?? [], zones = clip.zones ?? null;
@@ -116,6 +120,8 @@ export async function mount(view, ctx) {
   let saveError = '';   // why the last save failed, for a dialog that saves first
   let proposal = null, showProposal = false;
   let clipboard = [];
+  // interactive clips (iteration 5): the play mode, the panel, what the composition's validation says
+  let play = null, ipanel = null, interactiveErrors = [];
 
   const msg = notice('editor-error');
   const unsaved = h('span.badge.warn', { hidden: true, 'data-testid': 'unsaved' }, 'Unsaved changes');
@@ -123,7 +129,10 @@ export async function mount(view, ctx) {
   const saved = h('span.badge.ok', { hidden: true, 'data-testid': 'save-status', role: 'status' });
   const meta = h('p.sub', { 'data-testid': 'clip-meta' });
   const saveBtn = h('button.btn', { type: 'button', 'data-testid': 'save', disabled: true }, 'Save');
-  const renderBtn = h('button.btn.primary', { type: 'button', 'data-testid': 'render-button' }, 'Render');
+  // an interactive clip is played, not rendered: its button points to sharing instead
+  const renderBtn = isInteractive
+    ? h('button.btn.primary', { type: 'button', 'data-testid': 'render-button', 'data-interactive': '', title: 'This clip is played, not rendered to MP4. Share it as a page.' }, 'Share')
+    : h('button.btn.primary', { type: 'button', 'data-testid': 'render-button' }, 'Render');
   const remixBtn = h('button.btn', { type: 'button', 'data-testid': 'remix' }, 'Remix');
   const addBtn = h('button.btn.small', { type: 'button', 'data-testid': 'add-item' }, icon('plus', 14), 'Add item');
   const inspector = h('section.panel.inspector', { 'data-testid': 'inspector' });
@@ -171,6 +180,7 @@ export async function mount(view, ctx) {
     onTime(t) {
       timeline.setTime(t, stage.pv.playing);
       showPosition(t);
+      play?.refresh(t);
       cancelAnimationFrame(rafSync);
       rafSync = requestAnimationFrame(() => { handles.redraw(); syncInspector(); drawLayers(); });
       if (performance.now() - lastStored > 1000) remember();
@@ -245,6 +255,7 @@ export async function mount(view, ctx) {
     onCaptionSelect(list) { setCapSel(list, false); },
     onCaptionMove(page, key) { captionMove(page, key); },
     onCaptionSplit(key) { captionSplitAt(key); },
+    onSceneSelect(id) { selectScene(id); },
   });
   ctx.onCleanup(() => timeline.destroy());
   ctx.setGuard(() => (dirty ? 'This clip has unsaved changes. Leave without saving?' : null));
@@ -309,6 +320,67 @@ export async function mount(view, ctx) {
   });
   ctx.onCleanup(() => handles.destroy());
 
+  // ── interactive: scenes, the panel, the play mode ────────────────────────────────────────
+  const timelinePanel = h('section.panel.timeline-panel');
+  const fmtBar = h('div.fmt-bar');
+  if (isInteractive) {
+    ipanel = mountInteractivePanel({ onScene: selectScene });
+    play = createPlay({
+      slug, canvas: stage.canvas, pv: stage.pv, host: stage.frame,
+      composition: () => viewOf(draft),
+      blocked: () => (interactiveErrors.length ? 'Fix the problems listed under Interactive first.' : busy ? 'The studio is working on the clip. Try again in a moment.' : showProposal ? 'Close the proposal preview first.' : null),
+      onMode: setPlayMode,
+      // the playhead follows the session: each scene is a range of the design timeline
+      onFrame(n, view, st) { const t = view.frame / draft.fps; timeline.setTime(t, true); showPosition(t); timeline.setLiveScene(st.scene); },
+      onStop() { timeline.setLiveScene(null); timeline.setTime(time()); showPosition(time()); handles.redraw(); play.refresh(time()); },
+    });
+    ctx.onCleanup(() => play.destroy());
+  }
+
+  /** While a session runs the preview belongs to it: the timeline, layers, inspector and format are read-only. */
+  function setPlayMode(mode) {
+    const on = mode !== 'design';
+    for (const el of [timelinePanel, layersPanel, capPanel, fmtBar]) el.inert = on;
+    inspector.inert = on || busy;
+    handles.setEnabled(!on && !showProposal);
+    // the design timeline's transport (play, scrub, time) means nothing while a session runs; the overlay toggles stay
+    for (const c of stage.transport.querySelectorAll('[data-testid=play], [data-testid=scrub], [data-testid=time]')) c.style.display = on ? 'none' : '';
+  }
+
+  /** The composition's validation (the same rules the studio saves by), shown in the Interactive panel; Play waits for it to be clean. */
+  function runInteractiveChecks() {
+    if (!isInteractive) return;
+    try { interactiveErrors = normalizeComposition(clone(draft)).errors; } catch (e) { interactiveErrors = [{ path: 'composition', message: e.message }]; }
+    ipanel.update(draft, interactiveErrors);
+    play.refresh(time());
+    timeline.setSelectedScene(draft.interactive?.scenes.some((x) => x.id === ipanelScene) ? ipanelScene : null);
+  }
+  const checkInteractive = debounce(runInteractiveChecks, 120);
+  ctx.onCleanup(() => checkInteractive.cancel());
+  let ipanelScene = null;
+
+  /** A click on a scene band or in the panel: the scene is marked and the playhead goes to its start. */
+  function selectScene(id) {
+    const scene = draft.interactive?.scenes.find((x) => x.id === id);
+    if (!scene || play?.mode !== 'design') return;
+    ipanelScene = id;
+    timeline.setSelectedScene(id);
+    ipanel.select(id);
+    seekTo(scene.start);
+  }
+
+  /** The Share button of an interactive clip: it is played, not rendered, and a page plays it. */
+  function shareNote() {
+    openDialog({
+      title: 'Played, not rendered', testid: 'interactive-share-dialog',
+      body: h('div.form',
+        h('p', 'An interactive clip reacts to clicks, taps and keys, so it is played in the browser. There is no MP4 to render.'),
+        h('p', 'Share it as a page: ', h('a', { href: `/share/${slug}`, target: '_blank', rel: 'noopener', 'data-testid': 'interactive-share-link' }, `${location.origin}/share/${slug}`)),
+        dirty ? h('p.notice.info', 'This clip has unsaved changes. The page plays the saved clip, so save first.') : null,
+        h('p.hint', 'The page shows the clip as it is saved when it is opened.')),
+    });
+  }
+
   // ── state changes ────────────────────────────────────────────────────────────────────────
   function setDirty(on) { dirty = on; unsaved.hidden = !on; if (on) saved.hidden = true; saveBtn.disabled = !on || busy; }
   /** The server is working on the draft and its answer replaces it: no edits meanwhile, and news of other revisions waits. */
@@ -326,6 +398,7 @@ export async function mount(view, ctx) {
     refreshMeta();
     if (audioSig(draft) !== lastAudioSig) { lastAudioSig = audioSig(draft); refreshAudio(); }
     if (!showProposal) stage.pv.setComposition(viewOf(draft));
+    if (isInteractive) checkInteractive();
     const capsChanged = syncCaptions();
     if (tl || capsChanged) timeline.refresh();
     if (hd) handles.redraw();
@@ -404,6 +477,7 @@ export async function mount(view, ctx) {
     fill(meta,
       h('span.ref', clip.slug), ' · ', status.formats[draft.format]?.label ?? 'Custom size', ` · ${draft.width}×${draft.height} · ${fmtDuration(draft.duration)} · ${draft.fps} fps · `,
       h('span', { 'data-testid': 'revision' }, `revision ${clip.revision}`),
+      isInteractive ? [' · ', h('span.badge', { 'data-testid': 'interactive-badge', title: 'Played in the browser, not rendered to MP4' }, 'Interactive')] : null,
       clip.remixedFrom ? [' · remix of ', h('a', { href: `/clips/${clip.remixedFrom}` }, clip.remixedFrom)] : null);
   }
 
@@ -415,6 +489,7 @@ export async function mount(view, ctx) {
 
   async function setFormat(name) {
     if (name === fmt) return;
+    play?.stop();
     fmt = name;
     drawFormat();
     const v = viewSize();
@@ -429,6 +504,7 @@ export async function mount(view, ctx) {
   }
 
   async function showClip() {
+    play?.stop();
     const v = viewSize();
     stage.setSize(v.width, v.height);
     overlays.redraw();
@@ -549,6 +625,7 @@ export async function mount(view, ctx) {
     timeline.setData({ composition: draft, beats, words, anchors, captions: captionPages });
     loadFootage();
     drawCaptions();
+    runInteractiveChecks();
   }
 
   /** The set of assets changed: have the server pin and bundle `next`, then show it. */
@@ -1036,6 +1113,8 @@ export async function mount(view, ctx) {
 
   const onKey = (e) => {
     if (e.defaultPrevented || document.querySelector('dialog[open]') || isTyping(e.target)) return;
+    // a session in play mode owns the keys (the canvas takes them; the editor's shortcuts wait)
+    if (play && play.mode !== 'design') return;
     const mod = e.metaKey || e.ctrlKey;
     const k = e.key.toLowerCase();
     if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
@@ -1057,6 +1136,7 @@ export async function mount(view, ctx) {
 
   saveBtn.addEventListener('click', save);
   renderBtn.addEventListener('click', async () => {
+    if (isInteractive) { shareNote(); return; }
     if (dirty && !(await save())) return;
     msg.hide();
     openRenderPanel({
@@ -1435,6 +1515,7 @@ export async function mount(view, ctx) {
 
   // ── proposals from the agent ─────────────────────────────────────────────────────────────
   async function showProposalView() {
+    play?.stop();
     const p = proposal;
     const comp = viewOf(p.composition);
     stage.setSize(comp.width, comp.height);
@@ -1485,18 +1566,19 @@ export async function mount(view, ctx) {
     h('div.editor',
       h('div.ed-main',
         h('section.panel.stage-panel',
-          h('div.fmt-bar', fmtLabel, h('div.fmt-switch', { role: 'group', 'aria-label': 'Format to lay out' }, fmtBtns)),
+          fill(fmtBar, fmtLabel, h('div.fmt-switch', { role: 'group', 'aria-label': 'Format to lay out' }, fmtBtns)),
           overlays.bar,
           proposalBar,
+          play?.el,
           stage.el),
-        h('section.panel.timeline-panel',
+        fill(timelinePanel,
           h('div.panel-head', h('div.row', h('h2', 'Timeline'), position, audioStatus), h('div.row', addBtn, timeline.toolbar)),
           h('div.ed-toolbar', { role: 'toolbar', 'aria-label': 'Edit' }, undoBtn, redoBtn, splitBtn, copyBtn, pasteBtn, dupBtn, assetBtn, h('span.ed-marker-add', markerType, markerBtn), keysBtn),
           timeline.el,
           h('p.hint', `Drag an item to move it (also to another track), drag its edges to trim; footage trims the file and keeps its picture in place. Moves snap to the playhead, beats and other items; hold Alt to move freely. ${plural(beats.length, 'beat')} detected in the audio.`)),
         capPanel,
         layersPanel),
-      h('aside.ed-side', agentBox, inspector, issues.el, assetsPanel, credits.el, repo.el)));
+      h('aside.ed-side', agentBox, inspector, ipanel?.el, issues.el, assetsPanel, credits.el, repo.el)));
 
   drawMeta();
   drawFormat();
@@ -1507,6 +1589,7 @@ export async function mount(view, ctx) {
   capSig = captionSig();
   loadFootage();
   drawCaptions();
+  runInteractiveChecks();
   for (const track of draft.tracks) for (const item of track.items) if (item.anchor) resolved.set(item.id, item.start);
   showPosition(0);
   remember();

@@ -6,6 +6,7 @@ import { parentPort } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { createRuntime, describeError } from '../core/runtime.js';
+import { normalizeLog, replay, stepsToLog, summary, initialState, advance, applyInput, viewOf, inside, parseOn, reachable } from '../core/interactive.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
 import { fontAliases } from '../core/lib/text.js';
@@ -164,7 +165,7 @@ function sheet(cells, { cols, cellWidth, width, height }) {
   return out;
 }
 
-const metaOf = (def) => JSON.parse(JSON.stringify({ kind: def.kind, title: def.title, description: def.description, tags: def.tags, duration: def.duration, formats: def.formats, schema: def.schema, uses: def.uses }));
+const metaOf = (def) => JSON.parse(JSON.stringify({ kind: def.kind, title: def.title, description: def.description, tags: def.tags, duration: def.duration, formats: def.formats, schema: def.schema, uses: def.uses, events: def.events ?? undefined }));
 
 /** Compile unsaved source, check it and render test frames. Throws with a useful message when it fails. */
 async function validate(msg) {
@@ -291,6 +292,93 @@ function demoThumb(rt, ref, params, t, duration) {
   return png(c, 640);
 }
 
+// ── interactive clips: the checks' views of a session ───────────────────────────────────────────
+
+/** Seconds a state is left to settle before it is drawn and acted on: the animations of a scene or of a change have run out. */
+const SETTLE = 1.5;
+
+/** Did drawing fail because a text cannot fit at its size floor? (check_clip reports that as an issue, not as a failed check) */
+const isFloorError = (e) => /^TextFloorError\b/.test(String(e?.stack ?? '')) || /\bTextFloorError:/.test(String(e?.message ?? ''));
+
+/**
+ * One view of an interactive clip as the checks measure it: a session state (view = viewOf(…)) or, without a `ui`, the
+ * design timeline with the variables at their first values. → { texts (each with its contrast), regions, std (spread of the greys) }.
+ */
+async function measureView(comp, view, contrast) {
+  await loadMedia(state.rt, comp, view.frame);
+  const c = surface(comp.width, comp.height);
+  const extra = { ...state.clip, ...(view.ui ? { ui: view.ui } : {}) };
+  const r = state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, view.frame, { ...extra, record: true });
+  const a = new Uint8Array(c.data());
+  if (contrast && r.texts.length) {
+    const b2 = bareSurface(comp.width, comp.height);
+    state.rt.renderClipFrame(b2.getContext('2d', FRAME_CONTEXT), comp, view.frame, { ...extra, suppressText: true });
+    const b = new Uint8Array(b2.data());
+    for (const t of r.texts) t.contrast = boxContrast(a, b, comp.width, comp.height, t.box, { fill: t.fill });
+  }
+  return { texts: r.texts, regions: r.regions ?? [], std: grayStd(thumbGray(a, comp.width, comp.height)) };
+}
+
+/** The topmost region at a frame-pixel point (the last drawn is in front), as applyInput reads a press. */
+function topmost(regions, x, y) {
+  for (let i = regions.length - 1; i >= 0; i--) if (inside(regions[i], x, y)) return regions[i];
+  return null;
+}
+
+/** A point of region r in frame pixels, from fractions of its own rectangle. */
+function place(r, u, v) {
+  const [a, b, c, d, e, f] = r.m;
+  const lx = r.x + r.w * u, ly = r.y + r.h * v;
+  return { x: a * lx + c * ly + e, y: b * lx + d * ly + f };
+}
+
+/**
+ * Where a viewer can press region r so that r gets the press: its middle, else the first of a few other points that no
+ * region in front covers. A range region is pressed at its minimum or maximum end. → { x, y } or null (covered all over).
+ */
+function spot(regions, r, end = null) {
+  const here = (p) => topmost(regions, p.x, p.y)?.key === r.key;
+  let candidates;
+  if (r.range) {
+    // u runs along the axis from the minimum (0) to the maximum (1); start at the very end, then a little inside it
+    // (a point on the edge may fall just outside the region)
+    const along = (u) => (r.range.axis === 'y' ? place(r, 0.5, 1 - u) : place(r, u, 0.5));
+    candidates = (end === 'max' ? [1, 0.999, 0.98] : [0, 0.001, 0.02]).map(along);
+  } else {
+    candidates = [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75], [0.5, 0.1], [0.5, 0.9], [0.1, 0.5], [0.9, 0.5]].map(([u, v]) => place(r, u, v));
+  }
+  return candidates.find(here) ?? null;
+}
+
+/** A point of the frame that no region covers (a press there is a `tap` event), or null. */
+function freeSpot(regions, width, height) {
+  for (let j = 1; j < 12; j++) for (let i = 1; i < 12; i++) {
+    const x = (width * i) / 12, y = (height * j) / 12;
+    if (!topmost(regions, x, y)) return { x, y };
+  }
+  return null;
+}
+
+/** A press and release at a point, stamped with session frame n. */
+const pressAt = (n, p) => ['move', 'down', 'up'].map((type) => ({ f: n, type, x: p.x, y: p.y, pointer: 'mouse' }));
+
+/**
+ * A state at rest: its scene entered at frame 0 and observed after the settling time (or just before the scene ends), with
+ * every animation of what the viewer did run out. The crawl keeps states in this form, so that how a state was reached (and
+ * how quickly) does not decide how it is drawn, and a scene is never over before the crawl has acted in it.
+ */
+function atRest(comp, s, settleFrames) {
+  const scene = comp.interactive.scenes.find((x) => x.id === s.scene);
+  const len = Math.max(1, Math.round(scene.duration * comp.fps));
+  const out = structuredClone(s);
+  Object.assign(out, { entered: 0, f: Math.max(0, Math.min(settleFrames, len - 2)), ended: false, tx: null, pointer: null, capture: null, hover: null });
+  for (const x of Object.values(out.changed)) x.f = 0;
+  for (const k of Object.keys(out.pressed)) out.pressed[k] = 0;
+  for (const box of Object.values(out.inbox)) for (const x of Object.values(box)) x.f = 0;
+  for (const x of out.sounds) x.f = 0;
+  return out;
+}
+
 const handlers = {
   async load(msg) {
     takeLogs();
@@ -331,6 +419,126 @@ const handlers = {
     }
     const thumb = thumbGray(a, comp.width, comp.height);
     return { result: { texts, thumb, std: grayStd(thumb) }, transfer: [thumb.buffer] };
+  },
+  /**
+   * v5: play an interactive clip from an input log or scripted steps (core/interactive.js), as a viewer's browser
+   * would, and report the chosen session frames: { frame, playhead, state, hash, png?, regions? }, the log played and
+   * the final state. msg: { log | steps, frames, stills, maxSize, regions }.
+   */
+  async play(msg) {
+    const comp = state.comp;
+    if (!comp?.interactive) throw new Error('this clip is not interactive: it has no interactive section to play');
+    const c = surface(comp.width, comp.height);
+    const draw = async (view) => {
+      await loadMedia(state.rt, comp, view.frame);
+      if (view.transition) await loadMedia(state.rt, comp, view.transition.from);
+      return state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, view.frame, { ...state.clip, ui: view.ui, transition: view.transition }).regions;
+    };
+    const log = msg.steps ? (await stepsToLog(comp, msg.steps, { draw })).log : normalizeLog(msg.log ?? []);
+    const frames = [];
+    const end = await replay(comp, log, {
+      frames: msg.frames ?? [], draw,
+      onFrame: async (n, view, s) => {
+        const regions = await draw(view);
+        frames.push({ frame: n, t: n / comp.fps, playhead: view.frame, state: summary(s), hash: sha(c.data()), ...(msg.stills ? { png: png(c, msg.maxSize) } : {}), ...(msg.regions ? { regions } : {}) });
+      },
+    });
+    return { result: { log, frames, end: summary(end), last: Math.max(0, ...log.map((e) => e.f)) } };
+  },
+  /**
+   * v5: a frame of an interactive clip's design timeline (nobody playing, the variables at their first values) measured for
+   * the checks, with the hit regions it draws → { texts (each with its contrast), regions, std }. msg: { frame, contrast }.
+   */
+  async inspectScene(msg) {
+    return { result: await measureView(state.comp, { frame: msg.frame }, msg.contrast) };
+  },
+  /**
+   * v5: crawl the states of an interactive clip. From the first state, each state is drawn at rest and measured, then every
+   * way a viewer can leave it is tried: a press on each hit region (a range region at its minimum and at its maximum),
+   * each key a wire listens to, a press on nothing when a wire listens to `tap`, and waiting for the scene to end.
+   * States are told apart by scene and variables; at most msg.maxStates are visited, breadth first. msg: { maxStates, contrast }.
+   * → { states: [{ id, scene, vars, state, frame, playhead, texts, regions, std, occluded: [{ key, by }], error?, floorError? }],
+   *     edges: [{ from, action, to }], errors: [{ state, action, message }], truncated, max }
+   */
+  async explore(msg) {
+    const comp = state.comp;
+    if (!comp?.interactive) throw new Error('this clip is not interactive: it has no interactive section to explore');
+    const I = comp.interactive;
+    const max = msg.maxStates ?? 40;
+    const settle = Math.round(SETTLE * comp.fps);
+    const keyOf = (s) => JSON.stringify([s.scene, s.vars]);
+    const nodes = [], index = new Map(), edges = [], errors = [];
+    let truncated = false;
+    /** The node of a state, new ones appended to the queue; null when the crawl is full. */
+    const visit = (s) => {
+      const key = keyOf(s);
+      let node = index.get(key);
+      if (node) return node;
+      if (nodes.length >= max) { truncated = true; return null; }
+      node = { id: `s${nodes.length}`, scene: s.scene, vars: { ...s.vars }, state: atRest(comp, s, settle) };
+      index.set(key, node);
+      nodes.push(node);
+      return node;
+    };
+    visit(initialState(comp));
+    for (const node of nodes) {
+      const s = node.state, n = s.f;
+      const view = viewOf(comp, s, n);
+      Object.assign(node, { frame: n, playhead: view.frame, occluded: [] });
+      let regions = [];
+      try {
+        const m = await measureView(comp, view, msg.contrast);
+        Object.assign(node, m);
+        regions = m.regions;
+      } catch (e) {
+        Object.assign(node, { error: describeError(e), ...(isFloorError(e) ? { floorError: true } : {}) });
+      }
+      const here = (w) => w.scene === undefined || [].concat(w.scene).includes(s.scene);
+      /** Try one thing a viewer can do in this state; the state it leads to is a node too (and a wire that throws is an error). */
+      const act = (action, make) => {
+        let next;
+        try { next = make(); } catch (e) { errors.push({ state: node.id, action, message: e.message }); return; }
+        const to = next && visit(next);
+        if (to) edges.push({ from: node.id, action, to: to.id });
+      };
+      // what is behind an open modal is out of reach: neither pressed nor reported as covered
+      const live = reachable(regions);
+      for (const r of live) {
+        const name = `${r.item}.${r.name}${r.id !== undefined ? `#${r.id}` : ''}`;
+        // a range region is dragged to the end it is not at
+        for (const end of r.range ? ['min', 'max'].filter((e) => r.range.value !== r.range[e]) : [null]) {
+          const p = spot(live, r, end);
+          if (!p) {
+            if (!node.occluded.some((o) => o.key === r.key)) { const mid = place(r, 0.5, 0.5); node.occluded.push({ key: r.key, by: topmost(live, mid.x, mid.y)?.key ?? null }); }
+            continue;
+          }
+          act(end ? `drag ${name} to ${end}` : `tap ${name}`, () => applyInput(comp, s, n, pressAt(n, p), regions));
+        }
+      }
+      const keys = new Set();
+      for (const w of I.wires) {
+        const on = parseOn(w.on);
+        if (on?.kind === 'key' && here(w)) keys.add(on.key === 'any' ? 'x' : on.key);
+      }
+      for (const key of keys) act(`key ${key}`, () => applyInput(comp, s, n, [{ f: n, type: 'key', key }], regions));
+      if (I.wires.some((w) => w.on === 'tap' && here(w))) {
+        const p = freeSpot(live, comp.width, comp.height);
+        if (p) act('tap on nothing', () => applyInput(comp, s, n, pressAt(n, p), regions));
+      }
+      // time: the scene runs out (its end rule and the `end:` wires); no new state when nothing changes
+      const len = Math.max(1, Math.round(I.scenes.find((x) => x.id === s.scene).duration * comp.fps));
+      act('wait', () => { const t = advance(comp, s, len); return keyOf(t) === keyOf(s) ? null : t; });
+    }
+    return { result: { states: nodes, edges, errors, truncated, max } };
+  },
+  /** v5: the frame a session state draws (a state of `explore`, or any from the fold) as PNG. msg: { state, maxSize }. */
+  async stateFrame(msg) {
+    const comp = state.comp;
+    const view = viewOf(comp, msg.state, msg.state.f);
+    await loadMedia(state.rt, comp, view.frame);
+    const c = surface(comp.width, comp.height);
+    state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, view.frame, { ...state.clip, ui: view.ui });
+    return output(c, { maxSize: msg.maxSize });
   },
   assetFrame(msg) {
     return output(drawAsset(state.rt, msg.ref, state.fonts ? { ...msg, fonts: state.fonts } : msg), msg);

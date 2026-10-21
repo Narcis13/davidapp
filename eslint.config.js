@@ -13,6 +13,6 @@ export default [
       eqeqeq: ['error', 'always'],
     },
   },
-  { files: ['src/ui/**/*.js'], languageOptions: { globals: { ...globals.browser, ...globals.worker } } },
+  { files: ['src/ui/**/*.js', 'src/player/**/*.js'], languageOptions: { globals: { ...globals.browser, ...globals.worker } } },
   { files: ['src/core/**/*.js'], languageOptions: { globals: { Intl: 'readonly' } } },
 ];

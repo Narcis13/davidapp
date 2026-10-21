@@ -1,19 +1,20 @@
 // Guides drawn over a frame for people to look at (never into a render): a grid, title-safe and
-// action-safe, the format's safe zone, the platform zones, the caption lane, the measured text boxes,
-// and a highlighted box with a label (the stills of check_clip issues).
+// action-safe, the format's safe zone, the platform zones, the caption lane, the measured text boxes (and, in an
+// interactive clip, its hit regions), and a highlighted box with a label (the stills of check_clip issues).
 
 import { createCanvas, loadImage, registerFonts } from './host.js';
 
 export const OVERLAYS = ['grid', 'safe', 'platform', 'lane', 'text'];
 
-const COLORS = { grid: 'rgba(255,255,255,0.22)', title: 'rgba(255,255,255,0.85)', action: 'rgba(255,255,255,0.5)', format: '#5ce1e6', platform: '#ffb347', lane: 'rgba(255,92,205,0.22)', laneEdge: '#ff5ccd', text: '#7cf5a0', highlight: '#ff3b3b' };
+const COLORS = { grid: 'rgba(255,255,255,0.22)', title: 'rgba(255,255,255,0.85)', action: 'rgba(255,255,255,0.5)', format: '#5ce1e6', platform: '#ffb347', lane: 'rgba(255,92,205,0.22)', laneEdge: '#ff5ccd', text: '#7cf5a0', hit: '#ffd24a', highlight: '#ff3b3b' };
 
 /**
  * Draw overlays on a frame PNG. o: { width (the frame's own width: the PNG may be smaller), zones (studio/inspect.js zonesOf),
- * texts (layout-report blocks), show: names from OVERLAYS (default all), highlight: { box, label } | [..] }. → PNG Buffer at the PNG's size.
- * @param {Buffer} png @param {{ width: number, height?: number, zones?: any, texts?: any[], show?: string[], highlight?: any }} o
+ * texts (layout-report blocks), regions (an interactive clip's hit regions, as the layout report lists them; drawn with the texts),
+ * show: names from OVERLAYS (default all), highlight: { box, label } | [..] }. → PNG Buffer at the PNG's size.
+ * @param {Buffer} png @param {{ width: number, height?: number, zones?: any, texts?: any[], regions?: any[], show?: string[], highlight?: any }} o
  */
-export async function drawOverlays(png, { width, zones, texts = [], show = OVERLAYS, highlight = [] }) {
+export async function drawOverlays(png, { width, zones, texts = [], regions = [], show = OVERLAYS, highlight = [] }) {
   registerFonts();
   const img = await loadImage(png);
   const c = createCanvas(img.width, img.height);
@@ -64,6 +65,10 @@ export async function drawOverlays(png, { width, zones, texts = [], show = OVERL
     for (const t of texts) {
       rect(t.box, COLORS.text, t.approximate ? [3, 3] : []);
       label(`${t.item ?? '?'} · ${t.screenSize === null ? '' : `${Math.round(t.screenSize)}px`}`, t.box.x * k, t.box.y * k - Math.max(12, Math.round(img.width / 60)) - 2, COLORS.text);
+    }
+    for (const r of regions) {
+      rect(r.box, COLORS.hit, [6, 3]);
+      label(`${r.item}.${r.event} ${Math.round(r.css.width)}×${Math.round(r.css.height)}px`, r.box.x * k, (r.box.y + r.box.height) * k + 2, COLORS.hit);
     }
   }
   for (const h of [highlight].flat().filter(Boolean)) {

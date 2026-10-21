@@ -1,0 +1,543 @@
+{
+ "url": "http://127.0.0.1:8812/games/tap-the-beat/",
+ "size": "1440x900",
+ "mobile": false,
+ "headful": false,
+ "gpu": false,
+ "steps": [
+  {
+   "step": {
+    "wait": 1.5
+   },
+   "ms": 1507,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "document.querySelector('[data-share]').dataset.state === 'playing'"
+   },
+   "ms": 0,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "tap": "play"
+   },
+   "ms": 267,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 0.5
+   },
+   "ms": 513,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "window.fablecut.sound === \"running\" && window.fablecut.session.state.scene === \"game\""
+   },
+   "ms": 1,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 2
+   },
+   "ms": 2012,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "click": "[data-testid=play]"
+   },
+   "ms": 469,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 0.5
+   },
+   "ms": 514,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "document.querySelector('[data-share]').dataset.state === 'paused' && window.fablecut.session.paused"
+   },
+   "ms": 1,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "shot": "paused"
+   },
+   "ms": 100,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "click": "[data-testid=big-play]"
+   },
+   "ms": 454,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 0.5
+   },
+   "ms": 505,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "document.querySelector('[data-share]').dataset.state === 'playing' && !window.fablecut.session.paused && window.fablecut.sound === 'running'"
+   },
+   "ms": 0,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "click": "[data-testid=fullscreen]"
+   },
+   "ms": 447,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 0.8
+   },
+   "ms": 802,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "!!document.querySelector('[data-share]').dataset.full"
+   },
+   "ms": 1,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "shot": "fullscreen"
+   },
+   "ms": 80,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "getComputedStyle(document.querySelector('[data-testid=fullscreen]')).visibility !== 'hidden' && document.querySelector('[data-testid=fullscreen]').getBoundingClientRect().width > 0"
+   },
+   "ms": 1,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "click": "[data-testid=fullscreen]"
+   },
+   "ms": 462,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 0.6
+   },
+   "ms": 611,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "!document.querySelector('[data-share]').dataset.full"
+   },
+   "ms": 0,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "click": "[data-testid=sound]"
+   },
+   "ms": 473,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "document.querySelector('[data-share]').hasAttribute('data-muted')"
+   },
+   "ms": 1,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "click": "[data-testid=sound]"
+   },
+   "ms": 467,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "check": "!document.querySelector('[data-share]').hasAttribute('data-muted')"
+   },
+   "ms": 1,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  }
+ ],
+ "problems": [],
+ "states": [],
+ "firstFrame": 223,
+ "readyMs": 1162,
+ "frames": {
+  "drawn": 573,
+  "skipped": 0,
+  "drawMs": {
+   "p50": 8.8,
+   "p95": 12,
+   "p99": 15.6,
+   "max": 17.9,
+   "over16": 3
+  },
+  "slow": [
+   {
+    "frame": 315,
+    "playhead": 407,
+    "scene": "game",
+    "ms": 17.4,
+    "transition": false
+   },
+   {
+    "frame": 373,
+    "playhead": 465,
+    "scene": "game",
+    "ms": 17.8,
+    "transition": false
+   },
+   {
+    "frame": 453,
+    "playhead": 545,
+    "scene": "game",
+    "ms": 17.9,
+    "transition": false
+   }
+  ],
+  "gaps": [],
+  "stalls": []
+ },
+ "bytes": 1363296,
+ "log": 6,
+ "end": {
+  "scene": "game",
+  "vars": {
+   "score": 0,
+   "combo": 0,
+   "best": 0,
+   "hits": 0,
+   "perfects": 0,
+   "strays": 0,
+   "lane": 0,
+   "help": false,
+   "keys": true,
+   "speed": 1
+  },
+  "frame": 572,
+  "page": "playing"
+ }
+}

@@ -1,0 +1,80 @@
+{
+  "ref": "ui-score@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Score",
+  "description": "An animated score or counter for interactive compositions and game HUDs: the number ticks to each new value of a bound variable, pops with a spring and flashes (the accent on a gain, red on a loss) and floats the difference (\"+10\") above itself. Styles: a pill with a kit-icon and a small label, a scoreboard stack (label over a big number) or the bare number; prefix, suffix, decimals and thousands separators. A bump event pops it without a change. Keyframe `value` in a video. Text has a size floor; takes a theme.",
+  "tags": ["ui", "interactive", "score", "counter", "hud", "number", "game", "quiz"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "value": {
+      "type": "number",
+      "default": 1250,
+      "description": "The number: bind it to a number variable ({ \"$var\": \"score\" })"
+    },
+    "label": {"type": "string", "default": "Score", "description": "A small label (empty: none)"},
+    "icon": {
+      "type": "string",
+      "default": "star",
+      "description": "A kit-icon name (pill and plain styles; empty: none)"
+    },
+    "style": {
+      "type": "enum",
+      "options": ["pill", "stack", "plain"],
+      "default": "pill",
+      "description": "pill: a HUD chip; stack: a scoreboard (label over a big number); plain: the number"
+    },
+    "prefix": {"type": "string", "default": ""},
+    "suffix": {"type": "string", "default": "", "description": "After the number (pts, %, s…)"},
+    "decimals": {"type": "integer", "default": 0, "min": 0, "max": 3},
+    "grouping": {"type": "boolean", "default": true, "description": "Thousands separators (1,250)"},
+    "delta": {
+      "type": "boolean",
+      "default": true,
+      "description": "Float the difference above the number when it changes"
+    },
+    "tick": {
+      "type": "number",
+      "default": 0.6,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "description": "Seconds the count takes to reach a new value"
+    },
+    "align": {
+      "type": "enum",
+      "options": ["center", "left", "right"],
+      "default": "center",
+      "description": "Where it sits across its box"
+    },
+    "color": {
+      "type": "string",
+      "default": "",
+      "description": "Icon and flash colour, a CSS colour (empty: the theme's accent)"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 6,
+      "min": 2.6,
+      "max": 30,
+      "step": 0.1,
+      "description": "Number size in % of the frame's short side"
+    },
+    "delay": {"type": "number", "default": 0, "min": 0, "max": 10, "step": 0.05},
+    "inDur": {"type": "number", "default": 0.45, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {"type": "number", "default": 0, "min": 0, "max": 3, "step": 0.01}
+  },
+  "uses": {"easing": "easing", "kit-icon": "kit-icon"},
+  "deps": {"easing": "easing@1", "kit-icon": "kit-icon@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:07:07.869Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:07:07.869Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/ui-score@1.js", "sha1": "c6e7443721f0441be1114bcc29ce171c99997c5d"},
+  "hash": "2f4dec0cc901041281ac2a7eb5404143f561df40340e22257401cd0f8c4f415b"
+}

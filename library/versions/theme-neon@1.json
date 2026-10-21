@@ -1,0 +1,22 @@
+{
+  "ref": "theme-neon@1",
+  "type": "function",
+  "kind": "value",
+  "title": "Theme: Neon",
+  "description": "Theme kit for games and high-energy clips: hot pink, electric cyan and lime on a deep violet-black, the same typefaces by role and the same shape as theme-tide and theme-ember, so any asset that takes a theme can switch to it.",
+  "tags": ["theme", "palette", "brand", "foundation", "game", "neon"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {},
+  "uses": {},
+  "deps": {},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:07:01.270Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:07:01.270Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/theme-neon@1.js", "sha1": "b2ed73beb9ea78096701bcbcbc84d8980e7547fe"},
+  "hash": "6e14caef8ce76c741a5d5b20fa6b768fc13012e2c3d105d6d19338c2e7b0cef3"
+}
