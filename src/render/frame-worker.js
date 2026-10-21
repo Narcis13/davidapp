@@ -6,7 +6,7 @@ import { parentPort } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { createRuntime, describeError } from '../core/runtime.js';
-import { normalizeLog, replay, stepsToLog, summary, initialState, advance, applyInput, viewOf, inside, parseOn } from '../core/interactive.js';
+import { normalizeLog, replay, stepsToLog, summary, initialState, advance, applyInput, viewOf, inside, parseOn, reachable } from '../core/interactive.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
 import { fontAliases } from '../core/lib/text.js';
@@ -501,13 +501,15 @@ const handlers = {
         const to = next && visit(next);
         if (to) edges.push({ from: node.id, action, to: to.id });
       };
-      for (const r of regions) {
+      // what is behind an open modal is out of reach: neither pressed nor reported as covered
+      const live = reachable(regions);
+      for (const r of live) {
         const name = `${r.item}.${r.name}${r.id !== undefined ? `#${r.id}` : ''}`;
         // a range region is dragged to the end it is not at
         for (const end of r.range ? ['min', 'max'].filter((e) => r.range.value !== r.range[e]) : [null]) {
-          const p = spot(regions, r, end);
+          const p = spot(live, r, end);
           if (!p) {
-            if (!node.occluded.some((o) => o.key === r.key)) { const mid = place(r, 0.5, 0.5); node.occluded.push({ key: r.key, by: topmost(regions, mid.x, mid.y)?.key ?? null }); }
+            if (!node.occluded.some((o) => o.key === r.key)) { const mid = place(r, 0.5, 0.5); node.occluded.push({ key: r.key, by: topmost(live, mid.x, mid.y)?.key ?? null }); }
             continue;
           }
           act(end ? `drag ${name} to ${end}` : `tap ${name}`, () => applyInput(comp, s, n, pressAt(n, p), regions));
@@ -520,7 +522,7 @@ const handlers = {
       }
       for (const key of keys) act(`key ${key}`, () => applyInput(comp, s, n, [{ f: n, type: 'key', key }], regions));
       if (I.wires.some((w) => w.on === 'tap' && here(w))) {
-        const p = freeSpot(regions, comp.width, comp.height);
+        const p = freeSpot(live, comp.width, comp.height);
         if (p) act('tap on nothing', () => applyInput(comp, s, n, pressAt(n, p), regions));
       }
       // time: the scene runs out (its end rule and the `end:` wires); no new state when nothing changes

@@ -260,11 +260,8 @@ async function playInteractive(engine, canvas, composition, ui) {
     // held keys repeat: only the arrows (a slider) take the repeats
     if (e.repeat && !e.key.startsWith('Arrow')) { e.preventDefault(); return; }
     if (e.key === 'Tab') {
-      // from a visible focus on the clip's last control (or its first, going back) the browser moves focus on: no
-      // keyboard trap; a focus a click left is not shown, so the first Tab shows it
-      const list = session.regions.filter((r) => r.focus !== false);
-      const i = list.findIndex((r) => r.key === session.state.focus);
-      if (!list.length || (session.state.focusVisible && ((!e.shiftKey && i === list.length - 1) || (e.shiftKey && i === 0)))) return;
+      // past the clip's last control the browser moves focus on: no keyboard trap
+      if (session.tabLeaves(e.shiftKey)) return;
     }
     session.input({ type: 'key', key: e.key, shift: e.shiftKey });
     if (OWN.has(e.key) || e.key.length === 1) e.preventDefault();

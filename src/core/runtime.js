@@ -193,7 +193,7 @@ export function createRuntime(host) {
   const assetCanvases = new Set();
   // v5, interactive: the frame's view of the session (renderClipFrame sets it), the item being drawn (the outermost:
   // a precomp's layers belong to its item) with the params it binds to variables, and the hit regions the frame records
-  let frameUi = null, uiItem = null, uiVars = null, uiDepth = 0, regions = null;
+  let frameUi = null, uiItem = null, uiVars = null, uiLinks = null, uiDepth = 0, regions = null;
   // the scene a transition leaves, drawn once and held (it does not change while the transition runs)
   let held = null;
   const regionKeys = new Map();
@@ -389,7 +389,8 @@ export function createRuntime(host) {
           const [lx, ly] = toLocal(m, v.pointer.x, v.pointer.y);
           if (o.shape === 'circle') { const nx = (lx - x - w / 2) / (w / 2), ny = (ly - y - h / 2) / (h / 2); over = nx * nx + ny * ny <= 1; } else over = lx >= x && lx <= x + w && ly >= y && ly <= y + h;
         }
-        const hover = over && (v.pointer.type !== 'touch' || v.pointer.down);
+        // the topmost region under the pointer at its last move has the hover (a region under a scrim does not)
+        const hover = over && (!v.hover || v.hover.key === key) && (v.pointer.type !== 'touch' || v.pointer.down);
         return {
           hover, down: v.capture === key && !!v.pointer?.down, focus: v.focus === key && v.focusVisible,
           pressed: v.pressed[key] ?? Infinity, hoverFor: hover ? (v.hover?.key === key ? v.hover.since : Infinity) : 0,
@@ -406,7 +407,7 @@ export function createRuntime(host) {
 
   /** Run fn as the drawing of a clip item: f.ui inside it (and inside its precomp layers) belongs to that item. */
   function asItem(item, fn) {
-    if (uiDepth++ === 0) { uiItem = item.id; uiVars = item.vars ?? null; }
+    if (uiDepth++ === 0) { uiItem = item.id; uiVars = uiLinks?.get(item.id) ?? null; }
     try { return fn(); } finally { if (--uiDepth === 0) { uiItem = null; uiVars = null; } }
   }
 
@@ -718,6 +719,7 @@ export function createRuntime(host) {
     if (comp.interactive || extra.ui) {
       frameUi = extra.ui ?? staticUi(comp, frame);
       comp = bindComposition(comp, frameUi.vars, frameUi.scene);
+      uiLinks = comp.links ?? null;
       regions = [];
       regionKeys.clear();
     }
@@ -732,7 +734,7 @@ export function createRuntime(host) {
       inspect.suppress = false;
       inspect.fonts = null;
       cur = null; curTrack = null; inTransition = false;
-      frameUi = null; regions = null; uiItem = null; uiVars = null; uiDepth = 0;
+      frameUi = null; regions = null; uiItem = null; uiVars = null; uiLinks = null; uiDepth = 0;
     }
     if (texts || found) return { ...(texts ? { texts } : {}), ...(found ? { regions: found } : {}) };
     return undefined;
@@ -851,7 +853,9 @@ export function createRuntime(host) {
       resetState(held.ctx);
       const kept = regions, ui = frameUi, was = inTransition;
       regions = null; frameUi = fromUi; inTransition = true;
-      try { drawClip(held.ctx, bindComposition(source, fromUi.vars, fromUi.scene), tx.from, extra); } finally { regions = kept; frameUi = ui; inTransition = was; }
+      const fromComp = bindComposition(source, fromUi.vars, fromUi.scene), links = uiLinks;
+      uiLinks = fromComp.links ?? null;
+      try { drawClip(held.ctx, fromComp, tx.from, extra); } finally { regions = kept; frameUi = ui; inTransition = was; uiLinks = links; }
       held.key = inspect.record ? null : key; held.comp = source;
     }
     const from = held;

@@ -259,3 +259,51 @@ test('interactive: the studio saves, checks and plays an interactive clip, and r
     await t.cleanup();
   }
 });
+
+test('interactive: a transition holds the frame that was on screen, before the event\'s own actions', () => {
+  const raw = /** @type {any} */ (structuredClone(RAW));
+  raw.interactive.wires[0] = { on: 'start.press', do: [{ add: { score: 2 } }, { go: 'play', transition: { asset: 'tx-wipe@1', duration: 0.2 } }] };
+  const { composition: c } = normalizeComposition(raw);
+  const r = [{ key: 'start:press:', item: 'start', name: 'press', m: [1, 0, 0, 1, 0, 0], x: 0, y: 0, w: 100, h: 100, value: null }];
+  const s = applyInput(c, advance(c, initialState(c), 10), 10, [{ f: 10, type: 'down', x: 5, y: 5 }, { f: 10, type: 'up', x: 5, y: 5 }], r);
+  assert.equal(s.vars.score, 2);
+  const tx = viewOf(c, s, 12).transition;
+  assert.equal(tx.fromScene, 'menu');
+  assert.equal(tx.from, 10, 'the playhead frame that was on screen');
+  assert.equal(tx.fromUi.vars.score, 0, 'the variables as that frame drew them');
+});
+
+test('interactive: a restart ends the event; one in a start wire is refused', () => {
+  const raw = /** @type {any} */ (structuredClone(RAW));
+  raw.interactive.wires = [{ on: 'key:r', do: [{ add: { score: 1 } }, { restart: true }, { add: { score: 5 } }] }, { on: 'key:r', do: { go: 'win' } }];
+  const { composition: c } = normalizeComposition(raw);
+  const s = applyInput(c, advance(c, initialState(c), 10), 10, [{ f: 10, type: 'key', key: 'r' }], []);
+  assert.equal(s.scene, 'menu');
+  assert.equal(s.vars.score, 0, 'nothing after the restart ran, neither in its list nor in other wires');
+  const bad = normalizeComposition({ ...RAW, interactive: { ...RAW.interactive, wires: [{ on: 'enter:menu', do: { if: { var: 'score', eq: 0 }, then: [{ restart: true }] } }] } });
+  assert.ok(bad.errors.some((e) => /restart the clip for ever/.test(e.message)));
+});
+
+test('interactive: a cancel keeps the pointer where it was; a modal region keeps focus and keys inside it', () => {
+  const c = comp();
+  const at = (k, x) => ({ key: k, item: k.split(':')[0], name: k.split(':')[1], m: [1, 0, 0, 1, 0, 0], x, y: 0, w: 10, h: 10, value: null });
+  let s = applyInput(c, advance(c, initialState(c), 2), 2, [{ f: 2, type: 'down', x: 50, y: 40 }, { f: 2, type: 'cancel' }], []);
+  assert.deepEqual([s.pointer.x, s.pointer.y, s.pointer.down], [50, 40, false]);
+  const regions = [at('start:press:', 0), { ...at('level:change:', 20), modal: true, focus: false }, at('hit:press:', 40)];
+  s = applyInput(c, s, 3, [{ f: 3, type: 'key', key: 'Tab' }, { f: 3, type: 'key', key: 'Tab' }], regions);
+  assert.equal(s.focus, 'hit:press:', 'Tab never reaches a region behind the modal');
+});
+
+test('interactive: f.ui.changed follows a bound param on an item laid out for its format', () => {
+  const raw = /** @type {any} */ (structuredClone(RAW));
+  raw.tracks[1].items[2].formats = { horizontal: { opacity: 1 } };
+  const { composition: c } = normalizeComposition(raw);
+  const rt = runtime();
+  const { canvas } = drawer(rt, c);
+  const g = canvas.getContext('2d');
+  let s = { ...advance(c, initialState(c), 70), scene: 'play', entered: 60 };
+  s = { ...s, vars: { ...s.vars, score: 1 }, changed: { score: { from: 0, f: 70 } } };
+  const v = viewOf(c, s, 71);
+  rt.renderClipFrame(g, c, v.frame, { ui: v.ui });
+  assert.deepEqual(Array.from(g.getImageData(15, 105, 1, 1).data.slice(0, 3)), [255, 0, 0], 'the counter flashes on its change');
+});

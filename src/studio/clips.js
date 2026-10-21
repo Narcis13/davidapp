@@ -80,11 +80,15 @@ export function createClips(ctx, library) {
     // v5: in an interactive composition a param may be bound to a variable ({ $var: "score" }): it is checked with the
     // variable's first value and saved bound
     const vars = composition.interactive?.vars ?? null;
-    /** Check params against a schema (strictly) and pin the asset/image references in them. */
-    const pinWith = (schema, input, at) => {
+    /**
+     * Check params against a schema (strictly) and pin the asset/image references in them. bindable: the params of a visual
+     * item (or its format overrides), the only ones a state fills from its variables.
+     */
+    const pinWith = (schema, input, at, bindable = false) => {
       const bound = vars ? Object.entries(input).filter(([, v]) => v !== null && typeof v === 'object' && typeof v.$var === 'string') : [];
       for (const [name, v] of bound) {
-        if (!Object.hasOwn(vars, v.$var)) problems.push(`${at}: params.${name}: unknown variable "${v.$var}" (declared: ${Object.keys(vars).join(', ') || 'none'})`);
+        if (!bindable) problems.push(`${at}: params.${name}: only the params of a visual item bind to a variable (not an effect, motion, mask, transition or audio item)`);
+        else if (!Object.hasOwn(vars, v.$var)) problems.push(`${at}: params.${name}: unknown variable "${v.$var}" (declared: ${Object.keys(vars).join(', ') || 'none'})`);
         else if (['asset', 'image', 'array', 'object', 'font'].includes(schema[name]?.type)) problems.push(`${at}: params.${name}: only number, text, colour, choice and on/off params bind to a variable`);
       }
       const params = bound.length ? { ...input, ...Object.fromEntries(bound.map(([k, v]) => [k, vars[v.$var]])) } : input;
@@ -136,7 +140,7 @@ export function createClips(ctx, library) {
       const schema = row.type === 'function' ? json(row.schema, {}) : track.type === 'audio' ? null : FILE_ITEM_SCHEMA[row.type] ?? null;
       if (!schema) { if (Object.keys(item.params).length) problems.push(`${where}: ${row.type} assets take no params`); continue; }
       // the item's params, and each format's overrides of them, are checked and pinned the same way
-      const pinParams = (params, at) => pinWith(schema, params, at);
+      const pinParams = (params, at) => pinWith(schema, params, at, track.type !== 'audio');
       item.params = pinParams(item.params, where);
       if (row.type === 'video') checkTrim(json(row.meta, {}), [item.params, ...Object.values(item.formats ?? {}).map((o) => o.params).filter(Boolean)], where, problems);
       for (const [fname, o] of Object.entries(item.formats ?? {})) if (o.params) o.params = pinParams(o.params, `${where} (${fname})`);

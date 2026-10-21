@@ -471,10 +471,10 @@ asset({
 
 | | |
 |---|---|
-| `f.ui.hit(name, x, y, w, h, o)` | Declare a hit region where the asset draws it: a box in the current canvas transform (rotated and scaled items hit where they show). `name` must be in `events.emits`. Returns `{ hover, down, focus, pressed, hoverFor }`: `pressed` is seconds since it last fired (Infinity if never), `hoverFor` seconds the pointer has been on it, `focus` true when the keyboard put focus on it (draw a ring then). `o`: `id` (tells regions with the same name apart: menu options), `value` (sent with the event), `range: { min, max, step, value, axis }` (a slider: the value under the pointer while it drags, ± step with the arrow keys when focused), `keys: ['Enter', 'h']` (hotkeys), `shape: 'circle'`, `press: 'down'` (fire on press, not release: games), `focus: false` (not reached with Tab), `label` (its name for checks and screen readers), `disabled: true` (drawn, its state reported, not hittable). |
+| `f.ui.hit(name, x, y, w, h, o)` | Declare a hit region where the asset draws it: a box in the current canvas transform (rotated and scaled items hit where they show). `name` must be in `events.emits`. Returns `{ hover, down, focus, pressed, hoverFor }`: `pressed` is seconds since it last fired (Infinity if never), `hoverFor` seconds the pointer has been on it, `focus` true when the keyboard put focus on it (draw a ring then). `o`: `id` (tells regions with the same name apart: menu options), `value` (sent with the event), `range: { min, max, step, value, axis }` (a slider: the value under the pointer while it drags, ± step with the arrow keys when focused), `keys: ['Enter', 'h']` (hotkeys), `shape: 'circle'`, `press: 'down'` (fire on press, not release: games), `focus: false` (not reached with Tab), `label` (its name for checks and screen readers), `disabled: true` (drawn, its state reported, not hittable), `modal: true` (a dialog's scrim: what was drawn before it takes no taps, focus or hotkeys, and checks do not read the text behind it). |
 | `f.ui.since(event)`, `f.ui.received(event)` | Seconds since the clip last sent this item `event` (a `send` action), and `{ since, value, count }` of the last one (or null). `event` must be in `events.accepts`. |
 | `f.ui.changed(param)` | For a param bound to a variable (`{ "$var": "score" }`): `{ from, since }` after the variable changed, else null. Tick a counter up from `from`. |
-| `f.ui.live`, `f.ui.now`, `f.ui.scene`, `f.ui.sceneT` | Whether a session is playing (false in a video, a still, a check: draw the resting state), seconds since the session started, the scene and seconds in it. A scene that waits for input holds its last frame, so `f.t` stops: animate idle motion with `f.ui.now`. |
+| `f.ui.live`, `f.ui.now`, `f.ui.scene`, `f.ui.sceneT` | Whether a session is playing (false in a video, a still and the design-timeline frames of a check: draw the resting state; the states a check crawls are drawn as a session would), seconds since the session started, the scene and seconds in it. A scene that waits for input holds its last frame, so `f.t` stops: animate idle motion with `f.ui.now`. |
 | `f.ui.pointer` | The pointer in this asset's own coordinates `{ x, y, down, type: mouse|touch|pen }`, or null. |
 
 What makes input deterministic: an input event is stamped with a session frame and read against the hit regions
@@ -487,11 +487,14 @@ again and reads them the same way. The same log always reaches the same states a
 - **Draw state from `f.ui`, never remember it.** A target already caught is one whose region fired after it
   came into reach: `f.ui.hit(name, …, { id, disabled: true }).pressed <= f.t - appearedAt` (see `beat-lanes`).
 - **Tap targets are big.** `check_clip` measures each region at the size the clip shows on a phone: under
-  24 CSS px is an issue, under 44 px a warning. Size controls from the frame's short side.
+  24 CSS px is an error, under 44 px a note (44 is advised). Size controls from the frame's short side.
 - **Keyboard first-class.** Tab moves focus through the regions in drawing order, Enter or Space fires the
   focused one, arrows move a focused range; `keys` adds hotkeys. Draw `focus`.
 - A transition between scenes is a `transition` asset (`f.from`, `f.to`, `f.progress`); `f.ui.pointer` there is
-  where the viewer last pointed (an iris that opens from the tap).
+  where the viewer last pointed (an iris that opens from the tap). `f.from` is the scene it leaves, held as its last
+  frame showed it and drawn once per transition: read it, never draw into it. Keep a dim (a translucent fill over the
+  whole frame) in whole 8-bit steps of alpha, or leave it out: a fraction of a step rounds one level apart in Chrome
+  and in the renderer, over the whole frame.
 
 The UI set (`ui-button`, `ui-card`, `ui-menu`, `ui-toggle`, `ui-slider`, `ui-progress`, `ui-score`, `ui-dialog`,
 `ui-hotspot`, `ui-toast` and the `ui-tx-*` transitions) follows the kit's conventions (theme, sizes from the

@@ -199,6 +199,9 @@ export function normalizeInteractive(input, { duration, fps, visual, audio }, er
     else wire.do = checkActions(w.do, `${p}.do`, err, ctx);
     wires.push(wire);
   });
+  // a restart runs the start wires again: one among them would restart for ever
+  const restarts = (actions) => (actions ?? []).some((a) => a.restart || restarts(a.then) || restarts(a.else));
+  wires.forEach((w, i) => { if ((w.on === 'start' || w.on === `enter:${start}`) && restarts(w.do)) err(`interactive.wires[${i}].do`, `a restart in a "${w.on}" wire would restart the clip for ever: the restart runs it again`); });
   const out = { start, vars, scenes, wires };
   if (input.transition !== undefined) { const t = checkTransition(input.transition, 'interactive.transition', err); if (t) out.transition = t; }
   if (input.music !== undefined) {
@@ -268,7 +271,8 @@ const bound = new WeakMap();
 /**
  * The composition as one state draws it: every { $var } in item params filled with the variable's value and every
  * item whose `when` fails marked hidden. Items keep their ids; a composition without bindings comes back as is.
- * Each bound item carries a non-enumerable `vars` map (param name → variable) for f.ui.changed.
+ * The bound composition carries a non-enumerable `links` map (item id → { param: variable }) for f.ui.changed: by id,
+ * because an item laid out for a format is a copy.
  */
 export function bindComposition(comp, vars, scene = null) {
   if (!comp.interactive) return comp;
@@ -283,19 +287,22 @@ export function bindComposition(comp, vars, scene = null) {
   if (!plan.items.size) return comp;
   const key = JSON.stringify([vars, scene]);
   if (plan.cache?.key === key) return plan.cache.comp;
+  const links = new Map();
   const tracks = comp.tracks.map((tr) => {
     if (!tr.items.some((it) => plan.items.has(it))) return tr;
     return { ...tr, items: tr.items.map((it) => {
       if (!plan.items.has(it)) return it;
       const out = { ...it, params: fill(it.params, vars) };
-      if (it.formats) out.formats = Object.fromEntries(Object.entries(it.formats).map(([f, o]) => [f, o.params ? { ...o, params: fill(o.params, vars) } : o]));
-      if (it.when && !holds(it.when, vars, scene)) out.hidden = true;
-      const links = Object.fromEntries(Object.entries(it.params).filter(([, v]) => isPlain(v) && typeof v.$var === 'string').map(([k, v]) => [k, v.$var]));
-      Object.defineProperty(out, 'vars', { value: links, enumerable: false });
+      const hide = it.when && !holds(it.when, vars, scene);
+      // a format's own hidden: false must not show an item whose `when` fails
+      if (it.formats) out.formats = Object.fromEntries(Object.entries(it.formats).map(([f, o]) => [f, { ...o, ...(o.params ? { params: fill(o.params, vars) } : {}), ...(hide ? { hidden: true } : {}) }]));
+      if (hide) out.hidden = true;
+      links.set(it.id, Object.fromEntries(Object.entries(it.params).filter(([, v]) => isPlain(v) && typeof v.$var === 'string').map(([k, v]) => [k, v.$var])));
       return out;
     }) };
   });
   const out = { ...comp, tracks };
+  Object.defineProperty(out, 'links', { value: links, enumerable: false });
   plan.cache = { key, comp: out };
   return out;
 }
@@ -324,7 +331,8 @@ export function initialState(comp, at = 0, carry = null) {
     pointer: carry?.pointer ?? null, capture: null, hover: null, focus: null, focusVisible: false,
     pressed: {}, inbox: {}, sounds: carry?.sounds ?? [], n: carry?.n ?? 0,
   };
-  const run = runner(comp, s, at);
+  // a restart here would start again for ever: the runner refuses it
+  const run = runner(comp, s, at, { starting: true });
   run.emit('start');
   run.emit(`enter:${s.scene}`);
   return s;
@@ -332,15 +340,17 @@ export function initialState(comp, at = 0, carry = null) {
 
 /**
  * Run wires and actions on state `s` (changed in place) at session frame `at`. Returns { emit(on, value) }.
- * Every effect is stamped with `at`, the first frame that shows it.
+ * Every effect is stamped with `at`, the first frame that shows it. A restart ends the event: nothing after it runs.
  */
-function runner(comp, s, at) {
+function runner(comp, s, at, { starting = false } = {}) {
   const I = comp.interactive;
   const fps = comp.fps;
-  let budget = MAX_ACTIONS;
+  let budget = MAX_ACTIONS, stopped = false;
+  // the frame on screen when the event came, before any action ran: what a transition leaves (and holds)
+  const prior = structuredClone(s);
+  let leaving = null;
   const enter = (id, transition, remember = true) => {
-    // the scene it leaves, as its last frame showed it: a transition holds it there (and the runtime draws it once)
-    const from = { scene: s.scene, frame: playheadOf(comp, s, at - 1), ui: structuredClone(viewOf(comp, s, at - 1).ui) };
+    const from = (leaving ??= { scene: prior.scene, frame: playheadOf(comp, prior, at - 1), ui: viewOf(comp, prior, at - 1).ui });
     if (remember) { s.history.push(s.scene); if (s.history.length > 32) s.history.shift(); }
     const tx = transition === false ? null : (transition ?? sceneOf(comp, id).transition ?? I.transition ?? null);
     s.tx = tx ? { asset: tx.asset, params: tx.params ?? {}, frames: Math.max(1, Math.round(tx.duration * fps)), start: at, from } : null;
@@ -355,6 +365,7 @@ function runner(comp, s, at) {
   };
   function act(actions, event) {
     for (const a of actions) {
+      if (stopped) return;
       if (--budget < 0) throw new Error(`the wires ran more than ${MAX_ACTIONS} actions for one event: do two wires trigger each other?`);
       if (a.go === 'back') {
         const id = s.history.pop();
@@ -381,10 +392,12 @@ function runner(comp, s, at) {
         if (s.sounds.length > KEEP) s.sounds.shift();
       } else if (a.if) act(holds(a.if, s.vars, s.scene, event) ? a.then : (a.else ?? []), event);
       else if (a.restart) {
-        // the rest of this list is skipped: it was written for the state the restart left
+        if (starting) throw new Error('a restart in a start or enter wire of the first scene would restart the clip for ever');
+        // the rest of the event is dropped: it was written for the state the restart left
         const fresh = initialState(comp, at, s);
         for (const k of Object.keys(s)) delete s[k];
         Object.assign(s, fresh);
+        stopped = true;
         return;
       }
     }
@@ -393,6 +406,7 @@ function runner(comp, s, at) {
     const scene = s.scene;
     const event = { value };
     for (const w of I.wires) {
+      if (stopped) return;
       if (w.on !== on && !(w.on === 'key:any' && on.startsWith('key:'))) continue;
       if (w.scene !== undefined && !list(w.scene).includes(scene)) continue;
       if (w.if && !holds(w.if, s.vars, scene, event)) continue;
@@ -418,7 +432,8 @@ export function playheadOf(comp, s, n) {
 export function advance(comp, s, n) {
   if (n < s.f) throw new Error(`the session cannot go back in time (at frame ${s.f}, asked for ${n})`);
   const out = structuredClone(s);
-  for (let guard = 0; guard < 1000; guard++) {
+  // every pass ends a scene or stops: a scene's end moves `entered` forward (a scene lasts at least a frame)
+  for (;;) {
     const scene = sceneOf(comp, out.scene);
     const due = out.entered + framesOf(scene, comp.fps);
     if (out.ended || due > n) break;
@@ -466,6 +481,15 @@ function rangeValue(r, x, y) {
   return round(Math.min(max, Math.max(min, v)));
 }
 
+/** The regions input can reach: a modal region (a dialog's scrim) puts everything drawn before it out of reach. */
+export function reachable(regions) {
+  const i = regions.findLastIndex((r) => r.modal);
+  return i >= 0 ? regions.slice(i) : regions;
+}
+
+/** The regions Tab walks through, in drawing order (the player lets Tab leave the clip past the last one). */
+export const focusables = (regions) => reachable(regions).filter((r) => r.focus !== false);
+
 const topmost = (regions, x, y) => { for (let i = regions.length - 1; i >= 0; i--) if (inside(regions[i], x, y)) return regions[i]; return null; };
 
 /**
@@ -474,9 +498,7 @@ const topmost = (regions, x, y) => { for (let i = regions.length - 1; i >= 0; i-
  * An event: { f, type: down|move|up|cancel|leave|key, x, y (frame pixels), pointer: mouse|touch|pen, key, shift }.
  */
 export function applyInput(comp, s, j, events, drawn = []) {
-  // a modal region (a dialog's scrim) puts everything drawn before it out of reach: no focus, no hotkeys, no taps
-  const modal = drawn.findLastIndex((r) => r.modal);
-  const regions = modal >= 0 ? drawn.slice(modal) : drawn;
+  const regions = reachable(drawn);
   const out = structuredClone(s);
   const at = j + 1;
   const run = runner(comp, out, at);
@@ -485,8 +507,12 @@ export function applyInput(comp, s, j, events, drawn = []) {
     out.pressed[r.key] = at;
     run.emit(`${r.item}.${r.name}`, r.value ?? null);
   };
+  // a range's value as this frame's events leave it (two arrow presses in one frame make two steps)
+  const ranged = new Map();
+  const valueNow = (r) => ranged.get(r.key) ?? r.range.value;
   const change = (r, v) => {
-    if (v === r.range.value) return;
+    if (v === valueNow(r)) return;
+    ranged.set(r.key, v);
     out.pressed[r.key] = at;
     run.emit(`${r.item}.${r.name}`, v);
   };
@@ -495,18 +521,18 @@ export function applyInput(comp, s, j, events, drawn = []) {
     const key = r?.key ?? null;
     if ((out.hover?.key ?? null) !== key) out.hover = key ? { key, f: at } : null;
   };
-  const before = out.scene + out.entered;
+  const scene = out.scene, entered = out.entered;
   for (const ev of events) {
     // a scene change earlier in this frame's events: the regions belong to the scene that was drawn
-    if (out.scene + out.entered !== before && ev.type !== 'move' && ev.type !== 'leave') continue;
+    if ((out.scene !== scene || out.entered !== entered) && ev.type !== 'move' && ev.type !== 'leave') continue;
     if (ev.type === 'key') {
       const key = ev.key;
-      const focusables = regions.filter((r) => r.focus !== false);
       if (key === 'Tab') {
-        if (!focusables.length) continue;
-        const i = focusables.findIndex((r) => r.key === out.focus);
-        const next = i < 0 ? (ev.shift ? focusables.length - 1 : 0) : (i + (ev.shift ? -1 : 1) + focusables.length) % focusables.length;
-        out.focus = focusables[next].key; out.focusVisible = true;
+        const stops = focusables(drawn);
+        if (!stops.length) continue;
+        const i = stops.findIndex((r) => r.key === out.focus);
+        const next = i < 0 ? (ev.shift ? stops.length - 1 : 0) : (i + (ev.shift ? -1 : 1) + stops.length) % stops.length;
+        out.focus = stops[next].key; out.focusVisible = true;
         continue;
       }
       const focused = out.focus ? byKey(out.focus) : null;
@@ -514,7 +540,7 @@ export function applyInput(comp, s, j, events, drawn = []) {
       if (focused?.range && /^Arrow(Left|Right|Up|Down)$/.test(key)) {
         const { min, max } = focused.range;
         const step = focused.range.step || (max - min) / 20;
-        const v = round(Math.min(max, Math.max(min, focused.range.value + (key === 'ArrowRight' || key === 'ArrowUp' ? step : -step))));
+        const v = round(Math.min(max, Math.max(min, valueNow(focused) + (key === 'ArrowRight' || key === 'ArrowUp' ? step : -step))));
         out.focusVisible = true;
         change(focused, v);
         continue;
@@ -526,7 +552,9 @@ export function applyInput(comp, s, j, events, drawn = []) {
     }
     const { x, y } = ev;
     if (ev.type === 'leave') { out.pointer = null; out.hover = null; continue; }
-    out.pointer = { x, y, down: ev.type === 'down' ? true : ev.type === 'up' || ev.type === 'cancel' ? false : !!out.pointer?.down, type: ev.pointer ?? out.pointer?.type ?? 'mouse' };
+    // a cancel has no position: the pointer stays where it was, released
+    if (ev.type === 'cancel') { out.capture = null; if (out.pointer) out.pointer = { ...out.pointer, down: false }; continue; }
+    out.pointer = { x, y, down: ev.type === 'down' ? true : ev.type === 'up' ? false : !!out.pointer?.down, type: ev.pointer ?? out.pointer?.type ?? 'mouse' };
     if (ev.type === 'move') {
       hoverAt(x, y);
       const cap = out.capture ? byKey(out.capture.key) ?? out.capture.region : null;
@@ -546,7 +574,7 @@ export function applyInput(comp, s, j, events, drawn = []) {
       const r = byKey(cap.key);
       if (r && !r.range && r.press !== 'down' && inside(r, x, y)) activate(r);
       if (ev.pointer === 'touch') out.hover = null;
-    } else if (ev.type === 'cancel') out.capture = null;
+    }
   }
   out.f = Math.max(out.f, at);
   return out;

@@ -21,6 +21,8 @@ import { StudioError, canvasOf } from './library.js';
 
 /** The bundle.json format; a folder whose bundle.json has it is an export, so a new export may replace it. */
 export const SHARE_VERSION = 1;
+/** The file an export writes before anything else, so a folder it left half written can be replaced by the next. */
+const EXPORT_MARK = '.fablecut-share';
 const SRC = join(ROOT, 'src');
 const PLAYER = join(SRC, 'player');
 export const SHARE_DIR = join(ROOT, 'output', 'share');
@@ -132,7 +134,8 @@ export function createShare(studio) {
     const title = clip.title || slug;
     const description = clip.description?.trim() || `A ${Math.round(composition.duration)} s clip made with Fablecut.`;
     // an interactive clip has no mix: each audio item plays when the session says so (sounds below)
-    return { clip, composition, bundle, hasAudio: !composition.interactive && audio.inputs.length > 0, inputs: composition.interactive ? audio.inputs : [], title, description };
+    // an interactive clip has no mix: each audio item plays when the session says so (soundsOf), by its index in this list
+    return { clip, composition, bundle, hasAudio: !composition.interactive && audio.inputs.length > 0, sounds: composition.interactive ? audioItems(composition) : [], title, description };
   }
 
   const total = (c) => Math.max(1, Math.round(c.duration * c.fps));
@@ -154,7 +157,7 @@ export function createShare(studio) {
       footage: (ref) => `/api/footage/${ref.replace('@', '/')}/`,
       upload: (f) => `/media/${f.file}`,
     });
-    return { share: SHARE_VERSION, clip: { slug, title: c.title, description: c.description }, composition: c.composition, bundle, fonts: fontsFor(c.composition, c.bundle, (f) => `/fonts/${f}`), audio: c.hasAudio ? `/api/clips/${slug}/audio.wav` : null, ...(c.inputs.length ? { sounds: soundsOf(c.composition, c.inputs, (i) => `/api/clips/${slug}/sounds/${i.id}`) } : {}) };
+    return { share: SHARE_VERSION, clip: { slug, title: c.title, description: c.description }, composition: c.composition, bundle, fonts: fontsFor(c.composition, c.bundle, (f) => `/fonts/${f}`), audio: c.hasAudio ? `/api/clips/${slug}/audio.wav` : null, ...(c.sounds.length ? { sounds: soundsOf(c.sounds, (k) => `/api/clips/${slug}/sounds/${k}`) } : {}) };
   }
 
   /**
@@ -175,12 +178,14 @@ export function createShare(studio) {
     if (existsSync(dir)) {
       if (!statSync(dir).isDirectory()) throw new StudioError(`${dir} is a file; give a folder for the export`);
       const entries = readdirSync(dir);
-      let earlier = false;
-      try { earlier = JSON.parse(readFileSync(join(dir, 'bundle.json'), 'utf8')).share !== undefined; } catch { /* not an export */ }
+      // an earlier export: its bundle.json, or (one that stopped half way) the marker every export writes first
+      let earlier = existsSync(join(dir, EXPORT_MARK));
+      try { earlier ||= JSON.parse(readFileSync(join(dir, 'bundle.json'), 'utf8')).share !== undefined; } catch { /* not an export */ }
       if (entries.length && !earlier) throw new StudioError(`${dir} is not empty and holds no earlier share export; give an empty or new folder`);
       rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
     mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, EXPORT_MARK), 'A Fablecut share export (src/studio/share.js): a new export may replace this folder.\n');
   }
 
   /** The sequence and footage frames the clip draws, frame by frame (what its preview would fetch): ref → Set of indices. */
@@ -337,15 +342,17 @@ export function createShare(studio) {
       if (r.code !== 0) throw new StudioError(`The clip's sound could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
     }
 
-    // an interactive clip's sounds, one file per audio item (the session starts and stops them), as AAC like the mix
+    // an interactive clip's sounds, one file per audio item (the session starts and stops them), as AAC like the mix; named
+    // by their index, so no item id ends up in a path
     let sounds;
-    if (c.inputs.length) {
+    if (c.sounds.length) {
       mkdirSync(join(dir, 'media', 'sound'), { recursive: true });
-      for (const i of c.inputs) {
-        const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-i', i.path, '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(dir, 'media', 'sound', `${i.id}.m4a`)]);
-        if (r.code !== 0) throw new StudioError(`The sound of item "${i.id}" could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
+      for (const [k, item] of c.sounds.entries()) {
+        const wav = await studio.clipAudio({ composition: solo(comp, item) });
+        const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-i', wav, '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(dir, 'media', 'sound', `${k}.m4a`)]);
+        if (r.code !== 0) throw new StudioError(`The sound of item "${item.id}" could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
       }
-      sounds = soundsOf(comp, c.inputs, (i) => `media/sound/${i.id}.m4a`);
+      sounds = soundsOf(c.sounds, (k) => `media/sound/${k}.m4a`);
     }
 
     const { poster, card } = await posters(posterPng);
@@ -371,12 +378,12 @@ export function createShare(studio) {
     };
   }
 
-  /** The file of one audio item of an interactive clip (what /api/clips/<slug>/sounds/<item> serves). */
-  async function soundFile(slug, id) {
+  /** The sound of one audio item of an interactive clip, mixed on its own (what /api/clips/<slug>/sounds/<index> serves). */
+  async function soundFile(slug, index) {
     const c = await load(slug);
-    const input = c.inputs.find((i) => i.id === id);
-    if (!input) throw new StudioError(`Clip "${slug}" has no audio item "${id}" to play`, 'not_found');
-    return input.path;
+    const item = c.sounds[index];
+    if (!item) throw new StudioError(`Clip "${slug}" has no sound ${index} to play (it has ${c.sounds.length})`, 'not_found');
+    return studio.clipAudio({ composition: solo(c.composition, item) });
   }
 
   /** Where the clip can be shared from: the studio's path, and the default export folder if one was written. */
@@ -394,13 +401,25 @@ export function createShare(studio) {
   return { liveBundle, livePage, exportClip, info, soundFile };
 }
 
+/** The audio items of an interactive clip the session can play: those of its tracks that are not muted or hidden. */
+const audioItems = (comp) => comp.tracks.filter((t) => t.type === 'audio' && !t.muted && !t.hidden).flatMap((t) => t.items);
+
 /**
- * The sounds of an interactive clip, by audio item: { url, gain, loop?, cue? }. The session (src/player/session.js) says
- * when each starts and stops; the page plays them through Web Audio.
+ * One audio item as a composition of its own, from its own start: mixed by the studio, it keeps its gain, fades, offset
+ * and parameters (the editor's play mode mixes it the same way).
  */
-function soundsOf(composition, inputs, urlOf) {
-  const items = new Map(composition.tracks.filter((t) => t.type === 'audio').flatMap((t) => t.items).map((i) => [i.id, i]));
-  return Object.fromEntries(inputs.map((i) => [i.id, { url: urlOf(i), gain: i.gain ?? 1, ...(items.get(i.id)?.loop ? { loop: true } : {}), ...(items.get(i.id)?.cue ? { cue: true } : {}) }]));
+function solo(comp, item) {
+  const keep = {};
+  for (const k of ['offset', 'assetDuration', 'gain', 'fadeIn', 'fadeOut', 'keyframes', 'seedId']) if (item[k] !== undefined) keep[k] = item[k];
+  return { width: comp.width, height: comp.height, fps: comp.fps, duration: Math.max(0.1, item.duration), tracks: [{ id: 'sound', type: 'audio', items: [{ id: item.id, asset: item.asset, start: 0, duration: item.duration, params: item.params ?? {}, ...keep }] }] };
+}
+
+/**
+ * The sounds of an interactive clip, by audio item id: { url, gain: 1 (the mix has it), loop?, cue? }. The session
+ * (src/player/session.js) says when each starts and stops; the page plays them through Web Audio.
+ */
+function soundsOf(items, urlOf) {
+  return Object.fromEntries(items.map((item, k) => [item.id, { url: urlOf(k), gain: 1, ...(item.loop ? { loop: true } : {}), ...(item.cue ? { cue: true } : {}) }]));
 }
 
 const services = new WeakMap();

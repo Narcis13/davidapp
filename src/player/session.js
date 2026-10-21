@@ -5,10 +5,10 @@
 // an event is stamped with the frame being drawn or on screen, and read against that frame's regions.
 //
 //   const s = createSession(composition, { draw, onAudio, onFrame, onError })
-//   s.start()  s.pause()  s.resume()  s.restart()  s.stop()  s.input({ type, x, y, pointer, key, shift })
+//   s.start()  s.pause()  s.resume()  s.stop()  s.input({ type, x, y, pointer, key, shift })
 //   s.log  s.state  s.frame  s.regions  s.regionAt(x, y)  s.paused
 
-import { initialState, advance, applyInput, viewOf, inside } from '../core/interactive.js';
+import { initialState, advance, applyInput, viewOf, inside, focusables } from '../core/interactive.js';
 
 /**
  * @param {any} comp a normalized, pinned interactive composition
@@ -95,7 +95,6 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
       timer = raf(tick);
     },
     stop() { stopped = true; cancel(timer); onAudio({ start: [], stop: [...playing.keys(), ...music] }); },
-    restart() { this.stop(); this.start(); },
     /** Hold the clock (a hidden tab, the pause button): input is ignored until resume. */
     pause() { if (pausedAt === null) pausedAt = now(); },
     resume() { if (pausedAt !== null) { base += now() - pausedAt; pausedAt = null; } },
@@ -105,7 +104,8 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
      * Moves within one frame are kept as one (the last), as the log records them.
      */
     input(ev) {
-      if (stopped || pausedAt !== null) return;
+      // nothing is on screen before the first frame: input then would be read against regions nobody saw
+      if (stopped || pausedAt !== null || shown < 0) return;
       const e = ev.type === 'key' ? { f: open, type: 'key', key: ev.key, ...(ev.shift ? { shift: true } : {}) }
         : ev.type === 'leave' || ev.type === 'cancel' ? { f: open, type: ev.type }
           : { f: open, type: ev.type, x: Math.round(ev.x * 10) / 10, y: Math.round(ev.y * 10) / 10, pointer: ev.pointer ?? 'mouse' };
@@ -113,6 +113,15 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
       if (e.type === 'move' && last?.type === 'move') { pending[pending.length - 1] = e; log[log.length - 1] = e; return; }
       pending.push(e);
       log.push(e);
+    },
+    /**
+     * Should Tab (Shift+Tab) leave the clip for the page? Yes from a visible focus on its last (first) control, or with no
+     * control to reach: the page never traps the keyboard. A focus a click left is not shown, so the first Tab shows it.
+     */
+    tabLeaves(shift) {
+      const stops = focusables(regions);
+      const i = stops.findIndex((r) => r.key === state.focus);
+      return !stops.length || (state.focusVisible && (shift ? i === 0 : i === stops.length - 1));
     },
     /** The region under a frame-pixel point on the frame on screen (for the cursor), or null. */
     regionAt(x, y) { for (let i = regions.length - 1; i >= 0; i--) if (inside(regions[i], x, y)) return regions[i]; return null; },

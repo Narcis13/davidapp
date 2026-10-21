@@ -291,7 +291,7 @@ export function createPlay({ slug, canvas, pv, host, composition, blocked = () =
     if (mode !== 'playing' && mode !== 'paused') return;
     sound?.stopAll();
     sound?.resume();
-    // a new session, not session.restart(): a frame of the old one still being drawn must not land in the new one
+    // a new session: a frame of the old one still being drawn must not land in the new one
     const old = session;
     session = null;
     old.stop();
@@ -361,11 +361,8 @@ export function createPlay({ slug, canvas, pv, host, composition, blocked = () =
   canvas.addEventListener('keydown', (e) => {
     if (!live() || e.ctrlKey || e.metaKey || e.altKey || MODIFIERS.has(e.key) || /^F\d+$/.test(e.key)) return;
     if (e.key === 'Tab') {
-      // Tab walks the things that can be pressed; from a visible focus at either end it moves on, so the keyboard is
-      // never trapped here (a focus a click left is not shown: the first Tab shows it)
-      const stops = session.regions.filter((r) => r.focus !== false);
-      const at = stops.findIndex((r) => r.key === session.state.focus);
-      if (!stops.length || (session.state.focusVisible && (e.shiftKey ? at === 0 : at === stops.length - 1))) return;
+      // Tab walks the things that can be pressed; past either end it moves on, so the keyboard is never trapped here
+      if (session.tabLeaves(e.shiftKey)) return;
     }
     // the page must not scroll or act on a key the clip is using
     e.preventDefault();

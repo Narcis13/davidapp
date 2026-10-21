@@ -221,3 +221,13 @@ h1 { font: 700 21px/1.25 var(--font); letter-spacing: -0.01em; overflow-wrap: an
   .share[data-interactive] .description, .share[data-interactive] .made, .share[data-interactive] .rotate-hint { display: none; }
   .share[data-interactive] h1 { font-size: 16px; }
 }
+/* full screen, or a phone held sideways: the details are gone, the controls stay as a small pill in a corner */
+.share[data-interactive][data-full] .details,
+.share[data-interactive][data-full] .details .about, .share[data-interactive][data-full] .details .keys, .share[data-interactive][data-full] .details .made { display: none; }
+.share[data-interactive][data-full] .details:has(.controls) { display: block; position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); z-index: 12; width: auto; padding: 0; }
+.share[data-interactive][data-full] .details .controls { margin: 0; padding: 2px; border-radius: 12px; background: rgba(10, 10, 16, 0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+@media (orientation: landscape) and (max-height: 520px) {
+  .share[data-interactive] .details:has(.controls) { display: block; position: fixed; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); z-index: 12; width: auto; padding: 0; }
+  .share[data-interactive] .details .about, .share[data-interactive] .details .keys, .share[data-interactive] .details .made, .share[data-interactive] .details .rotate-hint { display: none; }
+  .share[data-interactive] .details .controls { margin: 0; padding: 2px; border-radius: 12px; background: rgba(10, 10, 16, 0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+}

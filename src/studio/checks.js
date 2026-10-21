@@ -16,6 +16,7 @@ import { grayDiff } from '../render/contrast.js';
 import { drawOverlays } from '../render/overlays.js';
 import { zonesOf, glyphFindings, textOf, phoneView, hitRegions } from './inspect.js';
 import { structureIssues, wireIssues, sceneGraph, reachable } from './interactive-checks.js';
+import { reachable as inReach } from '../core/interactive.js';
 import { StudioError } from './library.js';
 
 export const CHECKS = ['safe-zone', 'clipped', 'overlap', 'caption-lane', 'size', 'contrast', 'hold', 'captions', 'glyphs', 'first-frame', 'last-frame'];
@@ -204,7 +205,7 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
         if (p.scene.id === I.start && m.f === p.a && m.std < 2) at('first-frame', 'first', m.f, { severity: 'error', item: null, message: `The first frame of the first scene ("${p.scene.id}") is empty: a single flat colour (it is the thumbnail many feeds show).`, numbers: { spread: r2(m.std) } });
         for (const t of m.texts) if (t.family) allTexts.push(t);
         scan.frame(m.f, inFront(m.texts, m.regions, comp));
-        const reports = hitRegions(m.regions, comp, phone);
+        const reports = hitRegions(inReach(m.regions), comp, phone);
         regionsAt.set(m.f, reports);
         see(p.scene.id, m.regions);
         hit(reports, m.f, at);
@@ -219,7 +220,7 @@ export function createChecks(ctx, { clips, library, compositionOf, clipFrame, sa
       if (node.error) { at('state-error', `draw|${node.id}`, node.playhead, { severity: 'error', item: null, message: `State ${node.id} (scene "${node.scene}", ${JSON.stringify(node.vars)}) cannot be drawn: ${node.error}`, numbers: { vars: node.vars } }); continue; }
       for (const t of node.texts) if (t.family) allTexts.push(t);
       createScanner({ comp, opt, want, zones, textZone, captionItems, hasCaptions, issue: at }).frame(node.playhead, inFront(node.texts, node.regions, comp));
-      const reports = hitRegions(node.regions, comp, phone);
+      const reports = hitRegions(inReach(node.regions), comp, phone);
       regionsAt.set(`state:${node.id}`, reports);
       see(node.scene, node.regions);
       hit(reports, node.playhead, at);
@@ -426,7 +427,6 @@ const unite = (p, q) => { const x = Math.min(p.x, q.x), y = Math.min(p.y, q.y); 
 /** How far a box pokes out of a zone on each side, px (only the sides it crosses). */
 const past = (b, z) => Object.fromEntries(Object.entries({ left: z.x - b.x, top: z.y - b.y, right: b.x + b.width - z.x - z.width, bottom: b.y + b.height - z.y - z.height }).filter(([, v]) => v > 1).map(([k, v]) => [k, Math.round(v)]));
 
-/** The words a frame recorded, as blocks (one layout of one item), with the worst contrast of their words. */
 /**
  * The texts a viewer is meant to read while a modal is open: those of the items drawn before a modal region (a dialog's
  * scrim, f.ui.hit with modal: true) are behind it, dimmed on purpose, and out of reach; they are not checked as text.
@@ -439,6 +439,7 @@ function inFront(texts, regions, comp) {
   return texts.filter((t) => (order.get(t.item) ?? Infinity) >= at);
 }
 
+/** The words a frame recorded, as blocks (one layout of one item), with the worst contrast of their words. */
 function groupBlocks(texts) {
   const map = new Map();
   for (const t of texts) {
