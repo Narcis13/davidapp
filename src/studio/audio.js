@@ -203,7 +203,12 @@ export function createAudio(ctx, library, clips) {
         const m = await mix(comp, { tracks });
         const tmp = file.replace(/\.wav$/, `.${process.pid}.${Date.now()}.tmp`);
         writeFileSync(tmp, encodeWav(m.left, m.right, SAMPLE_RATE));
-        renameSync(tmp, file);
+        try { renameSync(tmp, file); } catch (e) {
+          // another process made the same mix (the same key: the same bytes) and is reading it; Windows refuses to replace an
+          // open file, so theirs is kept (two shapes of one clip rendering at once hit this)
+          if (!existsSync(file) || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
+          unlinkSync(tmp);
+        }
         writeFileSync(file.replace(/\.wav$/, '.json'), JSON.stringify({ master: m.master, loudness: summary(measureLoudness(m.left, m.right, SAMPLE_RATE)), tracks: tracks ?? null }));
         prune(dir, /^(mix|stem)-[0-9a-f]+((\.fix-[0-9a-f]+)*\.(wav|json)|\.\d+\.\d+\.tmp)$/, CACHE_BYTES);
         return file;
