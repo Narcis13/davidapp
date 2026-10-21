@@ -55,6 +55,9 @@ test('an export is one folder that plays from anywhere: relative URLs, its own p
   assert.equal(meta('name', 'twitter:card'), 'summary_large_image');
   assert.match(html, /<title>A tiny clip<\/title>/);
   assert.doesNotMatch(html, /<b>stay text/, 'the description is text, never markup');
+  // the clip is drawn on a canvas by its own asset code: no video element, no embedded player
+  assert.match(html, /<canvas/);
+  assert.doesNotMatch(html, /<video|<iframe|<embed|<object/i);
   const refs = [...html.matchAll(/\s(?:src|href|data-bundle)="([^"]*)"/g)].map((m) => m[1]).filter((u) => !u.startsWith('https://github.com/'));
   assert.ok(refs.length >= 5);
   for (const u of refs) assert.ok(relativeOnly(u) && existsSync(join(out, u)), `the page refers to ${u}, which must be relative and in the folder`);
@@ -69,8 +72,9 @@ test('an export is one folder that plays from anywhere: relative URLs, its own p
   assert.ok(data.fonts.some((f) => f.family === 'Inter'), 'Inter, every text\'s default, always goes');
   assert.ok(!data.fonts.some((f) => f.ext), 'no Latin Extended text, no Latin Extended files');
 
-  // the player and the runtime, every import of every module resolving inside the folder
+  // the player and the runtime, every import of every module resolving inside the folder; no rendered video in it
   const files = walk(out);
+  assert.deepEqual(files.filter((f) => /\.(mp4|mov|webm|m4v)$/i.test(f)), []);
   for (const f of ['player/player.js', 'player/engine.js', 'player/worker.js', 'player/player.css', 'core/runtime.js', 'core/lib/text.js', 'core/interactive.js']) assert.ok(files.includes(f), `${f} is exported`);
   for (const f of files.filter((x) => x.endsWith('.js'))) {
     const ast = parse(readFileSync(join(out, f), 'utf8'), { ecmaVersion: 'latest', sourceType: 'module' });

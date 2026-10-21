@@ -35,7 +35,8 @@ try {
   const node = await studio.play({ clip, steps, times, stills: true, maxSize: size });
   const s = await openSession({ width: 1440, height: 900 });
   try {
-    await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+    // with reduced motion the page waits at its play button: nothing but this replay draws on its engine
+    await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await s.goto(url, 'document.querySelector("[data-share]")?.dataset.state === "ready"');
     // the page replays the same log through the same fold, drawing with its own engine, and hands back each frame as PNG
     const shots = await s.evaluate(`(async () => {

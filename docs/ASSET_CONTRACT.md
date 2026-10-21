@@ -492,7 +492,9 @@ again and reads them the same way. The same log always reaches the same states a
   focused one, arrows move a focused range; `keys` adds hotkeys. Draw `focus`.
 - A transition between scenes is a `transition` asset (`f.from`, `f.to`, `f.progress`); `f.ui.pointer` there is
   where the viewer last pointed (an iris that opens from the tap). `f.from` is the scene it leaves, held as its last
-  frame showed it and drawn once per transition: read it, never draw into it. Keep a dim (a translucent fill over the
+  frame showed it and drawn once per transition: read it, never draw into it. The frame the scene changes on still
+  shows that held frame (progress 0); the asset draws from the next frame, so the first `f.progress` it sees is one
+  frame in. Keep a dim (a translucent fill over the
   whole frame) in whole 8-bit steps of alpha, or leave it out: a fraction of a step rounds one level apart in Chrome
   and in the renderer, over the whole frame.
 

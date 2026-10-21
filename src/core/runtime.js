@@ -859,6 +859,9 @@ export function createRuntime(host) {
       held.key = inspect.record ? null : key; held.comp = source;
     }
     const from = held;
+    // the frame the scene changes on still shows the scene it leaves (the transition at progress 0); the asset draws
+    // from the next frame, so the one frame that draws the held scene does not also run the transition
+    if (tx.t === 0) { composite(ctx, from.canvas); return; }
     const out = offscreen(width, height);
     try {
       invoke(e, tx.params ?? {}, {

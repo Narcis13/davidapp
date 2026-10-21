@@ -9,6 +9,7 @@ import { normalizeComposition } from '../src/core/composition.js';
 import { createRuntime, normalizeDefinition } from '../src/core/runtime.js';
 import { initialState, advance, applyInput, viewOf, replay, stepsToLog, playheadOf, bindComposition, normalizeLog, parseOn } from '../src/core/interactive.js';
 import { nodeHost, registerFonts, createCanvas } from '../src/render/host.js';
+import { createSession } from '../src/player/session.js';
 
 registerFonts();
 
@@ -306,4 +307,78 @@ test('interactive: f.ui.changed follows a bound param on an item laid out for it
   const v = viewOf(c, s, 71);
   rt.renderClipFrame(g, c, v.frame, { ui: v.ui });
   assert.deepEqual(Array.from(g.getImageData(15, 105, 1, 1).data.slice(0, 3)), [255, 0, 0], 'the counter flashes on its change');
+});
+
+test('interactive: the live session draws a frame back just after its slot without losing the next; a slow one skips by the clock', async () => {
+  let t = 0;
+  const rafs = [], replies = [], shown = [];
+  const s = createSession(comp(), {
+    now: () => t,
+    raf: (fn) => rafs.push(fn),
+    cancel: () => {},
+    draw: () => new Promise((resolve) => replies.push(() => resolve([]))),
+    onFrame: (n) => shown.push(n),
+  });
+  const settle = () => new Promise((r) => setImmediate(r));
+  const vsync = async (at) => { t = at; for (const fn of rafs.splice(0)) fn(); await settle(); };
+  const reply = async (at) => { t = at; replies.shift()(); await settle(); };
+  const slot = 1000 / 30;
+  s.start();
+  await vsync(0); await reply(5);
+  await vsync(slot + 0.1);
+  await vsync(2 * slot + 0.1);       // frame 1 is not back yet: this animation frame finds the session busy
+  await reply(2 * slot + 0.5);       // back just after the slot
+  assert.deepEqual(shown, [0, 1]);
+  assert.equal(replies.length, 1, 'frame 2 is asked for at once, not at the next animation frame');
+  await reply(2 * slot + 6);
+  assert.deepEqual(shown, [0, 1, 2]);
+  // a draw that takes two slots: the clock has moved on, and the frame it passed is skipped
+  await vsync(3 * slot + 0.1);
+  await vsync(4 * slot + 0.1);
+  await reply(5 * slot + 1);
+  await reply(5 * slot + 6);
+  assert.deepEqual(shown, [0, 1, 2, 3, 5]);
+  s.stop();
+});
+
+test('interactive: the live session sets its clock between animation frames, so their jitter neither skips nor repeats a frame', async () => {
+  const slot = 1000 / 30;
+  const run = async (stamped) => {
+    let t = 0;
+    const rafs = [], shown = [];
+    const s = createSession(comp(), { now: () => t, raf: (fn) => rafs.push(fn), cancel: () => {}, draw: async () => [], onFrame: (n) => shown.push(n) });
+    s.start();
+    for (let k = 1; k <= 30; k++) {
+      // animation frames right at the clip's frame boundaries, a little early or late each time
+      const ts = k * slot + (k % 2 ? 0.4 : -0.3);
+      t = ts;
+      for (const fn of rafs.splice(0)) fn(stamped ? ts : undefined);
+      await new Promise((r) => setImmediate(r));
+    }
+    s.stop();
+    return shown;
+  };
+  const aligned = await run(true);
+  assert.equal(aligned.length, 30, 'a frame for every animation frame');
+  assert.ok(aligned.every((n, i) => i === 0 || n === aligned[i - 1] + 1), `none skipped or repeated: ${aligned}`);
+  const unaligned = await run(false);
+  assert.ok(unaligned.length < 30, 'read at the boundary, the same jitter skips frames');
+});
+
+test('interactive: on a screen at twice the clip\'s rate the live session holds each frame two refreshes, evenly', async () => {
+  const slot = 1000 / 30;
+  let t = 0, k = 0;
+  const rafs = [], at = [];
+  const s = createSession(comp(), { now: () => t, raf: (fn) => rafs.push(fn), cancel: () => {}, draw: async () => [], onFrame: () => at.push(k) });
+  s.start();
+  for (k = 1; k <= 60; k++) {
+    // every other animation frame lands on a frame boundary of the clip, a little early or late by turns
+    const ts = (k * slot) / 2 + (k % 4 === 0 ? -0.3 : 0.3);
+    t = ts;
+    for (const fn of rafs.splice(0)) fn(ts);
+    await new Promise((r) => setImmediate(r));
+  }
+  s.stop();
+  const holds = at.slice(2).map((x, i) => x - at[i + 1]);
+  assert.ok(holds.length > 25 && holds.every((h) => h === 2), `two refreshes each: ${holds}`);
 });

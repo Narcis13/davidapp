@@ -20,18 +20,19 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
   const audioItems = comp.tracks.filter((t) => t.type === 'audio' && !t.muted && !t.hidden).flatMap((t) => t.items);
   const music = new Set(comp.interactive.music ?? []);
   // gen: which start this is; a frame still being drawn when the session restarts belongs to the old one and is dropped
-  let state, shown, regions, pending, open, base, pausedAt, busy, timer, stopped, log, heard, playing, gen = 0;
+  let state, shown, regions, pending, open, base, pausedAt, busy, late, align, lastTs, timer, stopped, log, heard, playing, gen = 0;
 
   function reset() {
     gen++;
     state = initialState(comp);
     shown = -1; regions = []; pending = []; open = 0; log = [];
-    base = now(); pausedAt = null; busy = false; heard = 0; playing = new Map();
+    base = now(); pausedAt = null; busy = false; late = false; align = true; lastTs = undefined; heard = 0; playing = new Map();
   }
   reset();
   stopped = true;
 
-  const clock = () => Math.max(0, Math.floor((((pausedAt ?? now()) - base) / 1000) * fps));
+  /** The clip frame at time t (an animation frame's own time, or now). */
+  const clock = (t = now()) => Math.max(0, Math.floor((((pausedAt ?? t) - base) / 1000) * fps));
 
   /** Which audio starts and stops between two frames: cues from play actions, timeline audio the playhead enters or leaves. */
   function audioBetween(view) {
@@ -54,13 +55,35 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
     return { start, stop };
   }
 
-  async function tick() {
+  /** @param {number} [ts] the animation frame's time */
+  function tick(ts) {
     if (stopped) return;
     timer = raf(tick);
-    if (busy || pausedAt !== null) return;
-    const m = clock();
+    // the second animation frame after a start or a resume sets the clock (by half a frame at most) so that animation
+    // frames come half a refresh after a frame of the clip begins: half way through it on a screen at the clip's rate, a
+    // quarter and three quarters at twice its rate. With a frame boundary right at them, their jitter would skip a frame
+    // and show the next twice (or hold frames one refresh and three), over and over
+    if (align && ts !== undefined && pausedAt === null) {
+      if (lastTs !== undefined) {
+        const refresh = Math.min(1, Math.max(0.1, ((ts - lastTs) / 1000) * fps));   // in frames of the clip
+        const x = ((ts - base) / 1000) * fps;
+        base = ts - ((Math.max(0, Math.round(x - refresh / 2)) + refresh / 2) / fps) * 1000;
+        align = false;
+      }
+      lastTs = ts;
+    }
+    step(ts);
+  }
+  // late: an animation frame came while a frame was still being drawn. The clock's frame is then drawn as soon as that
+  // one is back, not at the next animation frame: a frame back a moment after its slot would otherwise lose the next
+  /** @param {number} [ts] */
+  async function step(ts) {
+    if (busy) { late = true; return; }
+    if (pausedAt !== null) return;
+    const m = clock(ts);
     if (m <= shown) return;
     busy = true;
+    late = false;
     const mine = gen;
     try {
       // the events stamped with the frame on screen are read against the regions it drew; then time runs on to m
@@ -82,7 +105,10 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
       cancel(timer);
       onError(e instanceof Error ? e : new Error(String(e)));
     } finally {
-      if (mine === gen) busy = false;
+      if (mine === gen) {
+        busy = false;
+        if (late && !stopped) step();
+      }
     }
   }
 
@@ -97,8 +123,10 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
     stop() { stopped = true; cancel(timer); onAudio({ start: [], stop: [...playing.keys(), ...music] }); },
     /** Hold the clock (a hidden tab, the pause button): input is ignored until resume. */
     pause() { if (pausedAt === null) pausedAt = now(); },
-    resume() { if (pausedAt !== null) { base += now() - pausedAt; pausedAt = null; } },
+    resume() { if (pausedAt !== null) { base += now() - pausedAt; pausedAt = null; align = true; lastTs = undefined; } },
     get paused() { return pausedAt !== null; },
+    /** Seconds on the session's clock: it stands still while paused (what sound started late is measured by). */
+    get time() { return ((pausedAt ?? now()) - base) / 1000; },
     /**
      * Viewer input in frame pixels: { type: down|move|up|cancel|leave|key, x, y, pointer: mouse|touch|pen, key, shift }.
      * Moves within one frame are kept as one (the last), as the log records them.

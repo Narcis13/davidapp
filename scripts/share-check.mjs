@@ -52,7 +52,7 @@ async function checkSize({ width, height, mobile }) {
     if (method === 'Network.loadingFinished') bytes += p.encodedDataLength;
   });
   const ok = (key, pass, detail) => { checks[key] = { ok: !!pass, ...(detail === undefined ? {} : { detail }) }; console.log(`  ${pass ? '✓' : '✖'} ${key}${detail === undefined ? '' : `  ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`}`); };
-  const shot = async (label) => { const file = join(out, `${name}-${label}.png`); await s.shot(file); shots.push(file); };
+  const shot = async (label) => { const file = `${name}-${label}.png`; await s.shot(join(out, file)); shots.push(file); };
   const press = (target) => (mobile ? s.tap(target, { settle: 400 }) : s.click(target, { settle: 400 }));
   const frameAdvances = async (ms = 1200) => { const a = await s.evaluate(frameNow); await sleep(ms); const b = await s.evaluate(frameNow); return { from: a, to: b }; };
   // the viewer's way to bring the controls up: a mouse moves over the frame, a finger taps it once
@@ -225,8 +225,9 @@ async function parity() {
       const node = await decode((await studio.clipFrame({ clip, frame })).png);
       const m = compare(page[i], node);
       const pass = m.meanDiff <= LIMIT.meanDiff && m.over64 <= LIMIT.over64 && m.distinct > 8;
-      const image = join(out, `parity-${clip}-f${frame}.png`);
-      writeFileSync(image, diffImage(page[i], node));
+      // the diff image, next to the report
+      const image = `parity-${clip}-f${frame}.png`;
+      writeFileSync(join(out, image), diffImage(page[i], node));
       rows.push({ frame, t: Math.round((frame / comp.fps) * 1000) / 1000, ...m, ok: pass, image });
       console.log(`  ${pass ? '✓' : '✖'} frame ${String(frame).padStart(4)}  mean ${m.meanDiff}  max ${m.maxDiff}  >16 ${m.over16}%  >64 ${m.over64}%  colours ${m.distinct}`);
     }

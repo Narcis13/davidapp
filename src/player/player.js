@@ -10,6 +10,7 @@
 
 import { Engine } from './engine.js';
 import { createSession } from './session.js';
+import { transitionsOf } from '../core/interactive.js';
 
 const root = /** @type {HTMLElement} */ (document.querySelector('[data-share]'));
 const $ = (id) => /** @type {any} */ (root.querySelector(`[data-testid=${id}]`));
@@ -136,8 +137,10 @@ async function main() {
 async function playInteractive(engine, canvas, composition, ui) {
   const { data, base } = ui;
 
-  // ── sound: fetched and decoded in the background; the context that plays it is made at the viewer's first gesture
-  // (one made before is refused by the autoplay rules, and the browser says so in the console) ─────────────────────
+  // ── sound: fetched and decoded in the background. The context that plays it is made now, while the poster still
+  // covers the frame: making it opens the audio output, which holds up the page for 12–35 ms (two frames, when it came
+  // at the viewer's first tap). It stays suspended with nothing started on it until the first gesture resumes it: a
+  // sound started or a resume asked for before that is refused by the autoplay rules, and the browser says so ──────────
   const AC = window.AudioContext ?? /** @type {any} */ (window).webkitAudioContext;
   const OAC = window.OfflineAudioContext ?? /** @type {any} */ (window).webkitOfflineAudioContext;
   const sounds = data.sounds ?? {};
@@ -149,16 +152,23 @@ async function playInteractive(engine, canvas, composition, ui) {
     .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(String(res.status)))))
     .then((bytes) => decoder.decodeAudioData(bytes))
     .catch(() => null) : Promise.resolve(null)]));
-  let actx = null, master = null;
-  const voices = new Map(), wanted = new Map();
+  const actx = has ? new AC({ latencyHint: 'interactive' }) : null;
+  const master = actx?.createGain() ?? null;
+  if (actx && master) master.connect(actx.destination);
+  const live = () => actx?.state === 'running';
+  // early: hits asked for while the context was not running yet (it runs a few ms after the gesture resumes it)
+  const voices = new Map(), wanted = new Map(), early = [];
   // what the output adds before a sound is heard: the music starts that much further in, so it is heard on the beat
   const late = () => actx?.outputLatency || actx?.baseLatency || 0;
-  /** Start a sound as the session asked at `asked` (performance.now()): a late start picks up where it would be by now. */
+  /**
+   * Start a sound the session asked for at `asked` (seconds on its clock, which stands still while paused): a late
+   * start picks up where it would be by now.
+   */
   function play(c, asked, want) {
     const cue = !!sounds[c.item]?.cue;
     buffers.get(c.item)?.then((buffer) => {
-      if (!buffer || !actx || (!cue && wanted.get(c.item) !== want)) return;
-      const waited = (performance.now() - asked) / 1000;
+      if (!buffer || !actx || !master || !live() || (!cue && wanted.get(c.item) !== want)) return;
+      const waited = session.time - asked;
       // a hit that arrives late is worse than none; music and timeline sound pick up where they would be by now
       if (cue && waited > 0.12) return;
       const at = c.offset + (cue ? 0 : waited + late());
@@ -178,10 +188,11 @@ async function playInteractive(engine, canvas, composition, ui) {
     if (!has) return;
     for (const id of stop) { wanted.delete(id); try { voices.get(id)?.stop(); } catch { /* already over */ } voices.delete(id); }
     for (const c of start) {
-      const want = { c, asked: performance.now() };
-      // music and timeline sound are remembered, so a context made later still starts them where they would be
+      const want = { c, asked: session.time };
+      // music and timeline sound are remembered, so the first gesture still starts them where they would be by then
       if (!sounds[c.item]?.cue) wanted.set(c.item, want);
-      if (actx) play(c, want.asked, want);
+      if (live()) play(c, want.asked, want);
+      else if (sounds[c.item]?.cue) { early.push(want); while (session.time - early[0].asked > 0.12) early.shift(); }
     }
   }
   let muted = false;
@@ -192,28 +203,34 @@ async function playInteractive(engine, canvas, composition, ui) {
     if (master) master.gain.value = m ? 0 : 1;
   }
   if (has) { el.sound.hidden = false; setMuted(false); }
-  const stopSound = () => { wanted.clear(); for (const v of voices.values()) { try { v.stop(); } catch { /* over */ } } voices.clear(); };
-  // the first gesture anywhere on the page makes the context; until then a small pill says the sound is waiting for it
+  const stopSound = () => { wanted.clear(); early.length = 0; for (const v of voices.values()) { try { v.stop(); } catch { /* over */ } } voices.clear(); };
+  // the first gesture anywhere on the page resumes the context, in the gesture (as every browser wants); until then a
+  // small pill says the sound is waiting for it. A pause suspends it and the next play resumes it where it was.
+  let unlocked = false;
   const unlock = () => {
-    if (!has || root.dataset.state !== 'playing') return;
+    if (!has || !actx || root.dataset.state !== 'playing') return;
     // only an event that counts as the viewer's activation may start sound (a finger's press does not, its release does)
     if (navigator.userActivation && !navigator.userActivation.isActive) return;
-    if (!actx) {
-      actx = new AC({ latencyHint: 'interactive' });
-      master = actx.createGain();
-      master.connect(actx.destination);
-      setMuted(muted);
-      for (const want of wanted.values()) play(want.c, want.asked, want);
-    }
-    if (actx.state !== 'running') actx.resume().catch(() => {});
+    if (!live()) actx.resume().catch(() => {});
     el.hint.hidden = true;
   };
+  // the context runs (resumed by a gesture, or allowed to play from the start): the first time, what the clip asked for
+  // before starts now, where it would be by now; hits asked for while it was starting play if not too late. One that
+  // comes to run while the page is paused (a pause right after the gesture) is held again.
+  function running() {
+    if (!actx || !live()) return;
+    if (root.dataset.state !== 'playing') { actx.suspend().catch(() => {}); return; }
+    if (!unlocked) { unlocked = true; el.hint.hidden = true; for (const want of wanted.values()) play(want.c, want.asked, want); }
+    for (const want of early.splice(0)) play(want.c, want.asked, want);
+  }
+  actx?.addEventListener('statechange', running);
+  if (live()) unlocked = true;
   for (const type of ['pointerdown', 'pointerup', 'click', 'keydown']) window.addEventListener(type, unlock, { capture: true });
   el.hint.querySelector('span').textContent = coarse ? 'Sound on with your first tap' : 'Sound on with your first click';
   el.hint.addEventListener('click', unlock);
 
   // ── drawing: the session asks for each frame; timings are kept for the checks ─────────────────
-  const stats = { drawn: 0, skipped: 0, last: -1, ms: [], slow: [], started: 0 };
+  const stats = { drawn: 0, skipped: 0, last: -1, ms: [], slow: [], gaps: [], started: 0 };
   async function draw(view) {
     const t0 = performance.now();
     const r = await engine.drawFrame(view.frame, { ui: view.ui, transition: view.transition ?? undefined });
@@ -228,21 +245,25 @@ async function playInteractive(engine, canvas, composition, ui) {
     draw,
     onAudio,
     onFrame(n) {
-      if (stats.last >= 0 && n > stats.last + 1) stats.skipped += n - stats.last - 1;
+      // a skip: which frames, and what was on screen
+      if (stats.last >= 0 && n > stats.last + 1) {
+        stats.skipped += n - stats.last - 1;
+        if (stats.gaps.length < 200) stats.gaps.push({ after: stats.last, next: n, scene: session.state.scene });
+      }
       stats.last = n; stats.drawn++;
       canvas.dataset.frame = String(n);
       canvas.dataset.scene = session.state.scene;
     },
     onError(e) { stopSound(); ui.fail(`The clip stopped: ${e.message}`); },
   });
-  /** @type {any} */ (window).fablecut = { session, engine, stats, composition, get sound() { return actx?.state ?? (has ? 'waiting for a gesture' : 'none'); } };
+  /** @type {any} */ (window).fablecut = { session, engine, stats, composition, get sound() { return !actx ? 'none' : unlocked ? actx.state : 'waiting for a gesture'; } };
 
   /** gesture: a press on the play button, which may start the sound too; the page starting by itself waits for one */
   function begin(gesture = false) {
     if (root.dataset.state === 'ready') { session.start(); stats.started = performance.now(); } else session.resume();
     ui.setState('playing');
     el.big.hidden = true;
-    el.hint.hidden = !has || !!actx;
+    el.hint.hidden = !has || unlocked;
     if (gesture) unlock();
     el.play.setAttribute('aria-label', 'Pause');
     canvas.focus({ preventScroll: true });
@@ -303,6 +324,18 @@ async function playInteractive(engine, canvas, composition, ui) {
   const fps = composition.fps;
   for (const s of composition.interactive.scenes) for (const k of [0, 0.5]) await engine.drawFrame(Math.round((s.start + s.duration * k) * fps), {});
   const start = composition.interactive.scenes.find((s) => s.id === composition.interactive.start);
+  // and each scene transition once, half way: its asset run and the layers it draws through made, so the viewer's first
+  // scene change is not also their first time (cold, its second frame took 22 ms)
+  const next = composition.interactive.scenes.find((s) => s.id !== start.id) ?? start;
+  const warmed = new Set();
+  for (const tx of transitionsOf(composition.interactive)) {
+    const key = JSON.stringify([tx.asset, tx.params]);
+    if (warmed.has(key)) continue;
+    warmed.add(key);
+    const duration = tx.duration ?? 0.4;
+    await engine.drawFrame(Math.round(next.start * fps), { transition: { asset: tx.asset, params: tx.params ?? {}, t: duration / 2, duration, from: Math.round(start.start * fps), fromScene: start.id } });
+  }
+  // last, the start scene settled: what shows under the play button (with reduced motion) until the viewer presses it
   await engine.drawFrame(Math.round((start.start + start.duration) * fps) - 1, {});
   root.dataset.firstFrame = String(Math.round(performance.now()));
   ui.progress(1);
