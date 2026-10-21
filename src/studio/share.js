@@ -131,7 +131,8 @@ export function createShare(studio) {
     const { bundle, audio } = await clips.bundleFor(composition);
     const title = clip.title || slug;
     const description = clip.description?.trim() || `A ${Math.round(composition.duration)} s clip made with Fablecut.`;
-    return { clip, composition, bundle, hasAudio: audio.inputs.length > 0, title, description };
+    // an interactive clip has no mix: each audio item plays when the session says so (sounds below)
+    return { clip, composition, bundle, hasAudio: !composition.interactive && audio.inputs.length > 0, inputs: composition.interactive ? audio.inputs : [], title, description };
   }
 
   const total = (c) => Math.max(1, Math.round(c.duration * c.fps));
@@ -153,7 +154,7 @@ export function createShare(studio) {
       footage: (ref) => `/api/footage/${ref.replace('@', '/')}/`,
       upload: (f) => `/media/${f.file}`,
     });
-    return { share: SHARE_VERSION, clip: { slug, title: c.title, description: c.description }, composition: c.composition, bundle, fonts: fontsFor(c.composition, c.bundle, (f) => `/fonts/${f}`), audio: c.hasAudio ? `/api/clips/${slug}/audio.wav` : null };
+    return { share: SHARE_VERSION, clip: { slug, title: c.title, description: c.description }, composition: c.composition, bundle, fonts: fontsFor(c.composition, c.bundle, (f) => `/fonts/${f}`), audio: c.hasAudio ? `/api/clips/${slug}/audio.wav` : null, ...(c.inputs.length ? { sounds: soundsOf(c.composition, c.inputs, (i) => `/api/clips/${slug}/sounds/${i.id}`) } : {}) };
   }
 
   /**
@@ -336,10 +337,21 @@ export function createShare(studio) {
       if (r.code !== 0) throw new StudioError(`The clip's sound could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
     }
 
+    // an interactive clip's sounds, one file per audio item (the session starts and stops them), as AAC like the mix
+    let sounds;
+    if (c.inputs.length) {
+      mkdirSync(join(dir, 'media', 'sound'), { recursive: true });
+      for (const i of c.inputs) {
+        const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-i', i.path, '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(dir, 'media', 'sound', `${i.id}.m4a`)]);
+        if (r.code !== 0) throw new StudioError(`The sound of item "${i.id}" could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
+      }
+      sounds = soundsOf(comp, c.inputs, (i) => `media/sound/${i.id}.m4a`);
+    }
+
     const { poster, card } = await posters(posterPng);
     put('poster.jpg', poster);
     put('og.jpg', card);
-    const data = { share: SHARE_VERSION, clip: { slug, title: c.title, description: c.description }, composition: comp, bundle, fonts, audio, poster: 'poster.jpg', made: new Date().toISOString() };
+    const data = { share: SHARE_VERSION, clip: { slug, title: c.title, description: c.description }, composition: comp, bundle, fonts, audio, ...(sounds ? { sounds } : {}), poster: 'poster.jpg', made: new Date().toISOString() };
     put('bundle.json', JSON.stringify(data));
     put('index.html', pageHtml({
       title: c.title, description: c.description, root: '', bundle: 'bundle.json', poster: 'poster.jpg', width: comp.width, height: comp.height,
@@ -359,6 +371,14 @@ export function createShare(studio) {
     };
   }
 
+  /** The file of one audio item of an interactive clip (what /api/clips/<slug>/sounds/<item> serves). */
+  async function soundFile(slug, id) {
+    const c = await load(slug);
+    const input = c.inputs.find((i) => i.id === id);
+    if (!input) throw new StudioError(`Clip "${slug}" has no audio item "${id}" to play`, 'not_found');
+    return input.path;
+  }
+
   /** Where the clip can be shared from: the studio's path, and the default export folder if one was written. */
   function info(slug) {
     const clip = clips.getClip(slug);
@@ -371,7 +391,16 @@ export function createShare(studio) {
     return { clip: clip.slug, title: clip.title, path: `/share/${clip.slug}`, interactive: !!clip.composition.interactive, exported };
   }
 
-  return { liveBundle, livePage, exportClip, info };
+  return { liveBundle, livePage, exportClip, info, soundFile };
+}
+
+/**
+ * The sounds of an interactive clip, by audio item: { url, gain, loop?, cue? }. The session (src/player/session.js) says
+ * when each starts and stops; the page plays them through Web Audio.
+ */
+function soundsOf(composition, inputs, urlOf) {
+  const items = new Map(composition.tracks.filter((t) => t.type === 'audio').flatMap((t) => t.items).map((i) => [i.id, i]));
+  return Object.fromEntries(inputs.map((i) => [i.id, { url: urlOf(i), gain: i.gain ?? 1, ...(items.get(i.id)?.loop ? { loop: true } : {}), ...(items.get(i.id)?.cue ? { cue: true } : {}) }]));
 }
 
 const services = new WeakMap();

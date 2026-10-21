@@ -202,12 +202,13 @@ const handlers = {
    */
   async clipFrame(m) {
     const comp = m.composition ?? composition;
-    const urls = mediaAt(comp, m.frame, !!m.fast);
+    // a scene transition also draws the frame it leaves
+    const urls = [...new Set([...mediaAt(comp, m.frame, !!m.fast), ...(m.transition ? mediaAt(comp, m.transition.from, !!m.fast) : [])])];
     pinned = new Set(urls);
     try {
       await Promise.all(urls.map(bitmapOf));
       const c = surface(comp.width, comp.height);
-      const r = rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { ...clipExtra, record: !!m.record, ui: m.ui });
+      const r = rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { ...clipExtra, record: !!m.record, ui: m.ui, transition: m.transition });
       const bitmap = c.transferToImageBitmap();
       if (m.ahead > 0) ahead(comp, m.frame, m.ahead, !!m.fast);
       return { result: { bitmap, frame: m.frame, regions: r?.regions, texts: r?.texts }, transfer: [bitmap] };

@@ -143,11 +143,16 @@ const handlers = {
     const comp = m.composition ?? composition;
     await loadSequenceFrames(comp, m.frame);
     await loadFootageFrames(comp, m.frame, !!m.fast);
+    // an interactive scene change draws the frame the outgoing scene left on too
+    if (m.transition && m.transition.from !== m.frame) {
+      await loadSequenceFrames(comp, m.transition.from);
+      await loadFootageFrames(comp, m.transition.from, !!m.fast);
+    }
     const c = surface(comp.width, comp.height);
-    const r = rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { ...clipExtra, record: !!m.record });
+    const r = rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { ...clipExtra, record: !!m.record, ui: m.ui, transition: m.transition });
     const bitmap = c.transferToImageBitmap();
-    // with record: the measured text boxes, for the editor's overlay
-    return { result: { bitmap, texts: r?.texts }, transfer: [bitmap] };
+    // with record: the measured text boxes, for the editor's overlay; an interactive clip also returns its hit regions
+    return { result: { bitmap, texts: r?.texts, regions: r?.regions }, transfer: [bitmap] };
   },
   // a draft composition with the same assets (param tweaks, moved items): no recompile needed
   setComposition({ composition: comp }) {

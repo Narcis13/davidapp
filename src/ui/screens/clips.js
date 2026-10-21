@@ -1,4 +1,5 @@
-// Clips: every clip as a card with a poster frame drawn by the renderer.
+// Clips: every clip as a card with a poster frame drawn by the renderer. A new clip is a video (rendered to an MP4)
+// or, since iteration 5, an interactive clip (played in the browser, shared as a page).
 
 import { api, getStatus } from '/ui/lib/api.js';
 import { live } from '/ui/lib/live.js';
@@ -16,7 +17,7 @@ function clipCard(c) {
         ? h('img', { src: `/api/clips/${c.slug}/frame.png?t=${t}&maxSize=480&r=${c.revision}`, alt: '', loading: 'lazy' })
         : h('span.thumb-icon', icon('film', 40))),
     h('div.card-body',
-      h('div.card-title', h('h3', c.title), h('span.badge', c.format)),
+      h('div.card-title', h('h3', c.title), c.interactive ? h('span.badge.interactive', { 'data-testid': 'interactive-badge' }, 'Interactive') : null, h('span.badge', c.format)),
       h('div.ref', c.slug),
       c.description ? h('p.desc', c.description) : null,
       h('div.meta',
@@ -24,9 +25,20 @@ function clipCard(c) {
         h('span', fmtDuration(c.duration)),
         h('span', `revision ${c.revision}`),
         h('span', plural(c.assetCount, 'asset')),
-        h('span', c.renders ? plural(c.renders, 'finished render') : 'not rendered yet'),
+        h('span', c.interactive ? 'played, not rendered' : c.renders ? plural(c.renders, 'finished render') : 'not rendered yet'),
         c.remixedFrom ? h('span', 'remix of ', h('b', c.remixedFrom)) : null)));
 }
+
+/** What an interactive clip starts as: one scene that lasts the whole timeline (scenes, variables and wires come later). */
+const interactiveSkeleton = (format, duration) => ({
+  format, fps: 30, duration, tracks: [],
+  interactive: { scenes: [{ id: 'start', start: 0, duration, end: 'hold' }] },
+});
+
+const KIND_HINT = {
+  video: 'A timeline of assets that you render to an MP4.',
+  interactive: 'Starts with one scene. Viewers click, tap and press keys; you share it as a page, it is not rendered.',
+};
 
 /** A form that creates an empty clip and opens it in the editor. */
 function newClipDialog(ctx, status) {
@@ -34,11 +46,15 @@ function newClipDialog(ctx, status) {
   const title = h('input', { type: 'text', id: 'nc-title', placeholder: 'My clip', 'data-testid': 'new-clip-title', autocomplete: 'off' });
   const format = h('select', { id: 'nc-format', 'data-testid': 'new-clip-format' }, Object.entries(status.formats).map(([k, f]) => h('option', { value: k }, `${f.label} · ${f.width}×${f.height}`)));
   const duration = h('input.num', { type: 'number', id: 'nc-duration', min: 1, max: 120, step: 1, value: '30', 'data-testid': 'new-clip-duration' });
+  const kind = h('select', { id: 'nc-kind', 'data-testid': 'new-clip-kind' }, h('option', { value: 'video' }, 'Video'), h('option', { value: 'interactive' }, 'Interactive'));
+  const kindHint = h('p.hint.kind-hint', { 'data-testid': 'new-clip-kind-hint' }, KIND_HINT.video);
+  kind.addEventListener('change', () => { kindHint.textContent = KIND_HINT[kind.value] ?? ''; });
   const err = notice('new-clip-error');
   const create = h('button.btn.primary', { type: 'submit', 'data-testid': 'new-clip-create' }, 'Create clip');
   const form = h('form.form', { novalidate: true },
     h('div.field', h('label', { for: 'nc-name' }, 'Name'), name, h('p.hint', 'Lowercase letters, digits and dashes.')),
     h('div.field', h('label', { for: 'nc-title' }, 'Title'), title),
+    h('div.field', h('label', { for: 'nc-kind' }, 'Kind'), kind, kindHint),
     h('div.field', h('label', { for: 'nc-format' }, 'Format'), format),
     h('div.field', h('label', { for: 'nc-duration' }, 'Duration in seconds'), duration),
     err.el,
@@ -51,7 +67,10 @@ function newClipDialog(ctx, status) {
     if (!new RegExp(`^${SLUG}$`).test(slug)) { err.show('The name needs 2 to 64 lowercase letters, digits or dashes.'); name.focus(); return; }
     create.disabled = true;
     try {
-      const clip = await api.post('/api/clips', { name: slug, title: title.value.trim() || slug, format: format.value, duration: Number(duration.value) || 30 });
+      const seconds = Number(duration.value) || 30;
+      const made = { name: slug, title: title.value.trim() || slug, format: format.value, duration: seconds };
+      if (kind.value === 'interactive') made.composition = interactiveSkeleton(format.value, seconds);
+      const clip = await api.post('/api/clips', made);
       d.close();
       ctx.navigate(`/clips/${clip.slug}`);
     } catch (e2) {

@@ -198,3 +198,26 @@ h1 { font: 700 21px/1.25 var(--font); letter-spacing: -0.01em; overflow-wrap: an
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
   .spinner { animation: none; border-top-color: rgba(255, 255, 255, 0.7); }
 }
+
+/* ── an interactive clip: the frame is the game (nothing over its edges), the controls sit under it ───────────── */
+.share[data-interactive] .scrim, .share[data-interactive] .sound-hint, .share[data-interactive] .topline { display: none !important; }
+.share[data-interactive] { --reserve: 104px; }
+.share[data-interactive] .details .controls {
+  position: static; display: flex; justify-content: flex-start; gap: 2px; padding: 0; margin: 2px 0 0 -8px;
+  opacity: 1 !important; transform: none !important; pointer-events: auto !important;
+}
+.share[data-interactive] .details .ctl { color: var(--text); }
+.share[data-interactive] .details { grid-template-areas: 'about made' 'controls keys'; align-items: center; }
+.share[data-interactive] .details .controls { grid-area: controls; }
+.share[data-interactive] .keys { justify-self: end; }
+.share[data-interactive] .description { -webkit-line-clamp: 1; }
+.share[data-interactive][data-state=paused] .big, .share[data-interactive][data-state=ready] .big { animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.5), 0 0 0 14px rgba(255, 255, 255, 0.06), 0 12px 40px rgba(0, 0, 0, 0.45); } }
+@media (max-width: 640px) {
+  /* a phone: the frame as large as the screen allows, the title and controls in one short row under it */
+  .share[data-interactive] { --pad-x: 0px; --pad-y: 0px; --reserve: 60px; gap: 6px; padding-bottom: 0; }
+  .share[data-interactive] .frame { border-radius: 0; box-shadow: none; }
+  .share[data-interactive] .details { grid-template-areas: 'about controls'; grid-template-columns: 1fr auto; padding: 0 12px; }
+  .share[data-interactive] .description, .share[data-interactive] .made, .share[data-interactive] .rotate-hint { display: none; }
+  .share[data-interactive] h1 { font-size: 16px; }
+}

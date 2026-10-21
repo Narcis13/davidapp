@@ -19,9 +19,11 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
   const fps = comp.fps;
   const audioItems = comp.tracks.filter((t) => t.type === 'audio' && !t.muted && !t.hidden).flatMap((t) => t.items);
   const music = new Set(comp.interactive.music ?? []);
-  let state, shown, regions, pending, open, base, pausedAt, busy, timer, stopped, log, heard, playing;
+  // gen: which start this is; a frame still being drawn when the session restarts belongs to the old one and is dropped
+  let state, shown, regions, pending, open, base, pausedAt, busy, timer, stopped, log, heard, playing, gen = 0;
 
   function reset() {
+    gen++;
     state = initialState(comp);
     shown = -1; regions = []; pending = []; open = 0; log = [];
     base = now(); pausedAt = null; busy = false; heard = 0; playing = new Map();
@@ -59,6 +61,7 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
     const m = clock();
     if (m <= shown) return;
     busy = true;
+    const mine = gen;
     try {
       // the events stamped with the frame on screen are read against the regions it drew; then time runs on to m
       if (pending.length) { state = applyInput(comp, state, open, pending, regions); pending = []; }
@@ -68,15 +71,18 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
       const view = viewOf(comp, state, n);
       const cues = audioBetween(view);
       if (cues.start.length || cues.stop.length) onAudio(cues);
-      regions = (await draw(view)) ?? [];
+      const drawn = (await draw(view)) ?? [];
+      if (mine !== gen) return;
+      regions = drawn;
       shown = n;
       onFrame(n, view, state);
     } catch (e) {
+      if (mine !== gen) return;
       stopped = true;
       cancel(timer);
       onError(e instanceof Error ? e : new Error(String(e)));
     } finally {
-      busy = false;
+      if (mine === gen) busy = false;
     }
   }
 
