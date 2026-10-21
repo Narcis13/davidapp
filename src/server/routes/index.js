@@ -7,6 +7,8 @@ import fonts from './fonts.js';
 import speech from './speech.js';
 import exchange from './exchange.js';
 import provenance from './provenance.js';
+import share from './share.js';
+import interactive from './interactive.js';
 
 /** @param {any} api { studio, author, send, png, file, read, int } */
-export const moreRoutes = (api) => [footage, fonts, speech, exchange, provenance].flatMap((m) => m(api));
+export const moreRoutes = (api) => [footage, fonts, speech, exchange, provenance, share, interactive].flatMap((m) => m(api));

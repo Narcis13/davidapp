@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path';
 import { ENGINE_VERSION, FORMATS, SAMPLE_RATE, makeRef, parseRef } from '../core/engine.js';
 import { normalizeComposition, itemsOf, reformat } from '../core/composition.js';
+import { parseOn, transitionsOf } from '../core/interactive.js';
 import { needsEasing, boxToTransform } from '../core/transform.js';
 import { precompSource } from './generate.js';
 import { mapParams, resolveParams, walkParams } from '../core/schema.js';
@@ -76,8 +77,17 @@ export function createClips(ctx, library) {
       if (!row) { problems.push(`${where}: no asset "${wanted}" in the library`); return null; }
       return row;
     };
+    // v5: in an interactive composition a param may be bound to a variable ({ $var: "score" }): it is checked with the
+    // variable's first value and saved bound
+    const vars = composition.interactive?.vars ?? null;
     /** Check params against a schema (strictly) and pin the asset/image references in them. */
-    const pinWith = (schema, params, at) => {
+    const pinWith = (schema, input, at) => {
+      const bound = vars ? Object.entries(input).filter(([, v]) => v !== null && typeof v === 'object' && typeof v.$var === 'string') : [];
+      for (const [name, v] of bound) {
+        if (!Object.hasOwn(vars, v.$var)) problems.push(`${at}: params.${name}: unknown variable "${v.$var}" (declared: ${Object.keys(vars).join(', ') || 'none'})`);
+        else if (['asset', 'image', 'array', 'object', 'font'].includes(schema[name]?.type)) problems.push(`${at}: params.${name}: only number, text, colour, choice and on/off params bind to a variable`);
+      }
+      const params = bound.length ? { ...input, ...Object.fromEntries(bound.map(([k, v]) => [k, vars[v.$var]])) } : input;
       for (const e of resolveParams(schema, params, { strict: true }).errors) problems.push(`${at}: params.${e.path}: ${e.message}`);
       const out = mapParams(schema, params, ['asset', 'image'], (value, def) => {
         const dep = pin(value, `${at}: params`);
@@ -95,6 +105,7 @@ export function createClips(ctx, library) {
         else if (found.bundled) fonts.add(found.ref);
         else uploadedFamilies.add(found.family);
       });
+      for (const [k, v] of bound) out[k] = v;
       return out;
     };
     /** A motion, effect, mask or transition: the right kind of asset, pinned, with valid params. */
@@ -143,6 +154,27 @@ export function createClips(ctx, library) {
         for (const k of keys) for (const e of resolveParams({ [name]: def }, { [name]: k.v }, { strict: true }).errors) problems.push(`${where}: keyframes.${prop} at ${k.t}s: ${e.message}`);
       }
       if (needsEasing(item)) wantsEasing = true;
+    }
+    // v5: an interactive composition's scene transitions are pinned like any transition; its wires listen to events the
+    // items' assets declare (events.emits) and send them events they accept (events.accepts)
+    if (composition.interactive) {
+      for (const [i, tx] of transitionsOf(composition.interactive).entries()) pinAttachment(tx, `interactive: transition ${i + 1}`, ['transition']);
+      const byId = new Map([...itemsOf(composition)].map(({ item }) => [item.id, item]));
+      const declared = (id) => {
+        const item = byId.get(id);
+        const row = item && library.versionRow(item.asset);
+        return { ref: item?.asset, events: row?.type === 'function' ? json(row.meta, {}).events ?? null : null };
+      };
+      for (const [i, w] of composition.interactive.wires.entries()) {
+        const on = parseOn(w.on);
+        if (on?.kind !== 'item') continue;
+        const { ref, events } = declared(on.item);
+        if (!events || !Object.hasOwn(events.emits, on.event)) problems.push(`interactive.wires[${i}].on: item "${on.item}" (${ref}) does not emit "${on.event}" (it emits ${Object.keys(events?.emits ?? {}).join(', ') || 'nothing'})`);
+      }
+      for (const s of composition.interactive.sends ?? []) {
+        const { ref, events } = declared(s.item);
+        if (!events || !Object.hasOwn(events.accepts, s.event)) problems.push(`${s.path}: item "${s.item}" (${ref}) does not react to "${s.event}" (it accepts ${Object.keys(events?.accepts ?? {}).join(', ') || 'nothing'})`);
+      }
     }
     // the clip's theme (brand kit): a value asset every asset reads as f.theme
     if (composition.theme) {
@@ -339,6 +371,8 @@ export function createClips(ctx, library) {
     }
     if (composition.easing) refs.add(composition.easing);
     if (composition.theme) refs.add(composition.theme);
+    // v5: the scene transitions of an interactive composition
+    if (composition.interactive) for (const tx of transitionsOf(composition.interactive)) refs.add(tx.asset);
     // motions, effects, masks and transitions, with the assets named in their params
     const attachments = [...(composition.effects ?? []), ...composition.tracks.flatMap((t) => t.effects ?? [])];
     for (const { track, item } of itemsOf(composition)) if (track.type !== 'audio') attachments.push(...(item.motions ?? []), ...(item.effects ?? []), ...(item.mask ? [item.mask] : []), ...(item.transition ? [item.transition] : []));

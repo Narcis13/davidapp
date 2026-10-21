@@ -214,6 +214,21 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   }
 
   /**
+   * v5: play an interactive clip from an input log ({ f, type, x, y, key, pointer } in session frames and frame pixels)
+   * or scripted steps ({ wait } { tap } { key } …, see core/interactive.js), reporting the session frames asked for
+   * (times in seconds, or frames) with their state, playhead, pixel hash and (stills) a PNG. → { log, frames, end, last }.
+   * @param {{ clip?: string, composition?: any, format?: string, log?: any[], steps?: any[], times?: number[], frames?: number[], stills?: boolean, regions?: boolean, maxSize?: number }} o
+   */
+  async function play({ clip, composition, format, log, steps, times, frames, stills, regions, maxSize = 960 }) {
+    const comp = await compositionOf({ clip, composition, format });
+    if (!comp.interactive) throw new StudioError(`${clip ? `Clip "${clip}"` : 'The composition'} is not interactive: it has no interactive section to play`, 'invalid');
+    const want = [...new Set([...(frames ?? []), ...(times ?? []).map((t) => Math.max(0, Math.round(t * comp.fps)))])].sort((a, b) => a - b);
+    const { bundle } = await clips.bundleFor(comp);
+    const r = await pool.run('play', { log, steps, frames: want, stills, regions, maxSize }, { bundle, timeout: 300000 }).catch(fail);
+    return { ...r, frames: r.frames.map((x) => (x.png ? { ...x, png: Buffer.from(x.png) } : x)) };
+  }
+
+  /**
    * SHA-256 of the raw RGBA of frames at the given times → [{ t, frame, hash }].
    * @param {{ clip?: string, composition?: any, format?: string, isolate?: any, times: number[] }} o
    */
@@ -332,5 +347,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, speech, checks, fonts, provenance, exchange, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, speech, checks, fonts, provenance, exchange, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, play, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }

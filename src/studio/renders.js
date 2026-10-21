@@ -145,6 +145,7 @@ export function createRenders(ctx, library, clips, sound, provenance) {
     if (format && !FORMATS[format]) throw new StudioError(`Unknown format "${format}"; use ${Object.keys(FORMATS).join(', ')}`);
     const other = format && format !== row.format ? format : null;
     const comp = other ? reformat(json(row.composition), other) : json(row.composition);
+    if (comp.interactive) throw new StudioError(`Clip "${clip}" is interactive: it is played, not rendered to MP4. Share it as a page instead (share_clip), or look at its states with play_clip and render_clip_frame.`, 'unsupported');
     const visual = comp.tracks.some((t) => t.type !== 'audio' && t.items.length);
     if (!visual) throw new StudioError(`Clip "${clip}" has nothing on its visual tracks yet; add items before rendering.`);
     const total = Math.round(comp.duration * comp.fps);

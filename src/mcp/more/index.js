@@ -7,6 +7,8 @@ import fonts from './fonts.js';
 import speech from './speech.js';
 import exchange from './exchange.js';
 import provenance from './provenance.js';
+import share from './share.js';
+import interactive from './interactive.js';
 
 /** @param {any} api { studio, who, image, z, REF, PARAMS, AUTHOR, FORMAT, COMPOSITION, compactAsset, compactRender } */
-export const moreTools = (api) => [footage, fonts, speech, exchange, provenance].flatMap((m) => m(api));
+export const moreTools = (api) => [footage, fonts, speech, exchange, provenance, share, interactive].flatMap((m) => m(api));

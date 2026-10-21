@@ -6,6 +6,7 @@ import { parentPort } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { createRuntime, describeError } from '../core/runtime.js';
+import { normalizeLog, replay, stepsToLog, summary } from '../core/interactive.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
 import { fontAliases } from '../core/lib/text.js';
@@ -164,7 +165,7 @@ function sheet(cells, { cols, cellWidth, width, height }) {
   return out;
 }
 
-const metaOf = (def) => JSON.parse(JSON.stringify({ kind: def.kind, title: def.title, description: def.description, tags: def.tags, duration: def.duration, formats: def.formats, schema: def.schema, uses: def.uses }));
+const metaOf = (def) => JSON.parse(JSON.stringify({ kind: def.kind, title: def.title, description: def.description, tags: def.tags, duration: def.duration, formats: def.formats, schema: def.schema, uses: def.uses, events: def.events ?? undefined }));
 
 /** Compile unsaved source, check it and render test frames. Throws with a useful message when it fails. */
 async function validate(msg) {
@@ -331,6 +332,32 @@ const handlers = {
     }
     const thumb = thumbGray(a, comp.width, comp.height);
     return { result: { texts, thumb, std: grayStd(thumb) }, transfer: [thumb.buffer] };
+  },
+  /**
+   * v5: play an interactive clip from an input log or scripted steps (core/interactive.js), as a viewer's browser
+   * would, and report the chosen session frames: { frame, playhead, state, hash, png?, regions? }, the log played and
+   * the final state. msg: { log | steps, frames, stills, maxSize, regions }.
+   */
+  async play(msg) {
+    const comp = state.comp;
+    if (!comp?.interactive) throw new Error('this clip is not interactive: it has no interactive section to play');
+    const c = surface(comp.width, comp.height);
+    const g = c.getContext('2d', FRAME_CONTEXT);
+    const draw = async (view) => {
+      await loadMedia(state.rt, comp, view.frame);
+      if (view.transition) await loadMedia(state.rt, comp, view.transition.from);
+      return state.rt.renderClipFrame(g, comp, view.frame, { ...state.clip, ui: view.ui, transition: view.transition }).regions;
+    };
+    const log = msg.steps ? (await stepsToLog(comp, msg.steps, { draw })).log : normalizeLog(msg.log ?? []);
+    const frames = [];
+    const end = await replay(comp, log, {
+      frames: msg.frames ?? [], draw,
+      onFrame: async (n, view, s) => {
+        const regions = await draw(view);
+        frames.push({ frame: n, t: n / comp.fps, playhead: view.frame, state: summary(s), hash: sha(c.data()), ...(msg.stills ? { png: png(c, msg.maxSize) } : {}), ...(msg.regions ? { regions } : {}) });
+      },
+    });
+    return { result: { log, frames, end: summary(end), last: Math.max(0, ...log.map((e) => e.f)) } };
   },
   assetFrame(msg) {
     return output(drawAsset(state.rt, msg.ref, state.fonts ? { ...msg, fonts: state.fonts } : msg), msg);
