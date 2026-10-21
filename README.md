@@ -609,7 +609,7 @@ on a canvas there (no MP4, no third-party embed), so a link sent on WhatsApp ope
   and landscape handled. Open Graph and Twitter tags with a 1200×630 card.
 - The export holds only what the clip needs: the core modules the player imports (~250 kB), the fonts it names, its
   images, the footage frames it shows (WebP), its sound (AAC), a poster. Clip 11 (16 s with a screen recording):
-  13.1 MB, first frame in 0.4 s (desktop) and 0.24 s (phone) from a local server; the interactive clip 12: 1.6 MB.
+  13.1 MB, first frame in 0.22 s (desktop) and 0.24 s (phone) from a local server; the interactive clip 12: 1.6 MB.
 - Its frames match the studio's renderer within the parity limits (`scripts/parity.mjs`); `scripts/share-check.mjs`
   plays, pauses, scrubs, goes full screen and turns sound on in headless Chrome at desktop and phone sizes and
   reports console and network problems, page weight and time to the first frame.
@@ -625,8 +625,9 @@ hit regions while they draw (`f.ui.hit`) and read the viewer's input and what th
 What makes it testable: the state at any frame is a **pure function of the composition and the input log**. Each
 input event is stamped with a frame and read against the hit regions that frame drew, so the live page and a replay
 reach the same states and the same pixels. `play_clip` replays scripted steps or a recorded log (tests hash a replay
-twice), and `check_clip` crawls every state a viewer can reach (scenes, dead ends, tap target sizes on a phone, the
-text checks in each state). The studio editor plays an interactive clip on its preview (scene bands on the timeline,
+twice), and `check_clip` crawls the states a viewer can reach, trying every press, key and wait from each (up to
+`max_states`, 40 by default; a game's score makes its states endless): scenes, dead ends, tap target sizes on a
+phone, the text checks in each state. The studio editor plays an interactive clip on its preview (scene bands on the timeline,
 an interactive panel with the variables and wires), and `start_render` refuses one. See "Interactive assets" and
 "Interactive compositions" in [ASSET_CONTRACT.md](docs/ASSET_CONTRACT.md) and the recipes in
 [COOKBOOK.md](docs/COOKBOOK.md).
@@ -648,8 +649,9 @@ The UI set, each themed, keyboard-reachable, with a focus ring, press feedback a
 The showcase interactive clip: a neon rhythm game. A synthwave title, a 26 s song on a four-lane highway (tap the
 lanes or press D F J K as the notes cross the line), the combo, results with a rank. Its own assets are
 `beat-lanes`, `beat-title`, `beat-results` and `theme-neon`; it reuses `music-loop` and `synth-note` for the music and
-the hit sounds, and the UI set for its menus. Measured at phone width in headless Chrome without a GPU: a full
-playthrough, 1,812 frames, none skipped. Evidence: [docs/showcase/v5/INDEX.md](docs/showcase/v5/INDEX.md).
+the hit sounds, and the UI set for its menus. Measured in headless Chrome without a GPU (software raster), from the
+title through the tap on Play, the song and the results: ten runs at phone and desktop size, about 1,875 frames
+each, none skipped. Evidence: [docs/showcase/v5/INDEX.md](docs/showcase/v5/INDEX.md).
 
 ## How it works
 

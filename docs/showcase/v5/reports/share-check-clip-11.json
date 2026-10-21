@@ -1,0 +1,355 @@
+{
+ "url": "http://127.0.0.1:8813/clips/the-kit/",
+ "at": "2026-10-21T21:20:08.451Z",
+ "sizes": [
+  {
+   "size": "1440x900",
+   "width": 1440,
+   "height": 900,
+   "mobile": false,
+   "firstFrameMs": 220,
+   "firstFrameBytes": 3204163,
+   "firstFrameRequests": 81,
+   "bytes": 10281816,
+   "requests": 193,
+   "checks": {
+    "first frame": {
+     "ok": true,
+     "detail": "220 ms after navigation"
+    },
+    "plays by itself (muted)": {
+     "ok": true,
+     "detail": {
+      "from": 1,
+      "to": 37
+     }
+    },
+    "a way to turn the sound on": {
+     "ok": true
+    },
+    "sound starts on the first tap": {
+     "ok": true,
+     "detail": {
+      "playing": true,
+      "muted": false,
+      "t": 2.577123,
+      "state": "playing"
+     }
+    },
+    "pauses": {
+     "ok": true,
+     "detail": {
+      "from": 85,
+      "to": 85
+     }
+    },
+    "plays again": {
+     "ok": true,
+     "detail": {
+      "from": 99,
+      "to": 124
+     }
+    },
+    "scrubs": {
+     "ok": true,
+     "detail": {
+      "want": 289,
+      "got": 290,
+      "time": "0:09"
+     }
+    },
+    "keyboard: K, →, M": {
+     "ok": true,
+     "detail": {
+      "k1": "playing",
+      "k2": "paused",
+      "before": 299,
+      "after": 449,
+      "m1": true,
+      "m2": false
+     }
+    },
+    "full screen": {
+     "ok": true,
+     "detail": {
+      "full": "screen",
+      "element": true,
+      "frame": [
+       1440,
+       810
+      ],
+      "viewport": [
+       1440,
+       900
+      ]
+     }
+    },
+    "leaves full screen": {
+     "ok": true
+    },
+    "ends with a replay button": {
+     "ok": true
+    },
+    "replays from the start": {
+     "ok": true,
+     "detail": {
+      "frame": 33
+     }
+    },
+    "fits the viewport (no scroll)": {
+     "ok": true,
+     "detail": {
+      "scroll": [
+       1440,
+       900
+      ],
+      "viewport": [
+       1440,
+       900
+      ]
+     }
+    },
+    "reduced motion: poster and play button, no autoplay": {
+     "ok": true,
+     "detail": {
+      "state": "ready",
+      "drawn": false,
+      "big": true
+     }
+    },
+    "reduced motion: play starts it with sound": {
+     "ok": true,
+     "detail": {
+      "state": "playing",
+      "sound": true
+     }
+    },
+    "no console errors or failed requests": {
+     "ok": true
+    }
+   },
+   "problems": [],
+   "screenshots": [
+    "1440x900-1-playing.png",
+    "1440x900-2-paused.png",
+    "1440x900-3-scrubbed.png",
+    "1440x900-4-fullscreen.png",
+    "1440x900-5-ended.png",
+    "1440x900-6-reduced-motion.png"
+   ]
+  },
+  {
+   "size": "390x844-mobile",
+   "width": 390,
+   "height": 844,
+   "mobile": true,
+   "firstFrameMs": 235,
+   "firstFrameBytes": 2208860,
+   "firstFrameRequests": 60,
+   "bytes": 10601019,
+   "requests": 198,
+   "checks": {
+    "first frame": {
+     "ok": true,
+     "detail": "235 ms after navigation"
+    },
+    "plays by itself (muted)": {
+     "ok": true,
+     "detail": {
+      "from": 0,
+      "to": 35
+     }
+    },
+    "a way to turn the sound on": {
+     "ok": true
+    },
+    "sound starts on the first tap": {
+     "ok": true,
+     "detail": {
+      "playing": true,
+      "muted": false,
+      "t": 2.686637,
+      "state": "playing"
+     }
+    },
+    "pauses": {
+     "ok": true,
+     "detail": {
+      "from": 88,
+      "to": 88
+     }
+    },
+    "plays again": {
+     "ok": true,
+     "detail": {
+      "from": 102,
+      "to": 127
+     }
+    },
+    "scrubs": {
+     "ok": true,
+     "detail": {
+      "want": 289,
+      "got": 290,
+      "time": "0:09"
+     }
+    },
+    "full screen": {
+     "ok": true,
+     "detail": {
+      "full": "screen",
+      "element": true,
+      "frame": [
+       390,
+       219
+      ],
+      "viewport": [
+       390,
+       844
+      ]
+     }
+    },
+    "leaves full screen": {
+     "ok": true
+    },
+    "ends with a replay button": {
+     "ok": true
+    },
+    "replays from the start": {
+     "ok": true,
+     "detail": {
+      "frame": 34
+     }
+    },
+    "fits the viewport (no scroll)": {
+     "ok": true,
+     "detail": {
+      "scroll": [
+       390,
+       844
+      ],
+      "viewport": [
+       390,
+       844
+      ]
+     }
+    },
+    "reduced motion: poster and play button, no autoplay": {
+     "ok": true,
+     "detail": {
+      "state": "ready",
+      "drawn": false,
+      "big": true
+     }
+    },
+    "reduced motion: play starts it with sound": {
+     "ok": true,
+     "detail": {
+      "state": "playing",
+      "sound": true
+     }
+    },
+    "no console errors or failed requests": {
+     "ok": true
+    }
+   },
+   "problems": [],
+   "screenshots": [
+    "390x844-mobile-1-playing.png",
+    "390x844-mobile-2-paused.png",
+    "390x844-mobile-3-scrubbed.png",
+    "390x844-mobile-4-fullscreen.png",
+    "390x844-mobile-5-ended.png",
+    "390x844-mobile-6-reduced-motion.png"
+   ]
+  }
+ ],
+ "parity": {
+  "clip": "clip-11-the-kit",
+  "limit": {
+   "meanDiff": 1.5,
+   "over64": 1
+  },
+  "frames": [
+   {
+    "frame": 0,
+    "t": 0,
+    "meanDiff": 0.673,
+    "maxDiff": 118,
+    "over16": 0.062,
+    "over64": 0.003,
+    "distinct": 520,
+    "ok": true,
+    "image": "parity-clip-11-the-kit-f0.png"
+   },
+   {
+    "frame": 30,
+    "t": 1,
+    "meanDiff": 0.829,
+    "maxDiff": 134,
+    "over16": 0.157,
+    "over64": 0.008,
+    "distinct": 1000,
+    "ok": true,
+    "image": "parity-clip-11-the-kit-f30.png"
+   },
+   {
+    "frame": 60,
+    "t": 2,
+    "meanDiff": 0.902,
+    "maxDiff": 221,
+    "over16": 0.242,
+    "over64": 0.041,
+    "distinct": 1000,
+    "ok": true,
+    "image": "parity-clip-11-the-kit-f60.png"
+   },
+   {
+    "frame": 121,
+    "t": 4.033,
+    "meanDiff": 0.863,
+    "maxDiff": 221,
+    "over16": 0.231,
+    "over64": 0.024,
+    "distinct": 1000,
+    "ok": true,
+    "image": "parity-clip-11-the-kit-f121.png"
+   },
+   {
+    "frame": 200,
+    "t": 6.667,
+    "meanDiff": 0.893,
+    "maxDiff": 221,
+    "over16": 0.262,
+    "over64": 0.041,
+    "distinct": 1000,
+    "ok": true,
+    "image": "parity-clip-11-the-kit-f200.png"
+   },
+   {
+    "frame": 300,
+    "t": 10,
+    "meanDiff": 0.784,
+    "maxDiff": 183,
+    "over16": 0.293,
+    "over64": 0.087,
+    "distinct": 1000,
+    "ok": true,
+    "image": "parity-clip-11-the-kit-f300.png"
+   },
+   {
+    "frame": 482,
+    "t": 16.067,
+    "meanDiff": 0.837,
+    "maxDiff": 199,
+    "over16": 0.305,
+    "over64": 0.104,
+    "distinct": 1000,
+    "ok": true,
+    "image": "parity-clip-11-the-kit-f482.png"
+   }
+  ],
+  "problems": []
+ },
+ "ok": true
+}

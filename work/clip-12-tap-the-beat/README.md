@@ -13,7 +13,8 @@ beat-title, two of ui-dialog); the showcase journal makes each asset once, in it
 - For whom: anyone who opens a link on a phone; then the people who make clips.
 - Takeaway: *a clip can be played, not only watched, and it is still a function of time and input.*
 - Length: a 26 s song (12 bars at 120 bpm after a 4-beat count-in), around a title and a results screen.
-- Input: tap a lane (touch or mouse) or press D F J K (or the arrows); menus by tap, click, Tab and Enter, Escape.
+- Input: tap a lane (touch or mouse) or press D F J K (or the arrows); menus by tap, click, Tab and Enter (H opens
+  how to play, Enter closes it).
 
 ## Look
 
@@ -44,21 +45,26 @@ beat-title, two of ui-dialog); the showcase journal makes each asset once, in it
   lanes never repeated back to back, eighths from the second quarter, a breath every fourth bar), so it always
   matches a music-loop at the same tempo; the results card's total (55 notes) is read from the same function.
 - Catching: a note in reach draws `good` over its window (±0.14 s) and `perfect` on top of it near the beat (±0.06
-  s); the topmost region fires, pressing on press (`press: 'down'`). A lane pressed with nothing in reach is `miss`
-  (the combo breaks). A caught note is one whose region fired after it came into reach, so a replay is exact.
-- Score: 100 a perfect, 50 a good, plus the combo; the best combo kept; each lane sounds its own note (the lane is the
-  event's value, stored in `lane`, then one `if` per lane).
+  s); the topmost region fires, pressing on press (`press: 'down'`). A lane pressed with nothing in reach is `miss`: a
+  stray press, which breaks the combo and counts against the accuracy (`hits / (notes + strays)`), so mashing every
+  key does not earn an S. A caught note is one whose region fired after it came into reach, so a replay is exact.
+- Score: 100 a perfect, 50 a good, plus the combo; the best combo kept. A catch's value is `{ lane, combo }`:
+  beat-lanes keeps the streak itself (a stray press or a note let through breaks it), the wire stores both with
+  `$value.lane` and `$value.combo`, then one `if` per lane sounds its note.
 - Options on the title: key letters on the pads (a toggle) and the note speed (a slider, 0.6× to 1.6×), bound to
   variables the playfield reads. The how-to-play dialog disables what is under it and is a modal region.
-- Escape in the song goes back to the title; Play again resets the variables and starts the song; Menu goes back.
+- Play again resets the variables and starts the song; Menu goes back to the title. Escape does not quit the song (it
+  did in the first build): one press threw a run away, and in full screen the browser takes Escape to leave it.
 
 ## Checks
 
 | check | result | how |
 |---|---|---|
 | prepare (wires against declared events, bindings) | pass | `update_clip` |
-| check_clip, interactive | 0 errors, 0 warnings; 2 info (the dialog panel swallows taps: by design; the slider's target is 42.9 CSS px, advised 44) | 24 states, 80 transitions crawled |
+| check_clip, interactive | 0 errors, 0 warnings; 2 info (the dialog's scrim takes taps with no wire on it: by design; the slider's target is 42.9 CSS px, advised 44) | 40 states (the default cap), 99 transitions crawled |
 | replay determinism | same hashes twice | `play_clip` with the recorded log (tests do the same) |
-| share page, 1440×900 and 390×844 | plays, 0 console or network problems | `scripts/play-check.mjs` (real taps and keys; a bot plays the song) |
-| frame time at phone width, no GPU | 1,812 frames, 0 skipped, worst 16.8 ms | `play-check.mjs --size 390x844 --mobile`, headless Chrome |
-| GIF of a full playthrough | `docs/showcase/v5/gifs/` | `play-check.mjs --gif` |
+| share page, 1440×900 and 390×844 | plays; the first tap starts the sound; pause, resume, full screen, mute; 0 console or network problems | `scripts/play-check.mjs` (real taps, clicks and keys) |
+| parity of the page with the Node render | 16 states (title, dialog, the iris, the song, results) within the limits, worst mean 1.05 | `scripts/parity-interactive.mjs` |
+| frame time, no GPU, from the title through the tap, the song and the results | 10 runs (5 at 390×844, 5 at 1440×900), 0 frames skipped in each; round trip p99 12.0–12.4 ms | `play-check.mjs`, headless Chrome; `docs/showcase/v5/reports/frames-clip-12.json` |
+| the song played by real touch taps, mouse clicks and keys | 53 of 55 notes caught, 38 perfect, no stray presses, each way | `play-check.mjs` bot with `input: touch / mouse / key` |
+| GIF of a full playthrough | touch on a phone, keys on a desktop: `docs/showcase/v5/gifs/` | `play-check.mjs --gif` |

@@ -1,0 +1,86 @@
+{
+ "what": "Iteration-5 studio workflows (the editor's interactive mode) driven in headless Chrome with real mouse, keyboard and touch input (scripts/workflows-v5.mjs); every check is asserted by the script.",
+ "base": "http://127.0.0.1:8796",
+ "workflows": {
+  "play": {
+   "what": "the editor plays an interactive clip: pointer, keys, readout, log, stop; then on a phone with touch",
+   "checks": {
+    "the timeline shows a band per scene, at its range": true,
+    "the Interactive panel lists the variables (first values), 3 scenes and 6 wires, no problems": true,
+    "a wire reads as a sentence": true,
+    "the design timeline reads the first values": true,
+    "the editor: no sideways scroll, no text cut off": true,
+    "the band is selected, the playhead is in it, the panel row agrees": true,
+    "the readout names the scene at the playhead": true,
+    "the render button says Share": true,
+    "the dialog says played, not rendered, and links the share page": true,
+    "the button says it is playing, the readout shows the first scene": true,
+    "the timeline, layers and inspector are read-only meanwhile": true,
+    "the clock runs (the menu scene loops)": true,
+    "the cursor is a pointer over a region": true,
+    "away from every region it is not": true,
+    "the button draws its hover state (the pixels changed)": true,
+    "the click reached the button: scene play, score 0": true,
+    "the timeline playhead follows the session into the scene": true,
+    "the sounds were mixed by the studio and the music and the blip started": true,
+    "Tab focuses the button, Enter fires it: score 1": true,
+    "the third tap goes to win with score 3": true,
+    "the restart wire put the first values back": true,
+    "Escape ran the go back wire": true,
+    "a letter key reaches the wires: muted is true": true,
+    "Space and the arrows do not scroll the page": true,
+    "paused: the frame count does not move": true,
+    "resumed: the clock runs on": true,
+    "Restart: scene menu, nothing recorded yet": true,
+    "Tab past the last button moves on to the page: the keyboard is not trapped on the stage": true,
+    "Copy log copies the recorded input as JSON (pointer events in frame pixels)": true,
+    "the frames in the log never go back in time": true,
+    "the note says what was copied": true,
+    "the studio replays the log to the same scene and variables": true,
+    "stopped: the design readout, the timeline and inspector editable again": true,
+    "Copy log still works after Stop": true,
+    "no preview error was shown": true,
+    "phone: the editor: no sideways scroll, no text cut off, controls big enough to tap": true,
+    "phone: a finger on the Start button changes the scene": true,
+    "phone: three taps reach the win scene with score 3": true,
+    "phone: the page did not scroll sideways while playing": true,
+    "phone: Stop returns to the design timeline, with no preview error": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/play.gif",
+   "frames": 26,
+   "mobileGif": "gifs/play-mobile.gif",
+   "mobileFrames": 12
+  },
+  "problems": {
+   "what": "a deleted item that a wire needs: the panel names the problem and Play refuses; undo fixes it",
+   "checks": {
+    "the panel names the problem with its path": true,
+    "Play refuses and says why": true,
+    "after undo Play runs": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/problems.gif",
+   "frames": 7
+  },
+  "clips": {
+   "what": "the new-clip form: an interactive clip starts as one scene and plays; a video clip is as before",
+   "checks": {
+    "the form asks for the kind; video is the default": true,
+    "the hint says it is not rendered": true,
+    "the new-clip form: no sideways scroll, no text cut off": true,
+    "it was created with one scene as long as the clip": true,
+    "the editor shows its scene and panel": true,
+    "an empty interactive clip plays (scene start), no preview error": true,
+    "no play bar, no Interactive panel, no scene bands, the button says Render": true,
+    "the clips list marks the interactive clips": true,
+    "phone: the new-clip form: no sideways scroll, no text cut off, controls big enough to tap": true
+   },
+   "consoleProblems": [],
+   "gif": "gifs/clips.gif",
+   "frames": 10,
+   "mobileGif": "gifs/clips-mobile.gif",
+   "mobileFrames": 2
+  }
+ }
+}

@@ -1,0 +1,713 @@
+{
+ "what": "Clip 12's exported share page (served by scripts/serve-static.mjs with the studio stopped), played in headless Chrome without a GPU (software raster, a steady 60 Hz clock: the slowest drawing, standing in for a phone's worst case) by scripts/play-check.mjs. Measured from 1.5 s into the title, before the tap on Play (the first gesture: sound starts there), through the iris into the song (a bot presses each note's key while it is in reach), to the results. drawn/skipped: session frames drawn and skipped; drawMs: the round trip of each frame (the worker draws it, the page shows it); gaps: where frames were skipped; stalls: times the browser gave the page no animation frame for over 50 ms.",
+ "runs": [
+  {
+   "run": "desktop-1",
+   "size": "1440x900",
+   "mobile": false,
+   "firstFrameMs": 369,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1875,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.5,
+     "p95": 10.6,
+     "p99": 12.4,
+     "max": 17.2,
+     "over16": 1
+    },
+    "slow": [
+     {
+      "frame": 146,
+      "playhead": 146,
+      "scene": "title",
+      "ms": 17.2,
+      "transition": false
+     }
+    ],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2019,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "desktop-2",
+   "size": "1440x900",
+   "mobile": false,
+   "firstFrameMs": 309,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1875,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.5,
+     "p95": 10.6,
+     "p99": 12.3,
+     "max": 16.2,
+     "over16": 0
+    },
+    "slow": [],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2019,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "desktop-3",
+   "size": "1440x900",
+   "mobile": false,
+   "firstFrameMs": 332,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1874,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.5,
+     "p95": 10.5,
+     "p99": 12,
+     "max": 15.4,
+     "over16": 0
+    },
+    "slow": [],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2019,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "desktop-4",
+   "size": "1440x900",
+   "mobile": false,
+   "firstFrameMs": 227,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1870,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.4,
+     "p95": 10.3,
+     "p99": 12.2,
+     "max": 16.4,
+     "over16": 0
+    },
+    "slow": [],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2014,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "desktop-5",
+   "size": "1440x900",
+   "mobile": false,
+   "firstFrameMs": 325,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1874,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.6,
+     "p95": 10.8,
+     "p99": 12,
+     "max": 15.5,
+     "over16": 0
+    },
+    "slow": [],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2017,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "phone-1",
+   "size": "390x844",
+   "mobile": true,
+   "firstFrameMs": 398,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1879,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.5,
+     "p95": 10.8,
+     "p99": 12.2,
+     "max": 16,
+     "over16": 0
+    },
+    "slow": [],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2020,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "phone-2",
+   "size": "390x844",
+   "mobile": true,
+   "firstFrameMs": 615,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1878,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.6,
+     "p95": 10.7,
+     "p99": 12.1,
+     "max": 17.2,
+     "over16": 1
+    },
+    "slow": [
+     {
+      "frame": 146,
+      "playhead": 146,
+      "scene": "title",
+      "ms": 17.2,
+      "transition": false
+     }
+    ],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2019,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "phone-3",
+   "size": "390x844",
+   "mobile": true,
+   "firstFrameMs": 386,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1879,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.5,
+     "p95": 10.5,
+     "p99": 12.1,
+     "max": 15.3,
+     "over16": 0
+    },
+    "slow": [],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2025,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "phone-4",
+   "size": "390x844",
+   "mobile": true,
+   "firstFrameMs": 218,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1881,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.4,
+     "p95": 10.4,
+     "p99": 12,
+     "max": 15.4,
+     "over16": 0
+    },
+    "slow": [],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2026,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  },
+  {
+   "run": "phone-5",
+   "size": "390x844",
+   "mobile": true,
+   "firstFrameMs": 320,
+   "bytes": 1363296,
+   "problems": [],
+   "frames": {
+    "drawn": 1879,
+    "skipped": 0,
+    "drawMs": {
+     "p50": 9.4,
+     "p95": 10.4,
+     "p99": 12,
+     "max": 16.5,
+     "over16": 0
+    },
+    "slow": [],
+    "gaps": [],
+    "stalls": []
+   },
+   "end": {
+    "scene": "results",
+    "vars": {
+     "score": 5231,
+     "combo": 30,
+     "best": 30,
+     "hits": 53,
+     "perfects": 38,
+     "strays": 0,
+     "lane": 1,
+     "help": false,
+     "keys": true,
+     "speed": 1
+    },
+    "frame": 2024,
+    "page": "playing"
+   },
+   "steps": [
+    {
+     "start": true
+    },
+    {
+     "wait": 1.5
+    },
+    {
+     "measure": true
+    },
+    {
+     "tap": "play"
+    },
+    {
+     "bot": {
+      "until": "results",
+      "miss": 0.07,
+      "good": 0.18
+     }
+    },
+    {
+     "wait": 2.6
+    },
+    {
+     "expect": {
+      "scene": "results"
+     }
+    }
+   ]
+  }
+ ],
+ "summary": [
+  "desktop-1  1440x900  drawn 1875  skipped 0  p50 9.5  p99 12.4  max 17.2 ms  stalls 0  problems 0",
+  "desktop-2  1440x900  drawn 1875  skipped 0  p50 9.5  p99 12.3  max 16.2 ms  stalls 0  problems 0",
+  "desktop-3  1440x900  drawn 1874  skipped 0  p50 9.5  p99 12  max 15.4 ms  stalls 0  problems 0",
+  "desktop-4  1440x900  drawn 1870  skipped 0  p50 9.4  p99 12.2  max 16.4 ms  stalls 0  problems 0",
+  "desktop-5  1440x900  drawn 1874  skipped 0  p50 9.6  p99 12  max 15.5 ms  stalls 0  problems 0",
+  "phone-1    390x844  drawn 1879  skipped 0  p50 9.5  p99 12.2  max 16 ms  stalls 0  problems 0",
+  "phone-2    390x844  drawn 1878  skipped 0  p50 9.6  p99 12.1  max 17.2 ms  stalls 0  problems 0",
+  "phone-3    390x844  drawn 1879  skipped 0  p50 9.5  p99 12.1  max 15.3 ms  stalls 0  problems 0",
+  "phone-4    390x844  drawn 1881  skipped 0  p50 9.4  p99 12  max 15.4 ms  stalls 0  problems 0",
+  "phone-5    390x844  drawn 1879  skipped 0  p50 9.4  p99 12  max 16.5 ms  stalls 0  problems 0"
+ ]
+}

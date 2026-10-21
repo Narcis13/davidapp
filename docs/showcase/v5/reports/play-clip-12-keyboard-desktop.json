@@ -1,0 +1,453 @@
+{
+ "url": "http://127.0.0.1:8812/games/tap-the-beat/",
+ "size": "1440x900",
+ "mobile": false,
+ "headful": false,
+ "gpu": false,
+ "steps": [
+  {
+   "step": {
+    "wait": 2
+   },
+   "ms": 2014,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "key": "h"
+   },
+   "ms": 352,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": true,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 1.6
+   },
+   "ms": 1610,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": true,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "expect": {
+     "help": true
+    }
+   },
+   "ms": 0,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": true,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "key": "Enter"
+   },
+   "ms": 356,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 0.6
+   },
+   "ms": 599,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "expect": {
+     "help": false
+    }
+   },
+   "ms": 1,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "key": "Tab"
+   },
+   "ms": 356,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 0.5
+   },
+   "ms": 510,
+   "scene": "title",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "key": "Enter"
+   },
+   "ms": 362,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 0.3
+   },
+   "ms": 305,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "expect": {
+     "scene": "game"
+    }
+   },
+   "ms": 1,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 0,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "bot": {
+     "until": "results",
+     "miss": 0.07,
+     "good": 0.18
+    }
+   },
+   "ms": 27862,
+   "scene": "results",
+   "vars": {
+    "score": 5231,
+    "combo": 30,
+    "best": 30,
+    "hits": 53,
+    "perfects": 38,
+    "strays": 0,
+    "lane": 1,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 3
+   },
+   "ms": 3003,
+   "scene": "results",
+   "vars": {
+    "score": 5231,
+    "combo": 30,
+    "best": 30,
+    "hits": 53,
+    "perfects": 38,
+    "strays": 0,
+    "lane": 1,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "expect": {
+     "scene": "results"
+    }
+   },
+   "ms": 0,
+   "scene": "results",
+   "vars": {
+    "score": 5231,
+    "combo": 30,
+    "best": 30,
+    "hits": 53,
+    "perfects": 38,
+    "strays": 0,
+    "lane": 1,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "shot": "results"
+   },
+   "ms": 85,
+   "scene": "results",
+   "vars": {
+    "score": 5231,
+    "combo": 30,
+    "best": 30,
+    "hits": 53,
+    "perfects": 38,
+    "strays": 0,
+    "lane": 1,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "key": "Tab"
+   },
+   "ms": 363,
+   "scene": "results",
+   "vars": {
+    "score": 5231,
+    "combo": 30,
+    "best": 30,
+    "hits": 53,
+    "perfects": 38,
+    "strays": 0,
+    "lane": 1,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "key": "Enter"
+   },
+   "ms": 353,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 1,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "wait": 1
+   },
+   "ms": 1000,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 1,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  },
+  {
+   "step": {
+    "expect": {
+     "scene": "game"
+    }
+   },
+   "ms": 1,
+   "scene": "game",
+   "vars": {
+    "score": 0,
+    "combo": 0,
+    "best": 0,
+    "hits": 0,
+    "perfects": 0,
+    "strays": 0,
+    "lane": 1,
+    "help": false,
+    "keys": true,
+    "speed": 1
+   }
+  }
+ ],
+ "problems": [],
+ "states": [],
+ "firstFrame": 328,
+ "readyMs": 1240,
+ "frames": {
+  "drawn": 2402,
+  "skipped": 0,
+  "drawMs": {
+   "p50": 9.6,
+   "p95": 10.7,
+   "p99": 12.4,
+   "max": 17.4,
+   "over16": 1
+  },
+  "slow": [
+   {
+    "frame": 175,
+    "playhead": 175,
+    "scene": "title",
+    "ms": 17.4,
+    "transition": false
+   }
+  ],
+  "gaps": [],
+  "stalls": []
+ },
+ "bytes": 1363296,
+ "log": 59,
+ "end": {
+  "scene": "game",
+  "vars": {
+   "score": 0,
+   "combo": 0,
+   "best": 0,
+   "hits": 0,
+   "perfects": 0,
+   "strays": 0,
+   "lane": 1,
+   "help": false,
+   "keys": true,
+   "speed": 1
+  },
+  "frame": 2402,
+  "page": "playing"
+ },
+ "gif": {
+  "file": "../gifs/clip-12-playthrough-keyboard-desktop.gif",
+  "frames": 313,
+  "seconds": 39.1
+ }
+}
