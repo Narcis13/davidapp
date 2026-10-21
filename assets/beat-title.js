@@ -15,6 +15,8 @@ asset({
     subtitle: { type: 'string', default: 'A rhythm game you play in the browser' },
     bpm: { type: 'number', default: 120, min: 40, max: 200, step: 1 },
     top: { type: 'number', default: 0.07, min: 0, max: 0.6, step: 0.01, description: 'Where the title starts, as a share of the height' },
+    sun: { type: 'number', default: 24, min: 0, max: 50, step: 0.5, description: 'Radius of the sun on the horizon, % of the short side of the frame (0: none)' },
+    horizon: { type: 'number', default: 0.6, min: 0.3, max: 0.95, step: 0.01, description: 'Where the horizon (the sun, the grid floor) sits, as a share of the height' },
     size: { type: 'number', default: 30, min: 6, max: 40, step: 0.5, description: 'Line height of the title, % of the frame\'s short side' },
     theme: { type: 'asset', kind: 'value', default: 'theme-tide' },
   },
@@ -28,14 +30,14 @@ asset({
     const accents = [th.accent, th.accent2, th.accent3, th.accent4 ?? th.accent];
 
     // a horizon: a glow, a striped sun and a grid floor rolling towards the viewer
-    const hy = h * 0.6;
+    const hy = h * p.horizon;
     for (let i = 6; i >= 1; i--) {
       ctx.fillStyle = lib.color.alpha(th.accent, (0.03 + 0.025 * kick) * (1 - i / 7));
       ctx.beginPath();
       ctx.ellipse(w / 2, hy, w * 0.11 * i, h * 0.045 * i, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    const sunR = Math.min(w, h) * 0.24;
+    const sunR = (Math.min(w, h) * p.sun) / 100;
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, w, hy);

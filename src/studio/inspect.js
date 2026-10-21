@@ -4,7 +4,7 @@
 // platform profiles, the caption lane), and the characters the bundled fonts cannot draw. For an interactive
 // clip (v5), also the hit regions a frame draws, with their size on a phone.
 
-import { FORMATS, safeZone } from '../core/engine.js';
+import { FORMATS, safeZone, screenSafe } from '../core/engine.js';
 import { itemsOf } from '../core/composition.js';
 import { sceneAt } from '../core/interactive.js';
 import { walkParams } from '../core/schema.js';
@@ -24,8 +24,9 @@ const inset = (w, h, k) => rect(w * k, h * k, w * (1 - 2 * k), h * (1 - 2 * k));
  */
 export function zonesOf(comp) {
   const { width: w, height: h } = comp;
-  const format = safeZone(w, h);
-  const platform = comp.platforms?.length ? platformSafe(comp.platforms, w, h, { matching: true }) : null;
+  // v5: an interactive clip plays on its own page (core/engine.js screenSafe)
+  const format = comp.interactive ? screenSafe(w, h) : safeZone(w, h);
+  const platform = !comp.interactive && comp.platforms?.length ? platformSafe(comp.platforms, w, h, { matching: true }) : null;
   const tight = platform ?? format;
   return {
     frame: rect(0, 0, w, h),

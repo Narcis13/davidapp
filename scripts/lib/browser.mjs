@@ -17,16 +17,18 @@ const KEYS = { Enter: 13, Escape: 27, Tab: 9, Delete: 46, Backspace: 8, ArrowLef
 const mods = (list = []) => list.reduce((m, k) => m | MOD[k], 0);
 
 /**
- * @param {{ width?: number, height?: number, mobile?: boolean, scale?: number, chromeArgs?: string[], expected?: (problem: string) => boolean }} [o]
+ * @param {{ width?: number, height?: number, mobile?: boolean, scale?: number, chromeArgs?: string[], expected?: (problem: string) => boolean, headful?: boolean, gpu?: boolean }} [o]
  *   expected: problems the workflow causes on purpose (a refused request shown in the UI)
  *   scale: device scale factor (default 1, or 3 on a phone); chromeArgs: extra Chrome flags
  */
-export async function openSession({ width = 1440, height = 900, mobile = false, scale, chromeArgs = [], expected = () => false } = {}) {
+export async function openSession({ width = 1440, height = 900, mobile = false, scale, chromeArgs = [], expected = () => false, headful = false, gpu = false } = {}) {
   const bin = chromePath();
   if (!bin) throw new Error('Chrome not found; set CHROME=/path/to/chrome');
   const port = 9300 + Math.floor(Math.random() * 600);
   const dir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), 'workflow-chrome-'));
-  const chrome = spawn(bin, ['--headless=new', '--disable-gpu', '--hide-scrollbars', `--window-size=${width},${height}`, `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, ...chromeArgs, 'about:blank'], { stdio: 'ignore' });
+  // headful: a visible window (its frames come at the display's rate); gpu: headless with the GPU on (frames at 60 Hz), for
+  // frame timings as a viewer's Chrome draws them
+  const chrome = spawn(bin, [...(headful ? ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] : ['--headless=new', ...(gpu ? ['--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'] : ['--disable-gpu'])]), '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', `--window-size=${width},${height}`, `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, ...chromeArgs, 'about:blank'], { stdio: 'ignore' });
   let target;
   for (let i = 0; i < 200 && !target; i++) {
     await sleep(150);

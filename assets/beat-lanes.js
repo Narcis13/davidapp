@@ -50,7 +50,8 @@ asset({
 
     // the highway: a vanishing point, the line near the bottom, depth by 1 / (1 + k z)
     const cx = w / 2, vy = h * 0.27, lineY = h * 0.8;
-    const W = Math.min(w * 0.94, h * 0.56), lw = W / 4;
+    // the road fills the safe width (an interactive clip keeps only a small margin clear), its pads within the safe bottom
+    const W = Math.min(f.safe.width, h * 0.56), lw = W / 4;
     const K = 2.6;
     const sAt = (z) => 1 / (1 + K * z);
     const xAt = (l, s) => cx + (l - 1.5) * lw * s;
@@ -58,20 +59,29 @@ asset({
     const enter = lib.math.clamp01(t / 0.6);
     const E = 1 - Math.pow(1 - enter, 3);
 
-    // the room: a dark gradient, a glow on the horizon that breathes with the beat
-    const bg = ctx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, th.bg);
-    bg.addColorStop(0.5, th.bgAlt);
-    bg.addColorStop(1, th.bg);
-    ctx.fillStyle = bg;
+    // the room: the theme's background, a band of its second shade through the middle and a glow on the horizon that
+    // breathes with the beat. Each is one fill over only the area it changes: a phone without a GPU draws this 60 times
+    // a second.
+    ctx.fillStyle = th.bg;
     ctx.fillRect(0, 0, w, h);
+    const band = ctx.createLinearGradient(0, h * 0.15, 0, h * 0.85);
+    band.addColorStop(0, lib.color.alpha(th.bgAlt, 0));
+    band.addColorStop(0.5, th.bgAlt);
+    band.addColorStop(1, lib.color.alpha(th.bgAlt, 0));
+    ctx.fillStyle = band;
+    ctx.fillRect(0, h * 0.15, w, h * 0.7);
     const pulse = Math.pow(1 - lib.math.fract(Math.max(0, t) / beat), 3);
-    for (let i = 5; i >= 1; i--) {
-      ctx.fillStyle = lib.color.alpha(th.accent, (0.035 + 0.02 * pulse) * (1 - i / 6));
-      ctx.beginPath();
-      ctx.ellipse(cx, vy, W * 0.16 * i, h * 0.035 * i, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    const gx = W * 0.8, gy = h * 0.17;
+    ctx.save();
+    ctx.translate(cx, vy);
+    ctx.scale(1, gy / gx);
+    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, gx);
+    glow.addColorStop(0, lib.color.alpha(th.accent, 0.13 + 0.07 * pulse));
+    glow.addColorStop(0.45, lib.color.alpha(th.accent, 0.05 + 0.03 * pulse));
+    glow.addColorStop(1, lib.color.alpha(th.accent, 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(-gx, -gx, gx * 2, gx * 2);
+    ctx.restore();
 
     ctx.save();
     ctx.globalAlpha = E;
@@ -91,7 +101,7 @@ asset({
 
     // a flash down a lane after a press or a catch
     const flashes = [0, 0, 0, 0];
-    const laneBox = (l) => ({ x: xAt(l, 1) - lw / 2, y: lineY - h * 0.2, w: lw, h: h - (lineY - h * 0.2) });
+    const laneBox = (l) => ({ x: xAt(l, 1) - lw / 2, y: lineY - h * 0.2, w: lw, h: f.safe.y + f.safe.height - (lineY - h * 0.2) });
     const lanes = [0, 1, 2, 3].map((l) => {
       const b = laneBox(l);
       return f.ui.hit('miss', b.x, b.y, b.w, b.h, { id: l, value: l, keys: keysOf(l), press: 'down', focus: false, label: `Lane ${l + 1} (${(p.keys[l] ?? '').toUpperCase() || ARROWS[l]})` });
@@ -133,9 +143,11 @@ asset({
       // caught in this run: the press came after the note came into reach (an older press belongs to an earlier play)
       const caught = since <= t - (n.t - p.window) + 1e-6;
       if (caught) { bursts.push({ n, age: since, perfect: qp <= qg }); flashes[n.lane] = Math.max(flashes[n.lane], Math.max(0, 1 - since / 0.3)); continue; }
+      // in reach: good over the whole window, and perfect on top of it near the beat (the topmost region fires)
       if (Math.abs(dt) <= p.window) {
-        const name = Math.abs(dt) <= p.perfect ? 'perfect' : 'good';
-        f.ui.hit(name, box.x, box.y, box.w, box.h, { id: i, value: n.lane, keys: keysOf(n.lane), press: 'down', focus: false, label: `Note in lane ${n.lane + 1}` });
+        const o = { id: i, value: n.lane, keys: keysOf(n.lane), press: 'down', focus: false, label: `Note in lane ${n.lane + 1}` };
+        f.ui.hit('good', box.x, box.y, box.w, box.h, o);
+        if (Math.abs(dt) <= p.perfect) f.ui.hit('perfect', box.x, box.y, box.w, box.h, o);
       }
       const missed = dt < -p.window;
       const z = dt / travel;
@@ -170,8 +182,8 @@ asset({
 
     // the hit line and its pads
     const padR = lw * 0.36;
-    for (let k = 4; k >= 1; k--) {
-      ctx.strokeStyle = lib.color.alpha(th.ink, 0.05 + 0.04 * pulse);
+    for (let k = 4; k >= 2; k -= 2) {
+      ctx.strokeStyle = lib.color.alpha(th.ink, 0.08 + 0.06 * pulse);
       ctx.lineWidth = k * 0.7 * u;
       ctx.beginPath(); ctx.moveTo(xAt(-0.5, 1), lineY); ctx.lineTo(xAt(3.5, 1), lineY); ctx.stroke();
     }
@@ -196,8 +208,8 @@ asset({
       ctx.save();
       ctx.translate(x, lineY);
       ctx.scale(press, press);
-      for (let k = 3; k >= 1; k--) {
-        ctx.fillStyle = lib.color.alpha(colors[l], 0.06 + 0.1 * fl);
+      for (let k = 3; k >= 1; k -= 2) {
+        ctx.fillStyle = lib.color.alpha(colors[l], 0.09 + 0.14 * fl);
         ctx.beginPath(); ctx.arc(0, 0, padR + k * 0.8 * u, 0, Math.PI * 2); ctx.fill();
       }
       ctx.fillStyle = lib.color.mix(th.surface, colors[l], 0.18 + 0.6 * fl);
@@ -228,16 +240,22 @@ asset({
         ctx.beginPath(); ctx.arc(x + Math.cos(a) * r, lineY + Math.sin(a) * r * 0.7, (1 - k) * 0.9 * u, 0, Math.PI * 2); ctx.fill();
       }
       const word = b.perfect ? 'PERFECT' : 'GOOD';
-      const L = lib.text.layout(ctx, word, { font: th.fonts?.display ?? 'Anton', size: Math.max(lw * 0.24 * (1 + 0.25 * (1 - ease)), 2.6 * u), letterSpacing: 0.04, wrap: 'none' });
+      // laid out once at its size, popped by the transform (a size that changes every frame is a new layout every frame)
+      const L = lib.text.layout(ctx, word, { font: th.fonts?.display ?? 'Anton', size: Math.max(lw * 0.24, 2.6 * u), letterSpacing: 0.04, wrap: 'none' });
+      const pop = 1 + 0.25 * (1 - ease);
       ctx.save();
       ctx.globalAlpha *= Math.min(1, (1 - k) * 2);
-      lib.text.fill(ctx, L, x - L.boxWidth / 2, lineY - padR * 1.6 - ease * 6 * u - L.height, { color: b.perfect ? th.accent3 : th.ink });
+      ctx.translate(x, lineY - padR * 1.6 - ease * 6 * u);
+      ctx.scale(pop, pop);
+      lib.text.fill(ctx, L, -L.boxWidth / 2, -L.height, { color: b.perfect ? th.accent3 : th.ink });
       ctx.restore();
     }
     ctx.restore();
 
     // the count-in: 3, 2, 1, GO on the beats before the first note
-    if (p.countIn > 0 && t < p.countIn * beat + beat * 0.6) {
+    // GO stays a little into the first bar, long enough to read
+    const goFor = Math.max(beat * 0.6, 0.9);
+    if (p.countIn > 0 && t < p.countIn * beat + goFor) {
       const k = Math.floor(t / beat), ph = lib.math.fract(t / beat);
       const left = p.countIn - k;
       const word = left > 1 ? String(Math.min(left - 1, 3)) : 'GO';
@@ -247,7 +265,7 @@ asset({
         ctx.save();
         ctx.translate(cx, h * 0.5);
         ctx.scale(pop, pop);
-        ctx.globalAlpha = Math.min(1, (1 - ph) * 2.5) * (k >= p.countIn ? Math.max(0, 1 - (t - p.countIn * beat) / (beat * 0.6)) : 1);
+        ctx.globalAlpha = k >= p.countIn - 1 ? Math.min(1, Math.max(0, 1 - (t - p.countIn * beat) / goFor) * 2) : Math.min(1, (1 - ph) * 2.5);
         lib.text.fill(ctx, L, -L.boxWidth / 2, -L.height / 2, { color: word === 'GO' ? th.accent3 : th.ink });
         ctx.restore();
       }

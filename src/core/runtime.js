@@ -17,7 +17,7 @@
 import { createLib } from './lib/index.js';
 import { createRng, hashSeed } from './rng.js';
 import { normalizeSchema, resolveParams, SchemaError } from './schema.js';
-import { safeZone, formatOf, REF_RE, FORMATS, SAMPLE_RATE } from './engine.js';
+import { safeZone, screenSafe, formatOf, REF_RE, FORMATS, SAMPLE_RATE } from './engine.js';
 import { forFormat, isV2Item, layerGeometry, sampleItem, spaceRect, TRANSFORM_DEFAULTS } from './transform.js';
 import { drawDemo } from './demo.js';
 import { platformSafe } from './platforms.js';
@@ -194,6 +194,8 @@ export function createRuntime(host) {
   // v5, interactive: the frame's view of the session (renderClipFrame sets it), the item being drawn (the outermost:
   // a precomp's layers belong to its item) with the params it binds to variables, and the hit regions the frame records
   let frameUi = null, uiItem = null, uiVars = null, uiDepth = 0, regions = null;
+  // the scene a transition leaves, drawn once and held (it does not change while the transition runs)
+  let held = null;
   const regionKeys = new Map();
 
   function compile(ref, source, deps = {}) {
@@ -359,7 +361,8 @@ export function createRuntime(host) {
        * { hover, down, focus, pressed (seconds since it last fired, Infinity if never), hoverFor }.
        * o: { id (tells regions with the same name apart), value, range: { min, max, step, value, axis }, keys: ['Enter'],
        *      shape: 'rect' | 'circle', press: 'up' | 'down', focus: false (skip it when tabbing), label,
-       *      disabled: true (drawn but not hittable this frame: the state is still reported, e.g. a target already caught) }.
+       *      disabled: true (drawn but not hittable this frame: the state is still reported, e.g. a target already caught),
+       *      modal: true (a dialog's scrim: what was drawn before it takes no taps, focus or hotkeys while it is there) }.
        */
       hit(name, x, y, w, h, o = {}) {
         if (!Object.hasOwn(emits, name)) throw new AssetError(`f.ui.hit("${name}"): declare the event in events.emits (declared: ${Object.keys(emits).join(', ') || 'none'})`, [e.ref]);
@@ -378,7 +381,7 @@ export function createRuntime(host) {
             key, item, name, ...(o.id !== undefined ? { id: o.id } : {}), m: m.map(round4), x, y, w, h,
             ...(o.shape === 'circle' ? { shape: 'circle' } : {}), value: o.value ?? null, ...(range ? { range } : {}),
             ...(o.keys ? { keys: [].concat(o.keys).map(String) } : {}), ...(o.press === 'down' ? { press: 'down' } : {}),
-            ...(o.focus === false ? { focus: false } : {}), ...(typeof o.label === 'string' ? { label: o.label } : {}),
+            ...(o.focus === false ? { focus: false } : {}), ...(typeof o.label === 'string' ? { label: o.label } : {}), ...(o.modal ? { modal: true } : {}),
           });
         }
         let over = false;
@@ -711,6 +714,7 @@ export function createRuntime(host) {
     assetCanvases.clear();
     cur = null; inTransition = false;
     // v5: an interactive composition draws one state of its session: params bound to its variables, items shown `when` they hold
+    const source = comp;
     if (comp.interactive || extra.ui) {
       frameUi = extra.ui ?? staticUi(comp, frame);
       comp = bindComposition(comp, frameUi.vars, frameUi.scene);
@@ -720,7 +724,7 @@ export function createRuntime(host) {
     const found = regions;
     ctx.save();
     try {
-      if (extra.transition && comp.interactive) drawScenes(ctx, comp, frame, extra);
+      if (extra.transition && comp.interactive) drawScenes(ctx, comp, frame, extra, source);
       else drawClip(ctx, comp, frame, extra);
     } finally {
       while (ctx.__saveDepth() > 0) ctx.restore();
@@ -828,19 +832,29 @@ export function createRuntime(host) {
    * v5: a scene transition of an interactive clip: the scene it leaves (held on the frame it left) turning into the
    * one it enters, through a transition asset (f.from, f.to). What the viewer can hit is the scene coming in.
    */
-  function drawScenes(ctx, comp, frame, extra) {
+  function drawScenes(ctx, comp, frame, extra, source) {
     const tx = extra.transition;
     const e = entry(tx.asset);
     if (e.def.kind !== 'transition') throw new AssetError(`the scene transition ${tx.asset} is a ${e.def.kind} asset, not a transition`);
     const { width, height, fps } = comp;
     const to = offscreen(width, height);
     drawClip(to.ctx, comp, frame, extra);
-    const from = offscreen(width, height);
-    const kept = regions;
-    regions = null;
-    const was = inTransition;
-    inTransition = true;
-    try { drawClip(from.ctx, comp, tx.from, extra); } finally { regions = kept; inTransition = was; }
+    // the scene it leaves, as its last frame showed it (its own ui and variables): the same pixels every frame of the
+    // transition, so it is drawn once and held (not while text is being recorded: the checks read what each frame draws)
+    const fromUi = tx.fromUi ?? frameUi;
+    const key = `${tx.fromScene}|${tx.from}|${JSON.stringify(fromUi)}`;
+    if (!held || held.key !== key || held.comp !== source || held.width !== width || held.height !== height || inspect.record) {
+      if (!held || held.width !== width || held.height !== height) {
+        const canvas = host.createCanvas(width, height);
+        held = { canvas, ctx: track(canvas.getContext('2d', { willReadFrequently: true })), width, height };
+      }
+      resetState(held.ctx);
+      const kept = regions, ui = frameUi, was = inTransition;
+      regions = null; frameUi = fromUi; inTransition = true;
+      try { drawClip(held.ctx, bindComposition(source, fromUi.vars, fromUi.scene), tx.from, extra); } finally { regions = kept; frameUi = ui; inTransition = was; }
+      held.key = inspect.record ? null : key; held.comp = source;
+    }
+    const from = held;
     const out = offscreen(width, height);
     try {
       invoke(e, tx.params ?? {}, {
@@ -858,6 +872,8 @@ export function createRuntime(host) {
   /** The safe zone a clip's full-frame items see as f.safe: the format's, or (opt-in, safe: 'platform') the tightest edge of its platform profiles. */
   const safes = new Map();
   function clipSafe(comp) {
+    // v5: an interactive clip's page shows the whole frame
+    if (comp.interactive) return screenSafe(comp.width, comp.height);
     if (comp.safe !== 'platform' || !comp.platforms?.length) return safeZone(comp.width, comp.height);
     const key = `${comp.platforms.join(',')}|${comp.width}x${comp.height}`;
     if (!safes.has(key)) { const p = platformSafe(comp.platforms, comp.width, comp.height, { matching: true }); safes.set(key, { top: p.top, right: p.right, bottom: p.bottom, left: p.left, x: p.x, y: p.y, width: p.width, height: p.height }); }

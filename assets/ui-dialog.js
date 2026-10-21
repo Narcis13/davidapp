@@ -204,7 +204,7 @@ asset({
     // regions: the scrim under everything, the panel, then the buttons (Tab: confirm first)
     // (with one button, Escape belongs to the scrim when a tap on it cancels)
     const scrimCancels = p.scrimTap === 'cancel';
-    if (!closing && p.scrimTap !== 'through') f.ui.hit(scrimCancels ? 'cancel' : 'block', 0, 0, W, H, { id: 'scrim', focus: false, label: 'outside the dialog', keys: scrimCancels && !canc && p.hotkeys ? ['Escape'] : undefined });
+    if (!closing && p.scrimTap !== 'through') f.ui.hit(scrimCancels ? 'cancel' : 'block', 0, 0, W, H, { id: 'scrim', focus: false, modal: true, label: 'outside the dialog', keys: scrimCancels && !canc && p.hotkeys ? ['Escape'] : undefined });
     if (!closing) f.ui.hit('block', px, py, PW, PH, { id: 'panel', focus: false, label: p.title || 'dialog' });
     const sC = f.ui.hit('confirm', conf.x, conf.y, conf.w, conf.h, { keys: p.hotkeys ? ['Enter'] : undefined, label: p.confirm || 'OK', disabled: closing });
     const sX = canc ? f.ui.hit('cancel', canc.x, canc.y, canc.w, canc.h, { id: 'button', keys: p.hotkeys ? ['Escape'] : undefined, label: p.cancel, disabled: closing }) : null;

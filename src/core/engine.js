@@ -28,6 +28,15 @@ export function safeZone(width, height) {
   return { ...s, x: s.left, y: s.top, width: width - s.left - s.right, height: height - s.top - s.bottom };
 }
 
+/**
+ * The safe zone of an interactive clip: it plays on a page of its own with nothing over it (no platform buttons, no
+ * captions), so only a small margin of the frame is kept clear: 4 % of the short side on every edge.
+ */
+export function screenSafe(width, height) {
+  const m = Math.round(Math.min(width, height) * 0.04);
+  return { top: m, right: m, bottom: m, left: m, x: m, y: m, width: width - 2 * m, height: height - 2 * m };
+}
+
 export const REF_RE = /^([a-z0-9][a-z0-9-]*)(?:@(\d+))?$/;
 
 /** "slug@3" → { slug, version: 3 }; "slug" → { slug, version: null }. Throws on anything else. */

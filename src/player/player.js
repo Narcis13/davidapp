@@ -175,12 +175,15 @@ async function playInteractive(engine, canvas, composition, ui) {
   }
 
   // ── drawing: the session asks for each frame; timings are kept for the checks ─────────────────
-  const stats = { drawn: 0, skipped: 0, last: -1, ms: [], started: 0 };
+  const stats = { drawn: 0, skipped: 0, last: -1, ms: [], slow: [], started: 0 };
   async function draw(view) {
     const t0 = performance.now();
     const r = await engine.drawFrame(view.frame, { ui: view.ui, transition: view.transition ?? undefined });
-    stats.ms.push(Math.round((performance.now() - t0) * 10) / 10);
+    const ms = Math.round((performance.now() - t0) * 10) / 10;
+    stats.ms.push(ms);
     if (stats.ms.length > 3600) stats.ms.shift();
+    // the frames that took longer than a 60 fps frame, with what they showed
+    if (ms > 1000 / 60 && stats.slow.length < 200) stats.slow.push({ frame: view.ui.frame, playhead: view.frame, scene: view.ui.scene, ms, transition: !!view.transition });
     return r.regions ?? [];
   }
   const session = createSession(composition, {

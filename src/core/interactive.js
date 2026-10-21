@@ -339,7 +339,8 @@ function runner(comp, s, at) {
   const fps = comp.fps;
   let budget = MAX_ACTIONS;
   const enter = (id, transition, remember = true) => {
-    const from = { scene: s.scene, frame: playheadOf(comp, s, at - 1) };
+    // the scene it leaves, as its last frame showed it: a transition holds it there (and the runtime draws it once)
+    const from = { scene: s.scene, frame: playheadOf(comp, s, at - 1), ui: structuredClone(viewOf(comp, s, at - 1).ui) };
     if (remember) { s.history.push(s.scene); if (s.history.length > 32) s.history.shift(); }
     const tx = transition === false ? null : (transition ?? sceneOf(comp, id).transition ?? I.transition ?? null);
     s.tx = tx ? { asset: tx.asset, params: tx.params ?? {}, frames: Math.max(1, Math.round(tx.duration * fps)), start: at, from } : null;
@@ -472,7 +473,10 @@ const topmost = (regions, x, y) => { for (let i = regions.length - 1; i >= 0; i-
  * `regions`, the hit regions frame j drew. Returns the new state; its effects start at frame j + 1.
  * An event: { f, type: down|move|up|cancel|leave|key, x, y (frame pixels), pointer: mouse|touch|pen, key, shift }.
  */
-export function applyInput(comp, s, j, events, regions = []) {
+export function applyInput(comp, s, j, events, drawn = []) {
+  // a modal region (a dialog's scrim) puts everything drawn before it out of reach: no focus, no hotkeys, no taps
+  const modal = drawn.findLastIndex((r) => r.modal);
+  const regions = modal >= 0 ? drawn.slice(modal) : drawn;
   const out = structuredClone(s);
   const at = j + 1;
   const run = runner(comp, out, at);
@@ -569,7 +573,7 @@ export function viewOf(comp, s, n) {
   const view = { frame: playheadOf(comp, s, n), ui, transition: null };
   if (s.tx && n < s.tx.start + s.tx.frames) {
     const t = (n - s.tx.start) / fps;
-    view.transition = { asset: s.tx.asset, params: s.tx.params, t, duration: s.tx.frames / fps, from: s.tx.from.frame, fromScene: s.tx.from.scene };
+    view.transition = { asset: s.tx.asset, params: s.tx.params, t, duration: s.tx.frames / fps, from: s.tx.from.frame, fromScene: s.tx.from.scene, fromUi: s.tx.from.ui };
   }
   return view;
 }

@@ -4,7 +4,10 @@
 // in reach. It reports console and network problems, the time to the first frame, the bytes loaded, the states it
 // went through, and the frame timings (draw time per frame, session frames skipped), and can record a GIF.
 //
-//   node scripts/play-check.mjs <page url> <out dir> [--size 390x844] [--mobile] [--steps steps.json] [--gif name] [--name run]
+//   node scripts/play-check.mjs <page url> <out dir> [--size 390x844] [--mobile] [--steps steps.json] [--gif name] [--name run] [--gpu | --headful]
+//
+// --gpu runs headless Chrome with its GPU on (by default it runs without one); --headful opens a visible window instead
+// (its frames come at the display's own rate). Frame timings are worth reading with one of them.
 //
 // A step: { "start": true } · { "tap": "<item>" | { "item", "region", "id" } } · { "key": "d" } · { "wait": seconds }
 // · { "bot": { "until": "<scene>", "miss": 0.08, "good": 0.2 } } · { "shot": "name" } · { "expect": { "scene": "game" } }
@@ -27,8 +30,9 @@ const steps = JSON.parse(readFileSync(opt('--steps', ''), 'utf8'));
 const gif = opt('--gif', null);
 mkdirSync(out, { recursive: true });
 
-const s = await openSession({ width, height, mobile });
-const report = { url, size: `${width}x${height}`, mobile, steps: [], problems: [], states: [] };
+const headful = argv.includes('--headful'), gpu = argv.includes('--gpu');
+const s = await openSession({ width, height, mobile, headful, gpu });
+const report = { url, size: `${width}x${height}`, mobile, headful, gpu, steps: [], problems: [], states: [] };
 const frames = [];
 let stopCast = null;
 try {
@@ -82,11 +86,16 @@ try {
         f.botDone = false;
         const tick = () => {
           if (f.session.state.scene === o.until) { f.botDone = true; return; }
+          // a note in reach draws good over its whole window and perfect on top near the beat: a perfect press waits for
+          // perfect, a good one goes at the first sight of good, a missed note is let go
+          const perfect = new Set(f.session.regions.filter((r) => r.name === 'perfect').map((r) => r.id));
           for (const r of f.session.regions) {
             if ((r.name !== 'perfect' && r.name !== 'good') || done.has(r.id)) continue;
             const h = hash(r.id);
             if (h < (o.miss ?? 0)) { done.add(r.id); continue; }
-            if (r.name === 'perfect' && h < (o.miss ?? 0) + (o.good ?? 0)) continue;
+            const early = h < (o.miss ?? 0) + (o.good ?? 0);
+            if (!early && !perfect.has(r.id)) continue;
+            if (early && perfect.has(r.id)) continue;
             done.add(r.id);
             document.dispatchEvent(new KeyboardEvent('keydown', { key: r.keys[0], bubbles: true }));
           }
@@ -115,6 +124,7 @@ try {
   report.frames = {
     drawn: stats.drawn - (measureFrom?.drawn ?? 0), skipped: stats.skipped - (measureFrom?.skipped ?? 0),
     drawMs: { p50: q(0.5), p95: q(0.95), p99: q(0.99), max: ms.at(-1), over16: ms.filter((x) => x > 16.7).length },
+    slow: stats.slow,
   };
   report.bytes = await s.evaluate('performance.getEntriesByType("resource").reduce((n, r) => n + (r.transferSize || r.encodedBodySize || 0), 0) + (performance.getEntriesByType("navigation")[0]?.transferSize ?? 0)');
   report.log = await s.evaluate('window.fablecut.session.log.length');

@@ -141,8 +141,18 @@ function ahead(comp, frame, count, fast) {
   for (let f = frame + 1; f <= Math.min(total - 1, frame + 2); f++) for (const u of mediaAt(comp, f, fast)) if (files.has(u)) bitmapOf(u).catch(() => {});
 }
 
-function surface(w, h) {
-  if (!canvas || canvas.width !== w || canvas.height !== h) canvas = new OffscreenCanvas(w, h);
+/**
+ * The canvas a frame is drawn on, with its context. Only an effect on the whole clip reads the frame itself back (the
+ * runtime's own layers ask for that themselves): without one the frame's context is left to the GPU, which a 60 fps
+ * interactive clip needs on a phone; with one it is kept in memory for the reads, as in the studio.
+ */
+function surface(w, h, comp) {
+  const reads = !!comp.effects?.length;
+  if (!canvas || canvas.width !== w || canvas.height !== h || canvas.reads !== reads) {
+    canvas = new OffscreenCanvas(w, h);
+    canvas.reads = reads;
+    canvas.ctx = canvas.getContext('2d', { willReadFrequently: reads });
+  }
   return canvas;
 }
 
@@ -207,8 +217,8 @@ const handlers = {
     pinned = new Set(urls);
     try {
       await Promise.all(urls.map(bitmapOf));
-      const c = surface(comp.width, comp.height);
-      const r = rt.renderClipFrame(c.getContext('2d', { willReadFrequently: true }), comp, m.frame, { ...clipExtra, record: !!m.record, ui: m.ui, transition: m.transition });
+      const c = surface(comp.width, comp.height, comp);
+      const r = rt.renderClipFrame(c.ctx, comp, m.frame, { ...clipExtra, record: !!m.record, ui: m.ui, transition: m.transition });
       const bitmap = c.transferToImageBitmap();
       if (m.ahead > 0) ahead(comp, m.frame, m.ahead, !!m.fast);
       return { result: { bitmap, frame: m.frame, regions: r?.regions, texts: r?.texts }, transfer: [bitmap] };
