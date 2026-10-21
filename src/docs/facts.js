@@ -15,7 +15,7 @@ export const TOOL_GROUPS = [
   { title: 'Keep a tweak and organise', tools: ['save_defaults', 'create_preset', 'save_precomp', 'set_asset_metadata', 'organize_assets', 'add_asset_note'] },
   { title: 'Pictures, sounds, footage and fonts', tools: ['upload_image', 'list_undescribed', 'describe_asset', 'add_file_asset', 'bake_asset', 'bake_sequence', 'add_footage', 'footage_frames', 'add_font', 'list_fonts'] },
   { title: 'Compose clips', tools: ['list_clips', 'get_clip', 'create_clip', 'update_clip', 'edit_clip', 'remix_clip', 'repin_clip'] },
-  { title: 'Look at frames', tools: ['render_asset_frame', 'render_clip_frame', 'frame_hashes'] },
+  { title: 'Look at frames', tools: ['render_asset_frame', 'render_clip_frame', 'frame_hashes', 'play_clip'] },
   { title: 'Check a clip', tools: ['check_clip', 'layout_report', 'caption_pages', 'anchor_report', 'audio_report', 'export_stems'] },
   { title: 'Voice and transcription', tools: ['speech_status', 'voice_samples', 'generate_narration', 'add_narration', 'transcribe', 'check_transcript'] },
   { title: 'Render', tools: ['start_render', 'get_render', 'list_renders', 'cancel_render', 'render_report'] },

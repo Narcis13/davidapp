@@ -534,6 +534,11 @@ export function createClips(ctx, library) {
    *   { op: 'add_marker', marker: { t, type, label, duration? } }   { op: 'update_marker', index, patch }   { op: 'remove_marker', index }
    *   { op: 'caption_split', at: word key }   { op: 'caption_merge', page }   { op: 'caption_break', page, at: word key | null }
    *   { op: 'caption_move', page, at: word key }   { op: 'caption_auto' }   (caption page structure; the times stay the words')
+   *   v5, interactive clips (the section is checked when the clip is saved, as always):
+   *   { op: 'set_interactive', interactive }  (the whole section; null makes the clip a plain video again; `set` takes interactive too)
+   *   { op: 'add_scene', scene, index? }   { op: 'update_scene', id, patch }   { op: 'remove_scene', id }   (patch: null removes a field)
+   *   { op: 'add_wire', wire, index? }   { op: 'update_wire', index, patch }   { op: 'remove_wire', index }
+   *   { op: 'set_vars', vars }  (merges into interactive.vars; null removes a variable)
    */
   function applyOps(composition, ops) {
     let c = structuredClone(composition);
@@ -562,12 +567,34 @@ export function createClips(ctx, library) {
       if (!t) throw new StudioError(`edit: no track with id "${id}" (tracks: ${c.tracks.map((x) => x.id).join(', ') || 'none'})`, 'not_found');
       return t;
     };
+    /** The interactive section an edit changes. A clip gets one from set_interactive (or create_clip with interactive: true). */
+    const interactiveOf = (what) => {
+      if (!c.interactive) throw new StudioError(`edit: ${what} needs an interactive clip: add the section first with { op: "set_interactive", interactive: { scenes: [{ id: "main", start: 0, duration: ${c.duration}, end: "hold" }], wires: [] } }`);
+      c.interactive.scenes ??= [];
+      c.interactive.wires ??= [];
+      return c.interactive;
+    };
+    const sceneOf = (section, id) => {
+      const scene = section.scenes.find((x) => x.id === id);
+      if (!scene) throw new StudioError(`edit: no scene with id "${id}" (scenes: ${section.scenes.map((x) => x.id).join(', ') || 'none'})`, 'not_found');
+      return scene;
+    };
+    const wireAt = (section, op) => {
+      if (!Number.isInteger(op.index) || op.index < 0 || op.index >= section.wires.length) throw new StudioError(`edit: ${op.op}: no wire at index ${op.index} (the clip has ${section.wires.length}, numbered from 0)`, 'not_found');
+      return op.index;
+    };
+    /** A copy of a scene or wire with the fields of patch set (null removes one). */
+    const patched = (from, patch) => {
+      const out = { ...from };
+      for (const [k, v] of Object.entries(patch ?? {})) { if (v === null) delete out[k]; else out[k] = structuredClone(v); }
+      return out;
+    };
     for (const [n, op] of ops.entries()) {
       switch (op?.op) {
         case 'set':
-          for (const k of ['duration', 'fps', 'background', 'seed', 'markers', 'loudness', 'captions', 'platforms', 'safe', 'checks']) {
+          for (const k of ['duration', 'fps', 'background', 'seed', 'markers', 'loudness', 'captions', 'platforms', 'safe', 'checks', 'interactive']) {
             if (op[k] === undefined) continue;
-            if (op[k] === null) delete c[k]; else c[k] = op[k];
+            if (op[k] === null) delete c[k]; else c[k] = k === 'interactive' ? structuredClone(op[k]) : op[k];
           }
           if (op.format) c = reformat(c, op.format);
           break;
@@ -701,7 +728,54 @@ export function createClips(ctx, library) {
           to.items.splice(to === f.track ? f.i + 1 : to.items.length, 0, copy);
           break;
         }
-        default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, move_track, update_track, add_item, update_item, remove_item, move_item, set_transform, set_keyframes, add_keyframe, remove_keyframe, set_override, split_item, duplicate_item, add_marker, update_marker, remove_marker, caption_split, caption_merge, caption_break, caption_move, caption_auto)`);
+        case 'set_interactive':
+          if (op.interactive === null) delete c.interactive;
+          else if (typeof op.interactive === 'object' && !Array.isArray(op.interactive)) c.interactive = structuredClone(op.interactive);
+          else throw new StudioError('edit: set_interactive needs interactive: { start?, vars, scenes: [{ id, start, duration, end }], wires: [{ on, scene?, if?, do }], transition?, music? } (null makes the clip a plain video again)');
+          break;
+        case 'add_scene': {
+          const section = interactiveOf(op.op);
+          if (op.scene === null || typeof op.scene !== 'object' || typeof op.scene.id !== 'string') throw new StudioError('edit: add_scene needs scene: { id, start, duration, end? } (end: hold, loop, next or the id of the scene that follows)');
+          if (section.scenes.some((x) => x.id === op.scene.id)) throw new StudioError(`edit: a scene with id "${op.scene.id}" already exists (update_scene changes it)`, 'conflict');
+          section.scenes.splice(clampIndex(op.index, section.scenes.length), 0, structuredClone(op.scene));
+          break;
+        }
+        case 'update_scene': {
+          const section = interactiveOf(op.op);
+          const scene = sceneOf(section, op.id);
+          section.scenes[section.scenes.indexOf(scene)] = patched(scene, op.patch);
+          break;
+        }
+        case 'remove_scene': {
+          const section = interactiveOf(op.op);
+          section.scenes.splice(section.scenes.indexOf(sceneOf(section, op.id)), 1);
+          break;
+        }
+        case 'add_wire': {
+          const section = interactiveOf(op.op);
+          if (op.wire === null || typeof op.wire !== 'object' || Array.isArray(op.wire)) throw new StudioError('edit: add_wire needs wire: { on, scene?, if?, do } (on: "<item>.<event>", "key:<key>", "tap", "start", "enter:<scene>" or "end:<scene>")');
+          section.wires.splice(clampIndex(op.index, section.wires.length), 0, structuredClone(op.wire));
+          break;
+        }
+        case 'update_wire': {
+          const section = interactiveOf(op.op);
+          const i = wireAt(section, op);
+          section.wires[i] = patched(section.wires[i], op.patch);
+          break;
+        }
+        case 'remove_wire': {
+          const section = interactiveOf(op.op);
+          section.wires.splice(wireAt(section, op), 1);
+          break;
+        }
+        case 'set_vars': {
+          const section = interactiveOf(op.op);
+          if (op.vars === null || typeof op.vars !== 'object' || Array.isArray(op.vars)) throw new StudioError('edit: set_vars needs vars: { name: first value } (a number, a boolean or a string; null removes a variable)');
+          section.vars = { ...(section.vars ?? {}) };
+          for (const [k, v] of Object.entries(op.vars)) { if (v === null) delete section.vars[k]; else section.vars[k] = v; }
+          break;
+        }
+        default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, move_track, update_track, add_item, update_item, remove_item, move_item, set_transform, set_keyframes, add_keyframe, remove_keyframe, set_override, split_item, duplicate_item, add_marker, update_marker, remove_marker, caption_split, caption_merge, caption_break, caption_move, caption_auto, set_interactive, add_scene, update_scene, remove_scene, add_wire, update_wire, remove_wire, set_vars)`);
       }
     }
     return c;
@@ -861,6 +935,8 @@ export function createClips(ctx, library) {
     ...shape(row, { withComposition: false }),
     assetCount: q('SELECT COUNT(*) AS n FROM clip_assets WHERE clip_id = ?').get(row.id).n,
     renders: q("SELECT COUNT(*) AS n FROM renders WHERE clip_id = ? AND status = 'done'").get(row.id).n,
+    // v5: an interactive clip is played, not rendered
+    interactive: !!json(row.composition, {}).interactive,
   }));
 
   /** The pinned versions a clip uses, with where each asset came from. */
