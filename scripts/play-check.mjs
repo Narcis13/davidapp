@@ -9,7 +9,7 @@
 // --gpu runs headless Chrome with its GPU on (by default it runs without one); --headful opens a visible window instead
 // (its frames come at the display's own rate). Frame timings are worth reading with one of them.
 //
-// A step: { "start": true } · { "tap": "<item>" | { "item", "region", "id" } } · { "key": "d" } · { "wait": seconds }
+// A step: { "start": true } (presses the play button if the page shows one) · { "tap": "<item>" | { "item", "region", "id" } } · { "key": "d" } · { "wait": seconds }
 // · { "bot": { "until": "<scene>", "miss": 0.08, "good": 0.2 } } · { "shot": "name" } · { "expect": { "scene": "game" } }
 // · { "measure": true } (frame timings from here) · { "pointer": "x,y" } (a move, frame pixels).
 // Headless Chrome: set TMPDIR and CHROME only (not TEMP/TMP; see .claude/goal-loop/project.md).
@@ -40,7 +40,8 @@ let stopCast = null;
 try {
   await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
   const t0 = Date.now();
-  await s.goto(url, 'document.querySelector("[data-share]")?.dataset.state === "ready"');
+  // an interactive page plays as soon as it is ready (with reduced motion it waits for its play button)
+  await s.goto(url, '["ready", "playing"].includes(document.querySelector("[data-share]")?.dataset.state)');
   report.firstFrame = await s.evaluate('Number(document.querySelector("[data-share]").dataset.firstFrame)');
   report.readyMs = Date.now() - t0;
   if (gif) {
@@ -66,7 +67,8 @@ try {
   let measureFrom = null;
   for (const step of steps) {
     const at = Date.now();
-    if (step.start) { if (mobile) await s.tap('[data-testid=big-play]'); else await s.click('[data-testid=big-play]'); }
+    // the play button, when the page shows one (reduced motion, or paused)
+    if (step.start) { if (await s.evaluate('!document.querySelector("[data-testid=big-play]").hidden')) { if (mobile) await s.tap('[data-testid=big-play]'); else await s.click('[data-testid=big-play]'); } }
     else if (step.wait !== undefined) await s.sleep(step.wait * 1000);
     else if (step.key !== undefined) await s.key(step.key);
     else if (step.tap !== undefined) {

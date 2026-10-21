@@ -292,7 +292,7 @@ asset({
       const L = lib.text.layout(ctx, 'MISS', { font: th.fonts?.display ?? 'Anton', size: Math.max(lw * 0.2, 2.6 * u), letterSpacing: 0.06, wrap: 'none' });
       ctx.save();
       ctx.globalAlpha *= Math.min(1, (1 - k) * 2);
-      lib.text.fill(ctx, L, x - L.boxWidth / 2, lineY - padR * 1.5 - k * 4 * u - L.height, { color: lib.color.mix(th.accent, th.muted, 0.35) });
+      lib.text.fill(ctx, L, x - L.boxWidth / 2, lineY - padR * 1.5 - k * 4 * u - L.height, { color: lib.color.mix(th.ink, th.accent, 0.3) });
       ctx.restore();
     }
 

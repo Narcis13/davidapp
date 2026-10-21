@@ -13,11 +13,13 @@ asset({
   floor: 2.5,
   params: {
     eyebrow: { type: 'string', default: 'SONG CLEAR' },
+    retry: { type: 'string', default: 'KEEP PRACTISING', description: 'The eyebrow for a D' },
     score: { type: 'number', default: 0, min: 0 },
     hits: { type: 'number', default: 0, min: 0, description: 'Notes caught' },
     perfects: { type: 'number', default: 0, min: 0, description: 'Notes caught right on the beat' },
     best: { type: 'number', default: 0, min: 0, description: 'Best combo' },
     total: { type: 'number', default: 1, min: 1, description: 'Notes in the song' },
+    strays: { type: 'number', default: 0, min: 0, description: 'Presses that caught nothing: they count against the accuracy, so mashing every key does not pay' },
     top: { type: 'number', default: 0.08, min: 0, max: 0.5, step: 0.01, description: 'Where the card starts, as a share of the height' },
     theme: { type: 'asset', kind: 'value', default: 'theme-tide' },
   },
@@ -28,7 +30,8 @@ asset({
     const now = f.ui.live ? f.ui.now : f.t;
     const t = f.t;
     const ease = (k) => 1 - Math.pow(1 - lib.math.clamp01(k), 3);
-    const acc = Math.min(1, p.hits / p.total);
+    // accuracy: the notes caught, out of the notes and the stray presses
+    const acc = Math.min(1, p.hits / (p.total + p.strays));
     const ratio = p.hits ? p.perfects / p.hits : 0;
     const rank = acc >= 0.95 && ratio >= 0.75 ? 'S' : acc >= 0.85 ? 'A' : acc >= 0.7 ? 'B' : acc >= 0.5 ? 'C' : 'D';
     const stars = { S: 3, A: 3, B: 2, C: 1, D: 0 }[rank];
@@ -36,7 +39,7 @@ asset({
     const font = th.fonts ?? {};
     let y = h * p.top;
 
-    const eyebrow = lib.text.layout(ctx, p.eyebrow, { font: font.mono ?? 'JetBrains Mono', weight: 700, size: 3.2 * u, letterSpacing: 0.35, wrap: 'none' });
+    const eyebrow = lib.text.layout(ctx, rank === 'D' ? p.retry : p.eyebrow, { font: font.mono ?? 'JetBrains Mono', weight: 700, size: 3.2 * u, letterSpacing: 0.35, wrap: 'none' });
     ctx.save();
     ctx.globalAlpha *= ease(t / 0.4);
     lib.text.fill(ctx, eyebrow, (w - eyebrow.boxWidth) / 2, y, { color: th.accent3 });
@@ -92,7 +95,7 @@ asset({
     // the stats panel
     const kp = ease((t - 0.6) / 0.5);
     const pw = Math.min(w * 0.86, 80 * u), px = (w - pw) / 2;
-    const rows = [['Perfect', p.perfects, th.accent3], ['Good', Math.max(0, p.hits - p.perfects), th.accent2], ['Missed', Math.max(0, p.total - p.hits), th.accent], ['Best combo', p.best, th.ink], ['Accuracy', `${Math.round(acc * 100)}%`, th.ink]];
+    const rows = [['Perfect', p.perfects, th.accent3], ['Good', Math.max(0, p.hits - p.perfects), th.accent2], ['Missed', Math.max(0, p.total - p.hits), th.accent], ['Stray taps', p.strays, th.muted], ['Best combo', p.best, th.ink], ['Accuracy', `${Math.round(acc * 100)}%`, th.ink]];
     const rh = 6.2 * u, ph = rows.length * rh + 4 * u;
     ctx.save();
     ctx.globalAlpha *= kp;

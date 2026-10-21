@@ -5,10 +5,11 @@
 // f.ui: a caught note is one whose hit region fired after it came into reach, so the same input log replays exactly.
 //
 // Usage: the game scene of an interactive clip, with the music on an audio track starting with it and wires on its
-// events (catch = score, a lane pressed with nothing in it = the combo breaks):
-//   { "id": "field", "asset": "beat-lanes", "start": 6, "duration": 36, "params": { "bpm": 120, "bars": 16, "combo": { "$var": "combo" } } }
-//   { "on": "field.perfect", "do": [{ "add": { "score": 100, "combo": 1 } }, { "play": "sfx-hit" }] }
-//   { "on": "field.miss", "do": { "set": { "combo": 0 } } }
+// events. A catch's value is { lane, combo }: the lane (for its sound) and the streak this catch makes (the streak
+// breaks on a press on an empty lane and on a note let through, and the asset draws it itself):
+//   { "id": "field", "asset": "beat-lanes", "start": 6, "duration": 36, "params": { "bpm": 120, "bars": 16 } }
+//   { "on": "field.perfect", "do": [{ "add": { "score": 100 } }, { "set": { "combo": "$value.combo" } }, { "play": "sfx-hit" }] }
+//   { "on": "field.miss", "do": [{ "add": { "strays": 1 } }, { "play": "sfx-miss" }] }
 asset({
   title: 'Beat lanes',
   description: 'The playfield of a rhythm game for interactive clips: four lanes on a highway into the distance, notes riding down to a hit line on the beat, pads that light under a tap or a key (D F J K or the arrows), bursts and PERFECT/GOOD labels where a note is caught, a count-in, a combo and a progress line. Emits perfect and good when a note is caught and miss when a lane is pressed with no note in reach. The chart comes from bpm, bars and seed, so it fits a music-loop at the same tempo. Takes a theme.',
@@ -32,7 +33,6 @@ asset({
     window: { type: 'number', default: 0.14, min: 0.05, max: 0.3, step: 0.01, description: 'Seconds either side of the beat a note can be caught' },
     perfect: { type: 'number', default: 0.06, min: 0.02, max: 0.2, step: 0.01, description: 'Seconds either side of the beat that count as perfect' },
     showKeys: { type: 'boolean', default: true, description: 'Letters on the pads' },
-    combo: { type: 'number', default: 0, min: 0, description: 'The current combo, drawn above the highway from 2 up (bind it to a variable)' },
     theme: { type: 'asset', kind: 'value', default: 'theme-tide' },
   },
   render(f, p) {
@@ -130,22 +130,37 @@ asset({
       ctx.stroke();
     }
 
-    // notes: drawn far to near; a caught one becomes a burst at the line
-    const bursts = [];
-    for (let i = notes.length - 1; i >= 0; i--) {
-      const n = notes[i];
-      const dt = n.t - t;
-      if (dt > travel * 1.05 || dt < -0.6) continue;
+    // every note as the presses so far leave it: caught (when, how well) or not, let through (its window over) or not.
+    // The streak is the run of catches since it last broke: a press on an empty lane, or a note let through.
+    const state = notes.map((n, i) => {
       const box = laneBox(n.lane);
       const qp = f.ui.hit('perfect', box.x, box.y, box.w, box.h, { id: i, disabled: true }).pressed;
       const qg = f.ui.hit('good', box.x, box.y, box.w, box.h, { id: i, disabled: true }).pressed;
       const since = Math.min(qp, qg);
       // caught in this run: the press came after the note came into reach (an older press belongs to an earlier play)
       const caught = since <= t - (n.t - p.window) + 1e-6;
-      if (caught) { bursts.push({ n, age: since, perfect: qp <= qg }); flashes[n.lane] = Math.max(flashes[n.lane], Math.max(0, 1 - since / 0.3)); continue; }
-      // in reach: good over the whole window, and perfect on top of it near the beat (the topmost region fires)
+      return { since, caught, perfect: qp <= qg, at: t - since, gone: !caught && n.t + p.window < t };
+    });
+    let broke = -Infinity;
+    for (const s of lanes) if (s.pressed !== Infinity) broke = Math.max(broke, t - s.pressed);
+    notes.forEach((n, i) => { if (state[i].gone) broke = Math.max(broke, n.t + p.window); });
+    const caughtSince = state.filter((s) => s.caught && s.at > broke);
+    const streak = caughtSince.length, lastCatch = Math.max(-Infinity, ...caughtSince.map((s) => s.at));
+
+    // notes: drawn far to near; a caught one becomes a burst at the line, one let through a MISS
+    const bursts = [], misses = [];
+    for (let i = notes.length - 1; i >= 0; i--) {
+      const n = notes[i], st = state[i];
+      const dt = n.t - t;
+      if (st.gone && t - (n.t + p.window) < 0.5) misses.push({ n, age: t - (n.t + p.window) });
+      if (dt > travel * 1.05 || dt < -0.6) continue;
+      const box = laneBox(n.lane);
+      const { since, caught } = st;
+      if (caught) { bursts.push({ n, age: since, perfect: st.perfect }); flashes[n.lane] = Math.max(flashes[n.lane], Math.max(0, 1 - since / 0.3)); continue; }
+      // in reach: good over the whole window, and perfect on top of it near the beat (the topmost region fires). The value
+      // says the lane and the streak this catch makes, so the clip's wires can sound the lane and keep the best streak.
       if (Math.abs(dt) <= p.window) {
-        const o = { id: i, value: n.lane, keys: keysOf(n.lane), press: 'down', focus: false, label: `Note in lane ${n.lane + 1}` };
+        const o = { id: i, value: { lane: n.lane, combo: streak + 1 }, keys: keysOf(n.lane), press: 'down', focus: false, label: `Note in lane ${n.lane + 1}` };
         f.ui.hit('good', box.x, box.y, box.w, box.h, o);
         if (Math.abs(dt) <= p.perfect) f.ui.hit('perfect', box.x, box.y, box.w, box.h, o);
       }
@@ -271,11 +286,21 @@ asset({
       }
     }
 
-    // the combo above the road, popping when it grows
-    if (p.combo >= 2) {
-      const ch = f.ui.changed('combo');
-      const pop = ch && ch.from < p.combo ? 1 + 0.3 * Math.pow(1 - Math.min(1, ch.since / 0.25), 2) : 1;
-      const L = lib.text.layout(ctx, `${p.combo}×`, { font: th.fonts?.display ?? 'Anton', size: 10 * u, wrap: 'none' });
+    // a note let through: MISS rising from its pad, in the muted colour
+    for (const m of misses) {
+      const k = m.age / 0.5, x = xAt(m.n.lane, 1);
+      const L = lib.text.layout(ctx, 'MISS', { font: th.fonts?.display ?? 'Anton', size: Math.max(lw * 0.2, 2.6 * u), letterSpacing: 0.06, wrap: 'none' });
+      ctx.save();
+      ctx.globalAlpha *= Math.min(1, (1 - k) * 2);
+      lib.text.fill(ctx, L, x - L.boxWidth / 2, lineY - padR * 1.5 - k * 4 * u - L.height, { color: lib.color.mix(th.ink, th.accent, 0.3) });
+      ctx.restore();
+    }
+
+    // the streak above the road, popping when it grows (it breaks on a press on an empty lane and on a note let through)
+    if (streak >= 2) {
+      const since = t - lastCatch;
+      const pop = since < 0.25 ? 1 + 0.3 * Math.pow(1 - since / 0.25, 2) : 1;
+      const L = lib.text.layout(ctx, `${streak}×`, { font: th.fonts?.display ?? 'Anton', size: 10 * u, wrap: 'none' });
       const S = lib.text.layout(ctx, 'COMBO', { font: th.fonts?.mono ?? 'JetBrains Mono', weight: 700, size: 2.6 * u, letterSpacing: 0.3, wrap: 'none' });
       ctx.save();
       ctx.translate(cx, h * 0.2);

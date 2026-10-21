@@ -69,23 +69,17 @@
       "description": "Seconds either side of the beat that count as perfect"
     },
     "showKeys": {"type": "boolean", "default": true, "description": "Letters on the pads"},
-    "combo": {
-      "type": "number",
-      "default": 0,
-      "min": 0,
-      "description": "The current combo, drawn above the highway from 2 up (bind it to a variable)"
-    },
     "theme": {"type": "asset", "kind": "value", "default": "theme-tide"}
   },
   "uses": {},
   "deps": {"theme-tide": "theme-tide@1"},
   "author": "claude-opus-5-5",
   "note": null,
-  "created": "2026-10-21T19:07:01.970Z",
+  "created": "2026-10-21T19:39:26.118Z",
   "engine": 2,
   "madeForClip": "clip-12-tap-the-beat",
   "parent": null,
-  "asset": {"created": "2026-10-21T19:07:01.970Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
-  "source": {"file": "sources/beat-lanes@1.js", "sha1": "a94796ee05bb323da6ce9df008e66247beb28d9a"},
-  "hash": "5fb546c14f128aef520aaec428c1c6b2834977088175dd1e1969f9d59be16d7e"
+  "asset": {"created": "2026-10-21T19:39:26.118Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/beat-lanes@1.js", "sha1": "0be30864219f69277d7df18e1593a589ea9bb9d3"},
+  "hash": "7d315c8c7bdbca244fe9919847bfa651f180c850a142d6e68726e0bfab930590"
 }

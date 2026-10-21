@@ -65,11 +65,11 @@
   "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
   "author": "claude-opus-5-5",
   "note": null,
-  "created": "2026-10-21T19:07:12.180Z",
+  "created": "2026-10-21T19:39:36.715Z",
   "engine": 2,
   "madeForClip": "clip-12-tap-the-beat",
   "parent": null,
-  "asset": {"created": "2026-10-21T19:07:12.180Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
-  "source": {"file": "sources/ui-tx-iris@1.js", "sha1": "be59258711528b94d60b7c1f6523111593cf4a28"},
-  "hash": "2d395246f2150a555221f72abca4fd01d98e27445d065c12aa58376527c4ce04"
+  "asset": {"created": "2026-10-21T19:39:36.715Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/ui-tx-iris@1.js", "sha1": "d68ab7d19f96a21d5ca330713876bd0f7a35f117"},
+  "hash": "24149bde45c7f2eeb92d077c608ef130e073f6685217fadd24fa6f6787cf090f"
 }
