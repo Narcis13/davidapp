@@ -1,0 +1,63 @@
+{
+  "ref": "beat-title@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Beat title",
+  "description": "A title screen for a music game or a high-energy intro: stacked display words with a neon split that kicks on the beat, an equalizer along the bottom and notes drifting up, all at a tempo. Drops in word by word, then keeps moving while an interactive scene waits for input (it runs on f.ui.now). Takes a theme.",
+  "tags": ["title", "game", "music", "neon", "intro", "interactive"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "title": {
+      "type": "string",
+      "default": "TAP\nTHE\nBEAT",
+      "description": "One word per line (\\n breaks a line)"
+    },
+    "subtitle": {"type": "string", "default": "A rhythm game you play in the browser"},
+    "bpm": {"type": "number", "default": 120, "min": 40, "max": 200, "step": 1},
+    "top": {
+      "type": "number",
+      "default": 0.07,
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01,
+      "description": "Where the title starts, as a share of the height"
+    },
+    "sun": {
+      "type": "number",
+      "default": 24,
+      "min": 0,
+      "max": 50,
+      "step": 0.5,
+      "description": "Radius of the sun on the horizon, % of the short side of the frame (0: none)"
+    },
+    "horizon": {
+      "type": "number",
+      "default": 0.6,
+      "min": 0.3,
+      "max": 0.95,
+      "step": 0.01,
+      "description": "Where the horizon (the sun, the grid floor) sits, as a share of the height"
+    },
+    "size": {
+      "type": "number",
+      "default": 30,
+      "min": 6,
+      "max": 40,
+      "step": 0.5,
+      "description": "Line height of the title, % of the frame's short side"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"}
+  },
+  "uses": {},
+  "deps": {"theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:07:02.686Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:07:02.686Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/beat-title@1.js", "sha1": "f1b79938fc3da7fd82ba4cbaaa117d84bd95dc89"},
+  "hash": "5a5f8f963776af0d561c3ae79328b4775b7a57070f7be87251057f82f91fcee6"
+}

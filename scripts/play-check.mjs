@@ -4,7 +4,7 @@
 // in reach. It reports console and network problems, the time to the first frame, the bytes loaded, the states it
 // went through, and the frame timings (draw time per frame, session frames skipped), and can record a GIF.
 //
-//   node scripts/play-check.mjs <page url> <out dir> [--size 390x844] [--mobile] [--steps steps.json] [--gif name] [--name run] [--gpu | --headful]
+//   node scripts/play-check.mjs <page url> <out dir> [--size 390x844] [--mobile] [--steps steps.json] [--gif name] [--name run] [--gpu | --headful] [--gif-fps 12] [--gif-size 480]
 //
 // --gpu runs headless Chrome with its GPU on (by default it runs without one); --headful opens a visible window instead
 // (its frames come at the display's own rate). Frame timings are worth reading with one of them.
@@ -28,6 +28,8 @@ const mobile = argv.includes('--mobile');
 const name = opt('--name', `${width}x${height}${mobile ? '-mobile' : ''}`);
 const steps = JSON.parse(readFileSync(opt('--steps', ''), 'utf8'));
 const gif = opt('--gif', null);
+// the GIF's frame rate and the longer side of its frames
+const gifFps = Number(opt('--gif-fps', 12)), gifSize = Number(opt('--gif-size', mobile ? 480 : 960));
 mkdirSync(out, { recursive: true });
 
 const headful = argv.includes('--headful'), gpu = argv.includes('--gpu');
@@ -48,7 +50,7 @@ try {
       frames.push({ at: p.metadata.timestamp, data: p.data });
       s.send('Page.screencastFrameAck', { sessionId: p.sessionId }).catch(() => {});
     });
-    await s.send('Page.startScreencast', { format: 'jpeg', quality: 80, maxWidth: mobile ? 480 : 960, maxHeight: mobile ? 1040 : 600, everyNthFrame: 1 });
+    await s.send('Page.startScreencast', { format: 'jpeg', quality: 80, maxWidth: gifSize, maxHeight: gifSize, everyNthFrame: 1 });
   }
   const state = () => s.evaluate('(() => { const f = window.fablecut; if (!f) return null; const st = f.session.state; return { scene: st.scene, vars: st.vars, frame: f.session.frame, page: document.querySelector("[data-share]").dataset.state }; })()');
   /** The centre of a region on screen, in CSS pixels. */
@@ -143,7 +145,7 @@ if (gif && frames.length) {
   const dir = join(out, `${name}-frames`);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  const fps = 12, first = frames[0].at, last = frames.at(-1).at;
+  const fps = gifFps, first = frames[0].at, last = frames.at(-1).at;
   let k = 0, j = 0;
   for (let t = first; t <= last; t += 1 / fps, k++) {
     while (j + 1 < frames.length && frames[j + 1].at <= t) j++;

@@ -1,0 +1,502 @@
+{
+  "slug": "clip-12-tap-the-beat",
+  "title": "Tap the beat",
+  "description": "An interactive clip: a neon rhythm game played in the browser from a share link. Title, a 12-bar song on four lanes (tap or D F J K), results with a rank and play again.",
+  "format": "vertical",
+  "width": 1080,
+  "height": 1920,
+  "fps": 60,
+  "duration": 35.5,
+  "composition": {
+    "format": "vertical",
+    "width": 1080,
+    "height": 1920,
+    "fps": 60,
+    "duration": 35.5,
+    "seed": 12,
+    "background": "#0b0716",
+    "tracks": [
+      {
+        "id": "stage",
+        "name": "Stage",
+        "type": "visual",
+        "items": [
+          {
+            "id": "title",
+            "asset": "beat-title@1",
+            "start": 0,
+            "duration": 4,
+            "params": {
+              "title": "TAP\nTHE\nBEAT",
+              "subtitle": "A rhythm game you play in the browser",
+              "bpm": 120,
+              "size": 26,
+              "sun": 15,
+              "horizon": 0.615,
+              "theme": "theme-neon@1"
+            }
+          },
+          {
+            "id": "field",
+            "asset": "beat-lanes@1",
+            "start": 4,
+            "duration": 28.5,
+            "params": {
+              "bpm": 120,
+              "countIn": 4,
+              "bars": 12,
+              "seed": 7,
+              "combo": {"$var": "combo"},
+              "speed": {"$var": "speed"},
+              "showKeys": {"$var": "keys"},
+              "theme": "theme-neon@1"
+            }
+          },
+          {
+            "id": "horizon",
+            "asset": "beat-title@1",
+            "start": 32.5,
+            "duration": 3,
+            "params": {"title": "", "subtitle": "", "bpm": 120, "horizon": 0.76, "theme": "theme-neon@1"}
+          },
+          {
+            "id": "results",
+            "asset": "beat-results@1",
+            "start": 32.5,
+            "duration": 3,
+            "params": {
+              "score": {"$var": "score"},
+              "hits": {"$var": "hits"},
+              "perfects": {"$var": "perfects"},
+              "best": {"$var": "best"},
+              "total": 55,
+              "theme": "theme-neon@1"
+            }
+          }
+        ]
+      },
+      {
+        "id": "controls",
+        "name": "Controls",
+        "type": "visual",
+        "items": [
+          {
+            "id": "play",
+            "asset": "ui-button@1",
+            "start": 0,
+            "duration": 4,
+            "params": {
+              "label": "Play",
+              "icon": "play",
+              "variant": "primary",
+              "hotkey": "Enter",
+              "width": 100,
+              "size": 13,
+              "disabled": {"$var": "help"},
+              "delay": 0.8,
+              "theme": "theme-neon@1"
+            },
+            "transform": {"x": 0.5, "y": 0.675, "width": 0.72, "height": 0.09}
+          },
+          {
+            "id": "how",
+            "asset": "ui-button@1",
+            "start": 0,
+            "duration": 4,
+            "params": {
+              "label": "How to play",
+              "icon": "book-open",
+              "variant": "secondary",
+              "hotkey": "h",
+              "size": 12.5,
+              "width": 100,
+              "disabled": {"$var": "help"},
+              "delay": 0.9,
+              "theme": "theme-neon@1"
+            },
+            "transform": {"x": 0.5, "y": 0.765, "width": 0.72, "height": 0.075}
+          },
+          {
+            "id": "keys",
+            "asset": "ui-toggle@1",
+            "start": 0,
+            "duration": 4,
+            "params": {
+              "label": "Key letters",
+              "detail": "D F J K on the pads",
+              "on": {"$var": "keys"},
+              "disabled": {"$var": "help"},
+              "delay": 1,
+              "theme": "theme-neon@1"
+            },
+            "transform": {"x": 0.5, "y": 0.85, "width": 0.84, "height": 0.075}
+          },
+          {
+            "id": "speed",
+            "asset": "ui-slider@1",
+            "start": 0,
+            "duration": 4,
+            "params": {
+              "label": "Note speed",
+              "value": {"$var": "speed"},
+              "min": 0.6,
+              "max": 1.6,
+              "step": 0.1,
+              "decimals": 1,
+              "suffix": "×",
+              "disabled": {"$var": "help"},
+              "delay": 1.1,
+              "theme": "theme-neon@1"
+            },
+            "transform": {"x": 0.5, "y": 0.925, "width": 0.84, "height": 0.075}
+          },
+          {
+            "id": "again",
+            "asset": "ui-button@1",
+            "start": 32.5,
+            "duration": 3,
+            "params": {
+              "label": "Play again",
+              "icon": "rotate-ccw",
+              "variant": "primary",
+              "hotkey": "Enter",
+              "width": 100,
+              "size": 13,
+              "delay": 1.6,
+              "theme": "theme-neon@1"
+            },
+            "transform": {"x": 0.5, "y": 0.82, "width": 0.72, "height": 0.09}
+          },
+          {
+            "id": "menu",
+            "asset": "ui-button@1",
+            "start": 32.5,
+            "duration": 3,
+            "params": {
+              "label": "Menu",
+              "variant": "ghost",
+              "hotkey": "m",
+              "size": 12.5,
+              "width": 100,
+              "delay": 1.7,
+              "theme": "theme-neon@1"
+            },
+            "transform": {"x": 0.5, "y": 0.91, "width": 0.72, "height": 0.075}
+          }
+        ]
+      },
+      {
+        "id": "overlays",
+        "name": "Overlays",
+        "type": "visual",
+        "items": [
+          {
+            "id": "score",
+            "asset": "ui-score@1",
+            "start": 4,
+            "duration": 28.5,
+            "params": {"value": {"$var": "score"}, "label": "Score", "icon": "zap", "theme": "theme-neon@1"},
+            "transform": {"x": 0.5, "y": 0.09, "width": 0.6, "height": 0.08}
+          },
+          {
+            "id": "toast",
+            "asset": "ui-toast@1",
+            "start": 4,
+            "duration": 28.5,
+            "params": {"edge": "center", "hold": 1.2, "theme": "theme-neon@1"},
+            "transform": {"x": 0.5, "y": 0.35, "width": 0.9, "height": 0.12}
+          },
+          {
+            "id": "help",
+            "asset": "ui-dialog@1",
+            "start": 0,
+            "duration": 4,
+            "params": {
+              "title": "How to play",
+              "icon": "music",
+              "confirm": "Got it",
+              "cancel": "",
+              "tone": "accent",
+              "theme": "theme-neon@1",
+              "body": "Notes ride down four lanes. Tap a lane, or press D F J K (or the arrows), as its note crosses the line.\nRight on the beat is perfect. Keep the combo going."
+            },
+            "when": {"var": "help", "eq": true}
+          }
+        ]
+      },
+      {
+        "id": "music",
+        "name": "Music",
+        "type": "audio",
+        "items": [
+          {
+            "id": "title-loop",
+            "asset": "music-loop@1",
+            "start": 0,
+            "duration": 4,
+            "params": {
+              "bpm": 120,
+              "root": 45,
+              "scale": "minor",
+              "build": false,
+              "outroBars": 0,
+              "drums": 0.55,
+              "bass": 0.6,
+              "arp": 0.55,
+              "arpWave": "triangle"
+            },
+            "loop": true,
+            "gain": 0.55
+          },
+          {
+            "id": "song",
+            "asset": "music-loop@1",
+            "start": 4,
+            "duration": 28.5,
+            "params": {
+              "bpm": 120,
+              "root": 45,
+              "scale": "minor",
+              "build": true,
+              "outroBars": 1,
+              "drums": 0.9,
+              "bass": 0.75,
+              "arp": 0.5,
+              "arpWave": "square"
+            },
+            "gain": 0.8
+          }
+        ],
+        "role": "music"
+      },
+      {
+        "id": "sfx",
+        "name": "Sounds",
+        "type": "audio",
+        "items": [
+          {
+            "id": "hit-0",
+            "asset": "synth-note@1",
+            "start": 4,
+            "duration": 0.3,
+            "params": {"note": 69, "wave": "triangle", "decay": 0.09, "cutoff": 6000, "gain": 0.5},
+            "cue": true,
+            "gain": 0.5
+          },
+          {
+            "id": "hit-1",
+            "asset": "synth-note@1",
+            "start": 4,
+            "duration": 0.3,
+            "params": {"note": 72, "wave": "triangle", "decay": 0.09, "cutoff": 6000, "gain": 0.5},
+            "cue": true,
+            "gain": 0.5
+          },
+          {
+            "id": "hit-2",
+            "asset": "synth-note@1",
+            "start": 4,
+            "duration": 0.3,
+            "params": {"note": 76, "wave": "triangle", "decay": 0.09, "cutoff": 6000, "gain": 0.5},
+            "cue": true,
+            "gain": 0.5
+          },
+          {
+            "id": "hit-3",
+            "asset": "synth-note@1",
+            "start": 4,
+            "duration": 0.3,
+            "params": {"note": 79, "wave": "triangle", "decay": 0.09, "cutoff": 6000, "gain": 0.5},
+            "cue": true,
+            "gain": 0.5
+          },
+          {
+            "id": "miss",
+            "asset": "synth-note@1",
+            "start": 4,
+            "duration": 0.25,
+            "params": {"note": 38, "wave": "square", "decay": 0.07, "cutoff": 900, "gain": 0.5},
+            "cue": true,
+            "gain": 0.45
+          },
+          {
+            "id": "click",
+            "asset": "synth-note@1",
+            "start": 0,
+            "duration": 0.2,
+            "params": {"note": 84, "wave": "sine", "decay": 0.05, "cutoff": 8000, "gain": 0.5},
+            "cue": true,
+            "gain": 0.4
+          }
+        ],
+        "role": "sfx"
+      }
+    ],
+    "theme": "theme-neon@1",
+    "interactive": {
+      "start": "title",
+      "vars": {
+        "score": 0,
+        "combo": 0,
+        "best": 0,
+        "hits": 0,
+        "perfects": 0,
+        "lane": 0,
+        "help": false,
+        "keys": true,
+        "speed": 1
+      },
+      "scenes": [
+        {"id": "title", "start": 0, "duration": 4, "end": "hold", "label": "Title"},
+        {"id": "game", "start": 4, "duration": 28.5, "end": "next", "label": "Song"},
+        {"id": "results", "start": 32.5, "duration": 3, "end": "hold", "label": "Results", "final": true}
+      ],
+      "wires": [
+        {
+          "on": "play.press",
+          "do": [
+            {"play": "click"},
+            {"set": {"score": 0, "combo": 0, "best": 0, "hits": 0, "perfects": 0}},
+            {"go": "game"}
+          ]
+        },
+        {
+          "on": "how.press",
+          "do": [{"play": "click"}, {"set": {"help": true}}, {"send": "help", "event": "open"}]
+        },
+        {"on": "help.confirm", "do": [{"play": "click"}, {"set": {"help": false}}]},
+        {"on": "help.cancel", "do": [{"set": {"help": false}}]},
+        {"on": "keys.change", "do": [{"play": "click"}, {"set": {"keys": "$value"}}]},
+        {"on": "speed.change", "do": [{"set": {"speed": "$value"}}]},
+        {
+          "on": "field.perfect",
+          "do": [
+            {"add": {"score": 100, "combo": 1, "hits": 1, "perfects": 1}},
+            {"add": {"score": {"$var": "combo"}}},
+            {"if": {"var": "combo", "gt": {"$var": "best"}}, "then": [{"set": {"best": {"$var": "combo"}}}]},
+            {"set": {"lane": "$value"}},
+            {"if": {"var": "lane", "eq": 0}, "then": [{"play": "hit-0"}]},
+            {"if": {"var": "lane", "eq": 1}, "then": [{"play": "hit-1"}]},
+            {"if": {"var": "lane", "eq": 2}, "then": [{"play": "hit-2"}]},
+            {"if": {"var": "lane", "eq": 3}, "then": [{"play": "hit-3"}]},
+            {
+              "if": {"var": "combo", "eq": 10},
+              "then": [{"send": "toast", "event": "success", "value": "10 in a row"}, {"send": "score", "event": "bump"}]
+            },
+            {
+              "if": {"var": "combo", "eq": 25},
+              "then": [{"send": "toast", "event": "success", "value": "25 in a row"}, {"send": "score", "event": "bump"}]
+            },
+            {
+              "if": {"var": "combo", "eq": 40},
+              "then": [{"send": "toast", "event": "success", "value": "40 in a row"}, {"send": "score", "event": "bump"}]
+            }
+          ]
+        },
+        {
+          "on": "field.good",
+          "do": [
+            {"add": {"score": 50, "combo": 1, "hits": 1}},
+            {"add": {"score": {"$var": "combo"}}},
+            {"if": {"var": "combo", "gt": {"$var": "best"}}, "then": [{"set": {"best": {"$var": "combo"}}}]},
+            {"set": {"lane": "$value"}},
+            {"if": {"var": "lane", "eq": 0}, "then": [{"play": "hit-0"}]},
+            {"if": {"var": "lane", "eq": 1}, "then": [{"play": "hit-1"}]},
+            {"if": {"var": "lane", "eq": 2}, "then": [{"play": "hit-2"}]},
+            {"if": {"var": "lane", "eq": 3}, "then": [{"play": "hit-3"}]},
+            {
+              "if": {"var": "combo", "eq": 10},
+              "then": [{"send": "toast", "event": "success", "value": "10 in a row"}, {"send": "score", "event": "bump"}]
+            },
+            {
+              "if": {"var": "combo", "eq": 25},
+              "then": [{"send": "toast", "event": "success", "value": "25 in a row"}, {"send": "score", "event": "bump"}]
+            },
+            {
+              "if": {"var": "combo", "eq": 40},
+              "then": [{"send": "toast", "event": "success", "value": "40 in a row"}, {"send": "score", "event": "bump"}]
+            }
+          ]
+        },
+        {"on": "field.miss", "do": [{"set": {"combo": 0}}, {"play": "miss"}]},
+        {"on": "key:Escape", "scene": "game", "do": [{"go": "title"}]},
+        {
+          "on": "again.press",
+          "do": [
+            {"play": "click"},
+            {"set": {"score": 0, "combo": 0, "best": 0, "hits": 0, "perfects": 0}},
+            {"go": "game"}
+          ]
+        },
+        {"on": "menu.press", "do": [{"play": "click"}, {"go": "title"}]}
+      ],
+      "transition": {"asset": "ui-tx-iris@1", "params": {"zoom": 0}, "duration": 0.6}
+    }
+  },
+  "closure": ["beat-lanes@1", "beat-results@1", "beat-title@1", "drum-hat@1", "drum-kick@1", "drum-snare@1", "easing@1", "font-anton@1", "font-inter@1", "font-jetbrains-mono@1", "font-space-grotesk@1", "kit-icon@1", "music-loop@1", "synth-note@1", "theme-neon@1", "theme-tide@1", "ui-button@1", "ui-dialog@1", "ui-score@1", "ui-slider@1", "ui-toast@1", "ui-toggle@1", "ui-tx-iris@1"],
+  "files": [
+    {"ref": "font-anton@1", "store": "bundled", "family": "Anton", "license": "OFL-1.1"},
+    {"ref": "font-inter@1", "store": "bundled", "family": "Inter", "license": "OFL-1.1"},
+    {
+      "ref": "font-jetbrains-mono@1",
+      "store": "bundled",
+      "family": "JetBrains Mono",
+      "license": "OFL-1.1"
+    },
+    {"ref": "font-space-grotesk@1", "store": "bundled", "family": "Space Grotesk", "license": "OFL-1.1"}
+  ],
+  "check": {
+    "machine": "win32-x64",
+    "engine": 2,
+    "frames": {
+      "22": "197cf0b8f449dc76b4d5d7d5ae4445d29e6a00319a7ef7e697b918eb85fa0a09",
+      "66": "461baf300d8cc690bd971c434f1115f2f783c22adb89185d35fe4fd4126a068a",
+      "110": "f8238443bc511af78059f8be4e22545d0c64872a18f045b60d74f090da29cfdf",
+      "155": "94f18e3fff27ff3a24187fe0c0e4a934037177604bf87776dbfa2bdca3e8d344",
+      "199": "fcfe1531d2cdc40687be1135be5d2cb7279bfd28f15f3be2b18e51377393e9f8",
+      "244": "e13e912fd1a5b8c86622e8de6b7a1bc8a39fb3ad2a1214d8a0c5d925c5b7c378",
+      "288": "101318e2d80fd1f20280361fd2edc4b3e2988c5c83dea154bbebd43fcdf7a517",
+      "332": "584f17db5168d503b9ee2a17634389c58f6a5d63763ce2255c05025b7525e956",
+      "377": "168a7d11aaf912ab15db7fbdca588186496d705542a877a5d310e88901178e5e",
+      "421": "0cf80a74951d4a5e890ad7179af016d83367aa80dccbcab4e404ef4c72801f30",
+      "465": "726a1f23f73cffa45fb963225e240a0bd252edfaf845c57a908bda3e17438913",
+      "510": "4101a0e636180df50402be7e7c0613a1fe3daec272c7562891b0ea48b35edabc",
+      "554": "e21a3a091d8f963be85c2f070dd8e63e0d8338ad0a10d1691808038e394b25c5",
+      "599": "fe89a0caf02a4d06d0e2a2f53b70dc3a9bc67454f0d1e364496279a829a1105c",
+      "643": "652924b87c281e1f0e5ddfca6b6c1a8b378328290719d57919557ac046be34eb",
+      "687": "300b6d07173845a35219d24cce12c8259a4a65b8413770e3943a61a073f24aec",
+      "732": "08332d4f3090cc8acf914872a043a75a16bad152f8352fd8446444cd0c0336fd",
+      "776": "a0eb50cb1a4545e1eb285e8137776466cfecc61e63e0905d1ca51e54b40adb4d",
+      "820": "6d07db8c7fbce03174be1fdd1816b4c11e5d980dd11a3884b37ecf86ddc7af7b",
+      "865": "348323bb5b3602f5c33a0d4872405185a4796f645bb098db816c8b05848e94c4",
+      "909": "d1998938361644cf0a975d9ebb4d2dcfc7c109a234657412fa6e54c01367647a",
+      "954": "c89893ab25994e0909111c5c2363e14546e6fa0d013c6b19386a91d8f256cedc",
+      "998": "6756c069f22ac66b6fccb2e2640e94e50bf28952a70a1e741d4d810f67513b68",
+      "1042": "ec01b90ebed0f53faa1ab0ae0e1b998fa8115c163e4eaa7b5e76103217a1dfde",
+      "1087": "db23163afe4bf67457e9390343ed774c4a79955687f1f627cb1ba4bd1b72a15d",
+      "1131": "f1a666c94af4b33981c27aa4f9f1ec46690362e041ef496a4daad2c9f4ad1941",
+      "1175": "cbc81028ef9fe2425f7c9955ce06769ed112b7b8a0f6b41e49a34393c07ae948",
+      "1220": "283d2897cfc08cc86741d53b85faaa08f0209fd9d7c05b560dfcae157727088c",
+      "1264": "c1c0fb0ba906db1dbb045ad213482811774f10711b1e19a030e0c052f922400b",
+      "1309": "e44a67527f7b1c117ebdedf7ef2c81e3200a6fbf6a235f6e79ad4da1a6126089",
+      "1353": "fdd1c15bb30326772f7bf0f91f2f3a90523623eddac966ccddb82a9f1638f3e0",
+      "1397": "b6f8c1e51c521d963be02547f5a453cef34617bc93c16d15ca6210efea9fef91",
+      "1442": "79e5f68231eca7746764c923e33c83b1e74de19ed1495713d0946992bdd6dea0",
+      "1486": "2ffe56e09b5ba46b9e2971219087a3fbcfbe8746111ae2115bb778be8c0126fd",
+      "1530": "7a10453cd248ff49d33a22e4ad8abbfd2fb78951601d542a40c01cb2d7603658",
+      "1575": "5459b955d659aa1c6d0e5dc21721765e582313fa4b7af45d5bc9ab04d368bc1d",
+      "1619": "deb48a4b056f16e40564bc3efa06c20011517b44ccd3d06483c419867bda2dd6",
+      "1664": "ca1b446787cb3bf4e336b099d1f57c706863936ac651c1d77149ef12e1f7cefb",
+      "1708": "3795245eb9d07bf52cc578d50ac61b272c939459cb36193ab50a7826d4381c63",
+      "1752": "ae2050a95e0ebd9ffe81c094ee95ec9224fa20dc2bb4b8143342b01d14d84114",
+      "1797": "76eb3d688ca8d5671f90cd734244a03f60034874bc608742f274ccc70023f115",
+      "1841": "031dccb70f5f87df97e9b0889756c1b0ebf05b0138c758b33be73448f66f72bd",
+      "1885": "244af06adc29c3e975d027efa7ce941dffe8953b4d911c9bc7f06669fd9a4108",
+      "1930": "30a878594db47e29f3ad27dd49a1c2c614c6d6aef80db09947497cdb497e887b",
+      "1974": "e6441c74db69b38a68cd5bb187a44049864accae26474e41cc1c076c38b2bd59",
+      "2019": "027cb2f84e24cfbe471d03859b81510b902ce4b1054fc5970a0c82765f215cd3",
+      "2063": "30e621d8a171f1bb33be532a69b19be442d5ffb15f8abe2280d2567b51fc38ff",
+      "2107": "75e805b2fa6bceb9f295b64f9ed322a987419dade0fc96948f9220e4195f7cd3"
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "ref": "ui-slider@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Slider",
+  "description": "A slider for interactive compositions (volume, speed, difficulty, a guess on a scale): a label and its formatted value over a track and a thumb. The track is a range region: the runtime turns a drag (snapped to `step`) or the arrow keys (once focused) into a value and emits change with it. Bind `value` to a variable: the filled track and the thumb follow, glide when the value jumps, a bubble shows the value while dragging, ticks mark the steps. Hover halo, focus ring; a thumb-sized target on a phone. Takes a theme.",
+  "tags": ["ui", "interactive", "slider", "range", "settings", "volume", "control"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "label": {
+      "type": "string",
+      "default": "Volume",
+      "description": "Its name, above the track at the left (empty: none)"
+    },
+    "value": {
+      "type": "number",
+      "default": 0.6,
+      "description": "The value: bind it to a number variable ({ \"$var\": \"volume\" })"
+    },
+    "min": {"type": "number", "default": 0},
+    "max": {"type": "number", "default": 1},
+    "step": {
+      "type": "number",
+      "default": 0.05,
+      "min": 0,
+      "description": "The value snaps to multiples of it from min (0: continuous); also the arrow key step"
+    },
+    "display": {
+      "type": "enum",
+      "options": ["auto", "value", "percent", "none"],
+      "default": "auto",
+      "description": "value: the number with prefix, suffix and decimals; percent: where it is between min and max; auto: the value when a prefix, suffix or decimals are set or the range is not 0 to 1, else the percentage"
+    },
+    "decimals": {"type": "integer", "default": 0, "min": 0, "max": 4},
+    "prefix": {"type": "string", "default": ""},
+    "suffix": {"type": "string", "default": "", "description": "After the number (%, ×, s, km…)"},
+    "ticks": {
+      "type": "enum",
+      "options": ["auto", "on", "off"],
+      "default": "auto",
+      "description": "Marks at the steps (auto: when there are 2 to 12)"
+    },
+    "disabled": {"type": "boolean", "default": false, "description": "Dimmed and not draggable"},
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "size": {
+      "type": "number",
+      "default": 6,
+      "min": 3,
+      "max": 14,
+      "step": 0.1,
+      "description": "Thumb diameter in % of the frame's short side (the hit region is at least 11)"
+    },
+    "textSize": {
+      "type": "number",
+      "default": 3.6,
+      "min": 2.6,
+      "max": 9,
+      "step": 0.1,
+      "description": "Label size in % of the frame's short side"
+    },
+    "color": {
+      "type": "string",
+      "default": "",
+      "description": "Fill colour, a CSS colour (empty: the theme's accent)"
+    },
+    "delay": {"type": "number", "default": 0, "min": 0, "max": 10, "step": 0.05},
+    "inDur": {"type": "number", "default": 0.5, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 3,
+      "step": 0.01,
+      "description": "Seconds of the exit at the item's end (0 while a scene holds for input)"
+    }
+  },
+  "uses": {"easing": "easing"},
+  "deps": {"easing": "easing@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:07:06.590Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:07:06.590Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/ui-slider@1.js", "sha1": "c53c866c8fbda21086eca951667e4244995cff9e"},
+  "hash": "4d827b136b217f803d5c2e5716f0bfbe20b6818aa2d8fb9de2af26d11e47fd72"
+}

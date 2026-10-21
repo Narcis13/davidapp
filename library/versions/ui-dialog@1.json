@@ -1,0 +1,104 @@
+{
+  "ref": "ui-dialog@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Dialog",
+  "description": "A modal dialog for interactive compositions: a scrim over the frame, a soft panel with an optional kit-icon, a title, a multi-line body and one or two tactile buttons. Confirm emits confirm (Enter too), cancel emits cancel (Escape too); the scrim is a hit region under the panel, so nothing below takes a tap while it is open, and a tap on it emits cancel (or nothing). Springs in when its item appears, when the clip sends it open, or when a bound `open` turns true; sinks out when `open` turns false; shakes on shake. Buttons stack for thumbs on a vertical frame and sit side by side on a wide one. Takes a theme.",
+  "tags": ["ui", "interactive", "dialog", "modal", "confirm", "alert", "popup", "game"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "title": {
+      "type": "string",
+      "default": "Leave the game?",
+      "description": "The question or the news (empty: none)"
+    },
+    "body": {
+      "type": "text",
+      "default": "Your score is kept for today. You can come back and finish this round later.",
+      "description": "What it means; several lines are fine (empty: none)"
+    },
+    "confirm": {"type": "string", "default": "Leave", "description": "The confirm button's label"},
+    "cancel": {
+      "type": "string",
+      "default": "Stay",
+      "description": "The cancel button's label (empty: one button)"
+    },
+    "icon": {
+      "type": "string",
+      "default": "log-out",
+      "description": "A kit-icon name in a tinted circle above the title (empty: none)"
+    },
+    "tone": {
+      "type": "enum",
+      "options": ["accent", "danger", "success"],
+      "default": "accent",
+      "description": "Colour of the confirm button and the icon: the accent, red for a destructive choice, green for good news"
+    },
+    "open": {
+      "type": "boolean",
+      "default": true,
+      "description": "Shown or not: bind it to a boolean to animate it in and out (leave `when` out then)"
+    },
+    "hotkeys": {"type": "boolean", "default": true, "description": "Enter confirms, Escape cancels"},
+    "scrimTap": {
+      "type": "enum",
+      "options": ["cancel", "block", "through"],
+      "default": "cancel",
+      "description": "A tap on the scrim: emits cancel; is swallowed (emits block); or goes through to what is under it (not modal)"
+    },
+    "scrim": {
+      "type": "number",
+      "default": 0.62,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "description": "How dark the scrim is"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"},
+    "width": {
+      "type": "number",
+      "default": 82,
+      "min": 30,
+      "max": 100,
+      "step": 1,
+      "description": "Panel width in % of the frame's short side (never wider than the box)"
+    },
+    "size": {
+      "type": "number",
+      "default": 5.4,
+      "min": 2.6,
+      "max": 12,
+      "step": 0.1,
+      "description": "Title size in % of the frame's short side (the body is about two thirds of it)"
+    },
+    "buttonSize": {
+      "type": "number",
+      "default": 11.5,
+      "min": 7,
+      "max": 20,
+      "step": 0.1,
+      "description": "Button height in % of the frame's short side"
+    },
+    "inDur": {"type": "number", "default": 0.42, "min": 0, "max": 3, "step": 0.01},
+    "outDur": {
+      "type": "number",
+      "default": 0.24,
+      "min": 0,
+      "max": 3,
+      "step": 0.01,
+      "description": "Seconds it takes to sink out when `open` turns false"
+    }
+  },
+  "uses": {"easing": "easing", "kit-icon": "kit-icon"},
+  "deps": {"easing": "easing@1", "kit-icon": "kit-icon@1", "theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:07:08.573Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:07:08.573Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/ui-dialog@1.js", "sha1": "8d45595a7b1e2a72096eb9a404270d191a330f07"},
+  "hash": "0b88c822f9e773ccfc0ce1ba8cb0f8fdb6ab3e852dd7aefc319acaa1ea164d74"
+}

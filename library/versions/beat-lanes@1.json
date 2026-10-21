@@ -1,0 +1,91 @@
+{
+  "ref": "beat-lanes@1",
+  "type": "function",
+  "kind": "visual",
+  "title": "Beat lanes",
+  "description": "The playfield of a rhythm game for interactive clips: four lanes on a highway into the distance, notes riding down to a hit line on the beat, pads that light under a tap or a key (D F J K or the arrows), bursts and PERFECT/GOOD labels where a note is caught, a count-in, a combo and a progress line. Emits perfect and good when a note is caught and miss when a lane is pressed with no note in reach. The chart comes from bpm, bars and seed, so it fits a music-loop at the same tempo. Takes a theme.",
+  "tags": ["game", "rhythm", "interactive", "ui", "music", "beat"],
+  "duration": null,
+  "formats": ["vertical", "horizontal", "square"],
+  "schema": {
+    "bpm": {
+      "type": "number",
+      "default": 120,
+      "min": 60,
+      "max": 200,
+      "step": 1,
+      "description": "Tempo of the music the chart follows"
+    },
+    "countIn": {
+      "type": "integer",
+      "default": 4,
+      "min": 0,
+      "max": 8,
+      "description": "Beats of count-in before the first note (3, 2, 1, go)"
+    },
+    "bars": {
+      "type": "integer",
+      "default": 16,
+      "min": 1,
+      "max": 64,
+      "description": "Bars of notes after the count-in"
+    },
+    "seed": {"type": "integer", "default": 7, "description": "Picks the lanes of the chart"},
+    "keys": {
+      "type": "string",
+      "default": "dfjk",
+      "description": "The key of each lane, left to right (the arrows work too)"
+    },
+    "travel": {
+      "type": "number",
+      "default": 1.3,
+      "min": 0.4,
+      "max": 3,
+      "step": 0.05,
+      "description": "Seconds a note takes from the distance to the line at speed 1"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "min": 0.5,
+      "max": 2,
+      "step": 0.05,
+      "description": "How fast the notes ride (1 = normal, 2 = twice as fast): bind it to an options slider"
+    },
+    "window": {
+      "type": "number",
+      "default": 0.14,
+      "min": 0.05,
+      "max": 0.3,
+      "step": 0.01,
+      "description": "Seconds either side of the beat a note can be caught"
+    },
+    "perfect": {
+      "type": "number",
+      "default": 0.06,
+      "min": 0.02,
+      "max": 0.2,
+      "step": 0.01,
+      "description": "Seconds either side of the beat that count as perfect"
+    },
+    "showKeys": {"type": "boolean", "default": true, "description": "Letters on the pads"},
+    "combo": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "description": "The current combo, drawn above the highway from 2 up (bind it to a variable)"
+    },
+    "theme": {"type": "asset", "kind": "value", "default": "theme-tide"}
+  },
+  "uses": {},
+  "deps": {"theme-tide": "theme-tide@1"},
+  "author": "claude-opus-5-5",
+  "note": null,
+  "created": "2026-10-21T19:07:01.970Z",
+  "engine": 2,
+  "madeForClip": "clip-12-tap-the-beat",
+  "parent": null,
+  "asset": {"created": "2026-10-21T19:07:01.970Z", "originClip": "clip-12-tap-the-beat", "forkedFrom": null},
+  "source": {"file": "sources/beat-lanes@1.js", "sha1": "a94796ee05bb323da6ce9df008e66247beb28d9a"},
+  "hash": "5fb546c14f128aef520aaec428c1c6b2834977088175dd1e1969f9d59be16d7e"
+}

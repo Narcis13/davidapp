@@ -10,7 +10,7 @@ export const AUTHOR = 'claude-fable-5-1';
 
 /** Clips built step by step with scripts/act.mjs; build.mjs replays their journals (showcase/journal/<clip>.jsonl) after these steps. */
 export const JOURNAL_AUTHOR = 'claude-opus-5-5';
-export const JOURNALS = ['clip-4-direct-the-studio', 'clip-5-a-library-in-3d', 'clip-6-what-the-library-holds', 'clip-7-a-video-that-checks-itself', 'clip-8-cuvinte-pe-ritm', 'clip-9-your-first-clip', 'clip-10-every-clip-helps', 'clip-11-the-kit'];
+export const JOURNALS = ['clip-4-direct-the-studio', 'clip-5-a-library-in-3d', 'clip-6-what-the-library-holds', 'clip-7-a-video-that-checks-itself', 'clip-8-cuvinte-pe-ritm', 'clip-9-your-first-clip', 'clip-10-every-clip-helps', 'clip-11-the-kit', 'clip-12-tap-the-beat'];
 
 const C1 = 'clip-1-every-frame';
 const C2 = 'clip-2-compounding';
