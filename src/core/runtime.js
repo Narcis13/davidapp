@@ -358,21 +358,22 @@ export function createRuntime(host) {
        * Declare a hit region where the asset draws it (x, y, w, h in the current transform) and get its state:
        * { hover, down, focus, pressed (seconds since it last fired, Infinity if never), hoverFor }.
        * o: { id (tells regions with the same name apart), value, range: { min, max, step, value, axis }, keys: ['Enter'],
-       *      shape: 'rect' | 'circle', press: 'up' | 'down', focus: false (skip it when tabbing), label }.
+       *      shape: 'rect' | 'circle', press: 'up' | 'down', focus: false (skip it when tabbing), label,
+       *      disabled: true (drawn but not hittable this frame: the state is still reported, e.g. a target already caught) }.
        */
       hit(name, x, y, w, h, o = {}) {
         if (!Object.hasOwn(emits, name)) throw new AssetError(`f.ui.hit("${name}"): declare the event in events.emits (declared: ${Object.keys(emits).join(', ') || 'none'})`, [e.ref]);
         if (![x, y, w, h].every((n) => typeof n === 'number' && Number.isFinite(n)) || w <= 0 || h <= 0) throw new AssetError(`f.ui.hit("${name}", x, y, w, h): give a box with a positive width and height`, [e.ref]);
         const m = matrix();
         let key = `${item}:${name}:${o.id ?? ''}`;
-        if (regions) {
+        if (regions && !o.disabled) {
           const n = regionKeys.get(key) ?? 0;
           regionKeys.set(key, n + 1);
           if (n) key += `#${n}`;
         }
         const range = o.range ? { min: Number(o.range.min ?? 0), max: Number(o.range.max ?? 1), step: o.range.step ? Number(o.range.step) : 0, value: Number(o.range.value ?? o.range.min ?? 0), axis: o.range.axis === 'y' ? 'y' : 'x' } : undefined;
         // a region on an asset's own offscreen canvas has no place in the frame: it is drawn, not hit
-        if (regions && item && !assetCanvases.has(ctx.canvas)) {
+        if (regions && item && !o.disabled && !assetCanvases.has(ctx.canvas)) {
           regions.push({
             key, item, name, ...(o.id !== undefined ? { id: o.id } : {}), m: m.map(round4), x, y, w, h,
             ...(o.shape === 'circle' ? { shape: 'circle' } : {}), value: o.value ?? null, ...(range ? { range } : {}),
