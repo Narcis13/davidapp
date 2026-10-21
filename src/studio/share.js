@@ -375,6 +375,9 @@ export function createShare(studio) {
       clip: slug, title: c.title, dir, index: join(dir, 'index.html'), url: base ? base.href : null, studioPath: `/share/${slug}`,
       bytes: folderBytes(dir), files: count(dir), breakdown, frames, audio, fonts: fonts.map((f) => f.family), modules: code.filter((f) => f.endsWith('.js')).length,
       seconds: Math.round((performance.now() - t0) / 100) / 10,
+      ...(sounds ? { sounds: Object.keys(sounds).length } : {}),
+      // a link preview (WhatsApp, Slack, Facebook) needs absolute URLs: say so when they are relative
+      ...(base ? {} : { warnings: ['og:image and og:url are relative: link previews show only with absolute URLs; export again with base_url set to where the folder will be published'] }),
     };
   }
 

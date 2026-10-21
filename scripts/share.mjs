@@ -26,7 +26,8 @@ try {
   console.log(`${r.files} files, ${kb(r.bytes)} in ${r.seconds} s${r.url ? `; link previews point at ${r.url}` : ''}`);
   for (const [part, bytes] of Object.entries(r.breakdown)) if (bytes) console.log(`  ${part.padEnd(10)} ${kb(bytes).padStart(10)}`);
   for (const f of r.frames) console.log(`  ${f.kind} ${f.ref}: ${f.shown} frames shown, ${f.unique} kept (${f.format} q${f.quality})`);
-  console.log(`fonts: ${r.fonts.join(', ')}; sound: ${r.audio ?? 'none'}; ${r.modules} modules`);
+  console.log(`fonts: ${r.fonts.join(', ')}; sound: ${r.audio ?? (r.sounds ? `${r.sounds} sounds, one per audio item` : 'none')}; ${r.modules} modules`);
+  for (const w of r.warnings ?? []) console.log(`warning: ${w}`);
   console.log(`check it with the studio stopped: node scripts/serve-static.mjs "${r.dir}"`);
 } catch (e) {
   console.error(e.message);

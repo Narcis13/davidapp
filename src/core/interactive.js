@@ -26,6 +26,8 @@ export const ACTIONS = ['go', 'set', 'add', 'toggle', 'send', 'play', 'if', 'res
 export const INPUT_TYPES = ['down', 'move', 'up', 'cancel', 'leave', 'key'];
 const COMPARE = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'];
 const NAME_RE = /^[A-Za-z_][\w-]*$/;
+/** "$value.lane": a field of the event's value (a region's value may be an object). */
+const FIELD_RE = /^\$value(\.[A-Za-z_]\w*)+$/;
 /** Actions one event may run, nested wires included: a wire loop stops here instead of hanging the player. */
 const MAX_ACTIONS = 256;
 const KEEP = 48;
@@ -40,12 +42,13 @@ const list = (v) => (Array.isArray(v) ? v : [v]);
 
 /** A value in a wire: a literal, { $var }, or { $event: 'value' } (the event's value; also the string "$value"). */
 function checkValue(v, path, err, ctx) {
+  if (typeof v === 'string' && FIELD_RE.test(v)) { if (!ctx.event) err(path, `"${v}" is a field of the event's value; it means nothing here`); return; }
   if (v === '$value') { if (!ctx.event) err(path, '"$value" is the value of the event that ran the wire; it means nothing here'); return; }
   if (isPlain(v)) {
     if (typeof v.$var === 'string') { if (!ctx.vars.has(v.$var)) err(path, `unknown variable "${v.$var}" (declared: ${[...ctx.vars].join(', ') || 'none'})`); return; }
     if (v.$event === 'value') { if (!ctx.event) err(path, '{ $event: "value" } only works inside a wire'); return; }
   }
-  if (!scalar(v)) err(path, 'a value is a number, a boolean, a string, { $var: "name" } or "$value" (the event\'s value)');
+  if (!scalar(v)) err(path, 'a value is a number, a boolean, a string, { $var: "name" }, "$value" (the event\'s value) or "$value.field" (a field of it)');
 }
 
 /** A condition: { var, eq|ne|gt|gte|lt|lte }, { scene }, { all }, { any }, { not }. */
@@ -241,6 +244,8 @@ const fill = (v, vars) => (Array.isArray(v) ? v.map((x) => fill(x, vars)) : isPl
 /** The value of a wire value or condition operand. */
 function valueOf(v, vars, event) {
   if (v === '$value') return event?.value;
+  // "$value.combo": a field of an event whose value is an object (a region's value may be one)
+  if (typeof v === 'string' && FIELD_RE.test(v)) return v.slice(7).split('.').reduce((o, k) => (o !== null && typeof o === 'object' ? o[k] : undefined), event?.value);
   if (isPlain(v)) {
     if (typeof v.$var === 'string') return vars[v.$var];
     if (v.$event === 'value') return event?.value;

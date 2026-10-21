@@ -104,11 +104,16 @@ async function main() {
   progress(0.03);
   const base = new URL(root.dataset.bundle, location.href);
   const data = await fetchJson(base, (p) => progress(0.03 + p * 0.27));
+  // an interactive clip: the frame is the game (its controls go under it) and the hint names its own keys, from now on
+  if (data.composition.interactive) {
+    root.dataset.interactive = '';
+    root.querySelector('.details').append(el.controls);
+    root.querySelector('[data-testid=keys]').innerHTML = '<kbd>Tab</kbd><kbd>Enter</kbd> its buttons, and the keys it shows';
+  }
   const engine = new Engine({ canvas: el.canvas });
   await engine.load(data, { base, onProgress: (p) => progress(0.3 + p * 0.4) });
   const full = setupFullscreen(data.composition);
   if (data.composition.interactive) {
-    root.dataset.interactive = '';
     el.canvas.tabIndex = 0;
     const ui = { root, canvas: el.canvas, setState, fail, reveal, progress, toComposition, fullscreen: full, data, base };
     return playInteractive(engine, el.canvas, data.composition, ui);
@@ -118,61 +123,76 @@ async function main() {
 
 /**
  * An interactive composition: not a timeline to scrub but a session (session.js) that reacts to taps, clicks, keys
- * and the pointer. Until the viewer presses play the page shows the start scene settled, still; the press starts the
- * session and its sound (the browser's autoplay rules want a gesture). Pointer input on the canvas goes to the session
- * in composition pixels, keys while the clip is playing go to it too (Tab moves through the clip's own controls and
- * then on out of it, so the page never traps the keyboard). The sounds are one buffer per audio item, started and
- * stopped as the session says. window.fablecut exposes the session and frame timings to checks and the playthrough bot.
+ * and the pointer. It starts as soon as the page is ready, so the clip's own buttons answer the first tap; that tap
+ * (or key) also lets its sound play (the browser's autoplay rules want a gesture). With prefers-reduced-motion it waits
+ * for the play button instead. Pointer input on the canvas goes to the session in composition pixels; keys go to it too,
+ * except the ones that press a page control (Enter, Space, Tab on a focused button); Tab moves through the clip's own
+ * controls and then on out of it, so the page never traps the keyboard. The sounds are one buffer per audio item,
+ * fetched while the clip already plays, started and stopped as the session says (a sound that arrives late starts where
+ * it would be by then). window.fablecut exposes the session and frame timings to checks and the playthrough bot.
  * ui: { root, canvas, setState(name), fail(message), reveal(), progress(0…1), toComposition(event), fullscreen, data, base }.
  * @param {Engine} engine @param {HTMLCanvasElement} canvas @param {any} composition @param {any} ui
  */
 async function playInteractive(engine, canvas, composition, ui) {
   const { data, base } = ui;
-  root.querySelector('.details').append(el.controls);
-  root.querySelector('[data-testid=keys]').innerHTML = '<kbd>Tab</kbd><kbd>Enter</kbd> its buttons, and the keys it shows';
 
-  // ── sound: decoded before the first tap, heard from it on ────────────────────────────────────
+  // ── sound: fetched and decoded in the background; heard from the viewer's first gesture on ─────────
   const AC = window.AudioContext ?? /** @type {any} */ (window).webkitAudioContext;
   const sounds = data.sounds ?? {};
   const actx = AC && Object.keys(sounds).length ? new AC({ latencyHint: 'interactive' }) : null;
   const master = actx?.createGain();
   master?.connect(actx.destination);
-  const buffers = new Map(), voices = new Map();
-  let muted = false;
-  if (actx) {
-    const entries = Object.entries(sounds);
-    let done = 0;
-    await Promise.all(entries.map(async ([id, s]) => {
-      const res = await fetch(new URL(s.url, base));
-      if (!res.ok) throw new Error(`its sound "${id}" did not load (${res.status})`);
-      buffers.set(id, await actx.decodeAudioData(await res.arrayBuffer()));
-      ui.progress(0.7 + (++done / entries.length) * 0.2);
-    }));
-    el.sound.hidden = false;
-  }
+  /** id → Promise<AudioBuffer | null> */
+  const buffers = new Map(Object.entries(sounds).map(([id, s]) => [id, actx ? fetch(new URL(s.url, base))
+    .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(String(res.status)))))
+    .then((bytes) => actx.decodeAudioData(bytes))
+    .catch(() => null) : Promise.resolve(null)]));
+  const voices = new Map(), wanted = new Map();
+  // what the output adds before a sound is heard: the music starts that much further in, so it is heard on the beat
+  const late = () => actx?.outputLatency || actx?.baseLatency || 0;
   function onAudio({ start, stop }) {
     if (!actx) return;
-    for (const id of stop) { try { voices.get(id)?.stop(); } catch { /* already over */ } voices.delete(id); }
+    for (const id of stop) { wanted.delete(id); try { voices.get(id)?.stop(); } catch { /* already over */ } voices.delete(id); }
     for (const c of start) {
-      const buffer = buffers.get(c.item);
-      if (!buffer || (!c.loop && c.offset >= buffer.duration)) continue;
-      const src = actx.createBufferSource();
-      src.buffer = buffer;
-      src.loop = !!c.loop;
-      const gain = actx.createGain();
-      gain.gain.value = sounds[c.item].gain ?? 1;
-      src.connect(gain).connect(master);
-      src.start(actx.currentTime, c.loop ? c.offset % buffer.duration : c.offset);
-      // a cue may sound over itself (two hits in a row); anything else plays once at a time
-      if (!sounds[c.item].cue) { try { voices.get(c.item)?.stop(); } catch { /* over */ } voices.set(c.item, src); }
+      const cue = !!sounds[c.item]?.cue, asked = actx.currentTime, want = { ...c };
+      if (!cue) wanted.set(c.item, want);
+      buffers.get(c.item)?.then((buffer) => {
+        if (!buffer || (!cue && wanted.get(c.item) !== want)) return;
+        const waited = actx.currentTime - asked;
+        // a hit that arrives late is worse than none; music and timeline sound pick up where they would be by now
+        if (cue && waited > 0.12) return;
+        const at = c.offset + (cue ? 0 : waited + late());
+        if (!c.loop && at >= buffer.duration) return;
+        const src = actx.createBufferSource();
+        src.buffer = buffer;
+        src.loop = !!c.loop;
+        const gain = actx.createGain();
+        gain.gain.value = sounds[c.item].gain ?? 1;
+        src.connect(gain).connect(master);
+        src.start(actx.currentTime, c.loop ? at % buffer.duration : at);
+        // a cue may sound over itself (two hits in a row); anything else plays once at a time
+        if (!cue) { try { voices.get(c.item)?.stop(); } catch { /* over */ } voices.set(c.item, src); }
+      });
     }
   }
+  let muted = false;
   function setMuted(m) {
     muted = m;
     root.toggleAttribute('data-muted', m);
     el.sound.setAttribute('aria-label', m ? 'Turn sound on' : 'Turn sound off');
     if (master) master.gain.value = m ? 0 : 1;
   }
+  if (actx) { el.sound.hidden = false; setMuted(false); }
+  const stopSound = () => { wanted.clear(); for (const v of voices.values()) { try { v.stop(); } catch { /* over */ } } voices.clear(); };
+  // the first gesture anywhere on the page lets the sound play; until then a small pill says so
+  const unlock = () => {
+    if (!actx || actx.state === 'running' || root.dataset.state !== 'playing') return;
+    actx.resume().then(() => { el.hint.hidden = true; }, () => {});
+  };
+  window.addEventListener('pointerdown', unlock, { capture: true });
+  window.addEventListener('keydown', unlock, { capture: true });
+  el.hint.querySelector('span').textContent = coarse ? 'Sound on with your first tap' : 'Sound on with your first click';
+  el.hint.addEventListener('click', unlock);
 
   // ── drawing: the session asks for each frame; timings are kept for the checks ─────────────────
   const stats = { drawn: 0, skipped: 0, last: -1, ms: [], slow: [], started: 0 };
@@ -197,26 +217,14 @@ async function playInteractive(engine, canvas, composition, ui) {
     },
     onError(e) { stopSound(); ui.fail(`The clip stopped: ${e.message}`); },
   });
-  const stopSound = () => { for (const v of voices.values()) { try { v.stop(); } catch { /* over */ } } voices.clear(); };
   /** @type {any} */ (window).fablecut = { session, engine, stats, composition };
 
-  // ── the still before it starts: the start scene as it settles, with the play button over it ─────
-  const start = composition.interactive.scenes.find((s) => s.id === composition.interactive.start);
-  await engine.drawFrame(Math.round((start.start + start.duration) * composition.fps) - 1, {});
-  root.dataset.firstFrame = String(Math.round(performance.now()));
-  ui.progress(1);
-  ui.reveal();
-  ui.setState('ready');
-  el.big.hidden = false;
-  el.big.setAttribute('aria-label', 'Play');
-  el.big.focus({ preventScroll: true });
-
   function begin() {
-    actx?.resume();
-    setMuted(muted);
     if (root.dataset.state === 'ready') { session.start(); stats.started = performance.now(); } else session.resume();
+    if (actx?.state === 'running' || navigator.userActivation?.hasBeenActive) actx?.resume().then(() => { el.hint.hidden = true; }, () => {});
     ui.setState('playing');
     el.big.hidden = true;
+    el.hint.hidden = !actx || actx.state === 'running';
     el.play.setAttribute('aria-label', 'Pause');
     canvas.focus({ preventScroll: true });
   }
@@ -231,7 +239,7 @@ async function playInteractive(engine, canvas, composition, ui) {
   }
   el.big.addEventListener('click', begin);
   el.play.addEventListener('click', () => (root.dataset.state === 'playing' ? hold() : begin()));
-  el.sound.addEventListener('click', () => setMuted(!muted));
+  el.sound.addEventListener('click', () => { unlock(); setMuted(!muted); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) hold(); });
 
   // ── input: the pointer on the canvas, keys while it plays ─────────────────────────────────────
@@ -256,16 +264,32 @@ async function playInteractive(engine, canvas, composition, ui) {
   const OWN = new Set([' ', 'Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
   document.addEventListener('keydown', (e) => {
     if (!playing() || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (/** @type {any} */ (e.target)?.closest?.('.controls, .made, .big')) return;
-    // held keys repeat: only the arrows (a slider) take the repeats
-    if (e.repeat && !e.key.startsWith('Arrow')) { e.preventDefault(); return; }
-    if (e.key === 'Tab') {
-      // past the clip's last control the browser moves focus on: no keyboard trap
-      if (session.tabLeaves(e.shiftKey)) return;
+    // a page control keeps the keys that press it; every other key is the clip's (and the clip takes the focus back)
+    if (/** @type {any} */ (e.target)?.closest?.('.controls, .made, .big, .sound-hint')) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab') return;
+      canvas.focus({ preventScroll: true });
     }
+    // held keys repeat only for a slider with the focus (its arrows); a held lane key is one press
+    const focused = session.regions.find((r) => r.key === session.state.focus);
+    if (e.repeat && !(focused?.range && e.key.startsWith('Arrow'))) { e.preventDefault(); return; }
+    // past the clip's last control the browser moves focus on: no keyboard trap
+    if (e.key === 'Tab' && session.tabLeaves(e.shiftKey)) return;
     session.input({ type: 'key', key: e.key, shift: e.shiftKey });
     if (OWN.has(e.key) || e.key.length === 1) e.preventDefault();
   });
+
+  // ── ready: the first frame drawn, then it plays (or, with reduced motion, waits for the play button) ───────
+  const start = composition.interactive.scenes.find((s) => s.id === composition.interactive.start);
+  await engine.drawFrame(Math.round((start.start + start.duration) * composition.fps) - 1, {});
+  root.dataset.firstFrame = String(Math.round(performance.now()));
+  ui.progress(1);
+  ui.reveal();
+  ui.setState('ready');
+  if (reducedMotion) {
+    el.big.hidden = false;
+    el.big.setAttribute('aria-label', 'Play');
+    el.big.focus({ preventScroll: true });
+  } else begin();
 }
 
 /**

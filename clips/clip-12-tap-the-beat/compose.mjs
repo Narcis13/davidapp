@@ -31,16 +31,17 @@ const box = (x, y, width, height) => ({ transform: { x, y, width, height } });
 
 /** One hit sound per lane, a minor pentatonic chord from the left lane to the right. */
 const LANE_NOTES = [69, 72, 76, 79];
-const zero = { score: 0, combo: 0, best: 0, hits: 0, perfects: 0 };
+const zero = { score: 0, combo: 0, best: 0, hits: 0, perfects: 0, strays: 0 };
 /** A caught note: points, the combo bonus, the best combo, the lane's own note, and a toast at a few combos. */
 const catchWire = (event, points) => ({
   on: `field.${event}`,
   do: [
-    { add: { score: points, combo: 1, hits: 1, ...(event === 'perfect' ? { perfects: 1 } : {}) } },
+    // the event's value is { lane, combo }: beat-lanes counts the streak (a note let through breaks it too)
+    { set: { combo: '$value.combo', lane: '$value.lane' } },
+    { add: { score: points, hits: 1, ...(event === 'perfect' ? { perfects: 1 } : {}) } },
     { add: { score: { $var: 'combo' } } },
     { if: { var: 'combo', gt: { $var: 'best' } }, then: [{ set: { best: { $var: 'combo' } } }] },
-    // the lane comes with the event: each lane sounds its own note
-    { set: { lane: '$value' } },
+    // each lane sounds its own note
     ...LANE_NOTES.map((_, lane) => ({ if: { var: 'lane', eq: lane }, then: [{ play: `hit-${lane}` }] })),
     ...[10, 25, 40].map((n) => ({ if: { var: 'combo', eq: n }, then: [{ send: 'toast', event: 'success', value: `${n} in a row` }, { send: 'score', event: 'bump' }] })),
   ],
@@ -52,9 +53,9 @@ export default {
   tracks: [
     { id: 'stage', name: 'Stage', type: 'visual', items: [
       { id: 'title', asset: 'beat-title', ...span(TITLE), params: { title: 'TAP\nTHE\nBEAT', subtitle: 'A rhythm game you play in the browser', bpm: BPM, size: 26, sun: 15, horizon: 0.615, theme } },
-      { id: 'field', asset: 'beat-lanes', ...span(GAME), params: { bpm: BPM, countIn: COUNT_IN, bars: BARS, seed: SEED, combo: { $var: 'combo' }, speed: { $var: 'speed' }, showKeys: { $var: 'keys' }, theme } },
+      { id: 'field', asset: 'beat-lanes', ...span(GAME), params: { bpm: BPM, countIn: COUNT_IN, bars: BARS, seed: SEED, speed: { $var: 'speed' }, showKeys: { $var: 'keys' }, theme } },
       { id: 'horizon', asset: 'beat-title', ...span(RESULTS), params: { title: '', subtitle: '', bpm: BPM, horizon: 0.76, theme } },
-      { id: 'results', asset: 'beat-results', ...span(RESULTS), params: { score: { $var: 'score' }, hits: { $var: 'hits' }, perfects: { $var: 'perfects' }, best: { $var: 'best' }, total: NOTES, theme } },
+      { id: 'results', asset: 'beat-results', ...span(RESULTS), params: { score: { $var: 'score' }, hits: { $var: 'hits' }, perfects: { $var: 'perfects' }, best: { $var: 'best' }, strays: { $var: 'strays' }, total: NOTES, theme } },
     ] },
     { id: 'controls', name: 'Controls', type: 'visual', items: [
       { id: 'play', asset: 'ui-button', ...span(TITLE), ...box(0.5, 0.675, 0.72, 0.09), params: { label: 'Play', icon: 'play', variant: 'primary', hotkey: 'Enter', width: 100, size: 13, disabled: { $var: 'help' }, delay: 0.8, theme } },
@@ -69,7 +70,7 @@ export default {
       { id: 'toast', asset: 'ui-toast', ...span(GAME), ...box(0.5, 0.35, 0.9, 0.12), params: { edge: 'center', hold: 1.2, theme } },
       { id: 'help', asset: 'ui-dialog', ...span(TITLE), when: { var: 'help', eq: true }, params: {
         title: 'How to play', icon: 'music', confirm: 'Got it', cancel: '', tone: 'accent', theme,
-        body: 'Notes ride down four lanes. Tap a lane, or press D F J K (or the arrows), as its note crosses the line.\nRight on the beat is perfect. Keep the combo going.' } },
+        body: 'Notes ride down four lanes. Tap a lane, or press D F J K (or the arrows), as its note crosses the line.\nRight on the beat is perfect; a tap on an empty lane or a note let through ends the streak.' } },
     ] },
     { id: 'music', name: 'Music', type: 'audio', role: 'music', items: [
       // two bars that loop while the title waits; the song starts with the game scene, on its first frame
@@ -100,8 +101,7 @@ export default {
       { on: 'speed.change', do: { set: { speed: '$value' } } },
       catchWire('perfect', 100),
       catchWire('good', 50),
-      { on: 'field.miss', do: [{ set: { combo: 0 } }, { play: 'miss' }] },
-      { on: 'key:Escape', scene: 'game', do: { go: 'title' } },
+      { on: 'field.miss', do: [{ set: { combo: 0 } }, { add: { strays: 1 } }, { play: 'miss' }] },
       { on: 'again.press', do: [{ play: 'click' }, { set: zero }, { go: 'game' }] },
       { on: 'menu.press', do: [{ play: 'click' }, { go: 'title' }] },
     ],
