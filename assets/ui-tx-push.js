@@ -35,7 +35,9 @@ asset({
       ctx.scale(s, s);
       ctx.drawImage(f.from.canvas, -w / 2, -h / 2, w, h);
       ctx.restore();
-      if (p.dim > 0) { ctx.fillStyle = `rgba(0,0,0,${(p.dim * k).toFixed(4)})`; ctx.fillRect(0, 0, w, h); }
+      // a dim in whole 8-bit steps: a fraction of a step is rounded differently by Chrome and Skia, a whole frame one level apart
+      const d = Math.round(p.dim * k * 255);
+      if (d > 0) { ctx.fillStyle = `rgba(0,0,0,${d / 255})`; ctx.fillRect(0, 0, w, h); }
     }
     const tx = -dx * w * (1 - k), ty = -dy * h * (1 - k);
     if (p.shadow && k < 1) {

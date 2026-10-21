@@ -321,6 +321,68 @@ was not (read it: a dropped rule can change a colour). Describe it (`describe_as
 `logoMode: "svg"` fails loudly when the logo is not an uploaded SVG; `"auto"` falls back to the raster. The card is
 in within a second and then still, so the last frame holds.
 
+## Share a clip as a page
+
+```json
+{ "clip": "launch-teaser", "base_url": "https://example.com/clips/launch-teaser/" }
+```
+
+`share_clip` writes `output/share/<clip>/`: `index.html`, the player and the core modules it imports, `bundle.json`
+(the composition and its pinned assets), fonts, images, the footage frames the clip shows (WebP), the sound (AAC;
+one file per audio item for an interactive clip), a poster and a 1200×630 link-preview card. Every URL in it is
+relative, so the folder plays from any static host, under any path, with the studio stopped; `base_url` (where it
+will be published) only makes `og:image` and `og:url` absolute for link previews (WhatsApp, Slack). The running
+studio serves the same page at `/share/<clip>`. Check the folder before handing it over:
+
+```bash
+node scripts/serve-static.mjs output/share/launch-teaser --port 8800 --prefix clips/launch-teaser
+```
+
+then `node scripts/share-check.mjs` (a video) or `node scripts/play-check.mjs <url> <out> --steps steps.json`
+(an interactive clip) at 1440×900 and `--size 390x844 --mobile`. Publishing the folder is a step for a person.
+
+## An interactive clip: a game, a deck, a little app
+
+```json
+{ "name": "quiz", "format": "vertical", "fps": 60, "duration": 20, "interactive": true }
+```
+
+`create_clip` with `interactive: true` starts with one scene that holds. Lay the scenes out on the timeline like a
+storyboard (each a time range), put the UI on them (`ui-button`, `ui-card`, `ui-menu`, `ui-toggle`, `ui-slider`,
+`ui-score`, `ui-toast`, `ui-dialog`, `ui-hotspot`, a `ui-backdrop`), then wire them:
+
+```json
+{ "clip": "quiz", "operations": [
+  { "op": "set_vars", "vars": { "score": 0, "answered": false } },
+  { "op": "add_scene", "scene": { "id": "q1", "start": 4, "duration": 6, "end": "hold" } },
+  { "op": "add_wire", "wire": { "on": "start.press", "do": { "go": "q1", "transition": { "asset": "ui-tx-iris", "duration": 0.6 } } } },
+  { "op": "add_wire", "wire": { "on": "right.select", "if": { "var": "answered", "eq": false },
+    "do": [{ "add": { "score": 10 } }, { "set": { "answered": true } }, { "send": "toast", "event": "success", "value": "Correct" }] } }
+] }
+```
+
+That is `edit_clip`. A save checks every wire against the events the items' assets declare and every `{ "$var" }`
+binding against its param. Then play it:
+
+```json
+{ "clip": "quiz", "steps": [{ "wait": 1 }, { "tap": "start" }, { "wait": 0.8 }, { "tap": "right" }, { "key": "Tab" }, { "key": "Enter" }], "stills": true }
+```
+
+`play_clip` returns the state after each step (scene, variables, focus), stills and frame hashes, and the raw input
+log it played: the same log played again must give the same hashes. `check_clip` crawls the states a viewer can reach
+(each region pressed, each key wire, each scene end) and checks every one: unreachable scenes, dead ends, wires on
+events nothing draws, tap targets under 24 CSS px on a phone (44 advised), regions off the frame or overlapping, and
+the text checks in every state (text behind an open dialog is not read). Aim for 0 errors and 0 warnings.
+
+- **Idle motion** while a scene holds comes from `f.ui.now`, not `f.t` (the playhead stands still).
+- **A modal** (`ui-dialog`, or any asset whose full-frame region has `modal: true`) keeps focus and hotkeys inside
+  it; still disable what is under it (`disabled: { "$var": "help" }`) so it looks unavailable.
+- **Sound**: put cue sounds on an audio track with `cue: true` and `{ "play": "<item>" }` them; a bed that loops while
+  a scene waits gets `loop: true`.
+- **Frame time**: an interactive clip is drawn 60 times a second in the viewer's browser, often without a GPU on a
+  phone. Keep full-frame gradients and resampled `drawImage` of whole frames to a minimum (a transition that scales
+  both scenes costs two of them), and measure: `play-check.mjs` reports the frames skipped and the slow ones.
+
 ## Keep assets/ and the library in step
 
 `npm run sync-assets` pushes `assets/` into the library and never undoes a change made in the studio: when

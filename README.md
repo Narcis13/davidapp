@@ -13,7 +13,8 @@ Claude Code answers with a proposal, and you compare it with what is there and a
 
 ## The showcase
 
-Eleven clips, made in order through the MCP server. Each one grew the library and the next one reused it.
+Twelve clips, made in order through the MCP server. Each one grew the library and the next one reused it. The twelfth
+is played, not watched: [Tap the beat](#clip-12-tap-the-beat), an interactive clip shared as a page.
 
 Clips 1 to 3, each 32 seconds:
 
@@ -81,7 +82,8 @@ render clips 9 and 10 from a clean checkout. Contact sheets, ffprobe reports, th
 results are in [docs/showcase](docs/showcase/INDEX.md) for clips 1 to 3 and in
 [docs/showcase/v2](docs/showcase/v2/INDEX.md) for clips 4 to 6, with the full
 [compounding table](docs/showcase/v2/reports/compounding.md). Iteration 4's evidence (the clean rebuild with identical hashes, the checks, the compounding table with
-clips 9 to 11, the round trips, the sweep, parity, speed) is indexed in [docs/showcase/v4](docs/showcase/v4/INDEX.md).
+clips 9 to 11, the round trips, the sweep, parity, speed) is indexed in [docs/showcase/v4](docs/showcase/v4/INDEX.md), iteration 5's
+(share links, interactive clips, the UI set, clip 12) in [docs/showcase/v5](docs/showcase/v5/INDEX.md).
 
 ## Run it
 
@@ -90,7 +92,7 @@ is found automatically).
 
 ```bash
 npm install
-npm run showcase      # builds the library and the eleven clips through the MCP server, and renders them
+npm run showcase      # builds the library and the twelve clips through the MCP server, and renders the eleven videos
 npm run sync-assets   # pushes every asset in assets/ into the library (new or changed ones only)
 npm run studio        # the studio: http://127.0.0.1:8787
 ```
@@ -591,6 +593,64 @@ They share a convention: positions are in the picture's own pixels (`space`, def
 size), mapped into the item box the way footage is placed there (`fit`); sizes are a share of the frame's short
 side; text has a size floor and fails loudly instead of shrinking.
 
+## Share links and interactive clips (iteration 5)
+
+### Share links
+
+Any clip can be shared as a web page that plays it **in the viewer's browser**: the same asset code draws the frames
+on a canvas there (no MP4, no third-party embed), so a link sent on WhatsApp opens in the phone's browser and plays.
+
+- The studio serves it at `/share/<clip>`; `share_clip` (MCP), `POST /api/clips/<clip>/share` or
+  `node scripts/share.mjs <clip>` export it as **one folder** (`output/share/<clip>/`) that plays from any static
+  server, under any path, with the studio stopped. Only relative URLs; `--base-url` makes the link-preview tags
+  absolute. Nothing is published by the studio: putting the folder online is your step.
+- The page: a poster and a loading ring, then the clip; play/pause, a scrubber (video), sound that starts on the first
+  tap (browsers' autoplay rules), full screen, replay, keyboard shortcuts, reduced-motion respected, phone portrait
+  and landscape handled. Open Graph and Twitter tags with a 1200×630 card.
+- The export holds only what the clip needs: the core modules the player imports (~250 kB), the fonts it names, its
+  images, the footage frames it shows (WebP), its sound (AAC), a poster. Clip 11 (16 s with a screen recording):
+  13.1 MB, first frame in 0.4 s (desktop) and 0.24 s (phone) from a local server; the interactive clip 12: 1.6 MB.
+- Its frames match the studio's renderer within the parity limits (`scripts/parity.mjs`); `scripts/share-check.mjs`
+  plays, pauses, scrubs, goes full screen and turns sound on in headless Chrome at desktop and phone sizes and
+  reports console and network problems, page weight and time to the first frame.
+
+### Interactive clips
+
+A second kind of clip, **played, not rendered**: slides, a quiz, a mini game. It takes taps, clicks, the pointer
+and keys. Its tracks are a design timeline and its `interactive` section adds **scenes** (time ranges of it that hold,
+loop or move on), **variables** and **wires** (`on` an event → `do` actions: `go`, `set`, `add`, `toggle`, `send`,
+`play`, `if`, `restart`). Assets declare the events they emit and react to (`events: { emits, accepts }`), draw their
+hit regions while they draw (`f.ui.hit`) and read the viewer's input and what the clip sent them through `f.ui`.
+
+What makes it testable: the state at any frame is a **pure function of the composition and the input log**. Each
+input event is stamped with a frame and read against the hit regions that frame drew, so the live page and a replay
+reach the same states and the same pixels. `play_clip` replays scripted steps or a recorded log (tests hash a replay
+twice), and `check_clip` crawls every state a viewer can reach (scenes, dead ends, tap target sizes on a phone, the
+text checks in each state). The studio editor plays an interactive clip on its preview (scene bands on the timeline,
+an interactive panel with the variables and wires), and `start_render` refuses one. See "Interactive assets" and
+"Interactive compositions" in [ASSET_CONTRACT.md](docs/ASSET_CONTRACT.md) and the recipes in
+[COOKBOOK.md](docs/COOKBOOK.md).
+
+The UI set, each themed, keyboard-reachable, with a focus ring, press feedback and text at a size floor:
+
+| asset | |
+|---|---|
+| `ui-button` | Primary, secondary or ghost; an icon, a hotkey, ripple and spring; emits `press`. |
+| `ui-card`, `ui-menu` | A choice card (select, flip, right/wrong) and a list of options (one region each, number keys). |
+| `ui-toggle`, `ui-slider` | A switch row and a range (drag or arrow keys) bound to variables; emit `change`. |
+| `ui-progress`, `ui-score` | A bar, dots or ring; a counter that ticks, pops and floats "+N" when its variable changes. |
+| `ui-dialog`, `ui-toast` | A modal (scrim, Enter and Escape); feedback that drops in on `show`, `success`, `error`. |
+| `ui-hotspot`, `ui-backdrop` | A pulsing marker over a picture; a themed background that drifts while a scene waits. |
+| `ui-tx-push`, `ui-tx-iris`, `ui-tx-zoom` | Scene transitions; the iris opens from where the viewer tapped. |
+
+### Clip 12, "Tap the beat"
+
+The showcase interactive clip: a neon rhythm game. A synthwave title, a 26 s song on a four-lane highway (tap the
+lanes or press D F J K as the notes cross the line), the combo, results with a rank. Its own assets are
+`beat-lanes`, `beat-title`, `beat-results` and `theme-neon`; it reuses `music-loop` and `synth-note` for the music and
+the hit sounds, and the UI set for its menus. Measured at phone width in headless Chrome without a GPU: a full
+playthrough, 1,812 frames, none skipped. Evidence: [docs/showcase/v5/INDEX.md](docs/showcase/v5/INDEX.md).
+
 ## How it works
 
 ```
@@ -602,9 +662,10 @@ src/studio    library (versioned assets, search), clips (pinned compositions, ed
 src/mcp       the MCP tools (iteration 4's in src/mcp/more/, one module per area) and the stdio server
 src/server    HTTP API, server-sent events, media, static files
 src/ui        the studio (vanilla JS, no build step); preview-worker.js runs src/core in a Web Worker
+src/player    the share page: player, engine and worker (src/core in the viewer's browser), the live session of an interactive clip
 assets        every function asset's source (synced into the library by scripts/sync-assets.mjs)
 clips         one folder per clip with its composition
-showcase      the plan and the journals that rebuild the eleven showcase clips
+showcase      the plan and the journals that rebuild the twelve showcase clips
 library       the content store clips are exported to (src/studio/exchange.js)
 ```
 

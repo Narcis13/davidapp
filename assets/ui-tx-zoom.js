@@ -44,7 +44,9 @@ asset({
       // the old scene swells past the camera; the new one grows from 0.8 to 1 over it
       const kOld = E.inOutCubic(x), kNew = E.outCubic(lib.clamp01((x - 0.32) / 0.6));
       at(f.from, 1 + p.amount * kOld, 1);
-      if (f.from) { ctx.fillStyle = `rgba(0,0,0,${(0.55 * Math.min(1, x * 1.6)).toFixed(4)})`; ctx.fillRect(0, 0, w, h); }
+      // a dim in whole 8-bit steps: a fraction of a step is rounded differently by Chrome and Skia, a whole frame one level apart
+      const d = Math.round(0.55 * Math.min(1, x * 1.6) * 255);
+      if (f.from && d > 0) { ctx.fillStyle = `rgba(0,0,0,${d / 255})`; ctx.fillRect(0, 0, w, h); }
       at(f.to, 0.82 + 0.18 * kNew, f.from ? kNew : 1);
     } else {
       // the new scene arrives from in front (1 + amount to 1); the old one recedes and fades over it

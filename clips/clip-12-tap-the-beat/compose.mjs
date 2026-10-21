@@ -90,7 +90,7 @@ export default {
       { id: 'game', ...span(GAME), end: 'next', label: 'Song' },
       { id: 'results', ...span(RESULTS), end: 'hold', final: true, label: 'Results' },
     ],
-    transition: { asset: 'ui-tx-iris', params: { zoom: 0 }, duration: 0.6 },
+    transition: { asset: 'ui-tx-iris', params: { zoom: 0, dim: 0 }, duration: 0.6 },
     wires: [
       { on: 'play.press', do: [{ play: 'click' }, { set: zero }, { go: 'game' }] },
       { on: 'how.press', do: [{ play: 'click' }, { set: { help: true } }, { send: 'help', event: 'open' }] },

@@ -46,7 +46,9 @@ asset({
       ctx.translate(ox, oy); ctx.scale(s, s); ctx.translate(-ox, -oy);
       ctx.drawImage(f.from.canvas, 0, 0);
       ctx.restore();
-      if (p.dim > 0) { ctx.fillStyle = `rgba(0,0,0,${(p.dim * k).toFixed(4)})`; ctx.fillRect(0, 0, w, h); }
+      // a dim in whole 8-bit steps: a fraction of a step is rounded differently by Chrome and Skia, a whole frame one level apart
+      const d = Math.round(p.dim * k * 255);
+      if (d > 0) { ctx.fillStyle = `rgba(0,0,0,${d / 255})`; ctx.fillRect(0, 0, w, h); }
     }
     // the new scene inside the circle, settling from a slight zoom
     ctx.save();
