@@ -55,7 +55,7 @@ const titleItem = (id, o = {}) => ({
   params: { text: S(id).title, theme, font: T.fonts.headline, weight: 700, size: 92, floor: 7, align: 'left', valign: 'middle', delay: id === 'hook' ? 0 : 0.4, writeDur: 1.1, underline: 'none', jitter: 0.8, ...o },
 });
 
-const hook = S('hook'), fn = S('function'), lib = S('library'), reuse = S('reuse'), agent = S('agent'), shapes = S('shapes');
+const fn = S('function'), lib = S('library'), reuse = S('reuse'), agent = S('agent'), shapes = S('shapes');
 const solid = S('solid'), checks = S('checks'), sound = S('sound'), cta = S('cta');
 /** The hook's doodles: shape, centre (safe-zone fractions), width, idle. */
 const HOOK_DOODLES = [['star', 0.87, 0.27, 0.11, 'beat'], ['notes', 0.88, 0.7, 0.11, 'bob'], ['lightbulb', 0.14, 0.2, 0.09, 'sway'], ['rocket', 0.22, 0.84, 0.09, 'bob'], ['heart', 0.73, 0.88, 0.07, 'beat']];

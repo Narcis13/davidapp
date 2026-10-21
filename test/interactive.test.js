@@ -243,7 +243,7 @@ test('interactive: the studio saves, checks and plays an interactive clip, and r
     // a wire on an event the asset does not emit, and a send it does not accept, are refused with the item named
     const bad = structuredClone(unpinned);
     bad.interactive.wires.push({ on: 'count.press', do: { go: 'win' } }, { on: 'start.press', do: { send: 'count', event: 'flash' } });
-    await assert.rejects(studio.clips.updateClip('game', { composition: bad, by: AUTHOR }), (e) => /item "count" \(ui-count@1\) does not emit "press"/.test(e.message) && /does not react to "flash"/.test(e.message));
+    await assert.rejects(studio.clips.updateClip('game', { composition: bad, by: AUTHOR }), (/** @type {any} */ e) => /item "count" \(ui-count@1\) does not emit "press"/.test(e.message) && /does not react to "flash"/.test(e.message));
     const saved = await studio.clips.updateClip('game', { composition: unpinned, by: AUTHOR });
     assert.equal(saved.clip.composition.interactive.wires[0].do[0].transition.asset, 'tx-wipe@1', 'scene transitions are pinned');
     assert.deepEqual(saved.clip.composition.tracks[1].items[2].params, { n: { $var: 'score' } }, 'bindings are saved as written');

@@ -17,6 +17,7 @@ import { moreRoutes } from './routes/index.js';
 import { fromQuery } from '../studio/provenance.js';
 import { createDocs } from '../docs/docs.js';
 import { createTools } from '../mcp/tools.js';
+import { shareOf } from '../studio/share.js';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -415,6 +416,11 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     if (vendor && VENDOR.has(vendor[1])) return file(req, res, join(ROOT, 'node_modules', vendor[1]), vendor[2], { cache: 'max-age=86400' });
     if (path.startsWith('/ui/')) return file(req, res, UI, path.slice(4));
     if (path === '/favicon.ico') return file(req, res, UI, 'favicon.svg');
+    // share links: a clip's page and its bundle with the studio's media URLs (src/studio/share.js), and the player it runs
+    const share = /^\/share\/([a-z0-9-]+)(\/bundle\.json)?\/?$/.exec(path);
+    if (share && share[2]) return send(res, 200, await shareOf(studio).liveBundle(share[1]));
+    if (share) return send(res, 200, await shareOf(studio).livePage(share[1]), { 'content-type': 'text/html; charset=utf-8' });
+    if (path.startsWith('/player/')) return file(req, res, join(ROOT, 'src', 'player'), path.slice(8));
     // the manual: pages drawn here, on the server, from src/docs/templates
     const doc = /^\/docs(?:\/([a-z0-9-]+))?\/?$/.exec(path);
     if (doc) return docsPage(res, doc[1] ?? 'index', url);

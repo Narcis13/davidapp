@@ -43,7 +43,11 @@ export function createSession(comp, { draw, onAudio = () => {}, onFrame = () => 
       if (t >= item.start && t < item.start + item.duration) now.set(item.id, entry);
     }
     for (const [id, was] of playing) if (now.get(id) !== was) stop.push(id);
-    for (const [id, e] of now) if (playing.get(id) !== e) start.push({ item: id, offset: Math.max(0, t - audioItems.find((i) => i.id === id).start) });
+    for (const [id, e] of now) {
+      if (playing.get(id) === e) continue;
+      const item = audioItems.find((i) => i.id === id);
+      start.push({ item: id, offset: Math.max(0, t - item.start), ...(item.loop ? { loop: true } : {}) });
+    }
     playing = now;
     return { start, stop };
   }

@@ -27,7 +27,8 @@ asset({
     bars: { type: 'integer', default: 16, min: 1, max: 64, description: 'Bars of notes after the count-in' },
     seed: { type: 'integer', default: 7, description: 'Picks the lanes of the chart' },
     keys: { type: 'string', default: 'dfjk', description: 'The key of each lane, left to right (the arrows work too)' },
-    speed: { type: 'number', default: 1.3, min: 0.6, max: 3, step: 0.05, description: 'Seconds a note takes from the distance to the line (less = faster)' },
+    travel: { type: 'number', default: 1.3, min: 0.4, max: 3, step: 0.05, description: 'Seconds a note takes from the distance to the line at speed 1' },
+    speed: { type: 'number', default: 1, min: 0.5, max: 2, step: 0.05, description: 'How fast the notes ride (1 = normal, 2 = twice as fast): bind it to an options slider' },
     window: { type: 'number', default: 0.14, min: 0.05, max: 0.3, step: 0.01, description: 'Seconds either side of the beat a note can be caught' },
     perfect: { type: 'number', default: 0.06, min: 0.02, max: 0.2, step: 0.01, description: 'Seconds either side of the beat that count as perfect' },
     showKeys: { type: 'boolean', default: true, description: 'Letters on the pads' },
@@ -40,6 +41,7 @@ asset({
     const w = f.width, h = f.height, u = Math.min(w, h) / 100;
     const t = f.t;
     const beat = 60 / p.bpm;
+    const travel = p.travel / p.speed;
     const notes = chart(p, beat);
     const total = (p.countIn + p.bars * 4) * beat;
     const colors = [th.accent, th.accent2, th.accent3, th.accent4 ?? lib.color.mix(th.accent, th.accent2, 0.5)];
@@ -99,7 +101,7 @@ asset({
     // the scrolling beat lines: one bar per beat, riding the road like the notes do
     for (let k = 0; k < 8; k++) {
       const bt = (Math.floor(t / beat) + k) * beat;
-      const z = (bt - t) / p.speed;
+      const z = (bt - t) / travel;
       if (z < -0.1 || z > 1.2) continue;
       const s = sAt(Math.max(z, -0.1));
       const [a, b] = road(s);
@@ -123,7 +125,7 @@ asset({
     for (let i = notes.length - 1; i >= 0; i--) {
       const n = notes[i];
       const dt = n.t - t;
-      if (dt > p.speed * 1.05 || dt < -0.6) continue;
+      if (dt > travel * 1.05 || dt < -0.6) continue;
       const box = laneBox(n.lane);
       const qp = f.ui.hit('perfect', box.x, box.y, box.w, box.h, { id: i, disabled: true }).pressed;
       const qg = f.ui.hit('good', box.x, box.y, box.w, box.h, { id: i, disabled: true }).pressed;
@@ -136,11 +138,11 @@ asset({
         f.ui.hit(name, box.x, box.y, box.w, box.h, { id: i, value: n.lane, keys: keysOf(n.lane), press: 'down', focus: false, label: `Note in lane ${n.lane + 1}` });
       }
       const missed = dt < -p.window;
-      const z = dt / p.speed;
+      const z = dt / travel;
       const s = sAt(Math.max(z, -0.18));
       const x = xAt(n.lane, s), y = yAt(s);
       const nw = lw * 0.74 * s, nh = lw * 0.3 * s;
-      const fade = missed ? Math.max(0, 1 + (dt + p.window) / 0.35) : Math.min(1, (p.speed * 1.05 - dt) / (p.speed * 0.25));
+      const fade = missed ? Math.max(0, 1 + (dt + p.window) / 0.35) : Math.min(1, (travel * 1.05 - dt) / (travel * 0.25));
       if (fade <= 0) continue;
       const c = missed ? lib.color.mix(colors[n.lane], th.muted, 0.7) : colors[n.lane];
       ctx.save();

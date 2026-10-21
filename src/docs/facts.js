@@ -19,6 +19,7 @@ export const TOOL_GROUPS = [
   { title: 'Check a clip', tools: ['check_clip', 'layout_report', 'caption_pages', 'anchor_report', 'audio_report', 'export_stems'] },
   { title: 'Voice and transcription', tools: ['speech_status', 'voice_samples', 'generate_narration', 'add_narration', 'transcribe', 'check_transcript'] },
   { title: 'Render', tools: ['start_render', 'get_render', 'list_renders', 'cancel_render', 'render_report'] },
+  { title: 'Share', tools: ['share_clip'] },
   { title: 'Licences, credits and the repo', tools: ['check_provenance', 'clip_credits', 'export_clip', 'import_clip'] },
   { title: 'Requests from the studio', tools: ['list_requests', 'claim_request', 'get_request', 'reply_request', 'propose_asset_version', 'propose_new_asset', 'propose_clip_edit', 'complete_request'] },
   { title: 'Reports', tools: ['reuse_report', 'compounding_report'] },

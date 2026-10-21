@@ -237,6 +237,8 @@ export function normalizeComposition(input) {
       }
       if (type === 'audio') {
         if (it.cue !== undefined) { if (!interactive) err(`${ip}.cue`, 'cue only works in an interactive composition'); else if (it.cue) item.cue = true; }
+        // v5: an interactive clip's audio item that loops while the playhead is inside it (a scene that holds keeps its music)
+        if (it.loop !== undefined) { if (!interactive) err(`${ip}.loop`, 'loop only works in an interactive composition'); else if (it.loop) item.loop = true; }
         if (it.gain !== undefined) { if (!num(it.gain) || it.gain < 0 || it.gain > 4) err(`${ip}.gain`, 'gain must be between 0 and 4'); else item.gain = it.gain; }
         if (it.beats !== undefined) item.beats = !!it.beats;
         // v3: gain automation in dB and ducking under the narration

@@ -45,7 +45,7 @@ export async function openSession({ width = 1440, height = 900, mobile = false, 
     const msg = JSON.parse(m.data);
     if (msg.id && waiting.has(msg.id)) { waiting.get(msg.id)(msg); waiting.delete(msg.id); return; }
     const p = msg.params;
-    for (const fn of listeners) fn(msg.method, p);
+    for (const fn of listeners) fn(msg.method, p, msg.sessionId);
     if (msg.method === 'Runtime.exceptionThrown') report(`exception: ${p.exceptionDetails.exception?.description ?? p.exceptionDetails.text}`);
     if (msg.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(p.type)) report(`console.${p.type}: ${p.args.map((a) => a.value ?? a.description).join(' ')}`);
     if (msg.method === 'Log.entryAdded' && ['error', 'warning'].includes(p.entry.level)) report(`log.${p.entry.level}: ${p.entry.text} ${p.entry.url ?? ''}`);
@@ -54,10 +54,11 @@ export async function openSession({ width = 1440, height = 900, mobile = false, 
     // a page that navigates away drops its event stream and whatever was loading: not a failure
     if (msg.method === 'Network.loadingFailed' && !p.canceled && p.errorText !== 'net::ERR_ABORTED') report(`failed: ${p.errorText} ${urls.get(p.requestId) ?? ''}`);
   });
-  const send = (method, params = {}) => new Promise((resolve, reject) => {
+  // sessionId: a child target attached with Target.setAutoAttach({ flatten: true }), such as a worker
+  const send = (method, params = {}, sessionId = undefined) => new Promise((resolve, reject) => {
     const n = ++id;
     waiting.set(n, (msg) => (msg.error ? reject(new Error(`${method}: ${msg.error.message}`)) : resolve(msg.result)));
-    ws.send(JSON.stringify({ id: n, method, params }));
+    ws.send(JSON.stringify({ id: n, method, params, ...(sessionId ? { sessionId } : {}) }));
   });
   for (const d of ['Runtime', 'Page', 'Network', 'Log']) await send(`${d}.enable`);
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: scale ?? (mobile ? 3 : 1), mobile });
@@ -114,9 +115,9 @@ export async function openSession({ width = 1440, height = 900, mobile = false, 
 
   return {
     problems,
-    /** Raw CDP: `send('Page.startScreencast', {…})` → the result. */
+    /** Raw CDP: `send('Page.startScreencast', {…})` → the result; a third argument sends it to an attached child target's session. */
     send,
-    /** Listen to every CDP event as `fn(method, params)`; returns the function that stops listening. */
+    /** Listen to every CDP event as `fn(method, params, sessionId)`; returns the function that stops listening. */
     onEvent(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     evaluate, waitFor, rect, sleep,
     async goto(url, ready) {
