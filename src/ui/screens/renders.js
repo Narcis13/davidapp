@@ -335,6 +335,8 @@ export async function mount(view, ctx) {
   if (!ctx.alive()) return;
 
   const msg = notice('render-message');
+  // an interactive clip is played, not rendered: the studio marks it in the clip list, and it is left out here
+  clips = clips.filter((c) => !c.interactive);
   const select = h('select', { 'data-testid': 'render-clip-select', 'aria-label': 'Clip to render' }, clips.map((c) => h('option', { value: c.slug }, `${c.title} · ${c.format} · ${fmtDuration(c.duration)}`)));
   const start = h('button.btn.primary', { type: 'button', 'data-testid': 'start-render', disabled: !clips.length }, 'Render a clip');
   start.addEventListener('click', async () => {
