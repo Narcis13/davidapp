@@ -254,6 +254,14 @@ test('with a token, the studio is closed until the token is given', async () => 
     const cookie = session.headers.getSetCookie?.()[0] ?? session.headers.get('set-cookie');
     assert.match(cookie, /studio_token=/);
     assert.match(cookie, /HttpOnly/);
+    // Lax: a share link opened from a chat app (a navigation from another site) carries the cookie; a cross-site POST does not
+    assert.match(cookie, /SameSite=Lax/);
+    // a share link asks for the token as a page; its data stays 401
+    const sharePage = await fetch(root + '/share/demo');
+    assert.equal(sharePage.status, 200);
+    assert.match(await sharePage.text(), /Enter its token/);
+    assert.equal((await fetch(root + '/share/demo/bundle.json')).status, 401);
+    assert.equal((await fetch(root + '/share/demo', { headers: { cookie: cookie.split(';')[0] } })).status, 200);
     const authed = await fetch(root + '/api/status', { headers: { cookie: cookie.split(';')[0] } });
     assert.equal(authed.status, 200);
     const bearer = await fetch(root + '/api/status', { headers: { authorization: `Bearer ${secret}` } });
@@ -264,4 +272,18 @@ test('with a token, the studio is closed until the token is given', async () => 
     await new Promise((resolve) => locked.close(resolve));
     await new Promise((resolve) => openNet.close(resolve));
   }
+});
+
+test('a share link to a clip that is not there is a page that says so', async () => {
+  const res = await get('/share/no-such-clip');
+  assert.equal(res.status, 404);
+  assert.match(res.headers.get('content-type'), /text\/html/);
+  assert.match(await res.text(), /no clip called “no-such-clip”/);
+  assert.equal((await get('/share/no-such-clip/bundle.json')).status, 404);
+});
+
+test('a frame asked for at a time that is not a number is the first frame, not an error', async () => {
+  const res = await get('/api/clips/demo/frame.png?t=abc&maxSize=64');
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'image/png');
 });

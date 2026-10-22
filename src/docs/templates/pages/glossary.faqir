@@ -11,7 +11,7 @@ div(data-ui="prose")
     dt#caption-lane Caption lane
     dd The band at the bottom of the safe zone reserved for captions.
     dt#clip Clip
-    dd A composition: a format, a frame rate, a duration and tracks of items. What you render into a video.
+    dd A composition: a format, a frame rate, a duration and tracks of items. What you render into a video, or, for an interactive clip, what a viewer plays.
     dt#composition Composition
     dd
       raw md("The data that describes a clip. See [How a clip is built](/docs/compositions).")
@@ -29,6 +29,13 @@ div(data-ui="prose")
     dd A video file in the library, placed and trimmed like a picture layer.
     dt#format Format
     dd The shape of the frame: vertical 9:16 (1080 × 1920), horizontal 16:9 (1920 × 1080) or square 1:1 (1080 × 1080).
+    dt#hit-region Hit region
+    dd A part of a frame a viewer can press in an interactive clip, declared by the asset that draws it (f.ui.hit).
+    dt#input-log Input log
+    dd Every press, move and key of an interactive session, stamped with its frame. Played again, it reaches the same states and pixels.
+    dt#interactive-clip Interactive clip
+    dd
+      raw md("A clip that is played, not watched: scenes, variables and wires on top of a design timeline. See [Interactive clips](/docs/interactive).")
     dt#item Item
     dd One asset placed on a track, from a start time for a duration, with its parameters and layout.
     dt#keyframe Keyframe
@@ -75,13 +82,22 @@ div(data-ui="prose")
     dd A saved state of a clip. Each save makes a new revision.
     dt#safe-zone Safe zone
     dd The part of the frame no platform button or caption covers. Text belongs inside it.
+    dt#scene Scene
+    dd A time range of an interactive clip's timeline that holds, loops or moves on at its end.
     dt#sequence Sequence
     dd Frames baked from an asset (PNG with transparency), used as a layer.
+    dt#share-link Share link
+    dd
+      raw md("A web page that plays a clip in the viewer's browser: live on the studio at /share/<clip>, or exported as a folder to publish. See [Share a clip as a link](/docs/share).")
     dt#theme Theme
     dd A value asset with a palette and fonts that every asset in a clip can read.
     dt#track Track
     dd A row of the timeline: visual, text or audio. Visual tracks draw from bottom to top.
     dt#transition Transition
     dd An asset that turns one layer into the next.
+    dt#variable Variable
+    dd A value an interactive clip keeps while it is played (a score, a switch, a name); wires change it and items can show it.
     dt#version Version
     dd An immutable saved state of an asset (name@1, name@2, …). Editing makes a new version; old ones never change.
+    dt#wire Wire
+    dd A rule of an interactive clip: when something happens (a press, a key, a scene starting or ending), run these actions.

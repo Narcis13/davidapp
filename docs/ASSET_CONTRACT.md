@@ -664,6 +664,17 @@ interactive: {
   `f.ui.since`), `{ play: <audio item> }`, `{ if: condition, then: [...], else: [...] }`, `{ restart: true }`.
   A value is a literal, `{ $var: 'name' }` or `'$value'` (the event's value). A condition is
   `{ var, eq | ne | gt | gte | lt | lte: value }`, `{ scene: id }`, `{ all: [...] }`, `{ any: [...] }`, `{ not: … }`.
+- **Types and ranges.** A variable keeps the type of its first value: a `set` literal (or `$var`) of another type, an
+  `add` amount that is not a number, and `min` above `max` are refused when the clip is saved. At run time a value an
+  event brings (`$value`) that is not a finite number leaves the variable as it was, and `add` never makes NaN. With
+  `wrap`, whole steps over whole bounds wrap past the last value (`min: 0, max: 3`: 3 + 1 is 0); anything else wraps
+  on the span (`min: 0, max: 1`: 0.9 + 0.2 is 0.1).
+- **Restarts and loops.** A restart runs the `start` wires again, so one that the start wires reach (in a `start` or
+  `enter:<first scene>` wire, or in the `enter:` wire of any scene they `go` to, however far down) is refused. Each
+  input event may run 256 actions, nested wires included: two wires that trigger each other stop with a message.
+- **Limits of a replay.** A log holds at most 20,000 input events and reaches at most an hour of session time;
+  `play_clip` takes at most 500 steps and reports at most 1,000 frames. A region drawn under a transform that squashes
+  it flat (an item at scale 0, a pop-in's first frame) is not added: nothing can be hit there until it has a size.
 - **Bindings.** A number, text, colour, choice or on/off param may be `{ "$var": "score" }`: the item draws the
   variable's value, and `f.ui.changed(param)` reports a change. A visual item with `when: <condition>` is drawn
   (and hittable) only while it holds.

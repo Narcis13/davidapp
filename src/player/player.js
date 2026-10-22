@@ -9,7 +9,7 @@
 // main[data-first-frame] (ms from navigation to the first frame drawn).
 
 import { Engine } from './engine.js';
-import { createSession } from './session.js';
+import { createSession, keyFor } from './session.js';
 import { transitionsOf } from '../core/interactive.js';
 
 const root = /** @type {HTMLElement} */ (document.querySelector('[data-share]'));
@@ -34,6 +34,9 @@ function progress(p) {
 }
 
 function fail(message) {
+  // the controls (and the button that leaves full screen) are hidden in the error state: never keep the viewer in there
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  delete root.dataset.full;
   setState('error');
   el.message.textContent = message;
   el.message.hidden = false;
@@ -145,6 +148,8 @@ async function playInteractive(engine, canvas, composition, ui) {
   const OAC = window.OfflineAudioContext ?? /** @type {any} */ (window).webkitOfflineAudioContext;
   const sounds = data.sounds ?? {};
   const has = !!(AC && OAC && Object.keys(sounds).length);
+  // on an iPhone, Web Audio follows the ring/silent switch unless the page says it plays media (a video clip's <audio> does not)
+  try { if (has && /** @type {any} */ (navigator).audioSession) /** @type {any} */ (navigator).audioSession.type = 'playback'; } catch { /* not settable here */ }
   // decoding needs a context, not a playing one: an offline one decodes, and its buffers play in any context
   const decoder = has ? new OAC(2, 1, 48000) : null;
   /** id → Promise<AudioBuffer | null> */
@@ -309,11 +314,11 @@ async function playInteractive(engine, canvas, composition, ui) {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab') return;
       canvas.focus({ preventScroll: true });
     }
-    // held keys repeat only for a slider with the focus (its arrows); a held lane key is one press
-    const focused = session.regions.find((r) => r.key === session.state.focus);
-    if (e.repeat && !(focused?.range && e.key.startsWith('Arrow'))) { e.preventDefault(); return; }
-    // past the clip's last control the browser moves focus on: no keyboard trap
-    if (e.key === 'Tab' && session.tabLeaves(e.shiftKey)) return;
+    // the same rules as the editor (session.js keyFor): past the clip's last control Tab moves focus on (no keyboard trap),
+    // and a held key is one press except the arrows of a focused slider
+    const take = keyFor(e, session);
+    if (take === 'page') return;
+    if (take === 'drop') { e.preventDefault(); return; }
     session.input({ type: 'key', key: e.key, shift: e.shiftKey });
     if (OWN.has(e.key) || e.key.length === 1) e.preventDefault();
   });
@@ -363,20 +368,22 @@ async function playVideo(engine, data, base, full) {
 
   let t = 0, playing = false, startedAt = 0, raf = 0;
   let muted = true, soundChosen = false, scrubbing = false;
-  let shown = -1, shownFast = false, busy = false, drawStarted = 0, buffering = false;
+  let shown = -1, shownFast = false, busy = false, drawStarted = 0, buffering = false, seeks = 0;
 
   // ── drawing: one frame in flight; a newer wish replaces an older one ────────────────────────
   async function draw(frame, fast) {
     busy = true; drawStarted = performance.now();
+    const seeksBefore = seeks;
     try {
       await engine.drawFrame(frame, { fast, ahead: fast ? Math.round(fps * 2) : 0 });
       shown = frame; shownFast = fast;
       el.canvas.dataset.frame = String(frame);
       if (!root.dataset.firstFrame) root.dataset.firstFrame = String(Math.round(performance.now()));
       if (buffering) {
-        // back from waiting on the network: the clock resumes at the frame that arrived
+        // back from waiting on the network: the clock resumes at the frame that arrived, or where the viewer seeked meanwhile
         buffering = false; spinner.hidden = true;
-        t = frame / fps; startedAt = performance.now() - t * 1000;
+        if (seeks === seeksBefore) t = frame / fps;
+        startedAt = performance.now() - t * 1000;
         if (audio && !muted && playing) startAudio();
       }
     } catch (e) {
@@ -467,6 +474,9 @@ async function playVideo(engine, data, base, full) {
 
   function seek(s) {
     t = Math.max(0, Math.min(duration, s));
+    seeks++;
+    // a viewer who seeks before the first play (reduced motion keeps the poster up) sees the frames, not the poster
+    reveal();
     if (playing) { startedAt = performance.now() - t * 1000; if (audio && !muted) audio.currentTime = t; }
     else if (root.dataset.state === 'ended' && t < duration - 1 / fps) { setState('paused'); el.big.setAttribute('aria-label', 'Play'); }
     showTime();

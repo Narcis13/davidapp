@@ -332,7 +332,11 @@ in within a second and then still, so the last frame holds.
 one file per audio item for an interactive clip), a poster and a 1200×630 link-preview card. Every URL in it is
 relative, so the folder plays from any static host, under any path, with the studio stopped; `base_url` (where it
 will be published) only makes `og:image` and `og:url` absolute for link previews (WhatsApp, Slack). The running
-studio serves the same page at `/share/<clip>`. Check the folder before handing it over:
+studio serves the same page at `/share/<clip>` (and the clip editor's Share button exports the folder too). `out`
+writes elsewhere: a new export there replaces only what an export writes (`index.html`, `bundle.json`, `player/`,
+`core/`, `media/`, the posters) and keeps the rest (a `CNAME`, a `.git`); it is built beside the folder and moved in
+when complete, so a failure leaves the last export whole. A non-empty folder with no earlier export is refused.
+Check the folder before handing it over:
 
 ```bash
 node scripts/serve-static.mjs output/share/launch-teaser --port 8800 --prefix clips/launch-teaser

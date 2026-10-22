@@ -26,6 +26,12 @@ div(data-ui="prose")
     +card(title="Fix and polish")
       @body
         raw p("“Run `check_clip` on `launch-teaser` and fix every issue, then render a draft.” Or: “Make a vertical version of `launch-teaser` and fix what does not fit.”")
+    +card(title="Share it as a link")
+      @body
+        raw p("“Export `launch-teaser` with `share_clip` for `https://example.com/clips/launch-teaser/` and tell me how big the folder is.” Claude writes the folder; publishing it is your step. See [Share a clip as a link](/docs/share).")
+    +card(title="Something to play")
+      @body
+        raw p("“Make a vertical interactive quiz with three questions and a score, reuse the UI set, then `check_clip` and `play_clip` it until it passes.” See [Interactive clips](/docs/interactive).")
 
   h2#how-claude-works How Claude builds a clip
   ol

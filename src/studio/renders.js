@@ -392,12 +392,15 @@ export function createRenders(ctx, library, clips, sound, provenance) {
     setImmediate(() => { tick().catch(reportTick); });
   }
 
-  async function stopRunner() {
+  async function stopRunner({ timeoutMs = 15000 } = {}) {
     stopping = true;
     if (timer) clearInterval(timer);
     timer = null;
     current?.abort.abort();
-    while (busy) await new Promise((r) => setTimeout(r, 50));
+    // a job stops within a second of its abort; one stuck in a cleanup must not keep a process that is shutting down alive
+    // (its heartbeat stops with the process, and another runner marks it failed)
+    const end = Date.now() + timeoutMs;
+    while (busy && Date.now() < end) await new Promise((r) => setTimeout(r, 50));
   }
 
   /** Resolve when the render reaches a final state (or after timeoutMs, with whatever state it is in). */

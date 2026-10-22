@@ -71,6 +71,24 @@ document.querySelector('form').addEventListener('submit', async (e) => {
 </script>
 </body>
 </html>`;
+/** What /share/<slug> answers when there is no such clip. @param {string} slug (the route allows only a-z, 0-9 and dashes) */
+const shareMissing = (slug) => `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Clip not found · Fablecut</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0b10; color: #f4f1ea; font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 26rem; padding: 1rem; }
+  h1 { font-size: 1.25rem; }
+  p { color: #b7b3c7; }
+</style>
+</head>
+<body><main><h1>This clip is not here</h1><p>There is no clip called “${slug}” on this studio. It may have been renamed or removed: ask whoever sent the link for a new one.</p></main></body>
+</html>`;
 const secretEqual = (a, b) => timingSafeEqual(createHash('sha256').update(String(a)).digest(), createHash('sha256').update(String(b)).digest());
 /** The manual's pages draw no script and no inline style, so they are served under a policy that allows neither. */
 const DOCS_CSP = "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
@@ -397,7 +415,9 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     const bearer = /^bearer\s+/i.test(header) ? header.replace(/^bearer\s+/i, '').trim() : '';
     return secretEqual(bearer, token) || secretEqual(cookieToken(req), token);
   };
-  const sessionCookie = ` ${TOKEN_COOKIE}=${encodeURIComponent(token ?? '')}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`.trim();
+  // Lax, not Strict: a share link opened from a chat app is a navigation from another site, and Strict would leave the cookie
+  // off it. Writes from other sites stay refused: the Origin check, a JSON body, and Lax sends no cookie with a cross-site POST.
+  const sessionCookie = ` ${TOKEN_COOKIE}=${encodeURIComponent(token ?? '')}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`.trim();
 
   /** Only answer requests addressed to this machine, and refuse writes that come from another site's page. */
   function guard(req) {
@@ -475,7 +495,8 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       return send(res, 200, { ok: true }, { 'set-cookie': sessionCookie });
     }
     if (token && !authed(req)) {
-      const openPage = (req.method === 'GET' || req.method === 'HEAD') && !/^\/(api|media|core|fonts|vendor|ui|player|share)(\/|$)/.test(path);
+      // a page (a screen, the manual, a share link) gets the sign-in form; data and modules get 401
+      const openPage = (req.method === 'GET' || req.method === 'HEAD') && !/^\/(api|media|core|fonts|vendor|ui|player)(\/|$)|^\/share\/[^/]+\/bundle\.json$/.test(path);
       // connect-src 'self': this page posts the token with fetch. default-src 'none' would block that request.
       if (openPage) return send(res, 200, req.method === 'HEAD' ? '' : LOGIN_HTML, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'" });
       return send(res, 401, { error: 'Sign in required', code: 'forbidden' });
@@ -509,7 +530,15 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     // share links: a clip's page and its bundle with the studio's media URLs (src/studio/share.js), and the player it runs
     const share = /^\/share\/([a-z0-9-]+)(\/bundle\.json)?\/?$/.exec(path);
     if (share && share[2]) return send(res, 200, await shareOf(studio).liveBundle(share[1]));
-    if (share) return send(res, 200, await shareOf(studio).livePage(share[1]), { 'content-type': 'text/html; charset=utf-8' });
+    if (share) {
+      // a link to a clip that is not here (renamed, removed, a typo) is a page that says so, not a JSON error
+      let html;
+      try { html = await shareOf(studio).livePage(share[1]); } catch (e) {
+        if (!(e instanceof StudioError) || e.code !== 'not_found') throw e;
+        return send(res, 404, shareMissing(share[1]), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" });
+      }
+      return send(res, 200, html, { 'content-type': 'text/html; charset=utf-8' });
+    }
     if (path.startsWith('/player/')) return file(req, res, join(ROOT, 'src', 'player'), path.slice(8));
     // the manual: pages drawn here, on the server, from src/docs/templates
     const doc = /^\/docs(?:\/([a-z0-9-]+))?\/?$/.exec(path);

@@ -38,6 +38,9 @@
         </button>
         <div class="spinner" aria-hidden="true" hidden></div>
         <p class="message" data-testid="message" role="alert" hidden></p>
+        <!-- shown by the stylesheet alone when the player never starts: opened as a file, or its scripts not served as JavaScript -->
+        <p class="message stalled" data-testid="stalled">This clip is taking long to start. Open it from its web address (not as a file on this computer) in an up-to-date browser, and reload.</p>
+        <noscript><p class="message">This clip plays with JavaScript. Turn it on to watch.</p></noscript>
       </div>
 
       <button class="sound-hint" type="button" data-testid="sound-hint" hidden>

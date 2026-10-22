@@ -1,0 +1,100 @@
+//- Share a clip as a link. Params: d.
+div(data-ui="prose")
+  raw p("Any clip can be shared as a **web page that plays it**. The page runs the clip's own asset code in the viewer's browser and draws the frames on a canvas there, so there is no MP4 to upload and no video site in between. A link sent in a chat opens in the phone's browser and plays. An [interactive clip](/docs/interactive) is shared the same way, and the page is where it is played.")
+  raw p("There are two forms of the same page: the **live page** the running studio serves, for you and anyone who can reach your studio, and an **exported folder** that plays from any static web host with the studio stopped. That folder is what you publish.")
+
+  h2#share-dialog The Share dialog
+  raw p("In the clip editor, press **Share** in the header (for an interactive clip it takes the place of **Render**). The dialog has two parts:")
+  dl
+    dt The live page
+    dd
+      raw md("The address `/share/<clip>` on this studio, with **Open** and **Copy link**. It plays the clip as it is **saved**: save first if the editor says “Unsaved changes”. Only people who can reach the studio can open it, and a studio started with `STUDIO_TOKEN` shows its sign-in page first (a link opened from a chat app keeps the sign-in of that browser). A link to a clip that was renamed or removed answers with a page that says so.")
+    dt Export a folder
+    dd
+      raw md("Writes the page and everything it needs to `output/share/<clip>/` in the repository folder. **Base URL** is optional: where you will publish the folder (for example `https://example.com/clips/my-clip/`). It is used only to make the link-preview picture and address absolute; leave it empty to check the folder first. The dialog then shows the folder, the number of files, its size and any warning.")
+  raw p("Exporting again replaces what the last export wrote (`index.html`, `bundle.json`, `player/`, `core/`, `media/` and the two posters) and keeps anything else you put in the folder, such as a `CNAME` file or a `.git` folder. The new export is built next to the folder and moved in only when it is complete, so an export that fails leaves the last one as it was. The studio refuses to write into a non-empty folder that holds no earlier export.")
+
+  h2#viewer What the viewer sees
+  ul
+    li
+      raw md("A poster and a loading ring, then the clip. A video starts playing **muted** by itself (a moving picture needs no permission); the first tap or click turns the sound on. With the system setting **Reduce motion**, nothing starts until the viewer presses play.")
+    li
+      raw md("Play and pause, a scrubber with the time, sound on and off, full screen and replay. The controls fade a few seconds into playing and come back when the pointer moves or the screen is tapped; a wide clip on a phone held upright suggests turning it sideways.")
+    li
+      raw md("Keys: [[Space]] or [[K]] play and pause, [[←]] and [[→]] seek 5 seconds ([[Shift]] for one frame), [[Home]] and [[End]], [[F]] full screen, [[M]] sound. An interactive clip takes its own keys instead, and [[Tab]] moves through its buttons.")
+    li
+      raw md("A background tab pauses the clip and its sound; it does not start again by itself.")
+    li
+      raw md("A browser that cannot draw in a worker (an old browser) gets a message asking for an up-to-date Chrome, Safari, Edge or Firefox instead of a blank page.")
+    li
+      raw md("A media file that does not arrive at the first try (a phone on a train) is fetched again a few times before the page gives up and says which file it could not load.")
+
+  h2#export What an export holds
+  raw p("Only what the clip needs, with every address relative, so the folder plays under any path (`https://example.com/`, `https://you.github.io/repo/clips/x/`) and from a USB stick served by any static server:")
+  div(role="region" aria-label="Files in a share export" tabindex="0")
+    table
+      thead
+        tr
+          th File or folder
+          th What it is
+      tbody
+        tr
+          td
+            raw md("`index.html`")
+          td The page, with the clip's title and description, and the link-preview tags.
+        tr
+          td
+            raw md("`bundle.json`")
+          td The composition and the source of every asset version it pins.
+        tr
+          td
+            raw md("`player/`, `core/`")
+          td The player and the asset runtime it runs: the same modules the studio's renderer uses (about 250 kB).
+        tr
+          td
+            raw md("`media/fonts/`, `media/images/`")
+          td The bundled font families the clip names (with their Latin Extended files only when it needs them), its uploaded fonts, and its pictures.
+        tr
+          td
+            raw md("`media/footage/`, `media/sequences/`")
+          td Only the frames of footage and baked sequences that the clip shows, as WebP, a frame identical to an earlier one stored once.
+        tr
+          td
+            raw md("`media/sound/`")
+          td The mix as AAC (a video), or one AAC file per audio item (an interactive clip, whose session starts each when it should).
+        tr
+          td
+            raw md("`poster.jpg`, `og.jpg`")
+          td The poster shown while it loads, and the 1200 × 630 card link previews show.
+  raw p("Clip 11 of the showcase (16 seconds with a screen recording) comes to 13.1 MB; clip 12, an interactive game drawn only by code, to 1.6 MB.")
+
+  h2#publish Publish it
+  raw p("The studio never publishes anything: putting the folder online is your step. Any static host works (GitHub Pages, Netlify, an S3 bucket, your own web server). The page loads nothing from anywhere else, and its own policy allows only files from the same folder.")
+  ol
+    li
+      raw md("Export with **Base URL** set to the address the folder will have, so WhatsApp, Slack and others show the card. Without it the export warns that link previews will not show a picture.")
+    li
+      raw md("Check it locally first: `node scripts/serve-static.mjs output/share/<clip> --port 8800 --prefix clips/<clip>` serves it under a sub-path, as a real host would. Open `http://127.0.0.1:8800/clips/<clip>/`.")
+    li
+      raw md("Upload the whole folder. Serve `.js` files as `text/javascript` and `.json` as `application/json` (every common host does); the page needs no server code. Link to the folder with its trailing slash (`…/clips/my-clip/`) or to its `index.html`: without the slash the page looks for its player one folder up.")
+    li
+      raw md("After exporting again over a published folder, clear the host's cache if it keeps files for long: the player, the runtime and `bundle.json` keep their names from one export to the next.")
+  +callout(variant="info")
+    @content
+      raw p("**It does not play from a file.** Double-clicking `index.html` opens it as a `file://` page, where browsers refuse the player's modules; after about 15 seconds the page says so. Serve the folder, even on your own computer, with `serve-static.mjs` or any web server.")
+  +callout(variant="warning")
+    @content
+      raw p("**A share folder carries the clip's asset code and media.** Anyone who opens the page can download them. Do not publish a clip that holds a picture, font or sound you may not redistribute; [Licences and credits](/docs/provenance) lists what each file allows.")
+
+  h2#claude-and-scripts From Claude and from a shell
+  ul
+    li
+      raw md("**Claude:** `share_clip { clip, base_url?, poster_at?, quality?, out? }` writes the folder and answers with its size, files and warnings.")
+    li
+      raw md("**A shell:** `node scripts/share.mjs <clip> [--out <dir>] [--base-url <url>] [--poster-at <s>] [--quality <1-100>]`, with `STUDIO_DATA` set to the studio's data directory. `--name=value` works too, and a misspelt option is refused rather than ignored.")
+    li
+      raw md("**The API:** `GET /api/clips/<clip>/share` says where the clip can be shared from and when it was last exported; `POST /api/clips/<clip>/share` with `{ baseUrl, posterAt, quality }` exports it.")
+  raw p("`quality` is the WebP quality of footage and sequence frames (1 to 100, default 80); `poster_at` the time of the poster frame (default 40 % of the way in).")
+
+  h2#checks Check a share page
+  raw p("`node scripts/share-check.mjs <page url>` opens a video's page in headless Chrome at desktop and phone size, plays, pauses, scrubs, goes full screen and turns the sound on, then reports console errors, failed requests, the page's weight and the time to the first frame. With `--parity --clip <clip>` it also compares the page's frames with the studio's renderer. `node scripts/play-check.mjs <page url> <out dir> --steps steps.json` does the same for an interactive clip, pressing its own controls, and reports any frames the browser skipped.")

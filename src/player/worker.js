@@ -34,12 +34,30 @@ let pinned = new Set();
 
 const touch = (map, key) => { const v = map.get(key); map.delete(key); map.set(key, v); return v; };
 
+/** Waits between the tries of a media fetch: a phone on a train drops a request now and then, and one miss must not end the clip. */
+const RETRIES = [400, 1200, 3000];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** A fetch that tries again after a network error or a 5xx / 408 / 429 answer; a 404 is final. */
+async function fetchRetrying(url) {
+  for (let i = 0; ; i++) {
+    let res = null, error = null;
+    try { res = await fetch(url); } catch (e) { error = e; }
+    if (res && (res.ok || !(res.status >= 500 || res.status === 408 || res.status === 429))) return res;
+    if (i >= RETRIES.length) {
+      if (res) return res;
+      throw new Error(`${url.split('/').slice(-2).join('/')} could not be loaded (${error?.message ?? 'network error'})`);
+    }
+    await wait(RETRIES[i]);
+  }
+}
+
 /** The file at url as a Blob, fetched once. */
 function fileOf(url) {
   if (files.has(url)) return Promise.resolve(touch(files, url));
   if (fetching.has(url)) return fetching.get(url);
   const p = (async () => {
-    const res = await fetch(url);
+    const res = await fetchRetrying(url);
     if (!res.ok) throw new Error(`${url.split('/').slice(-2).join('/')} could not be loaded (${res.status})`);
     const blob = await res.blob();
     files.set(url, blob);
@@ -147,7 +165,8 @@ function addFonts(faces, progress) {
   return Promise.all(faces.map(async (f) => {
     const key = `${f.family}|${f.url}|${f.weight}|${f.style}`;
     if (!fontsAdded.has(key)) {
-      const face = await new FontFace(f.family, `url(${f.url})`, { weight: String(f.weight), style: f.style }).load().catch((e) => { throw new Error(`The font "${f.label ?? f.family}" could not be loaded: ${e.message}`); });
+      // quoted: a folder published under a path with ( or ' in it (which URLs leave unescaped) is still a valid url()
+      const face = await new FontFace(f.family, `url(${JSON.stringify(f.url)})`, { weight: String(f.weight), style: f.style }).load().catch((e) => { throw new Error(`The font "${f.label ?? f.family}" could not be loaded: ${e.message}`); });
       self.fonts.add(face);
       fontsAdded.add(key);
     }

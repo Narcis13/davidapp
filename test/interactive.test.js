@@ -9,7 +9,7 @@ import { normalizeComposition } from '../src/core/composition.js';
 import { createRuntime, normalizeDefinition } from '../src/core/runtime.js';
 import { initialState, advance, applyInput, viewOf, replay, stepsToLog, playheadOf, bindComposition, normalizeLog, parseOn } from '../src/core/interactive.js';
 import { nodeHost, registerFonts, createCanvas } from '../src/render/host.js';
-import { createSession } from '../src/player/session.js';
+import { createSession, keyFor } from '../src/player/session.js';
 
 registerFonts();
 
@@ -409,4 +409,111 @@ test('interactive: on a screen at twice the clip\'s rate the live session holds 
   s.stop();
   const holds = at.slice(2).map((x, i) => x - at[i + 1]);
   assert.ok(holds.length > 25 && holds.every((h) => h === 2), `two refreshes each: ${holds}`);
+});
+
+// ── production review, 22 October 2026: each defect the review found, proven fixed ───────────────────────
+
+test('interactive: a region drawn at scale 0 is not hittable, and a tap there is a tap on nothing', () => {
+  const raw = /** @type {any} */ (structuredClone(RAW));
+  raw.tracks[1].items[0].transform = { x: 0.5, y: 0.5, width: 1, height: 1, scale: 0 };
+  raw.interactive.wires.push({ on: 'tap', do: { set: { level: 0.1 } } });
+  const { composition: c, errors } = normalizeComposition(raw);
+  assert.deepEqual(errors, []);
+  const { draw } = drawer(runtime(), c);
+  const s = advance(c, initialState(c), 5);
+  const regions = draw(viewOf(c, s, 5));
+  assert.deepEqual(regions, [], 'a box squashed to a point has no region');
+  // a region that came in with a singular matrix (a log made before this fix) maps every point outside itself
+  const flat = [{ key: 'start:press:', item: 'start', name: 'press', m: [0, 0, 0, 0, 160, 90], x: 0, y: 0, w: 80, h: 40, value: null }];
+  const after = applyInput(c, s, 5, [{ f: 5, type: 'down', x: 5, y: 5 }, { f: 5, type: 'up', x: 5, y: 5 }], flat);
+  assert.equal(after.scene, 'menu', 'the start button did not fire');
+  assert.equal(after.vars.level, 0.1, 'the press landed on nothing');
+});
+
+test('interactive: an item called toString gets what is sent to it, and the maps stay null-prototype across copies', () => {
+  const c = {
+    fps: 30,
+    interactive: {
+      start: 'main', vars: { toString: 0 },
+      scenes: [{ id: 'main', start: 0, duration: 1, end: 'hold' }],
+      wires: [{ on: 'key:f', do: [{ send: 'toString', event: 'flash', value: 2 }, { add: { toString: 1 } }] }],
+    },
+  };
+  let s = initialState(c);
+  s = applyInput(c, advance(c, s, 3), 3, [{ f: 3, type: 'key', key: 'f' }], []);
+  s = applyInput(c, advance(c, s, 4), 4, [{ f: 4, type: 'key', key: 'f' }], []);
+  assert.equal(s.inbox.toString.flash.count, 2);
+  assert.equal(s.vars.toString, 2);
+  for (const k of ['vars', 'changed', 'pressed', 'inbox']) assert.equal(Object.getPrototypeOf(s[k]), null, `${k} after two copies`);
+  assert.equal(/** @type {any} */ (Object.prototype.toString).flash, undefined);
+});
+
+test('interactive: a restart the start wires reach through another scene is refused when the clip is saved', () => {
+  const raw = /** @type {any} */ (structuredClone(RAW));
+  raw.interactive.wires = [{ on: 'start', do: { go: 'play' } }, { on: 'enter:play', do: { go: 'next' } }, { on: 'enter:win', do: { restart: true } }];
+  const bad = normalizeComposition(raw);
+  assert.ok(bad.errors.some((e) => e.path === 'interactive.wires[2].do' && /restart the clip for ever/.test(e.message)), JSON.stringify(bad.errors));
+  // the same restart behind a press is fine: the clip starts, and a press restarts it once
+  raw.interactive.wires = [{ on: 'start', do: { go: 'play' } }, { on: 'hit.press', do: { restart: true } }];
+  assert.deepEqual(normalizeComposition(raw).errors, []);
+});
+
+test('interactive: variables never become NaN, and wrap works on fractions', () => {
+  const at = (raw) => normalizeComposition({ ...RAW, interactive: { ...RAW.interactive, vars: { ...RAW.interactive.vars, name: 'x', hue: 0.9 }, wires: raw } });
+  const paths = (wires) => at(wires).errors.map((e) => e.path);
+  assert.ok(paths([{ on: 'key:a', do: { add: { score: 'abc' } } }]).includes('interactive.wires[0].do[0].add.score'));
+  assert.ok(paths([{ on: 'key:a', do: { set: { score: 'ten' } } }]).includes('interactive.wires[0].do[0].set.score'));
+  assert.ok(paths([{ on: 'key:a', do: { set: { score: { $var: 'name' } } } }]).includes('interactive.wires[0].do[0].set.score'));
+  assert.ok(paths([{ on: 'key:a', do: { add: { score: 1 }, min: 5, max: 4 } }]).includes('interactive.wires[0].do[0].min'));
+  assert.deepEqual(paths([{ on: 'level.change', do: { set: { level: '$value' } } }]), [], 'an event value may set any variable');
+  // at run time: a value that is not a finite number changes nothing; 0.9 + 0.2 in 0–1 wraps to 0.1; lanes 0–3 wrap 3 + 1 to 0
+  const { composition: c } = at([
+    { on: 'key:n', do: { set: { level: '$value' } } },
+    { on: 'key:h', do: { add: { hue: 0.2 }, min: 0, max: 1, wrap: true } },
+    { on: 'key:l', do: { add: { score: 1 }, min: 0, max: 3, wrap: true } },
+  ]);
+  let s = advance(c, initialState(c), 2);
+  const fire = (key) => { s = applyInput(c, advance(c, s, s.f + 1), s.f + 1, [{ f: s.f + 1, type: 'key', key }], []); };
+  fire('h');
+  assert.equal(s.vars.hue, 0.1);
+  for (let i = 0; i < 4; i++) fire('l');
+  assert.equal(s.vars.score, 0);
+  // an event value of NaN (a broken slider): the wire leaves the variable alone
+  const region = { key: 'level:change:', item: 'level', name: 'change', m: [1, 0, 0, 1, 0, 0], x: 0, y: 0, w: 100, h: 20, value: null, range: { min: NaN, max: NaN, step: 0, value: 0.5, axis: 'x' } };
+  const { composition: c2 } = at([{ on: 'level.change', do: { set: { level: '$value' } } }]);
+  const s2 = applyInput(c2, advance(c2, initialState(c2), 2), 2, [{ f: 2, type: 'down', x: 50, y: 10 }, { f: 2, type: 'up', x: 50, y: 10 }], [region]);
+  assert.equal(s2.vars.level, 0.5);
+});
+
+test('interactive: each input event has its own action budget; one event that loops is still stopped', () => {
+  const raw = /** @type {any} */ (structuredClone(RAW));
+  raw.interactive.wires = [{ on: 'key:a', do: [{ add: { score: 1 } }, { add: { score: -1 } }] }];
+  const { composition: c } = normalizeComposition(raw);
+  const keys = Array.from({ length: 300 }, () => ({ f: 3, type: 'key', key: 'a' }));
+  const s = applyInput(c, advance(c, initialState(c), 3), 3, keys, []);
+  assert.equal(s.vars.score, 0, '300 presses in one frame, 600 actions, none refused');
+});
+
+test('interactive: a log or steps past an hour are refused, and steps make a log a replay accepts', async () => {
+  const c = comp();
+  assert.throws(() => normalizeLog([{ f: 1e9, type: 'key', key: 'a' }], { fps: 30 }), /past the longest session/);
+  assert.throws(() => normalizeLog(Array.from({ length: 20001 }, () => ({ f: 1, type: 'key', key: 'a' }))), /at most 20000/);
+  const { draw } = drawer(runtime(), c);
+  await assert.rejects(stepsToLog(c, [{ wait: 1e6 }, { key: 'a' }], { draw }), /past the longest session/);
+  await assert.rejects(stepsToLog(c, [{ down: { x: '5', y: 5 } }], { draw }), /\{ x, y \} in frame pixels/);
+  const { log } = await stepsToLog(c, [{ down: { x: 5, y: 5 }, pointer: 'finger' }, { up: { x: 5, y: 5 } }], { draw });
+  assert.deepEqual(normalizeLog(log), log, 'the log steps make is already what a replay reads');
+});
+
+test('interactive: the share page and the editor read keys by one rule, so the same keystrokes make the same log', () => {
+  const session = { tabLeaves: (shift) => shift, regions: [{ key: 'level:change:', range: { min: 0, max: 1 } }], state: { focus: null } };
+  const key = (k, o = {}) => /** @type {any} */ ({ key: k, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, repeat: false, ...o });
+  assert.equal(keyFor(key('d'), session), 'clip');
+  for (const k of ['Shift', 'Control', 'CapsLock', 'Dead', 'F5']) assert.equal(keyFor(key(k), session), 'page', k);
+  assert.equal(keyFor(key('c', { ctrlKey: true }), session), 'page');
+  assert.equal(keyFor(key('Tab'), session), 'clip', 'Tab walks the controls');
+  assert.equal(keyFor(key('Tab', { shiftKey: true }), session), 'page', 'past the first control Shift+Tab leaves the clip');
+  assert.equal(keyFor(key('d', { repeat: true }), session), 'drop', 'a held lane key is one press');
+  assert.equal(keyFor(key('ArrowRight', { repeat: true }), session), 'drop', 'arrows repeat only on a focused slider');
+  assert.equal(keyFor(key('ArrowRight', { repeat: true }), { ...session, state: { focus: 'level:change:' } }), 'clip');
 });

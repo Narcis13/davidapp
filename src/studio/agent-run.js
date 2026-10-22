@@ -11,6 +11,9 @@ import { delimiter, join } from 'node:path';
 import { ROOT } from '../render/host.js';
 import { StudioError } from './library.js';
 
+/** Settings of the studio a Run now session is not given (it gets the rest of the environment, for its own sign-in). */
+const SECRETS = ['STUDIO_TOKEN', 'ELEVENLABS_API_KEY'];
+
 /** The tools a Run now session may call: reading the studio, and answering requests. */
 export const RUN_TOOLS = ['studio_guide', 'search_assets', 'suggest_assets', 'get_asset', 'validate_asset', 'render_asset_frame', 'list_clips', 'get_clip', 'list_clip_assets', 'render_clip_frame',
   'list_requests', 'claim_request', 'get_request', 'reply_request', 'propose_asset_version', 'propose_new_asset', 'propose_clip_edit', 'complete_request'];
@@ -123,7 +126,10 @@ export function createAgentRuns(studio, { env = process.env, timeoutSeconds = Nu
       '--mcp-config', configFile(), '--strict-mcp-config', '--tools', '', '--allowedTools', RUN_TOOLS.map((t) => `mcp__studio__${t}`).join(','),
       '--permission-mode', 'dontAsk', '--restricted', '--no-session-persistence'];
     const c = commandFor(bin, args);
-    const child = spawn(c.cmd, c.args, { cwd: ROOT, env: { ...env }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, shell: c.shell });
+    // the session needs its own credentials, not the studio's: the sign-in token and the voice service's key stay here
+    const childEnv = { ...env };
+    for (const k of SECRETS) delete childEnv[k];
+    const child = spawn(c.cmd, c.args, { cwd: ROOT, env: childEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, shell: c.shell });
     child.stdin.on('error', () => { /* the session ended before it read the prompt; 'close' reports it */ });
     child.stdin.end(promptFor(r));
     const startedAt = new Date().toISOString();

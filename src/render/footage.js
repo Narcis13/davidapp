@@ -336,6 +336,8 @@ export function createFootageService({ cacheBytes = envMB('STUDIO_FOOTAGE_CACHE_
 let shared = null;
 /** The one footage service of this process (the pool and the HTTP server share it). */
 export const footageService = () => (shared ??= createFootageService());
+/** Stop the process's decoders (FFmpeg children) if it ever started any: for a process that is shutting down. */
+export const closeFootageService = async () => { if (shared) await shared.close(); };
 
 /**
  * Peaks of the file's sound, 100 per second, as 0–255 (for the waveform image), or null without audio.

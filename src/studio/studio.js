@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
 import { openDb, json } from '../db/db.js';
 import { reformat } from '../core/composition.js';
+import { MAX_LOG_EVENTS, MAX_SESSION_SECONDS, MAX_STEPS, maxSessionFrame } from '../core/interactive.js';
 import { mapParams, walkParams } from '../core/schema.js';
 import { WorkerPool } from '../render/pool.js';
 import { ROOT } from '../render/host.js';
@@ -33,6 +34,8 @@ export { StudioError };
 export const defaultDataDir = () => resolve(process.env.STUDIO_DATA ?? join(ROOT, 'data'));
 
 const sha1 = (s) => createHash('sha1').update(s).digest('hex');
+/** The most session frames one play reports (play_clip asks for up to 200 times, or one after each of up to 500 steps). */
+const MAX_REPORTED = 1000;
 
 export function createStudio({ dataDir = defaultDataDir(), role = 'studio', poolSize = 2, runner = false } = {}) {
   mkdirSync(dataDir, { recursive: true });
@@ -191,7 +194,9 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   async function clipFrame({ clip, composition, format, isolate, t = 0, frame, maxSize, hash }) {
     const comp = await compositionOf({ clip, composition, format, isolate });
     const total = Math.round(comp.duration * comp.fps);
-    const n = Math.max(0, Math.min(total - 1, frame ?? Math.round(t * comp.fps)));
+    const asked = frame ?? Math.round(t * comp.fps);
+    // a time that is not a number (?t=abc on the frame route) draws the first frame instead of a frame called NaN
+    const n = Number.isFinite(asked) ? Math.max(0, Math.min(total - 1, Math.round(asked))) : 0;
     const { bundle } = await clips.bundleFor(comp);
     const r = await pool.run('clipFrame', { frame: n, output: 'png', maxSize, hash }, { bundle, timeout: 30000 }).catch(fail);
     return { ...r, png: Buffer.from(r.png), frame: n, t: n / comp.fps };
@@ -223,6 +228,13 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     const comp = await compositionOf({ clip, composition, format });
     if (!comp.interactive) throw new StudioError(`${clip ? `Clip "${clip}"` : 'The composition'} is not interactive: it has no interactive section to play`, 'invalid');
     const want = [...new Set([...(frames ?? []), ...(times ?? []).map((t) => Math.max(0, Math.round(t * comp.fps)))])].sort((a, b) => a - b);
+    // the same bounds for the editor's HTTP route as for play_clip: a frame far in the future would hold a worker for minutes
+    const last = maxSessionFrame(comp.fps);
+    if (want.length > MAX_REPORTED) throw new StudioError(`A play reports at most ${MAX_REPORTED} frames; ${want.length} were asked for`, 'invalid');
+    const bad = want.find((n) => !Number.isInteger(n) || n < 0 || n > last);
+    if (bad !== undefined) throw new StudioError(`Frame ${bad} is not a session frame: give whole frames from 0 to ${last} (${MAX_SESSION_SECONDS} s)`, 'invalid');
+    if (steps !== undefined && (!Array.isArray(steps) || steps.length > MAX_STEPS)) throw new StudioError(`steps is a list of at most ${MAX_STEPS} steps`, 'invalid');
+    if (log !== undefined && (!Array.isArray(log) || log.length > MAX_LOG_EVENTS)) throw new StudioError(`log is a list of at most ${MAX_LOG_EVENTS} input events`, 'invalid');
     const { bundle } = await clips.bundleFor(comp);
     const r = await pool.run('play', { log, steps, frames: want, stills, regions, maxSize }, { bundle, timeout: 300000 }).catch(fail);
     return { ...r, frames: r.frames.map((x) => (x.png ? { ...x, png: Buffer.from(x.png) } : x)) };

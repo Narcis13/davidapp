@@ -126,6 +126,35 @@ test('an export never overwrites a folder that is not one', async () => {
   await assert.rejects(shareOf(studio).exportClip('nope', { out: join(t.dataDir, 'y') }), /No clip named "nope"/);
 });
 
+test('a new export replaces only what an export wrote, and a failed one leaves the last one whole', async () => {
+  const dir = join(t.dataDir, 'site', 'tiny');
+  const first = await shareOf(studio).exportClip('tiny', { out: dir });
+  // what a person adds to a published folder stays through the next export
+  writeFileSync(join(dir, 'CNAME'), 'clips.example.com');
+  mkdirSync(join(dir, '.git'), { recursive: true });
+  writeFileSync(join(dir, '.git', 'HEAD'), 'ref: refs/heads/main');
+  writeFileSync(join(dir, 'media', 'stale.bin'), 'left by an older export');
+  const second = await shareOf(studio).exportClip('tiny', { out: dir });
+  assert.equal(readFileSync(join(dir, 'CNAME'), 'utf8'), 'clips.example.com');
+  assert.equal(readFileSync(join(dir, '.git', 'HEAD'), 'utf8'), 'ref: refs/heads/main');
+  assert.ok(!existsSync(join(dir, 'media', 'stale.bin')), 'media/ is the export\'s own and is replaced whole');
+  assert.equal(second.files, first.files, 'the counts are the export\'s, not the folder\'s');
+  assert.deepEqual(readdirSync(join(t.dataDir, 'site')), ['tiny'], 'no staging folder is left next to it');
+
+  // an export that fails half way (a sound ffmpeg cannot encode) keeps the last good one
+  const before = readFileSync(join(dir, 'bundle.json'), 'utf8');
+  const realAudio = studio.clipAudio;
+  studio.clipAudio = async () => join(t.dataDir, 'no-such.wav');
+  try {
+    await assert.rejects(shareOf(studio).exportClip('tiny', { out: dir }), /could not be encoded/);
+  } finally {
+    studio.clipAudio = realAudio;
+  }
+  assert.equal(readFileSync(join(dir, 'bundle.json'), 'utf8'), before);
+  assert.ok(existsSync(join(dir, 'index.html')) && existsSync(join(dir, 'player', 'player.js')));
+  assert.deepEqual(readdirSync(join(t.dataDir, 'site')), ['tiny']);
+});
+
 test('footage, sequences and images: only the frames the clip shows, as WebP, a repeated frame once', async () => {
   const dir = join(t.dataDir, 'media-src');
   mkdirSync(dir, { recursive: true });

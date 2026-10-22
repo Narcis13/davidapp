@@ -335,8 +335,10 @@ export function createRuntime(host) {
 
   const STILL = Object.freeze({ live: false, vars: {}, changed: {}, pointer: null, capture: null, focus: null, focusVisible: false, hover: null, pressed: {}, inbox: {} });
   const round4 = (v) => Math.round(v * 1e4) / 1e4;
-  /** @param {number[]} m @param {number} x @param {number} y */
-  const toLocal = (m, x, y) => { const [a, b, c, d, e, f] = m; const det = a * d - b * c || 1e-12, dx = x - e, dy = y - f; return [(d * dx - c * dy) / det, (a * dy - b * dx) / det]; };
+  /** A transform that squashes everything to a line or a point (an item at scale 0): nothing drawn under it can be hit. @param {number[]} m */
+  const singular = (m) => Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-9;
+  /** A frame point in the coordinates of transform m; [NaN, NaN] when m is singular (no point maps back). @param {number[]} m @param {number} x @param {number} y */
+  const toLocal = (m, x, y) => { if (singular(m)) return [NaN, NaN]; const [a, b, c, d, e, f] = m; const det = a * d - b * c, dx = x - e, dy = y - f; return [(d * dx - c * dy) / det, (a * dy - b * dx) / det]; };
 
   /** f.ui for one call of an asset: pure, from the frame's view of the session (or a still one). */
   function makeUi(e, env, ctx) {
@@ -346,7 +348,9 @@ export function createRuntime(host) {
     const matrix = () => { const m = ctx.getTransform(); return [m.a, m.b, m.c, m.d, m.e, m.f]; };
     const heard = (event, what) => {
       if (typeof event !== 'string' || !Object.hasOwn(accepts, event)) throw new AssetError(`f.ui.${what}("${event}"): declare the event in events.accepts (declared: ${Object.keys(accepts).join(', ') || 'none'})`, [e.ref]);
-      return item ? v.inbox[item]?.[event] ?? null : null;
+      // own keys only: a state that came through postMessage has ordinary objects, and an item may be called "toString"
+      const box = item && Object.hasOwn(v.inbox, item) ? v.inbox[item] : null;
+      return box && Object.hasOwn(box, event) ? box[event] : null;
     };
     return Object.freeze({
       live: v.live, now: v.now, frame: v.frame, scene: v.scene, sceneT: v.sceneT,
@@ -354,6 +358,7 @@ export function createRuntime(host) {
       get pointer() {
         if (!v.pointer) return null;
         const [x, y] = toLocal(matrix(), v.pointer.x, v.pointer.y);
+        if (!Number.isFinite(x)) return null;
         return { x, y, down: v.pointer.down, type: v.pointer.type };
       },
       /**
@@ -376,7 +381,8 @@ export function createRuntime(host) {
         }
         const range = o.range ? { min: Number(o.range.min ?? 0), max: Number(o.range.max ?? 1), step: o.range.step ? Number(o.range.step) : 0, value: Number(o.range.value ?? o.range.min ?? 0), axis: o.range.axis === 'y' ? 'y' : 'x' } : undefined;
         // a region on an asset's own offscreen canvas has no place in the frame: it is drawn, not hit
-        if (regions && item && !o.disabled && !assetCanvases.has(ctx.canvas)) {
+        // a box squashed to nothing (scale 0, a pop-in's first frame) would map every point of the frame onto itself: no region
+        if (regions && item && !o.disabled && !assetCanvases.has(ctx.canvas) && !singular(m.map(round4))) {
           regions.push({
             key, item, name, ...(o.id !== undefined ? { id: o.id } : {}), m: m.map(round4), x, y, w, h,
             ...(o.shape === 'circle' ? { shape: 'circle' } : {}), value: o.value ?? null, ...(range ? { range } : {}),
@@ -401,7 +407,7 @@ export function createRuntime(host) {
       /** The last time the clip sent this item `event`: { since, value, count }, or null. */
       received(event) { const x = heard(event, 'received'); return x ? { ...x } : null; },
       /** For a param bound to a variable ({ $var }): { from (the value before), since (seconds) } after it changed, else null. */
-      changed(param) { const name = links?.[param]; const c = name ? v.changed[name] : null; return c ? { ...c } : null; },
+      changed(param) { const name = links?.[param]; const c = name && Object.hasOwn(v.changed, name) ? v.changed[name] : null; return c ? { ...c } : null; },
     });
   }
 

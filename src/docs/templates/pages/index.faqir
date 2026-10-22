@@ -46,6 +46,10 @@ div(data-ui="prose")
     li Voiced videos with captions: a narration with the time of every word, captions built from those words, and music that ducks under the voice.
     li The same video in several shapes: one composition laid out for vertical (9:16), horizontal (16:9) and square (1:1).
     li Videos that must be right: the studio checks text size, contrast, safe zones, captions, loudness and licences before you publish.
+    li
+      raw md("Clips shared as a link: a page that plays the clip in any phone or desktop browser, with no video site in between. See [Share a clip as a link](/docs/share).")
+    li
+      raw md("Clips that are played, not watched: slides, a quiz, a menu, a small game. See [Interactive clips](/docs/interactive).")
   raw p("It is not a camera-footage editor: it can place and trim video files ([Pictures, video and fonts](/docs/media)), but its strength is everything drawn by code. A clip is at most " + d.live.maxClipSeconds + " seconds long.")
 
   h2#how-this-manual-works How this manual is organised
@@ -56,6 +60,8 @@ div(data-ui="prose")
     dd One page per screen of the studio, plus every shortcut and the request flow for asking the agent.
     dt Making videos
     dd How a clip is built, how to write assets, media, sound and captions, the checks, licences and the repository.
+    dt Share and play
+    dd A clip as a link that plays in the viewer's browser, and interactive clips: scenes, variables, wires and their checks.
     dt Working with Claude
     dd How Claude Code drives the studio, and the reference of every MCP tool.
     dt Reference

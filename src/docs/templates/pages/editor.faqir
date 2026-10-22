@@ -1,16 +1,18 @@
 //- The clip editor. Params: d.
 div(data-ui="prose")
   raw p("The **clip editor** (`/clips/<name>`) is where a clip is put together. Open it from **Clips** by clicking a clip's card, or make a new clip there with **New clip** (a name, a title, a format and a duration from 1 to " + d.live.maxClipSeconds + " seconds).")
-  p The screen has four parts: the header with Save, Remix and Render; the preview; the timeline; and a side column with the agent panel, the inspector, the issues, the assets in the clip, the credits and the repo.
+  p The screen has four parts: the header with Save, Remix, Share and Render; the preview; the timeline; and a side column with the agent panel, the inspector, the issues, the assets in the clip, the credits and the repo.
 
-  h2#header Header: save, remix, render
+  h2#header Header: save, remix, share, render
   ul
     li
       raw md("**Save** is enabled once you have changed something; the **Unsaved changes** badge shows until you save. Each save is a new **revision** of the clip and pins every asset to its version.")
     li
       raw md("**Remix** makes a **new clip** with the same timeline in another format (for example a vertical copy of a horizontal clip). The assets re-lay themselves out for the new frame. A remix copies the **saved** clip: unsaved changes are not included.")
     li
-      raw md("**Render** saves the clip, then opens the render panel. See [Render, gallery and lineage](/docs/renders#render-panel).")
+      raw md("**Share** opens the Share dialog: the link to the clip's page on this studio, and **Export folder**, which writes a folder you can publish on any web host. See [Share a clip as a link](/docs/share#share-dialog).")
+    li
+      raw md("**Render** saves the clip, then opens the render panel. See [Render, gallery and lineage](/docs/renders#render-panel). An interactive clip has no Render: its primary button is **Share**, and the editor adds a play bar, scene bands on the timeline and an **Interactive** panel (see [Interactive clips](/docs/interactive#play-in-editor)).")
   +callout(variant="warning")
     @content
       raw p("**Save before you use the browser's Back button.** Leaving through the studio's own links asks “Leave without saving?”, and so do reloading and closing the tab, but the browser's Back and Forward buttons leave without asking, and unsaved edits are lost.")

@@ -6,7 +6,7 @@ import { parentPort } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { createRuntime, describeError } from '../core/runtime.js';
-import { normalizeLog, replay, stepsToLog, summary, initialState, advance, applyInput, viewOf, inside, parseOn, reachable } from '../core/interactive.js';
+import { normalizeLog, replay, stepsToLog, summary, initialState, advance, applyInput, viewOf, inside, parseOn, reachable, cloneState } from '../core/interactive.js';
 import { FORMATS, SAMPLE_RATE } from '../core/engine.js';
 import { hashSeed } from '../core/rng.js';
 import { fontAliases } from '../core/lib/text.js';
@@ -370,7 +370,7 @@ const pressAt = (n, p) => ['move', 'down', 'up'].map((type) => ({ f: n, type, x:
 function atRest(comp, s, settleFrames) {
   const scene = comp.interactive.scenes.find((x) => x.id === s.scene);
   const len = Math.max(1, Math.round(scene.duration * comp.fps));
-  const out = structuredClone(s);
+  const out = cloneState(s);
   Object.assign(out, { entered: 0, f: Math.max(0, Math.min(settleFrames, len - 2)), ended: false, tx: null, pointer: null, capture: null, hover: null });
   for (const x of Object.values(out.changed)) x.f = 0;
   for (const k of Object.keys(out.pressed)) out.pressed[k] = 0;
@@ -434,7 +434,7 @@ const handlers = {
       if (view.transition) await loadMedia(state.rt, comp, view.transition.from);
       return state.rt.renderClipFrame(c.getContext('2d', FRAME_CONTEXT), comp, view.frame, { ...state.clip, ui: view.ui, transition: view.transition }).regions;
     };
-    const log = msg.steps ? (await stepsToLog(comp, msg.steps, { draw })).log : normalizeLog(msg.log ?? []);
+    const log = msg.steps ? (await stepsToLog(comp, msg.steps, { draw })).log : normalizeLog(msg.log ?? [], { fps: comp.fps });
     const frames = [];
     const end = await replay(comp, log, {
       frames: msg.frames ?? [], draw,

@@ -1,0 +1,94 @@
+//- Interactive clips. Params: d.
+div(data-ui="prose")
+  raw p("An **interactive clip** is played, not watched: a quiz, a set of slides, a menu, a product configurator, a small game. The viewer taps, clicks, drags and presses keys, and the clip answers. It is never rendered to an MP4 (a render is refused); it plays in the clip editor and on its [share page](/docs/share), in the viewer's browser.")
+  raw p("It is made of the same things as any clip. Its tracks are a **design timeline** you lay out like a storyboard, and an `interactive` section adds three things on top: **scenes**, **variables** and **wires**.")
+
+  h2#make-one Make one
+  ol
+    li
+      raw md("On **Clips**, press **New clip** and choose **Interactive** as the kind. It starts with one scene that lasts the whole timeline and holds its last frame. Claude does the same with `create_clip { interactive: true }`.")
+    li
+      raw md("Lay out each screen of the clip as a time range of the timeline, with the UI set on it: `ui-button`, `ui-card`, `ui-menu`, `ui-toggle`, `ui-slider`, `ui-score`, `ui-progress`, `ui-dialog`, `ui-toast`, `ui-hotspot` and a `ui-backdrop`. Each is themed, reachable with the keyboard, and draws a focus ring.")
+    li
+      raw md("Turn the ranges into scenes, add the variables, and wire the controls to what they do. Today this is done by Claude (or `edit_clip`): ask for it in the editor's agent panel, for example “make the Start button go to the first question with an iris”.")
+    li
+      raw md("Press **Play** in the editor to try it, then **Share** to get its page.")
+
+  h2#scenes Scenes
+  raw p("A scene is a time range of the design timeline: `{ id, start, duration, end }`. The playhead runs through it from its start; what happens at its end is the scene's `end`:")
+  div(role="region" aria-label="How a scene ends" tabindex="0")
+    table
+      thead
+        tr
+          th end
+          th At the end of the scene
+      tbody
+        tr
+          td
+            raw md("`hold`")
+          td It holds its last frame and waits for the viewer (a title, a question, a menu).
+        tr
+          td
+            raw md("`loop`")
+          td It starts again from its own start (an idle animation).
+        tr
+          td
+            raw md("`next`, or a scene id")
+          td It moves on to the next scene, or to the one named.
+  raw p("A scene marked `final: true` is one the viewer may stop on (the results screen); the checks call any other scene that cannot be left a dead end. `interactive.start` names the first scene (by default the first listed). `interactive.transition` (for example `ui-tx-iris`, `ui-tx-push` or `ui-tx-zoom` with a duration) is used between scenes unless a `go` names its own.")
+  raw p("While a scene holds, the playhead stands still, so an asset that should keep moving (a pulsing button, a drifting backdrop) animates from `f.ui.now`, the seconds since the session started.")
+
+  h2#variables Variables and bindings
+  raw p("`interactive.vars` holds the clip's state with its first values: numbers, on/off values and text, such as `{ \"score\": 0, \"help\": false, \"name\": \"\" }`. A parameter of an item can follow a variable: `{ \"$var\": \"score\" }` instead of a value, and the item draws the variable as it is now (`ui-score` ticks up when it changes). An item with `when` (a condition, below) is drawn, and can be pressed, only while the condition holds.")
+
+  h2#wires Wires
+  raw p("A wire runs actions when something happens: `{ on, do }`, optionally only in some scenes (`scene`) and only if a condition holds (`if`).")
+  dl
+    dt Events (on)
+    dd
+      raw md("`<item>.<event>`: an event the item's asset emits, such as `start.press` or `answer.select` (each asset lists its events; `get_asset` shows them). `key:<key>`: a key, as the browser names it (`key:ArrowRight`, `key:Enter`, `key:h`, `key:any`). `tap`: a press on nothing. `start`: the session starts. `enter:<scene>` and `end:<scene>`.")
+    dt Actions (do)
+    dd
+      raw md("`{ go: <scene> | \"next\" | \"back\", transition? }` · `{ set: { var: value } }` · `{ add: { var: amount }, min?, max?, wrap? }` · `{ toggle: var }` · `{ send: <item>, event, value? }` (the item reacts, for example a toast that drops in) · `{ play: <audio item> }` · `{ if: condition, then: [...], else: [...] }` · `{ restart: true }`. A value is a literal, `{ \"$var\": \"name\" }`, or `\"$value\"` (the value the event carried, such as a slider's position).")
+    dt Conditions
+    dd
+      raw md("`{ var, eq | ne | gt | gte | lt | lte: value }`, `{ scene: id }`, `{ all: [...] }`, `{ any: [...] }`, `{ not: ... }`.")
+  raw p("A save checks every wire against the events the items' assets really declare, and every `$var` binding against the type of its parameter, so a misspelt event or a text bound to a number is refused with its path. A variable keeps the type it starts with: `set` gives it a value of that type, `add` takes a number, and `min` cannot be above `max`. A value an event brings that is not a finite number leaves the variable as it was. With `wrap`, whole steps over whole bounds wrap past the last value (lanes 0 to 3: 3 + 1 is 0) and anything else wraps on the span (0.9 + 0.2 between 0 and 1 is 0.1).")
+  raw p("A restart runs the start wires again, so a restart that the start wires reach (directly, or in the enter wire of a scene they go to) would never end, and the save refuses it. Each input event may run at most 256 actions: two wires that trigger each other stop the clip with a message instead of freezing the page.")
+
+  h2#sound Sound
+  raw p("Audio items play as the playhead enters them. An item with `loop: true` keeps looping while the playhead is inside it (music under a title that waits); one with `cue: true` plays only when a wire says `{ play: <item> }` (a click, a hit, a fanfare). `interactive.music` lists items that loop for the whole session. Browsers start sound only after the viewer's first tap or key, so the first tap both presses what it lands on and lets the sound play.")
+
+  h2#play-in-editor Play it in the editor
+  raw p("The editor of an interactive clip shows the scenes as bands over the timeline, an **Interactive** side panel that lists the variables, the scenes (click one to move the playhead to it) and the wires in plain words, and the problems a save found. Under the preview, the play bar has:")
+  dl
+    dt Play, Pause, Resume
+    dd
+      raw md("Runs the clip on the preview as a viewer would: click and drag on the stage, and press keys while it has the focus. It plays the draft on the timeline, saved or not.")
+    dt Restart, Stop
+    dd Start again from the first scene; go back to the design timeline.
+    dt Copy log
+    dd The input of this session (every press, move and key, stamped with its frame) as JSON. Played again, it reaches the same states and the same pixels: give it to Claude to reproduce what you saw.
+    dt Hit regions
+    dd Outlines everything that can be pressed in the frame.
+  raw p("A readout next to it names the scene and the variables as they change.")
+
+  h2#checks Checks for an interactive clip
+  raw p("`check_clip` treats an interactive clip as what it is. It runs the usual text checks on frames of every scene, then **crawls** the states a viewer can reach: from the first state it tries every press, every key a wire listens to, a press on nothing and waiting for the scene to end, up to 40 states by default (`max_states`; a score makes the states of a game endless). It reports:")
+  ul
+    li Scenes nobody can reach, dead ends, and states from which no final scene can be reached.
+    li Wires that listen to an event no frame draws a hit region for, regions no wire listens to, and variables nothing reads.
+    li
+      raw md("Tap targets under 24 CSS pixels at phone size (an error) or under 44 (advised), regions off the frame or out of the safe zone, regions that cover each other, and regions with no label for screen readers.")
+    li The text checks in every state found (text behind an open dialog is not read).
+  raw p("`play_clip` plays scripted steps (`{ \"wait\": 1 }`, `{ \"tap\": \"start\" }`, `{ \"key\": \"Enter\" }`) or a recorded log, and answers with the scene and variables after each step, stills and frame hashes. The same log played twice gives the same hashes, which is how a fix is proven.")
+
+  h2#deterministic Why a replay gives the same pixels
+  raw p("The state of an interactive clip at any frame is a pure function of its composition and the **input log**. Each input is stamped with the frame it arrived on and read against the hit regions that frame drew. The live page, the editor and a replay in the studio all fold the same log the same way, and the share page and the editor read keys by the same rule (Ctrl, Cmd and Alt shortcuts, modifier and function keys are left to the browser; a held key is one press, except the arrows of a focused slider), so a bug a viewer hit can be replayed exactly, and a check run on the studio sees what the viewer saw.")
+  raw p("A replay covers at most an hour of session time and 20,000 input events (500 scripted steps); a log or a step past that is refused with the reason, so a mistyped frame number cannot keep the studio busy. A control drawn at scale 0 (the first frame of a pop-in) has no hit region until it has a size.")
+
+  h2#performance Keep it smooth on a phone
+  raw p("An interactive clip is drawn 60 times a second in the viewer's browser, often on a phone without a GPU doing the work. Keep full-frame gradients, blurs and scaled copies of the whole frame to a minimum (a transition that scales both scenes draws two of them), and measure with `node scripts/play-check.mjs <page url> <out dir> --size 390x844 --mobile`: it reports the frames the browser skipped and the slow ones.")
+
+  h2#writing-assets Writing interactive assets
+  raw p("An asset says which events it can fire and which it reacts to with `events: { emits, accepts }`, declares where it can be pressed while it draws (`f.ui.hit(name, x, y, w, h, options)`), and reads what the viewer did from `f.ui` (hover, down, focus, how long since it fired, the pointer, what the clip sent it). It still keeps nothing between frames. The full contract is in [Writing assets](/docs/assets) and in `docs/ASSET_CONTRACT.md` (“Interactive assets”).")
