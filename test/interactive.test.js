@@ -289,6 +289,58 @@ test('interactive: the studio saves, checks and plays an interactive clip, and r
   }
 });
 
+/** RAW with the "hit" button split at 3 s, as split_item and the editor's split leave it. */
+function splitHit() {
+  const raw = /** @type {any} */ (structuredClone(RAW));
+  const items = raw.tracks[1].items, i = items.findIndex((/** @type {any} */ x) => x.id === 'hit');
+  items.splice(i, 1, { ...items[i], duration: 1, assetDuration: 2 }, { ...items[i], id: 'hit-b', start: 3, duration: 1, offset: 1, assetDuration: 2, seedId: 'hit' });
+  return raw;
+}
+
+test('interactive: a part of a split item fires the whole item\'s events, keeps its state and hears what is sent to it', () => {
+  const { composition: c, errors } = normalizeComposition(splitHit());
+  assert.deepEqual(errors, []);
+  const rt = runtime();
+  const { draw, canvas } = drawer(rt, c);
+  const g = canvas.getContext('2d');
+  // Enter on the start button: the play scene from frame 6, the cut 30 frames into it
+  let s = advance(c, initialState(c), 5);
+  s = applyInput(c, s, 5, [{ f: 5, type: 'key', key: 'Enter' }], draw(viewOf(c, s, 5)));
+  assert.equal(s.scene, 'play');
+  // a press just before the cut: the flash it sends is still on after the cut, drawn by the second part
+  s = advance(c, s, 33);
+  s = applyInput(c, s, 33, [{ f: 33, type: 'key', key: 'Enter' }], draw(viewOf(c, s, 33)));
+  assert.equal(s.vars.score, 1);
+  s = advance(c, s, 37);
+  const regions = draw(viewOf(c, s, 37));
+  assert.deepEqual(regions.map((r) => r.key), ['hit:press:', 'level:change:'], 'the second part draws the whole item\'s regions');
+  assert.deepEqual(Array.from(g.getImageData(130, 30, 1, 1).data.slice(0, 3)), [255, 255, 255], 'the flash carries over the cut');
+  // a press on the second part runs the wire on "hit.press"
+  s = applyInput(c, s, 37, [{ f: 37, type: 'key', key: 'Enter' }], regions);
+  assert.equal(s.vars.score, 2);
+});
+
+test('interactive: a wire or a send that names a part of a split item is refused with the whole item to name', async () => {
+  const { tempStudio, AUTHOR } = await import('./helpers.js');
+  const t = tempStudio();
+  const { studio } = t;
+  try {
+    await studio.clips.createClip({ slug: 'split-game', title: 'Split game', author: AUTHOR, width: 320, height: 180, fps: 30, duration: 6 });
+    for (const [ref, source] of Object.entries(ASSETS)) await studio.library.createAsset({ slug: ref.split('@')[0], source, author: AUTHOR, forClip: 'split-game' });
+    const raw = JSON.parse(JSON.stringify(splitHit()).replace(/@1"/g, '"'));
+    const bad = structuredClone(raw);
+    bad.interactive.wires.push({ on: 'hit-b.press', do: { send: 'hit-b', event: 'flash' } });
+    await assert.rejects(studio.clips.updateClip('split-game', { composition: bad, by: AUTHOR }), (/** @type {any} */ e) => /"hit-b" is a part of "hit".*listen to "hit\.press"/.test(e.message) && /send to "hit"/.test(e.message));
+    // with its first part gone, the whole item's id still names the parts left
+    const rest = structuredClone(raw);
+    rest.tracks[1].items = rest.tracks[1].items.filter((/** @type {any} */ x) => x.id !== 'hit');
+    const saved = await studio.clips.updateClip('split-game', { composition: rest, by: AUTHOR });
+    assert.equal(saved.clip.composition.interactive.wires[1].on, 'hit.press');
+  } finally {
+    await t.cleanup();
+  }
+});
+
 test('interactive: a transition holds the frame that was on screen, before the event\'s own actions', () => {
   const raw = /** @type {any} */ (structuredClone(RAW));
   raw.interactive.wires[0] = { on: 'start.press', do: [{ add: { score: 2 } }, { go: 'play', transition: { asset: 'tx-wipe@1', duration: 0.2 } }] };

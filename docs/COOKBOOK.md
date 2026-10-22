@@ -26,7 +26,7 @@ Edit a clip with `edit_clip { clip, operations }` instead of resending the compo
 - `set_transform { id, transform, format? }` (merges; with `format` it edits that format's override), `set_override { id, format, override }`.
 - `add_keyframe { id, prop, t, v, ease? }`, `remove_keyframe { id, prop, t }`, `set_keyframes { id, prop, keyframes }`.
 - `move_track { id, index }` (draw order: the last track is in front), `move_item { id, track, index? }`, `update_track { id, patch: { name, hidden, locked, solo, muted } }`.
-- `split_item { id, at }` (the second part is a continuation: same random seed through `seedId`, no transition, motions and effects carry on), `duplicate_item { id, newId?, start?, track? }`.
+- `split_item { id, at }` (the second part is a continuation: same random seed through `seedId`, no transition, motions and effects carry on; in an interactive clip its hit regions fire the whole item's events, so wires keep naming the item it was cut from), `duplicate_item { id, newId?, start?, track? }`.
 - `update_item { id, patch }` for everything else on an item: `motions`, `effects`, `transition`, `mask`, `params` (merged; `null` removes one).
 
 Lay out once in fractions (`transform`), then fix what does not fit another format with

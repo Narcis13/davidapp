@@ -169,6 +169,9 @@ export function createClips(ctx, library) {
     if (composition.interactive) {
       for (const [i, tx] of transitionsOf(composition.interactive).entries()) pinAttachment(tx, `interactive: transition ${i + 1}`, ['transition']);
       const byId = new Map([...itemsOf(composition)].map(({ item }) => [item.id, item]));
+      // the parts of a split item draw f.ui as the whole item (its seedId): wires listen to it and sends go to it
+      for (const { item } of itemsOf(composition)) if (item.seedId && !byId.has(item.seedId)) byId.set(item.seedId, item);
+      const partOf = (id) => { const whole = byId.get(id)?.seedId; return whole && whole !== id ? whole : null; };
       const declared = (id) => {
         const item = byId.get(id);
         const row = item && library.versionRow(item.asset);
@@ -177,10 +180,14 @@ export function createClips(ctx, library) {
       for (const [i, w] of composition.interactive.wires.entries()) {
         const on = parseOn(w.on);
         if (on?.kind !== 'item') continue;
+        const whole = partOf(on.item);
+        if (whole) { problems.push(`interactive.wires[${i}].on: "${on.item}" is a part of "${whole}" (split from it), and its hit regions fire the whole item's events: listen to "${whole}.${on.event}"`); continue; }
         const { ref, events } = declared(on.item);
         if (!events || !Object.hasOwn(events.emits, on.event)) problems.push(`interactive.wires[${i}].on: item "${on.item}" (${ref}) does not emit "${on.event}" (it emits ${Object.keys(events?.emits ?? {}).join(', ') || 'nothing'})`);
       }
       for (const s of composition.interactive.sends ?? []) {
+        const whole = partOf(s.item);
+        if (whole) { problems.push(`${s.path}: "${s.item}" is a part of "${whole}" (split from it), and every part hears what is sent to the whole item: send to "${whole}"`); continue; }
         const { ref, events } = declared(s.item);
         if (!events || !Object.hasOwn(events.accepts, s.event)) problems.push(`${s.path}: item "${s.item}" (${ref}) does not react to "${s.event}" (it accepts ${Object.keys(events?.accepts ?? {}).join(', ') || 'nothing'})`);
       }
