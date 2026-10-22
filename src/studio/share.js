@@ -9,8 +9,8 @@
 //
 // A base URL (where the folder will be published) only makes og:image and og:url absolute, for link previews.
 
-import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { parse } from 'acorn';
 import { ROOT, FONTS_DIR, fontManifest, nodeHost, createCanvas, loadImage } from '../render/host.js';
@@ -23,6 +23,8 @@ import { StudioError, canvasOf } from './library.js';
 export const SHARE_VERSION = 1;
 /** The file an export writes before anything else, so a folder it left half written can be replaced by the next. */
 const EXPORT_MARK = '.fablecut-share';
+/** What an export writes at the top of its folder: a new export replaces these and leaves anything else there alone. */
+const OWNED = [EXPORT_MARK, 'index.html', 'bundle.json', 'poster.jpg', 'og.jpg', 'player', 'core', 'media'];
 const SRC = join(ROOT, 'src');
 const PLAYER = join(SRC, 'player');
 export const SHARE_DIR = join(ROOT, 'output', 'share');
@@ -102,6 +104,30 @@ export function playerFiles() {
   return all.map((f) => relative(SRC, f).split(sep).join('/')).sort();
 }
 
+/**
+ * A small pool of promises. `join` rejects if any of them rejected, including one that already left
+ * the in-flight set: a failure must not disappear because the pool moved on.
+ * @param {number} limit
+ */
+export function createWritePool(limit) {
+  const active = new Set();
+  const jobs = [];
+  let failure = null;
+  return {
+    async add(promise) {
+      const job = promise.catch((e) => { failure ??= e; });
+      jobs.push(job);
+      active.add(job);
+      job.finally(() => active.delete(job));
+      if (active.size >= limit) await Promise.race(active);
+    },
+    async join() {
+      await Promise.all(jobs);
+      if (failure) throw failure;
+    },
+  };
+}
+
 /** The page: page.html with the clip's title, description, shape, URLs and link-preview tags filled in. */
 function pageHtml({ title, description, root, bundle, poster, width, height, image, url }) {
   const meta = [
@@ -173,19 +199,35 @@ export function createShare(studio) {
 
   // ── the static export ──────────────────────────────────────────────────────────────────────
 
-  /** Make `dir` empty: refused when it holds something other than an earlier export. */
-  function prepare(dir) {
-    if (existsSync(dir)) {
-      if (!statSync(dir).isDirectory()) throw new StudioError(`${dir} is a file; give a folder for the export`);
-      const entries = readdirSync(dir);
-      // an earlier export: its bundle.json, or (one that stopped half way) the marker every export writes first
-      let earlier = existsSync(join(dir, EXPORT_MARK));
-      try { earlier ||= JSON.parse(readFileSync(join(dir, 'bundle.json'), 'utf8')).share !== undefined; } catch { /* not an export */ }
-      if (entries.length && !earlier) throw new StudioError(`${dir} is not empty and holds no earlier share export; give an empty or new folder`);
-      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-    }
+  /** Check that `dir` may take an export: refused when it is a file, or holds something and no earlier export. */
+  function checkTarget(dir) {
+    if (!existsSync(dir)) return;
+    if (!statSync(dir).isDirectory()) throw new StudioError(`${dir} is a file; give a folder for the export`);
+    // an earlier export: its bundle.json, or (one that stopped half way) the marker every export writes first
+    let earlier = existsSync(join(dir, EXPORT_MARK));
+    try { earlier ||= JSON.parse(readFileSync(join(dir, 'bundle.json'), 'utf8')).share !== undefined; } catch { /* not an export */ }
+    if (readdirSync(dir).length && !earlier) throw new StudioError(`${dir} is not empty and holds no earlier share export; give an empty or new folder`);
+  }
+
+  /**
+   * Put a finished export (built in `staging`) into `dir`: the entries an export owns are replaced, anything else a person
+   * put there (a CNAME, a _headers file, a .git folder) stays. A folder that is open elsewhere on Windows refuses a rename
+   * for a moment, so a move is tried a few times and then copied.
+   */
+  async function install(staging, dir) {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, EXPORT_MARK), 'A Fablecut share export (src/studio/share.js): a new export may replace this folder.\n');
+    for (const name of OWNED) rmSync(join(dir, name), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    for (const name of OWNED) {
+      const from = join(staging, name), to = join(dir, name);
+      if (!existsSync(from)) continue;
+      for (let i = 0; ; i++) {
+        try { renameSync(from, to); break; } catch (e) {
+          if (i >= 4 || !['EPERM', 'EBUSY', 'EACCES'].includes(e?.code)) { cpSync(from, to, { recursive: true }); break; }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+    }
+    rmSync(staging, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 
   /** The sequence and footage frames the clip draws, frame by frame (what its preview would fetch): ref → Set of indices. */
@@ -210,21 +252,18 @@ export function createShare(studio) {
    */
   async function writeFrames(indices, frameAt, dir, quality) {
     mkdirSync(dir, { recursive: true });
-    const byHash = new Map(), files = {}, writing = new Set();
+    const byHash = new Map(), files = {}, pool = createWritePool(4);
     for (const i of [...indices].sort((a, b) => a - b)) {
       const f = await frameAt(i);
       const h = sha1(f.data).slice(0, 16);
       if (!byHash.has(h)) {
         const name = `${h}.webp`;
         byHash.set(h, name);
-        const p = Promise.resolve(f.canvas()).then((c) => c.encode('webp', quality)).then((buf) => writeFileSync(join(dir, name), buf));
-        writing.add(p);
-        p.finally(() => writing.delete(p)).catch(() => {});
-        if (writing.size >= 4) await Promise.race(writing);
+        await pool.add(Promise.resolve(f.canvas()).then((c) => c.encode('webp', quality)).then((buf) => writeFileSync(join(dir, name), buf)));
       }
       files[i] = byHash.get(h);
     }
-    await Promise.all(writing);
+    await pool.join();
     return { files, shown: indices.size, unique: byHash.size };
   }
 
@@ -300,85 +339,97 @@ export function createShare(studio) {
     const c = await load(slug);
     const { composition: comp, bundle: b } = c;
     const dir = resolve(out ?? join(SHARE_DIR, slug));
-    if (dir === ROOT || dir === SRC || ROOT.startsWith(dir + sep)) throw new StudioError(`${dir} holds the studio itself; give a folder of its own for the export`);
+    const fold = (p) => (process.platform === 'win32' ? p.toLowerCase() : p);
+    const inside = (parent) => fold(parent) === fold(dir) || fold(parent).startsWith(fold(dir.endsWith(sep) ? dir : dir + sep));
+    if (inside(ROOT) || inside(SRC)) throw new StudioError(`${dir} holds the studio itself; give a folder of its own for the export`);
+    checkTarget(dir);
     const posterPng = (await studio.clipFrame({ clip: slug, frame: posterFrame(comp, posterAt) })).png;
-    prepare(dir);
-    const put = (rel, data) => { const p = join(dir, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, data); };
-    const copy = (from, rel) => { const p = join(dir, rel); mkdirSync(dirname(p), { recursive: true }); copyFileSync(from, p); };
+    // built next to the folder and moved in when it is complete: a failed export leaves the last good one as it was
+    const work = join(dirname(dir), `.${basename(dir) || 'share'}.partial-${randomBytes(4).toString('hex')}`);
+    try {
+      mkdirSync(work, { recursive: true });
+      writeFileSync(join(work, EXPORT_MARK), 'A Fablecut share export (src/studio/share.js): a new export replaces what it wrote here and leaves the rest.\n');
+      const put = (rel, data) => { const p = join(work, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, data); };
+      const copy = (from, rel) => { const p = join(work, rel); mkdirSync(dirname(p), { recursive: true }); copyFileSync(from, p); };
 
-    // the player and the runtime, in the layout their relative imports expect
-    const code = playerFiles();
-    for (const rel of code) copy(join(SRC, rel), rel);
+      // the player and the runtime, in the layout their relative imports expect
+      const code = playerFiles();
+      for (const rel of code) copy(join(SRC, rel), rel);
 
-    // fonts: the bundled families it names, the uploaded ones it pins
-    const fonts = fontsFor(comp, b, (file) => `media/fonts/${file}`);
-    for (const fam of fonts) for (const f of [...fam.files, ...(fam.ext?.files ?? [])]) copy(join(FONTS_DIR, basename(f.url)), f.url);
-    // footage and baked sequences: only the frames it shows, as WebP (measured on clip 11's footage and clip 5's baked
-    // orb: a quarter or less of PNG, alpha kept exactly, a mean error under 1 of 255)
-    const shown = shownMedia(comp, b);
-    const frames = [], kept = {};
-    for (const [kind, list, frameAt] of [['footage', b.videos, footageFrame], ['sequences', b.sequences, sequenceFrame]]) {
-      for (const [ref, asset] of Object.entries(list ?? {})) {
-        const r = await writeFrames(shown[kind].get(ref) ?? new Set(), frameAt(asset), join(dir, 'media', kind, fileName(ref)), quality);
-        kept[ref] = r.files;
-        frames.push({ ref, kind, shown: r.shown, unique: r.unique, format: 'webp', quality });
+      // fonts: the bundled families it names, the uploaded ones it pins
+      const fonts = fontsFor(comp, b, (file) => `media/fonts/${file}`);
+      for (const fam of fonts) for (const f of [...fam.files, ...(fam.ext?.files ?? [])]) copy(join(FONTS_DIR, basename(f.url)), f.url);
+      // footage and baked sequences: only the frames it shows, as WebP (measured on clip 11's footage and clip 5's baked
+      // orb: a quarter or less of PNG, alpha kept exactly, a mean error under 1 of 255)
+      const shown = shownMedia(comp, b);
+      const frames = [], kept = {};
+      for (const [kind, list, frameAt] of [['footage', b.videos, footageFrame], ['sequences', b.sequences, sequenceFrame]]) {
+        for (const [ref, asset] of Object.entries(list ?? {})) {
+          const r = await writeFrames(shown[kind].get(ref) ?? new Set(), frameAt(asset), join(work, 'media', kind, fileName(ref)), quality);
+          kept[ref] = r.files;
+          frames.push({ ref, kind, shown: r.shown, unique: r.unique, format: 'webp', quality });
+        }
       }
-    }
-    const bundle = browserBundle(b, {
-      image: (ref, img) => { const rel = `media/images/${fileName(ref)}${extname(img.path)}`; copy(img.path, rel); return rel; },
-      sequence: (ref) => `media/sequences/${fileName(ref)}/`,
-      footage: (ref) => `media/footage/${fileName(ref)}/`,
-      files: (ref) => kept[ref],
-      upload: (f) => { const rel = `media/fonts/${fileName(f.ref)}${extname(f.path)}`; copy(f.path, rel); return rel; },
-    });
+      const bundle = browserBundle(b, {
+        image: (ref, img) => { const rel = `media/images/${fileName(ref)}${extname(img.path)}`; copy(img.path, rel); return rel; },
+        sequence: (ref) => `media/sequences/${fileName(ref)}/`,
+        footage: (ref) => `media/footage/${fileName(ref)}/`,
+        files: (ref) => kept[ref],
+        upload: (f) => { const rel = `media/fonts/${fileName(f.ref)}${extname(f.path)}`; copy(f.path, rel); return rel; },
+      });
 
-    // the mix, as AAC: the same WAV the render encodes
-    let audio = null;
-    if (c.hasAudio) {
-      const wav = await studio.clipAudio({ clip: slug });
-      audio = `media/sound/${slug}.m4a`;
-      mkdirSync(join(dir, 'media', 'sound'), { recursive: true });
-      const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-i', wav, '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(dir, audio)]);
-      if (r.code !== 0) throw new StudioError(`The clip's sound could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
-    }
-
-    // an interactive clip's sounds, one file per audio item (the session starts and stops them), as AAC like the mix; named
-    // by their index, so no item id ends up in a path
-    let sounds;
-    if (c.sounds.length) {
-      mkdirSync(join(dir, 'media', 'sound'), { recursive: true });
-      for (const [k, item] of c.sounds.entries()) {
-        const wav = await studio.clipAudio({ composition: solo(comp, item) });
-        const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-i', wav, '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(dir, 'media', 'sound', `${k}.m4a`)]);
-        if (r.code !== 0) throw new StudioError(`The sound of item "${item.id}" could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
+      // the mix, as AAC: the same WAV the render encodes
+      let audio = null;
+      if (c.hasAudio) {
+        const wav = await studio.clipAudio({ clip: slug });
+        audio = `media/sound/${slug}.m4a`;
+        mkdirSync(join(work, 'media', 'sound'), { recursive: true });
+        const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-i', wav, '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(work, audio)]);
+        if (r.code !== 0) throw new StudioError(`The clip's sound could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
       }
-      sounds = soundsOf(c.sounds, (k) => `media/sound/${k}.m4a`);
+
+      // an interactive clip's sounds, one file per audio item (the session starts and stops them), as AAC like the mix; named
+      // by their index, so no item id ends up in a path
+      let sounds;
+      if (c.sounds.length) {
+        mkdirSync(join(work, 'media', 'sound'), { recursive: true });
+        for (const [k, item] of c.sounds.entries()) {
+          const wav = await studio.clipAudio({ composition: solo(comp, item) });
+          const r = await run(ffmpegPath(), ['-v', 'error', '-y', '-i', wav, '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(work, 'media', 'sound', `${k}.m4a`)]);
+          if (r.code !== 0) throw new StudioError(`The sound of item "${item.id}" could not be encoded: ${r.stderr.trim().split('\n').pop()}`);
+        }
+        sounds = soundsOf(c.sounds, (k) => `media/sound/${k}.m4a`);
+      }
+
+      const { poster, card } = await posters(posterPng);
+      put('poster.jpg', poster);
+      put('og.jpg', card);
+      const data = { share: SHARE_VERSION, clip: { slug, title: c.title, description: c.description }, composition: comp, bundle, fonts, audio, ...(sounds ? { sounds } : {}), poster: 'poster.jpg', made: new Date().toISOString() };
+      put('bundle.json', JSON.stringify(data));
+      put('index.html', pageHtml({
+        title: c.title, description: c.description, root: '', bundle: 'bundle.json', poster: 'poster.jpg', width: comp.width, height: comp.height,
+        image: base ? new URL('og.jpg', base).href : 'og.jpg', url: base ? base.href : null,
+      }));
+
+      const size = (rel) => (existsSync(join(work, rel)) ? (statSync(join(work, rel)).isDirectory() ? folderBytes(join(work, rel)) : statSync(join(work, rel)).size) : 0);
+      const breakdown = {
+        page: size('index.html'), bundle: size('bundle.json'), posters: size('poster.jpg') + size('og.jpg'), player: size('player'), core: size('core'),
+        fonts: size('media/fonts'), images: size('media/images'), sequences: size('media/sequences'), footage: size('media/footage'), sound: size('media/sound'),
+      };
+      const count = (d) => readdirSync(d, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? count(join(d, e.name)) : 1), 0);
+      const bytes = folderBytes(work), files = count(work);
+      await install(work, dir);
+      return {
+        clip: slug, title: c.title, dir, index: join(dir, 'index.html'), url: base ? base.href : null, studioPath: `/share/${slug}`,
+        bytes, files, breakdown, frames, audio, fonts: fonts.map((f) => f.family), modules: code.filter((f) => f.endsWith('.js')).length,
+        seconds: Math.round((performance.now() - t0) / 100) / 10,
+        ...(sounds ? { sounds: Object.keys(sounds).length } : {}),
+        // a link preview (WhatsApp, Slack, Facebook) needs absolute URLs: say so when they are relative
+        ...(base ? {} : { warnings: ['og:image and og:url are relative: link previews show only with absolute URLs; export again with base_url set to where the folder will be published'] }),
+      };
+    } finally {
+      rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
-
-    const { poster, card } = await posters(posterPng);
-    put('poster.jpg', poster);
-    put('og.jpg', card);
-    const data = { share: SHARE_VERSION, clip: { slug, title: c.title, description: c.description }, composition: comp, bundle, fonts, audio, ...(sounds ? { sounds } : {}), poster: 'poster.jpg', made: new Date().toISOString() };
-    put('bundle.json', JSON.stringify(data));
-    put('index.html', pageHtml({
-      title: c.title, description: c.description, root: '', bundle: 'bundle.json', poster: 'poster.jpg', width: comp.width, height: comp.height,
-      image: base ? new URL('og.jpg', base).href : 'og.jpg', url: base ? base.href : null,
-    }));
-
-    const size = (rel) => (existsSync(join(dir, rel)) ? (statSync(join(dir, rel)).isDirectory() ? folderBytes(join(dir, rel)) : statSync(join(dir, rel)).size) : 0);
-    const breakdown = {
-      page: size('index.html'), bundle: size('bundle.json'), posters: size('poster.jpg') + size('og.jpg'), player: size('player'), core: size('core'),
-      fonts: size('media/fonts'), images: size('media/images'), sequences: size('media/sequences'), footage: size('media/footage'), sound: size('media/sound'),
-    };
-    const count = (d) => readdirSync(d, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? count(join(d, e.name)) : 1), 0);
-    return {
-      clip: slug, title: c.title, dir, index: join(dir, 'index.html'), url: base ? base.href : null, studioPath: `/share/${slug}`,
-      bytes: folderBytes(dir), files: count(dir), breakdown, frames, audio, fonts: fonts.map((f) => f.family), modules: code.filter((f) => f.endsWith('.js')).length,
-      seconds: Math.round((performance.now() - t0) / 100) / 10,
-      ...(sounds ? { sounds: Object.keys(sounds).length } : {}),
-      // a link preview (WhatsApp, Slack, Facebook) needs absolute URLs: say so when they are relative
-      ...(base ? {} : { warnings: ['og:image and og:url are relative: link previews show only with absolute URLs; export again with base_url set to where the folder will be published'] }),
-    };
   }
 
   /** The sound of one audio item of an interactive clip, mixed on its own (what /api/clips/<slug>/sounds/<index> serves). */

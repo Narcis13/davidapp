@@ -106,7 +106,8 @@ each: film grain does not compress), so leave a few gigabytes free for a full sh
 | variable | |
 |---|---|
 | `STUDIO_DATA` | The data directory (default `./data`). |
-| `PORT`, `HOST` | Where the studio listens (default `127.0.0.1:8787`). |
+| `PORT`, `HOST` | Where the studio listens (default `127.0.0.1:8787`). Any `HOST` other than loopback is refused without `STUDIO_TOKEN`. |
+| `STUDIO_TOKEN` | A secret of at least 16 characters. Every page asks for it once (an `HttpOnly`, `SameSite=Lax` cookie keeps it 30 days) and every API call needs the cookie or `Authorization: Bearer <token>`. Required to open the studio to other devices (`STUDIO_TOKEN=… HOST=0.0.0.0 npm run studio`); the server speaks plain HTTP, so put it behind an HTTPS proxy or an SSH tunnel on a network you do not trust. |
 | `STUDIO_AUTHOR` | Recorded as the author of what a process writes (the MCP server defaults to `mcp-client`, `.mcp.json` sets `claude-code`). |
 | `STUDIO_TOOLS` | For an MCP server process: a comma-separated list of tool names; only these are registered. A "Run now" session's server gets the tools that read the studio and answer requests. |
 | `STUDIO_RUNNER` | For an MCP server process: `0` means it does not pick up queued renders (a short-lived server would take a render down with it). |
@@ -167,8 +168,9 @@ node scripts/prompt-tools.mjs [prompt.md]                            # every too
 |---|---|
 | **Library** `/` | Ranked search (text match, boosted by featured, favourites and use) with facets and their counts: type, kind, tags, format, author, the clip that made an asset, the clip that uses it. Sort by relevance, newest, most used or name; favourites, featured, collections, recently used, needs description. A virtualised grid with filmstrip previews, a detail panel, keyboard navigation, multi-select with bulk tagging and add-to-clip. Drop PNG, JPEG, WebP or SVG files on the page to upload them, video files (MP4, MOV, M4V, WebM, MKV) to add footage, and TTF, OTF or WOFF2 files to add fonts (a short form asks for the licence). The Licence button next to Upload sets the licence and source of the next drops; a file without one is recorded as "Licence unknown", and its card says a final render will refuse it. A "Kit" quick view lists the kit. |
 | **Playground** `/assets/<name>` | Live preview of one asset of any kind with controls generated from its parameter schema, a scrub bar, format and safe-zone toggles. Keep a tweak: save the params as the new defaults (a new version) or as a preset, edit title, description and tags without a new version. A file asset has a "Source and licence" panel (edited without a new version) and shows placeholder and unknown-licence badges. The source in a CodeMirror editor (validate a draft, save a new version), version diffs (source, and the same frame side by side), versions, lineage. "Exact frame" asks the renderer for the same frame. The agent panel takes a request about this asset and shows the proposal next to the current version. |
-| **Clips** `/clips` | Every clip as a card with a poster frame. |
-| **Clip editor** `/clips/<name>` | Preview with audio and handles on the canvas: move, scale and rotate a layer, snapping to the frame, the safe zone and other layers. A format switch for per-format layouts. A timeline with move, trim, split, snapping, waveforms and keyframe marks; tracks you reorder, rename, lock, solo, mute and hide; a layers view. An inspector for timing, layout, keyframes with easing, parameters, motions, effects, transition and mask. Multi-select, copy, paste, duplicate, undo and redo (each action is one step; a drag or typing in one field counts as one), keyboard shortcuts (`?` lists them). A split leaves two parts that play on as one. "Save as asset" turns the selected layers into one library asset (a precomp) and can put it in their place. Footage items show a filmstrip of the frames they play and their edges trim the file (`in`, `out`). The caption pages are a lane under the narration: drag a page's start to another word, click a word to start a page there, select pages to merge them; the words and their times never change. Save, remix into another format, and the agent panel for requests about the clip. Render opens a panel: one or more shapes (one request), Normal, Draft (2/3 size, a quick look) or Final (the sources are checked and the credits written next to the video; a refusal names each asset that is not ready, with a link), workers, and the poster time from the playhead. The Credits panel lists the credit lines, the sources and what would stop a final render; the Repo panel says whether the clip's folder in the repo is up to date and writes it ("Write to repo"). |
+| **Clips** `/clips` | Every clip as a card with a poster frame. New clip makes a video or an interactive clip. |
+| **Clip editor** `/clips/<name>` | Preview with audio and handles on the canvas: move, scale and rotate a layer, snapping to the frame, the safe zone and other layers. A format switch for per-format layouts. A timeline with move, trim, split, snapping, waveforms and keyframe marks; tracks you reorder, rename, lock, solo, mute and hide; a layers view. An inspector for timing, layout, keyframes with easing, parameters, motions, effects, transition and mask. Multi-select, copy, paste, duplicate, undo and redo (each action is one step; a drag or typing in one field counts as one), keyboard shortcuts (`?` lists them). A split leaves two parts that play on as one. "Save as asset" turns the selected layers into one library asset (a precomp) and can put it in their place. Footage items show a filmstrip of the frames they play and their edges trim the file (`in`, `out`). The caption pages are a lane under the narration: drag a page's start to another word, click a word to start a page there, select pages to merge them; the words and their times never change. Save, remix into another format, and the agent panel for requests about the clip. Render opens a panel: one or more shapes (one request), Normal, Draft (2/3 size, a quick look) or Final (the sources are checked and the credits written next to the video; a refusal names each asset that is not ready, with a link), workers, and the poster time from the playhead. The Credits panel lists the credit lines, the sources and what would stop a final render; the Repo panel says whether the clip's folder in the repo is up to date and writes it ("Write to repo"). Share opens the clip's share link (`/share/<clip>`, with Copy link and Open) and "Export folder" (an optional base URL for link previews; it shows the folder, its size and any warning). An interactive clip has Share in place of Render, a play bar (Play, Restart, Stop, Copy log, Hit regions, a readout of the scene and variables), scene bands on the timeline and an Interactive panel. |
+| **Manual** `/docs` | The user manual, drawn by the server from `src/docs/templates` with what the running studio knows (its MCP tools, formats, fonts, kit): install, every screen, making videos, share links and interactive clips, Claude, settings, troubleshooting. Searchable. |
 | **Requests** `/requests` | The inbox of requests to the agent by status, and each request's thread with its proposals: preview, accept, reject with a reason, reply, "Run now". |
 | **Renders** `/renders` | The queue with live progress, cancel, timings; drafts and finals labelled, a batch of shapes under one heading, a final's credits file linked. |
 | **Gallery** `/gallery` | Finished clips with their poster, the MP4 and the assets each one used. |
@@ -289,7 +291,8 @@ recipes for the tools are in [docs/COOKBOOK.md](docs/COOKBOOK.md). Every asset s
 ## Use it from Claude Code (MCP)
 
 The repository registers the server in [.mcp.json](.mcp.json), so Claude Code started in this
-folder gets a `studio` server with 67 tools:
+folder gets a `studio` server with 69 tools (the studio's manual, `/docs/mcp-tools`, lists each with its parameters,
+read from the running studio):
 
 | | |
 |---|---|
@@ -305,15 +308,17 @@ folder gets a `studio` server with 67 tools:
 | `add_footage`, `footage_frames` | Add a video file as footage; see its own frames, labelled with their time and index, to pick trim points. |
 | `add_font`, `list_fonts` | Add a TTF, OTF or WOFF2 font with its licence (usable at once); list every family a font parameter can name. |
 | `clip_credits`, `check_provenance` | A clip's credits and sources from everything it pins; what would stop a final render (placeholders, files with no licence). |
-| `create_clip`, `update_clip`, `edit_clip`, `get_clip`, `list_clips` | Compose clips; references are pinned and params validated against each asset's schema. `edit_clip` has operations for the timeline, layers, transforms, keyframes and per-format overrides. |
+| `create_clip`, `update_clip`, `edit_clip`, `get_clip`, `list_clips` | Compose clips; references are pinned and params validated against each asset's schema. `edit_clip` has operations for the timeline, layers, transforms, keyframes and per-format overrides, and for an interactive clip's scenes, wires and variables. `create_clip { interactive: true }` starts an interactive clip. |
 | `remix_clip`, `repin_clip` | A clip in another format; a clip moved to newer asset versions. |
 | `render_asset_frame`, `render_clip_frame` | One frame as PNG, or a contact sheet, so the model can see its work. |
 | `frame_hashes` | SHA-256 of frames, for checking determinism and that old clips did not change. |
+| `play_clip` | Play an interactive clip from scripted steps (`wait`, `tap`, `key`, raw pointer input) or a recorded input log; the scene, variables and focus after each step, stills, frame hashes, and the log played (the same log always gives the same frames). |
 | `layout_report`, `check_clip` | Every text in a frame measured; what a careful editor would point at, with item, time, numbers and a still. |
 | `add_narration`, `generate_narration`, `voice_samples`, `transcribe`, `speech_status`, `check_transcript` | A voice with its script and word times: imported, timed by the studio (`align`), or spoken from a script; one line in several voices; word times of any audio; what is set up; a take checked against its script. |
 | `anchor_report`, `caption_pages`, `audio_report`, `export_stems` | How far anchored visuals are from their words; the caption pages and the rules they break; the mix measured; WAV stems. |
 | `start_render`, `get_render`, `list_renders`, `cancel_render`, `render_report` | Render to MP4 (another format, several formats at once, a draft, a final render with credits) and follow the queue; what the studio measured on the encoded file. |
 | `export_clip`, `import_clip` | A clip and everything it pins to `clips/<clip>/clip.json` and `library/` in the repo; that folder into any library, with the same refs and frames. |
+| `share_clip` | A clip as a share link: one folder (`output/share/<clip>/` by default) with the page, the player and only the media the clip shows, that plays from any static host; `base_url` makes the link-preview tags absolute. |
 | `list_requests`, `claim_request`, `get_request`, `reply_request`, `propose_asset_version`, `propose_new_asset`, `propose_clip_edit`, `complete_request` | Work the requests the user wrote in the studio and answer them with proposals. |
 | `list_clip_assets`, `reuse_report`, `compounding_report` | What a clip uses and where each asset came from; what each clip cost to build. |
 
@@ -331,8 +336,14 @@ node scripts/mcp.mjs call render_clip_frame '{"clip":"clip-1-every-frame","t":13
 
 Asset code runs only in worker threads, each asset in its own `vm` context without host globals,
 and a watchdog stops a worker that overruns its time. That protects the studio from buggy assets;
-it is not a sandbox for hostile code, so only connect clients you trust. The web server answers
-only to loopback host names and refuses writes from other origins.
+it is not a sandbox for hostile code, so only connect clients you trust. The tools that take a file
+or folder path (`import_clip`, `add_file_asset`, `add_footage`, `add_font`, `transcribe`, `share_clip { out }`, …)
+exist only over MCP, never over HTTP. The web server answers only to loopback host names and refuses writes from
+other origins; any other `HOST` needs `STUDIO_TOKEN`, and then every page, API call, media file and share link
+needs the token. Asset code in the browser (the preview, the share page) runs in a worker with the constructors
+that compile strings replaced, and in Node inside a `vm` context that refuses code generation. The review of
+22 October 2026 lists every hardening step and how each was checked:
+[docs/production-review-2026-10-22.md](docs/production-review-2026-10-22.md).
 
 ## Make a clip
 
@@ -600,13 +611,26 @@ side; text has a size floor and fails loudly instead of shrinking.
 Any clip can be shared as a web page that plays it **in the viewer's browser**: the same asset code draws the frames
 on a canvas there (no MP4, no third-party embed), so a link sent on WhatsApp opens in the phone's browser and plays.
 
-- The studio serves it at `/share/<clip>`; `share_clip` (MCP), `POST /api/clips/<clip>/share` or
-  `node scripts/share.mjs <clip>` export it as **one folder** (`output/share/<clip>/`) that plays from any static
-  server, under any path, with the studio stopped. Only relative URLs; `--base-url` makes the link-preview tags
-  absolute. Nothing is published by the studio: putting the folder online is your step.
+- **In the studio:** the clip editor's **Share** button (an interactive clip's primary button) opens the link to the
+  live page and **Export folder**. The studio serves the page at `/share/<clip>`, playing the clip as it is saved; on a
+  studio started with `STUDIO_TOKEN` the link shows the sign-in page first, and a link to a clip that is gone answers
+  with a page that says so.
+- **The export:** the dialog, `share_clip { clip, base_url?, poster_at?, quality?, out? }` (MCP),
+  `POST /api/clips/<clip>/share { baseUrl, posterAt, quality }` or
+  `node scripts/share.mjs <clip> [--out <dir>] [--base-url <url>] [--poster-at <s>] [--quality <1-100>]` write
+  **one folder** (`output/share/<clip>/` unless `out` says otherwise) that plays from any static server, under any
+  path, with the studio stopped. Only relative URLs; the base URL (where the folder will be published) makes the
+  link-preview tags absolute. Exporting again replaces what the last export wrote and keeps anything else in the
+  folder (a `CNAME`, a `.git`); the export is built next to the folder and moved in when complete, so a failed one
+  leaves the last one whole, and a non-empty folder with no earlier export is refused. Nothing is published by the
+  studio: putting the folder online is your step. Link to the folder with its trailing slash (or `index.html`), serve
+  it over HTTP (a `file://` page cannot load the player's modules; after 15 s the page says so), and purge a long
+  cache after exporting again (the player and `bundle.json` keep their names).
 - The page: a poster and a loading ring, then the clip; play/pause, a scrubber (video), sound that starts on the first
-  tap (browsers' autoplay rules), full screen, replay, keyboard shortcuts, reduced-motion respected, phone portrait
-  and landscape handled. Open Graph and Twitter tags with a 1200×630 card.
+  tap (browsers' autoplay rules), full screen, replay, keyboard shortcuts (Space or K, ← → five seconds, Shift+← → one
+  frame, Home, End, F, M), reduced-motion respected, phone portrait and landscape handled, a media file that fails
+  fetched again before the page gives up. Open Graph and Twitter tags with a 1200×630 card. An interactive clip has
+  no scrubber; its keys are its own, and its sound is one file per audio item.
 - The export holds only what the clip needs: the core modules the player imports (~250 kB), the fonts it names, its
   images, the footage frames it shows (WebP), its sound (AAC), a poster. Clip 11 (16 s with a screen recording):
   13.1 MB, first frame in 0.22 s (desktop) and 0.24 s (phone) from a local server; the interactive clip 12: 1.6 MB.
@@ -628,9 +652,17 @@ reach the same states and the same pixels. `play_clip` replays scripted steps or
 twice), and `check_clip` crawls the states a viewer can reach, trying every press, key and wait from each (up to
 `max_states`, 40 by default; a game's score makes its states endless): scenes, dead ends, tap target sizes on a
 phone, the text checks in each state. The studio editor plays an interactive clip on its preview (scene bands on the timeline,
-an interactive panel with the variables and wires), and `start_render` refuses one. See "Interactive assets" and
-"Interactive compositions" in [ASSET_CONTRACT.md](docs/ASSET_CONTRACT.md) and the recipes in
-[COOKBOOK.md](docs/COOKBOOK.md).
+an interactive panel with the variables and wires), and `start_render` refuses one. The share page and the editor read
+keys by one rule (`keyFor` in `src/player/session.js`), so a log copied in the editor replays what a viewer did.
+
+What a save refuses and what the runtime guarantees: every wire is checked against the events its items' assets
+declare; a variable keeps its type (`set` with its type, `add` with a number, `min` ≤ `max`), and a value from an event
+that is not a finite number leaves the variable alone; a restart that the start wires reach, directly or through the
+enter wire of a scene they go to, is refused; each input event may run 256 actions (a wire loop stops with a message);
+a region drawn at scale 0 is not hittable; a replay covers at most an hour, 20,000 input events or 500 steps. See
+"Interactive assets" and "Interactive compositions" in [ASSET_CONTRACT.md](docs/ASSET_CONTRACT.md), the recipes in
+[COOKBOOK.md](docs/COOKBOOK.md), and the manual's "Share a clip as a link" and "Interactive clips" pages (`/docs/share`,
+`/docs/interactive`).
 
 The UI set, each themed, keyboard-reachable, with a focus ring, press feedback and text at a size floor:
 
@@ -662,9 +694,10 @@ src/render    Node host: vm sandbox, Skia canvas (@napi-rs/canvas), worker pool,
 src/studio    library (versioned assets, search), clips (pinned compositions, edit operations), render queue,
               lineage, requests and proposals, "Run now", uploads and the SVG sanitiser, events, compounding: all on SQLite
 src/mcp       the MCP tools (iteration 4's in src/mcp/more/, one module per area) and the stdio server
-src/server    HTTP API, server-sent events, media, static files
+src/server    HTTP API, server-sent events, media, static files, the sign-in page of a studio with STUDIO_TOKEN
 src/ui        the studio (vanilla JS, no build step); preview-worker.js runs src/core in a Web Worker
 src/player    the share page: player, engine and worker (src/core in the viewer's browser), the live session of an interactive clip
+src/docs      the user manual at /docs: Faqir UI templates drawn on the server with the studio's live facts
 assets        every function asset's source (synced into the library by scripts/sync-assets.mjs)
 clips         one folder per clip with its composition
 showcase      the plan and the journals that rebuild the twelve showcase clips

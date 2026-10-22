@@ -25,6 +25,8 @@ export const BLEND_MODES = ['source-over', 'screen', 'multiply', 'overlay', 'lig
 
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
+// These strings are setters on Object.prototype. An id is later used as a property name (a send's inbox, a variable).
+const RESERVED_ID = new Set(['__proto__', 'constructor', 'prototype']);
 
 export const MOTION_PHASES = ['in', 'out', 'emphasis', 'loop'];
 export const MASK_MODES = ['alpha', 'alpha-inverted', 'luma', 'luma-inverted'];
@@ -191,7 +193,9 @@ export function normalizeComposition(input) {
     if (!isPlain(tr)) return err(tp, 'a track is an object with type and items');
     const type = tr.type ?? 'visual';
     if (!TRACK_TYPES.includes(type)) err(`${tp}.type`, `track type must be one of ${TRACK_TYPES.join(', ')}`);
-    const track = { id: typeof tr.id === 'string' && tr.id ? tr.id : `track-${ti + 1}`, name: typeof tr.name === 'string' ? tr.name : undefined, type, hidden: tr.hidden ? true : undefined, items: [] };
+    let trackId = typeof tr.id === 'string' && tr.id ? tr.id : `track-${ti + 1}`;
+    if (RESERVED_ID.has(trackId)) { err(`${tp}.id`, `id "${trackId}" is reserved`); trackId = `track-${ti + 1}`; }
+    const track = { id: trackId, name: typeof tr.name === 'string' ? tr.name : undefined, type, hidden: tr.hidden ? true : undefined, items: [] };
     // editor flags (v2): only written when set, so a v1 track normalizes to exactly what it was
     for (const k of ['locked', 'solo', 'muted']) if (tr[k]) track[k] = true;
     if (tr.role !== undefined) { if (!TRACK_ROLES.includes(tr.role)) err(`${tp}.role`, `role must be one of ${TRACK_ROLES.join(', ')}`); else track.role = tr.role; }
@@ -202,6 +206,7 @@ export function normalizeComposition(input) {
       const ip = `${tp}.items[${ii}]`;
       if (!isPlain(it)) return err(ip, 'an item is an object with asset, start, duration and params');
       let id = typeof it.id === 'string' && it.id ? it.id : `${track.id}-${ii + 1}`;
+      if (RESERVED_ID.has(id)) { err(`${ip}.id`, `id "${id}" is reserved`); id = `item-${ti}-${ii}`; }
       if (ids.has(id)) { err(`${ip}.id`, `duplicate item id "${id}"`); id = `${id}-${ti}-${ii}`; }
       ids.add(id);
       if (typeof it.asset !== 'string' || !REF_RE.test(it.asset)) err(`${ip}.asset`, 'asset must be a reference such as "text-word-reveal" or "text-word-reveal@2"');

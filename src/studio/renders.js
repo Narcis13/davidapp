@@ -24,6 +24,7 @@ export function sampleFrames(total, count = 16) {
 }
 
 const r2 = (v) => Math.round(v * 100) / 100;
+const reportTick = (e) => console.error(`ERROR render queue: ${e?.stack ?? e}`);
 
 /** Draft scales, largest first; a draft keeps the first one that gives whole, even pixel sizes (yuv420p needs even sides). */
 export const DRAFT_SCALES = /** @type {[number, string][]} */ ([[2 / 3, '2/3'], [1 / 2, '1/2'], [1 / 3, '1/3']]);
@@ -135,7 +136,7 @@ export function createRenders(ctx, library, clips, sound, provenance) {
    */
   function enqueue({ clip, requestedBy = 'studio', format, options }) {
     const id = transaction(db, () => insert({ clip, requestedBy, format, options }));
-    if (timer) setImmediate(() => { tick().catch(() => {}); });
+    if (timer) setImmediate(() => { tick().catch(reportTick); });
     return get(id);
   }
 
@@ -178,7 +179,7 @@ export function createRenders(ctx, library, clips, sound, provenance) {
       const rest = formats.slice(1).map((format) => { const id = insert({ clip, requestedBy, format, options }); batch(id); return id; });
       return [first, ...rest];
     });
-    if (timer) setImmediate(() => { tick().catch(() => {}); });
+    if (timer) setImmediate(() => { tick().catch(reportTick); });
     return { batch: ids[0], renders: ids.map(get) };
   }
 
@@ -386,17 +387,20 @@ export function createRenders(ctx, library, clips, sound, provenance) {
   function startRunner() {
     stopping = false;
     if (timer) return;
-    timer = setInterval(() => { tick().catch(() => {}); }, 700);
+    timer = setInterval(() => { tick().catch(reportTick); }, 700);
     timer.unref();
-    setImmediate(() => { tick().catch(() => {}); });
+    setImmediate(() => { tick().catch(reportTick); });
   }
 
-  async function stopRunner() {
+  async function stopRunner({ timeoutMs = 15000 } = {}) {
     stopping = true;
     if (timer) clearInterval(timer);
     timer = null;
     current?.abort.abort();
-    while (busy) await new Promise((r) => setTimeout(r, 50));
+    // a job stops within a second of its abort; one stuck in a cleanup must not keep a process that is shutting down alive
+    // (its heartbeat stops with the process, and another runner marks it failed)
+    const end = Date.now() + timeoutMs;
+    while (busy && Date.now() < end) await new Promise((r) => setTimeout(r, 50));
   }
 
   /** Resolve when the render reaches a final state (or after timeoutMs, with whatever state it is in). */

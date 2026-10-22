@@ -17,7 +17,17 @@ div(data-ui="prose")
     @trigger
       | “This studio answers only to localhost, 127.0.0.1, [::1]”
     @content
-      raw p("For safety the studio refuses requests addressed to any other name. Open it as `http://127.0.0.1:8787` or `http://localhost:8787`. Serving it on a network on purpose takes `HOST=0.0.0.0`, which opens it to anyone who can reach your computer.")
+      raw p("For safety the studio refuses requests addressed to any other name. Open it as `http://127.0.0.1:8787` or `http://localhost:8787`. To open it from another device on purpose, start it with `HOST=0.0.0.0` and a `STUDIO_TOKEN` of at least 16 characters; see [Open the studio to other devices](/docs/config#network).")
+  +collapsible
+    @trigger
+      | “Refusing to listen on a non-loopback address without STUDIO_TOKEN”
+    @content
+      raw p("You set `HOST` to an address other devices can reach, and the studio will not open itself to them without a secret. Set `STUDIO_TOKEN` to a long random string (at least 16 characters), or leave `HOST` unset to keep the studio on this computer.")
+  +collapsible
+    @trigger
+      | The studio asks for a token
+    @content
+      raw p("It was started with `STUDIO_TOKEN`. Enter the same value; the browser keeps the sign-in for 30 days. Claude's MCP server does not use the web server, so it needs no token.")
   +collapsible
     @trigger
       | Renders fail at once, or FFmpeg is not found
@@ -136,3 +146,40 @@ div(data-ui="prose")
       | Frames differ on another computer
     @content
       raw p("Emoji and some system fonts are drawn by the operating system. Use the bundled fonts or added fonts for anything that must match, and verify imported clips on the computer that exported them.")
+
+  h2#share-and-play Share links and interactive clips
+  +collapsible
+    @trigger
+      | The exported page stays on “Loading”, or says it is taking long to start
+    @content
+      raw p("The player's scripts did not run. Most often the page was opened as a file (double-clicking `index.html`): serve the folder instead, for example with `node scripts/serve-static.mjs output/share/<clip>`. On a web host, check that the link ends with a slash or `index.html`, and that `.js` files are served as JavaScript. A host-wide Content-Security-Policy header must allow `'unsafe-eval'` for scripts, because the player compiles the clip's asset code.")
+  +collapsible
+    @trigger
+      | “This browser cannot play the clip”
+    @content
+      raw p("The page needs a browser that draws in a worker (`OffscreenCanvas`): any recent Chrome, Edge, Firefox or Safari (16.4 or later). Open the link there.")
+  +collapsible
+    @trigger
+      | The link preview in a chat app shows no picture
+    @content
+      raw p("Link previews need absolute addresses. Export again with **Base URL** (or `base_url`, `--base-url`) set to the address the folder will have, publish it there, and share that address.")
+  +collapsible
+    @trigger
+      | “Export” says the folder is not empty
+    @content
+      raw p("The studio writes a share export only into an empty folder or one that holds an earlier export, so it never deletes files of yours. Give a new folder, or empty that one.")
+  +collapsible
+    @trigger
+      | An interactive clip plays no sound
+    @content
+      raw p("Browsers start sound only after the viewer's first tap or key press: tap the clip once. On an iPhone, also check the ring/silent switch on an older iOS. In the editor, the sound of each audio item is mixed by the studio the first time it plays, which takes a moment.")
+  +collapsible
+    @trigger
+      | Render is refused for an interactive clip
+    @content
+      raw p("An interactive clip is played, not rendered: it has no single timeline to turn into an MP4. Press **Share** to get its page. To make a video of it, record the share page being played, or build a separate video clip from the same assets.")
+  +collapsible
+    @trigger
+      | A save says a wire or a variable is wrong
+    @content
+      raw p("Each problem names its path, such as `interactive.wires[2].do[0].add.score`. The usual causes: an event the item's asset does not emit (`get_asset` lists its events), a variable that was never declared in `vars`, a `set` that changes a variable's type, or a restart that the start wires reach. See [Interactive clips](/docs/interactive#wires).")

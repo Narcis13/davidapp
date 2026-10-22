@@ -13,8 +13,6 @@
 import { api } from '/ui/lib/api.js';
 import { fill, h, icon, s } from '/ui/lib/util.js';
 import { sceneAtTime, varsOf } from '/ui/lib/wires.js';
-
-const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'NumLock', 'Dead', 'Process', 'Unidentified', 'AltGraph']);
 const LABEL = { design: 'Play', loading: 'Loading', playing: 'Pause', paused: 'Resume', error: 'Play again' };
 
 /** Web Audio for a session: one buffer per audio item (made by the studio), started and stopped on the session's cues. */
@@ -359,14 +357,14 @@ export function createPlay({ slug, canvas, pv, host, composition, blocked = () =
   canvas.addEventListener('contextmenu', (e) => { if (mode !== 'design') e.preventDefault(); });
 
   canvas.addEventListener('keydown', (e) => {
-    if (!live() || e.ctrlKey || e.metaKey || e.altKey || MODIFIERS.has(e.key) || /^F\d+$/.test(e.key)) return;
-    if (e.key === 'Tab') {
-      // Tab walks the things that can be pressed; past either end it moves on, so the keyboard is never trapped here
-      if (session.tabLeaves(e.shiftKey)) return;
-    }
+    if (!live()) return;
+    // the share page's rules (player/session.js keyFor), so a log copied here replays what a viewer there does: Tab walks the
+    // things that can be pressed and moves on past either end, and a held key is one press except a focused slider's arrows
+    const take = mod.keyFor(e, session);
+    if (take === 'page') return;
     // the page must not scroll or act on a key the clip is using
     e.preventDefault();
-    if (e.repeat && !e.key.startsWith('Arrow')) return;
+    if (take === 'drop') return;
     session.input({ type: 'key', key: e.key, shift: e.shiftKey });
   });
 

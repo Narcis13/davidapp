@@ -21,6 +21,7 @@ import { mountIssues } from '/ui/lib/issues.js';
 import { createPlay } from '/ui/lib/play.js';
 import { mountRepo } from '/ui/lib/repo.js';
 import { openRenderPanel } from '/ui/lib/render-panel.js';
+import { openShareDialog } from '/ui/lib/share.js';
 import { live as liveEvents } from '/ui/lib/live.js';
 import { createOverlays } from '/ui/lib/overlays.js';
 import { pickAsset } from '/ui/lib/picker.js';
@@ -134,6 +135,8 @@ export async function mount(view, ctx) {
     ? h('button.btn.primary', { type: 'button', 'data-testid': 'render-button', 'data-interactive': '', title: 'This clip is played, not rendered to MP4. Share it as a page.' }, 'Share')
     : h('button.btn.primary', { type: 'button', 'data-testid': 'render-button' }, 'Render');
   const remixBtn = h('button.btn', { type: 'button', 'data-testid': 'remix' }, 'Remix');
+  // a video clip shares from a button of its own; an interactive clip's Share is the render button above
+  const shareBtn = isInteractive ? null : h('button.btn', { type: 'button', 'data-testid': 'share-button', title: 'A page that plays this clip in the browser, and a folder to publish it' }, 'Share');
   const addBtn = h('button.btn.small', { type: 'button', 'data-testid': 'add-item' }, icon('plus', 14), 'Add item');
   const inspector = h('section.panel.inspector', { 'data-testid': 'inspector' });
   const assetsPanel = h('section.panel', { 'data-testid': 'clip-assets' }, h('h2', 'Assets in this clip'));
@@ -369,17 +372,8 @@ export async function mount(view, ctx) {
     seekTo(scene.start);
   }
 
-  /** The Share button of an interactive clip: it is played, not rendered, and a page plays it. */
-  function shareNote() {
-    openDialog({
-      title: 'Played, not rendered', testid: 'interactive-share-dialog',
-      body: h('div.form',
-        h('p', 'An interactive clip reacts to clicks, taps and keys, so it is played in the browser. There is no MP4 to render.'),
-        h('p', 'Share it as a page: ', h('a', { href: `/share/${slug}`, target: '_blank', rel: 'noopener', 'data-testid': 'interactive-share-link' }, `${location.origin}/share/${slug}`)),
-        dirty ? h('p.notice.info', 'This clip has unsaved changes. The page plays the saved clip, so save first.') : null,
-        h('p.hint', 'The page shows the clip as it is saved when it is opened.')),
-    });
-  }
+  /** The Share dialog: the live page of the saved clip, and its export to a folder (lib/share.js). An interactive clip's Render button opens it. */
+  const shareNote = () => openShareDialog({ slug, interactive: isInteractive, dirty });
 
   // ── state changes ────────────────────────────────────────────────────────────────────────
   function setDirty(on) { dirty = on; unsaved.hidden = !on; if (on) saved.hidden = true; saveBtn.disabled = !on || busy; }
@@ -387,6 +381,7 @@ export async function mount(view, ctx) {
   function setBusy(on) {
     busy = on;
     saveBtn.disabled = !dirty || on; renderBtn.disabled = on; remixBtn.disabled = on; addBtn.disabled = on;
+    if (shareBtn) shareBtn.disabled = on;
     inspector.inert = on;
     if (!on && pendingRevision > clip.revision) onRevision(pendingRevision);
   }
@@ -1148,6 +1143,8 @@ export async function mount(view, ctx) {
     });
   });
 
+  shareBtn?.addEventListener('click', shareNote);
+
   remixBtn.addEventListener('click', () => {
     const others = Object.entries(status.formats).filter(([k]) => k !== draft.format);
     const format = h('select', { id: 'rx-format', 'data-testid': 'remix-format' }, others.map(([k, f]) => h('option', { value: k }, `${f.label} · ${f.width}×${f.height}`)));
@@ -1560,7 +1557,7 @@ export async function mount(view, ctx) {
         h('a.back', { href: '/clips' }, icon('back', 16), 'Clips'),
         h('div.title-row', h('h1', clip.title), unsaved, saved),
         meta),
-      h('div.page-head-side', saveBtn, remixBtn, renderBtn)),
+      h('div.page-head-side', saveBtn, remixBtn, shareBtn, renderBtn)),
     msg.el,
     changedBanner,
     h('div.editor',

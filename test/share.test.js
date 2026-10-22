@@ -8,7 +8,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { parse } from 'acorn';
 import { tempStudio, seedAssets, smallComposition, AUTHOR } from './helpers.js';
 import { createStudioServer } from '../src/server/http.js';
-import { shareOf, SHARE_DIR } from '../src/studio/share.js';
+import { shareOf, SHARE_DIR, createWritePool } from '../src/studio/share.js';
 import { ffmpegPath, run, probeSummary } from '../src/render/ffmpeg.js';
 import { createCanvas, loadImage } from '../src/render/host.js';
 import { connect, callTool } from '../scripts/mcp.mjs';
@@ -35,6 +35,20 @@ function urlsOf(value, path = '') {
   return [];
 }
 const relativeOnly = (u) => !/^[a-z][a-z0-9+.-]*:/i.test(u) && !u.startsWith('/') && !u.startsWith('\\') && !u.split('/').includes('..');
+
+test('a failed frame write is reported after the pool has moved on', async () => {
+  const pool = createWritePool(2);
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const first = pool.add(held);
+  await pool.add(Promise.reject(new Error('encode failed')));
+  release();
+  await first;
+  await assert.rejects(pool.join(), /encode failed/);
+  const ok = createWritePool(2);
+  await ok.add(Promise.resolve());
+  await ok.join();
+});
 
 test('an export is one folder that plays from anywhere: relative URLs, its own player and runtime, the media it uses', async () => {
   const r = await shareOf(studio).exportClip('tiny', { out, baseUrl: 'https://example.com/clips/tiny' });
@@ -75,7 +89,7 @@ test('an export is one folder that plays from anywhere: relative URLs, its own p
   // the player and the runtime, every import of every module resolving inside the folder; no rendered video in it
   const files = walk(out);
   assert.deepEqual(files.filter((f) => /\.(mp4|mov|webm|m4v)$/i.test(f)), []);
-  for (const f of ['player/player.js', 'player/engine.js', 'player/worker.js', 'player/player.css', 'core/runtime.js', 'core/lib/text.js', 'core/interactive.js']) assert.ok(files.includes(f), `${f} is exported`);
+  for (const f of ['player/player.js', 'player/engine.js', 'player/worker.js', 'player/player.css', 'core/runtime.js', 'core/lib/text.js', 'core/interactive.js', 'core/isolate.js', 'core/static-check.js']) assert.ok(files.includes(f), `${f} is exported`);
   for (const f of files.filter((x) => x.endsWith('.js'))) {
     const ast = parse(readFileSync(join(out, f), 'utf8'), { ecmaVersion: 'latest', sourceType: 'module' });
     for (const node of ast.body) {
@@ -110,6 +124,35 @@ test('an export never overwrites a folder that is not one', async () => {
   assert.equal(readFileSync(join(other, 'notes.txt'), 'utf8'), 'mine');
   await assert.rejects(shareOf(studio).exportClip('tiny', { out: join(t.dataDir, 'x'), baseUrl: 'ftp://example.com/' }), /http or https/);
   await assert.rejects(shareOf(studio).exportClip('nope', { out: join(t.dataDir, 'y') }), /No clip named "nope"/);
+});
+
+test('a new export replaces only what an export wrote, and a failed one leaves the last one whole', async () => {
+  const dir = join(t.dataDir, 'site', 'tiny');
+  const first = await shareOf(studio).exportClip('tiny', { out: dir });
+  // what a person adds to a published folder stays through the next export
+  writeFileSync(join(dir, 'CNAME'), 'clips.example.com');
+  mkdirSync(join(dir, '.git'), { recursive: true });
+  writeFileSync(join(dir, '.git', 'HEAD'), 'ref: refs/heads/main');
+  writeFileSync(join(dir, 'media', 'stale.bin'), 'left by an older export');
+  const second = await shareOf(studio).exportClip('tiny', { out: dir });
+  assert.equal(readFileSync(join(dir, 'CNAME'), 'utf8'), 'clips.example.com');
+  assert.equal(readFileSync(join(dir, '.git', 'HEAD'), 'utf8'), 'ref: refs/heads/main');
+  assert.ok(!existsSync(join(dir, 'media', 'stale.bin')), 'media/ is the export\'s own and is replaced whole');
+  assert.equal(second.files, first.files, 'the counts are the export\'s, not the folder\'s');
+  assert.deepEqual(readdirSync(join(t.dataDir, 'site')), ['tiny'], 'no staging folder is left next to it');
+
+  // an export that fails half way (a sound ffmpeg cannot encode) keeps the last good one
+  const before = readFileSync(join(dir, 'bundle.json'), 'utf8');
+  const realAudio = studio.clipAudio;
+  studio.clipAudio = async () => join(t.dataDir, 'no-such.wav');
+  try {
+    await assert.rejects(shareOf(studio).exportClip('tiny', { out: dir }), /could not be encoded/);
+  } finally {
+    studio.clipAudio = realAudio;
+  }
+  assert.equal(readFileSync(join(dir, 'bundle.json'), 'utf8'), before);
+  assert.ok(existsSync(join(dir, 'index.html')) && existsSync(join(dir, 'player', 'player.js')));
+  assert.deepEqual(readdirSync(join(t.dataDir, 'site')), ['tiny']);
 });
 
 test('footage, sequences and images: only the frames the clip shows, as WebP, a repeated frame once', async () => {

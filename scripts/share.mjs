@@ -9,8 +9,20 @@ import { createStudio } from '../src/studio/studio.js';
 import { shareOf } from '../src/studio/share.js';
 
 const argv = process.argv.slice(2);
-const opt = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : undefined; };
-const clip = argv.find((a, i) => !a.startsWith('--') && !argv[i - 1]?.startsWith('--'));
+const NAMES = ['out', 'base-url', 'poster-at', 'quality'];
+// --name value and --name=value both work: a dropped --out=… would otherwise replace the export in the default folder
+const opt = (name) => {
+  const eq = argv.find((a) => a.startsWith(`--${name}=`));
+  if (eq) return eq.slice(name.length + 3);
+  const i = argv.indexOf(`--${name}`);
+  return i >= 0 ? argv[i + 1] : undefined;
+};
+const unknown = argv.filter((a) => a.startsWith('--') && !NAMES.includes(a.slice(2).split('=')[0]));
+const clip = argv.find((a, i) => !a.startsWith('--') && !(argv[i - 1]?.startsWith('--') && !argv[i - 1].includes('=')));
+if (unknown.length) {
+  console.error(`unknown option ${unknown.join(', ')}; the options are ${NAMES.map((n) => `--${n}`).join(', ')}`);
+  process.exit(2);
+}
 if (!clip) {
   console.error('usage: STUDIO_DATA=<dir> node scripts/share.mjs <clip> [--out <dir>] [--base-url <url>] [--poster-at <s>] [--quality <1-100>]');
   process.exit(2);

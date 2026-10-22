@@ -48,7 +48,7 @@ div(data-ui="prose")
   raw p("To change the port or the address, set `PORT` and `HOST` before starting, for example `PORT=8800 npm run studio`. The studio answers only to `localhost`, `127.0.0.1` and `::1` unless you bind another address on purpose.")
 
   h2#showcase Fill the library with the showcase (optional)
-  p A fresh studio has an empty library apart from its fonts. The repository holds the recipe of eleven showcase clips that build a large library of reusable assets. To rebuild them:
+  p A fresh studio has an empty library apart from its fonts. The repository holds the recipe of twelve showcase clips (eleven videos and one interactive game) that build a large library of reusable assets. To rebuild them:
   div(role="region" aria-label="Showcase commands" tabindex="0")
     table
       thead
@@ -63,7 +63,7 @@ div(data-ui="prose")
         tr
           td
             raw md("`npm run showcase`")
-          td The same, and renders every showcase clip to MP4. Leave a few gigabytes of disk free: some renders are 180 to 600 MB.
+          td The same, and renders the eleven showcase videos to MP4 (the twelfth, an interactive clip, is played, not rendered). Leave a few gigabytes of disk free: some renders are 180 to 600 MB.
         tr
           td
             raw md("`npm run sync-assets`")

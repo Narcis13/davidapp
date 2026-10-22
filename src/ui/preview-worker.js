@@ -5,29 +5,11 @@
 
 import { createRuntime, describeError } from '/core/runtime.js';
 import { fontAliases } from '/core/lib/text.js';
-
-// What asset source can see: nothing from the worker's global scope.
-const HIDDEN = ['self', 'globalThis', 'window', 'document', 'fetch', 'XMLHttpRequest', 'WebSocket', 'importScripts', 'setTimeout', 'setInterval',
-  'requestAnimationFrame', 'queueMicrotask', 'performance', 'postMessage', 'close', 'caches', 'indexedDB', 'navigator', 'location', 'Function', 'Worker', 'onmessage'];
-
-const no = (what, instead) => { throw new Error(`${what} is not available inside an asset: frames must be a pure function of (t, params). ${instead}`); };
-const SafeMath = Object.freeze(Object.fromEntries([...Object.getOwnPropertyNames(Math).map((k) => [k, Math[k]]), ['random', () => no('Math.random()', 'Use f.rng().')]]));
-const SafeDate = new Proxy(Date, {
-  construct(T, args) { if (!args.length) no('new Date()', 'Use f.t or f.clip.t.'); return new T(...args); },
-  apply() { no('Date()', 'Use f.t or f.clip.t.'); },
-  get(T, k) { return k === 'now' ? () => no('Date.now()', 'Use f.t or f.clip.t.') : T[k]; },
-});
-const quiet = { log() {}, info() {}, warn() {}, error() {}, debug() {} };
+import { evaluateBrowser } from '/core/isolate.js';
 
 const host = {
   lineOffset: 2,
-  evaluate(source, filename) {
-    let captured, calls = 0;
-    const fn = new Function('asset', 'console', 'Math', 'Date', ...HIDDEN, `"use strict"; ${source}\n//# sourceURL=${filename}`);
-    fn((def) => { calls++; captured = def; }, quiet, SafeMath, SafeDate);
-    if (calls !== 1) throw new Error(calls ? 'asset({...}) was called more than once; one source declares one asset' : 'The source never called asset({...})');
-    return captured;
-  },
+  evaluate: evaluateBrowser,
   createCanvas: (w, h) => new OffscreenCanvas(w, h),
 };
 

@@ -12,6 +12,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createStudio } from '../studio/studio.js';
 import { createTools } from './tools.js';
+import { closeFootageService } from '../render/footage.js';
 
 // stdout carries the protocol: anything else printed there would corrupt it
 console.log = (...args) => console.error(...args);
@@ -35,7 +36,7 @@ let closing = false;
 async function shutdown() {
   if (closing) return;
   closing = true;
-  try { await studio.close(); } finally { process.exit(0); }
+  try { await studio.close(); await closeFootageService(); } finally { process.exit(0); }
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

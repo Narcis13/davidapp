@@ -94,6 +94,32 @@ div(data-ui="prose")
             raw md("`node scripts/synth-library.mjs <data-dir> [--count 5000]`")
           td A synthetic library of thousands of assets, for testing at scale.
 
+  h2#share-scripts Share links
+  div(role="region" aria-label="Share scripts" tabindex="0")
+    table
+      thead
+        tr
+          th Command
+          th Does
+      tbody
+        tr
+          td
+            raw md("`node scripts/share.mjs <clip> [--out <dir>] [--base-url <url>] [--poster-at <s>] [--quality <1-100>]`")
+          td
+            raw md("Exports a clip's share page as one folder (default `output/share/<clip>/`), with `STUDIO_DATA` set. See [Share a clip as a link](/docs/share).")
+        tr
+          td
+            raw md("`node scripts/serve-static.mjs <folder> [--port 8800] [--prefix some/path]`")
+          td Serves an exported folder, under a sub-path if you like, with the studio stopped.
+        tr
+          td
+            raw md("`node scripts/share-check.mjs <page url> [--out <dir>] [--parity --clip <clip>]`")
+          td Plays a video's share page in headless Chrome at desktop and phone size and reports console errors, failed requests, weight and time to the first frame.
+        tr
+          td
+            raw md("`node scripts/play-check.mjs <page url> <out dir> [--size 390x844 --mobile] [--steps steps.json]`")
+          td Plays an interactive share page with real input and reports the states, problems and frame timings.
+
   h2#measuring Measuring
   div(role="region" aria-label="Measuring scripts" tabindex="0")
     table

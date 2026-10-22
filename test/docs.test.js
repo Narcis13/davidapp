@@ -135,3 +135,12 @@ test('inline markup: code, strong, keys and links, and nothing else', () => {
   assert.deepEqual(snippet('one two three', ['two']), [{ text: 'one ', hit: false }, { text: 'two', hit: true }, { text: ' three', hit: false }]);
   assert.equal(marked([{ text: 'start_', hit: false }, { text: 'render', hit: true }, { text: ' <x>', hit: false }]), 'start_<mark>render</mark> &lt;x&gt;');
 });
+
+test('share links and interactive clips have their pages, found by search, linked from the start page', async () => {
+  for (const [q, href] of [['export folder base url', '/docs/share'], ['wires scenes variables', '/docs/interactive'], ['STUDIO_TOKEN', '/docs/config']]) {
+    const html = await (await get(`/docs/search?q=${encodeURIComponent(q)}`)).text();
+    assert.ok(html.includes(`href="${href}`), `searching "${q}" finds ${href}`);
+  }
+  const start = pages.get('index').html;
+  assert.ok(start.includes('href="/docs/share"') && start.includes('href="/docs/interactive"'));
+});

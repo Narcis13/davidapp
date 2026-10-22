@@ -53,6 +53,12 @@ export default function routes({ studio, author, send }) {
   async function upload({ req, query }) {
     const name = query.get('name') || 'footage.mp4';
     const ext = extname(name).toLowerCase();
+    const type = String(req.headers['content-type'] ?? '').toLowerCase().split(';')[0].trim();
+    // a form on another site can POST text/plain without a preflight; a video body cannot
+    if (!/^(video\/[a-z0-9.+-]+|application\/octet-stream)$/.test(type)) {
+      for await (const _c of req) { /* drop the body so the refusal arrives */ }
+      throw new StudioError('Send the video as the request body with a video/* Content-Type or application/octet-stream', 'unsupported');
+    }
     if (!['.mp4', '.m4v', '.mov', '.webm', '.mkv'].includes(ext)) throw new StudioError(`"${name}" is not a video file the studio takes (MP4, MOV, M4V, WebM, MKV)`, 'unsupported');
     if (Number(req.headers['content-length']) > MAX_UPLOAD) throw new StudioError('The file is larger than 2 GB', 'too_large');
     // said before the bytes are streamed: a mistake in it costs nothing

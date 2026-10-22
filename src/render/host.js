@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
+import { dynamicCode } from '../core/isolate.js';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const FONTS_DIR = join(ROOT, 'fonts');
@@ -58,6 +59,34 @@ const GUARD = `(() => {
 })()`;
 const guardScript = new vm.Script(GUARD, { filename: 'sandbox-guard.js' });
 
+// asset() and console live inside the context, so a render cannot follow them out to this process.
+// Constructors that compile strings are replaced in the context only. __log is removed before user source runs.
+const PRELUDE = `"use strict";
+(() => {
+  const send = globalThis.__log;
+  delete globalThis.__log;
+  const show = (v) => {
+    if (typeof v === 'string') return v;
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
+  };
+  const line = (level) => (...args) => send(level, args.map(show).join(' '));
+  globalThis.console = { log: line('log'), info: line('info'), warn: line('warn'), error: line('error'), debug: line('debug') };
+  const deny = function assetIsolateDenied() { throw new Error('eval and new Function are not available inside an asset.'); };
+  const poison = (sample) => {
+    try {
+      const C = sample.constructor;
+      if (!C || !C.prototype || C.prototype.constructor === deny) return;
+      Object.defineProperty(C.prototype, 'constructor', { configurable: true, writable: true, value: deny });
+    } catch (e) { /* some realms freeze a constructor; the context still refuses strings */ }
+  };
+  poison(function () {});
+  poison(function* () {});
+  poison(async function () {});
+  poison(async function* () {});
+  globalThis.asset = (def) => { globalThis.__calls = (globalThis.__calls || 0) + 1; globalThis.__captured = def; };
+})();`;
+const preludeScript = new vm.Script(PRELUDE, { filename: 'sandbox-prelude.js' });
+
 const logs = [];
 /** Lines written with console.* by asset code since the last call. */
 export function takeLogs() {
@@ -69,21 +98,49 @@ const show = (v) => {
 };
 const log = (level) => (...args) => { if (logs.length < 100) logs.push(`${level}: ${args.map(show).join(' ')}`.slice(0, 500)); };
 
-/** Evaluate asset source in a fresh context and return what it passed to asset({...}). */
-export function evaluate(source, filename = 'asset.js') {
-  let captured, calls = 0;
-  const sandbox = {
-    asset: (def) => { calls++; captured = def; },
-    console: { log: log('log'), info: log('info'), warn: log('warn'), error: log('error'), debug: log('debug') },
+// While an asset render runs, a host function's .constructor must not be the real Function.
+// Restored afterwards, and only when the outermost asset returns (assets call each other).
+const denyHost = function assetIsolateDenied() {
+  throw new Error('eval and new Function are not available inside an asset.');
+};
+let sealDepth = 0;
+let savedConstructor;
+function seal(fn) {
+  return function sealedAsset(...args) {
+    if (sealDepth === 0) {
+      savedConstructor = Object.getOwnPropertyDescriptor(Function.prototype, 'constructor');
+      Object.defineProperty(Function.prototype, 'constructor', { configurable: true, writable: true, value: denyHost });
+    }
+    sealDepth++;
+    try { return fn.apply(this, args); }
+    finally {
+      sealDepth--;
+      if (sealDepth === 0 && savedConstructor) Object.defineProperty(Function.prototype, 'constructor', savedConstructor);
+    }
   };
-  const context = vm.createContext(sandbox, { name: filename, codeGeneration: { strings: false, wasm: false } });
-  guardScript.runInContext(context);
-  new vm.Script(source, { filename }).runInContext(context, { timeout: 2000 });
-  if (calls !== 1) throw new Error(calls ? 'asset({...}) was called more than once; one source declares one asset' : 'The source never called asset({...})');
-  return captured;
 }
 
-export const nodeHost = { evaluate, createCanvas };
+/** Evaluate asset source in a fresh context and return what it passed to asset({...}). */
+export function evaluate(source, filename = 'asset.js') {
+  const blocked = dynamicCode(source);
+  if (blocked) throw new Error(blocked);
+  const sandbox = { __log: (level, text) => log(level)(text) };
+  const context = vm.createContext(sandbox, { name: filename, codeGeneration: { strings: false, wasm: false } });
+  preludeScript.runInContext(context);
+  guardScript.runInContext(context);
+  // one strict line before the source, subtracted again by nodeHost.lineOffset
+  new vm.Script(`"use strict";\n${source}`, { filename }).runInContext(context, { timeout: 2000 });
+  const calls = sandbox.__calls || 0;
+  if (calls !== 1) throw new Error(calls ? 'asset({...}) was called more than once; one source declares one asset' : 'The source never called asset({...})');
+  const def = sandbox.__captured;
+  if (def && typeof def === 'object') {
+    if (typeof def.render === 'function') def.render = seal(def.render);
+    if (typeof def.preview === 'function') def.preview = seal(def.preview);
+  }
+  return def;
+}
+
+export const nodeHost = { evaluate, createCanvas, lineOffset: 1 };
 export { createCanvas, loadImage };
 
 /**

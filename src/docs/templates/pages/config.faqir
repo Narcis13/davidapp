@@ -22,7 +22,13 @@ div(data-ui="prose")
             raw md("`PORT`, `HOST`")
           td 8787, 127.0.0.1
           td
-            raw md("Where the studio listens. Binding another address (`HOST=0.0.0.0`) opens it to anyone who can reach that address.")
+            raw md("Where the studio listens. Any address other than loopback (`HOST=0.0.0.0`, a network address) is refused unless `STUDIO_TOKEN` is set. See [Open the studio to other devices](#network).")
+        tr
+          td
+            raw md("`STUDIO_TOKEN`")
+          td none
+          td
+            raw md("A secret of at least 16 characters. When it is set, every page asks for it once (a sign-in cookie keeps it for 30 days) and every API request must carry the cookie or `Authorization: Bearer <token>`. Required for any `HOST` other than loopback.")
         tr
           td
             raw md("`FFMPEG_PATH`")
@@ -87,6 +93,16 @@ div(data-ui="prose")
           td found automatically
           td The Chrome program for the browser parity test and the recording and measuring scripts.
 
+  h2#network Open the studio to other devices
+  raw p("By default the studio answers only on this computer (`127.0.0.1`), with no password, and only to the names `localhost`, `127.0.0.1` and `[::1]`. To open it from a phone or another computer on your network, give it a token and an address:")
+  pre
+    code
+      | STUDIO_TOKEN=<a long random secret> HOST=0.0.0.0 npm run studio
+  raw p("Then open `http://<this computer's address>:8787` on the other device and enter the token. Without a token the studio refuses to start on such an address, and a token shorter than 16 characters is refused too. Every page, the API, the media and the share links then need the token; the sign-in cookie is `HttpOnly` and `SameSite=Lax`.")
+  +callout(variant="warning")
+    @content
+      raw p("**The studio speaks plain HTTP.** On a network you do not trust, put it behind a reverse proxy that adds HTTPS (Caddy, nginx) or reach it through an SSH tunnel; otherwise the token travels in the clear. The studio runs asset code you or Claude wrote, so never open it to people you would not let run code on this computer. To share a clip with anyone, export it and publish the folder instead: see [Share a clip as a link](/docs/share).")
+
   h2#data-directory The data directory
   raw p("This studio keeps its data in `" + d.live.dataDir + "`. Git ignores it. Inside:")
   div(role="region" aria-label="Data directory" tabindex="0")
@@ -140,7 +156,7 @@ div(data-ui="prose")
         tr
           td
             raw md("`showcase/`")
-          td The recipe and the recorded steps that rebuild the eleven showcase clips, with their pictures, recordings and voice takes.
+          td The recipe and the recorded steps that rebuild the twelve showcase clips, with their pictures, recordings and voice takes.
         tr
           td
             raw md("`work/<clip>/`")
@@ -153,7 +169,7 @@ div(data-ui="prose")
           td
             raw md("`src/`")
           td
-            raw md("The studio: `core` (the asset runtime shared by Node and the browser), `render`, `studio`, `mcp`, `server`, `ui`, and `docs` (this manual).")
+            raw md("The studio: `core` (the asset runtime shared by Node and the browser), `render`, `studio`, `mcp`, `server`, `ui`, `player` (the share page and the live session of an interactive clip) and `docs` (this manual).")
         tr
           td
             raw md("`docs/`")
@@ -162,5 +178,6 @@ div(data-ui="prose")
         tr
           td
             raw md("`output/`")
-          td Exports and evidence from the scripts (ignored by git).
+          td
+            raw md("Exports and evidence from the scripts, and `output/share/<clip>/`, each clip's share folder (ignored by git).")
   raw p("No video is ever committed: renders go on GitHub releases. The pages of this manual are templates in `src/docs/templates/`, drawn by the studio's server with Faqir UI.")

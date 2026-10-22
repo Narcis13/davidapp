@@ -71,3 +71,10 @@
   .tl-scene { font-size: 12.5px; }
   .iv-scene { min-height: 44px; }
 }
+
+/* ── the Share dialog (lib/share.js): the live link, and the export to a folder ─────────────── */
+.share-form h3 { margin: var(--s2) 0 0; font-size: 14px; }
+.share-row { flex-wrap: nowrap; }
+.share-url { flex: 1; min-width: 0; }
+.share-copied:empty { display: none; }
+.share-form .mono { overflow-wrap: anywhere; }

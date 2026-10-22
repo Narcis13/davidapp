@@ -273,6 +273,40 @@ test('importing again reuses what is there; replace updates the clip', async () 
   assert.equal(B.clips.getClip('exch-clip').revision, 2);
 });
 
+test('an interactive clip imports with the events its assets declare, also over a version saved before events were recorded', async () => {
+  const BUTTON = `asset({
+    description: 'A test button that fires press when tapped, for the exchange tests.', tags: ['ui', 'test'],
+    params: { label: { type: 'string', default: 'Go' } },
+    events: { emits: { press: 'when tapped' } },
+    render(f, p) { f.ui.hit('press', 20, 20, 80, 40, { label: p.label }); f.ctx.fillStyle = '#3366ff'; f.ctx.fillRect(20, 20, 80, 40); },
+  })`;
+  await A.studio.library.createAsset({ slug: 'exch-button', source: BUTTON, author: AUTHOR });
+  await A.studio.clips.createClip({ slug: 'exch-tap', title: 'Exchange, interactive', author: AUTHOR, composition: {
+    width: 320, height: 180, fps: 30, duration: 4, background: '#000000',
+    tracks: [{ id: 'ui', items: [{ id: 'go', asset: 'exch-button@1', start: 0, duration: 2 }] }],
+    interactive: { scenes: [{ id: 'menu', start: 0, duration: 2, end: 'loop' }, { id: 'done', start: 2, duration: 2, final: true }], wires: [{ on: 'go.press', do: { go: 'done' } }] },
+  } });
+  const store = tmp('exchange-tap-');
+  toClean.push(store);
+  await A.studio.exchange.exportClip('exch-tap', { root: store });
+  const folder = join(store, 'clips', 'exch-tap');
+  const emits = (S) => S.library.getAsset('exch-button@1').meta.events?.emits;
+
+  const fresh = emptyLibrary();
+  assert.deepEqual((await fresh.exchange.importClip(folder)).versions.created, ['exch-button@1']);
+  assert.deepEqual(Object.keys(emits(fresh)), ['press']);
+
+  // a library that has the same version, saved by a build that did not record events
+  const old = emptyLibrary();
+  await old.library.createAsset({ slug: 'exch-button', source: BUTTON, author: AUTHOR });
+  old.db.prepare("UPDATE asset_versions SET meta = json_remove(meta, '$.events') WHERE source = ?").run(BUTTON);
+  assert.equal(emits(old), undefined);
+  const r = await old.exchange.importClip(folder);
+  assert.deepEqual([r.versions.reused, r.versions.refreshed], [['exch-button@1'], ['exch-button@1']]);
+  assert.deepEqual(Object.keys(emits(old)), ['press']);
+  assert.equal(old.clips.getClip('exch-tap').title, 'Exchange, interactive');
+});
+
 test('exporting an unchanged clip changes no file; an edit in the studio is written back by the next export', async () => {
   const before = snapshot(root);
   const again = await A.studio.exchange.exportClip('exch-clip', { root });

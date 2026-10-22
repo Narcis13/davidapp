@@ -336,6 +336,13 @@ test('the editor routes: play (no pictures) and check-interactive', async () => 
     const draftPlay = await (await post('/api/clips/quest/play', { composition: draft, times: [3] })).json();
     assert.equal(draftPlay.frames[0].state.scene, 'play', 'the draft\'s first scene ends by itself');
     assert.equal((await (await post('/api/clips/quest/play', { times: [3] })).json()).frames[0].state.scene, 'main', 'the saved clip\'s holds');
+    // the route has play_clip's bounds: a frame an hour past the start, or a log of a frame far ahead, is refused at once
+    const far = await post('/api/clips/quest/play', { frames: [1e9] });
+    assert.equal(far.status, 400);
+    assert.match((await far.json()).error, /not a session frame/);
+    const farLog = await post('/api/clips/quest/play', { log: [{ f: 1e9, type: 'key', key: 'a' }], times: [0] });
+    assert.ok(farLog.status >= 400 && farLog.status < 500, `a log far ahead is refused (${farLog.status})`);
+    assert.match((await farLog.json()).error, /longest session/);
     const checked = await post('/api/clips/quest/check-interactive', { maxStates: 5 });
     assert.equal(checked.status, 200);
     const report = await checked.json();

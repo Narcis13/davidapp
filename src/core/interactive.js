@@ -26,11 +26,21 @@ export const ACTIONS = ['go', 'set', 'add', 'toggle', 'send', 'play', 'if', 'res
 export const INPUT_TYPES = ['down', 'move', 'up', 'cancel', 'leave', 'key'];
 const COMPARE = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'];
 const NAME_RE = /^[A-Za-z_][\w-]*$/;
+// `__proto__` matches NAME_RE, and assigning it on an ordinary object walks Object.prototype's setter.
+const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
+const bag = () => Object.create(null);
 /** "$value.lane": a field of the event's value (a region's value may be an object). */
 const FIELD_RE = /^\$value(\.[A-Za-z_]\w*)+$/;
 /** Actions one event may run, nested wires included: a wire loop stops here instead of hanging the player. */
 const MAX_ACTIONS = 256;
 const KEEP = 48;
+/** The longest session a log, scripted steps or a report may reach: an hour. Each frame costs a fold, so a frame number of 1e9 would hold a worker for minutes. */
+export const MAX_SESSION_SECONDS = 3600;
+/** The most input events a log may hold, and the most scripted steps. */
+export const MAX_LOG_EVENTS = 20000;
+export const MAX_STEPS = 500;
+/** The last session frame of a clip played at fps. */
+export const maxSessionFrame = (fps) => Math.round(MAX_SESSION_SECONDS * fps);
 
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -101,14 +111,22 @@ function checkActions(actions, path, err, ctx) {
         if (!ctx.vars.has(name)) err(`${p}.${kind}.${name}`, `unknown variable "${name}"`);
         checkValue(v, `${p}.${kind}.${name}`, err, ctx);
         if (kind === 'add' && ctx.vars.has(name) && !num(ctx.initial[name])) err(`${p}.add.${name}`, `"${name}" is not a number`);
+        // a variable keeps the type it starts with: a number set to text would turn every later add into NaN
+        const type = ctx.vars.has(name) ? typeof ctx.initial[name] : null;
+        const fromEvent = v === '$value' || (typeof v === 'string' && FIELD_RE.test(v));
+        const given = fromEvent ? null : scalar(v) ? typeof v : isPlain(v) && typeof v.$var === 'string' && ctx.vars.has(v.$var) ? typeof ctx.initial[v.$var] : null;
+        if (kind === 'add' && given !== null && given !== 'number') err(`${p}.add.${name}`, 'an amount to add is a number, { $var } of a number variable, or "$value"');
+        else if (kind === 'set' && type && given !== null && given !== type) err(`${p}.set.${name}`, `"${name}" holds a ${type}; this sets it to a ${given}`);
       }
       for (const k of ['min', 'max']) if (a[k] !== undefined && !num(a[k])) err(`${p}.${k}`, `${k} must be a number`);
+      if (num(a.min) && num(a.max) && a.min > a.max) err(`${p}.min`, `min (${a.min}) is above max (${a.max})`);
       if (a.wrap !== undefined && typeof a.wrap !== 'boolean') err(`${p}.wrap`, 'wrap is true or false');
     } else if (kind === 'toggle') {
       for (const name of list(a.toggle)) if (!ctx.vars.has(name) || typeof ctx.initial[name] !== 'boolean') err(`${p}.toggle`, `toggle names boolean variables; "${name}" is not one`);
     } else if (kind === 'send') {
       if (!ctx.items.has(a.send)) err(`${p}.send`, `no visual item "${a.send}"`);
       if (typeof a.event !== 'string' || !NAME_RE.test(a.event)) err(`${p}.event`, 'event is the name the item reacts to, e.g. "burst"');
+      else if (RESERVED.has(a.event)) err(`${p}.event`, `"${a.event}" is reserved`);
       if (a.value !== undefined) checkValue(a.value, `${p}.value`, err, ctx);
       ctx.sends.push({ item: a.send, event: a.event, path: p });
     } else if (kind === 'play') {
@@ -144,11 +162,12 @@ export function normalizeInteractive(input, { duration, fps, visual, audio }, er
   if (!isPlain(input)) { err('interactive', 'interactive is { start, vars, scenes, wires, transition, music }'); return undefined; }
   const known = ['start', 'vars', 'scenes', 'wires', 'transition', 'music'];
   for (const k of Object.keys(input)) if (!known.includes(k)) err(`interactive.${k}`, `unknown field (use ${known.join(', ')})`);
-  const vars = {};
+  const vars = bag();
   if (input.vars !== undefined) {
     if (!isPlain(input.vars)) err('interactive.vars', 'vars maps names to their first values: { score: 0, sound: true }');
     else for (const [name, v] of Object.entries(input.vars)) {
       if (!NAME_RE.test(name)) err(`interactive.vars.${name}`, 'a variable name is letters, digits, _ and -, starting with a letter');
+      else if (RESERVED.has(name)) err(`interactive.vars.${name}`, `"${name}" is reserved`);
       else if (!scalar(v)) err(`interactive.vars.${name}`, 'a variable starts as a number, a boolean or a string');
       else vars[name] = v;
     }
@@ -160,6 +179,7 @@ export function normalizeInteractive(input, { duration, fps, visual, audio }, er
     const p = `interactive.scenes[${i}]`;
     if (!isPlain(s)) return err(p, 'a scene is { id, start, duration, end }');
     if (typeof s.id !== 'string' || !NAME_RE.test(s.id)) return err(`${p}.id`, 'id names the scene: letters, digits, _ and -');
+    if (RESERVED.has(s.id)) return err(`${p}.id`, `"${s.id}" is reserved`);
     if (ids.has(s.id)) return err(`${p}.id`, `duplicate scene "${s.id}"`);
     ids.add(s.id);
     if (!num(s.start) || s.start < 0) err(`${p}.start`, 'start is where the scene begins on the timeline, in seconds ≥ 0');
@@ -202,9 +222,31 @@ export function normalizeInteractive(input, { duration, fps, visual, audio }, er
     else wire.do = checkActions(w.do, `${p}.do`, err, ctx);
     wires.push(wire);
   });
-  // a restart runs the start wires again: one among them would restart for ever
+  // a restart runs the start wires again: one among them would restart for ever, and so would one in the enter wire of a
+  // scene they go to (start → go b → enter:b → restart), however many scenes down that chain it is
   const restarts = (actions) => (actions ?? []).some((a) => a.restart || restarts(a.then) || restarts(a.else));
-  wires.forEach((w, i) => { if ((w.on === 'start' || w.on === `enter:${start}`) && restarts(w.do)) err(`interactive.wires[${i}].do`, `a restart in a "${w.on}" wire would restart the clip for ever: the restart runs it again`); });
+  const order = scenes.map((x) => x.id);
+  /** The scenes a list of actions goes to, run while `cur` is on screen. */
+  const goes = (actions, cur, out) => {
+    for (const a of actions ?? []) {
+      if (a.go !== undefined && a.go !== 'back') { cur = a.go === 'next' ? order[(order.indexOf(cur) + 1) % order.length] : a.go; out.add(cur); }
+      if (a.if !== undefined) { goes(a.then, cur, out); goes(a.else, cur, out); }
+    }
+    return out;
+  };
+  const listens = (w, on, scene) => w.on === on && (w.scene === undefined || list(w.scene).includes(scene));
+  if (ids.has(start)) {
+    const reached = new Set([start]);
+    const queue = [[start, 'start'], [start, `enter:${start}`]];
+    while (queue.length) {
+      const [scene, on] = queue.shift();
+      wires.forEach((w, i) => {
+        if (!listens(w, on, scene)) return;
+        if (restarts(w.do)) err(`interactive.wires[${i}].do`, `a restart in this "${w.on}" wire would restart the clip for ever: the clip ${on === 'start' || scene === start ? 'starts' : `goes to "${scene}" as it starts`}, and the restart starts it again`);
+        for (const next of goes(w.do, scene, new Set())) if (!reached.has(next)) { reached.add(next); queue.push([next, `enter:${next}`]); }
+      });
+    }
+  }
   const out = { start, vars, scenes, wires };
   if (input.transition !== undefined) { const t = checkTransition(input.transition, 'interactive.transition', err); if (t) out.transition = t; }
   if (input.music !== undefined) {
@@ -324,6 +366,17 @@ const framesOf = (s, fps) => Math.max(1, Math.round(s.duration * fps));
 const sceneOf = (comp, id) => comp.interactive.scenes.find((s) => s.id === id);
 
 /**
+ * A copy of a session state. structuredClone (and postMessage) hand back ordinary objects, so the maps keyed by names a
+ * clip chose (variables, the inbox by item id) are made null-prototype again: an item called "toString" stays an own key.
+ */
+export function cloneState(s) {
+  const out = structuredClone(s);
+  for (const k of ['vars', 'changed', 'pressed', 'inbox']) out[k] = Object.assign(bag(), out[k]);
+  for (const id of Object.keys(out.inbox)) out.inbox[id] = Object.assign(bag(), out.inbox[id]);
+  return out;
+}
+
+/**
  * The first state: the start scene entered at session frame `at` (0, or a restart's frame), `start` and
  * `enter:<start>` wires run. A restart carries the sounds already played over (carry).
  */
@@ -332,9 +385,9 @@ export function initialState(comp, at = 0, carry = null) {
   /** @type {any} */
   const s = {
     f: at, scene: I.start, entered: at, ended: false, history: [], tx: null,
-    vars: { ...I.vars }, changed: {},
+    vars: Object.assign(bag(), I.vars), changed: bag(),
     pointer: carry?.pointer ?? null, capture: null, hover: null, focus: null, focusVisible: false,
-    pressed: {}, inbox: {}, sounds: carry?.sounds ?? [], n: carry?.n ?? 0,
+    pressed: bag(), inbox: bag(), sounds: carry?.sounds ?? [], n: carry?.n ?? 0,
   };
   // a restart here would start again for ever: the runner refuses it
   const run = runner(comp, s, at, { starting: true });
@@ -352,7 +405,7 @@ function runner(comp, s, at, { starting = false } = {}) {
   const fps = comp.fps;
   let budget = MAX_ACTIONS, stopped = false;
   // the frame on screen when the event came, before any action ran: what a transition leaves (and holds)
-  const prior = structuredClone(s);
+  const prior = cloneState(s);
   let leaving = null;
   const enter = (id, transition, remember = true) => {
     const from = (leaving ??= { scene: prior.scene, frame: playheadOf(comp, prior, at - 1), ui: viewOf(comp, prior, at - 1).ui });
@@ -364,7 +417,7 @@ function runner(comp, s, at, { starting = false } = {}) {
     emit(`enter:${id}`);
   };
   const set = (name, v) => {
-    if (s.vars[name] === v) return;
+    if (RESERVED.has(name) || s.vars[name] === v) return;
     s.changed[name] = { from: s.vars[name], f: at };
     s.vars[name] = v;
   };
@@ -378,18 +431,32 @@ function runner(comp, s, at, { starting = false } = {}) {
       } else if (a.go !== undefined) {
         const scenes = I.scenes;
         enter(a.go === 'next' ? scenes[(scenes.findIndex((x) => x.id === s.scene) + 1) % scenes.length].id : a.go, a.transition);
-      } else if (a.set) for (const [k, v] of Object.entries(a.set)) set(k, valueOf(v, s.vars, event));
-      else if (a.add) {
+      } else if (a.set) {
+        for (const [k, v] of Object.entries(a.set)) {
+          const x = valueOf(v, s.vars, event);
+          // an event's value that is not a finite number (a broken slider) leaves the variable as it was
+          if (typeof x === 'number' && !Number.isFinite(x)) continue;
+          set(k, x);
+        }
+      } else if (a.add) {
         for (const [k, v] of Object.entries(a.add)) {
-          let x = s.vars[k] + Number(valueOf(v, s.vars, event) ?? 0);
-          if (a.wrap && a.min !== undefined && a.max !== undefined) { const span = a.max - a.min + 1; x = a.min + ((((x - a.min) % span) + span) % span); }
+          const amount = Number(valueOf(v, s.vars, event) ?? 0);
+          if (typeof s.vars[k] !== 'number' || !Number.isFinite(amount)) continue;
+          let x = s.vars[k] + amount;
+          if (a.wrap && a.min !== undefined && a.max !== undefined) {
+            // whole steps over whole bounds wrap past the last value (lanes 0–3: 3 + 1 is 0); anything else wraps on the span (0.9 + 0.2 in 0–1 is 0.1)
+            const whole = [a.min, a.max, s.vars[k], amount].every(Number.isInteger);
+            const span = whole ? a.max - a.min + 1 : a.max - a.min;
+            if (span > 0) x = a.min + ((((x - a.min) % span) + span) % span);
+          }
           if (a.min !== undefined) x = Math.max(a.min, x);
           if (a.max !== undefined) x = Math.min(a.max, x);
           set(k, round(x));
         }
       } else if (a.toggle) for (const k of list(a.toggle)) set(k, !s.vars[k]);
       else if (a.send) {
-        const box = (s.inbox[a.send] ??= {});
+        // a null-prototype box: an item id or event of "__proto__" stays an own field of this state
+        const box = Object.hasOwn(s.inbox, a.send) ? s.inbox[a.send] : (s.inbox[a.send] = bag());
         const prev = box[a.event];
         box[a.event] = { f: at, value: a.value === undefined ? event?.value ?? null : valueOf(a.value, s.vars, event), count: (prev?.count ?? 0) + 1 };
       } else if (a.play) {
@@ -418,7 +485,9 @@ function runner(comp, s, at, { starting = false } = {}) {
       act(w.do, event);
     }
   }
-  return { emit, act };
+  /** A new event starts with the whole budget: keys that piled up in one frame are each their own event. */
+  const next = () => { budget = MAX_ACTIONS; };
+  return { emit, act, next };
 }
 
 /** The playhead frame (on the design timeline) state `s` shows at session frame n. */
@@ -436,7 +505,7 @@ export function playheadOf(comp, s, n) {
  */
 export function advance(comp, s, n) {
   if (n < s.f) throw new Error(`the session cannot go back in time (at frame ${s.f}, asked for ${n})`);
-  const out = structuredClone(s);
+  const out = cloneState(s);
   // every pass ends a scene or stops: a scene's end moves `entered` forward (a scene lasts at least a frame)
   for (;;) {
     const scene = sceneOf(comp, out.scene);
@@ -457,10 +526,11 @@ export function advance(comp, s, n) {
 
 // ── input ───────────────────────────────────────────────────────────────────────────────────────
 
-/** Map a frame-pixel point into a region's own rectangle: [lx, ly]. */
+/** Map a frame-pixel point into a region's own rectangle: [lx, ly]; [NaN, NaN] (outside every box) when the region is squashed flat. */
 function local(r, x, y) {
   const [a, b, c, d, e, f] = r.m;
-  const det = a * d - b * c || 1e-12;
+  const det = a * d - b * c;
+  if (Math.abs(det) < 1e-9) return [NaN, NaN];
   const dx = x - e, dy = y - f;
   return [(d * dx - c * dy) / det, (a * dy - b * dx) / det];
 }
@@ -481,6 +551,7 @@ function rangeValue(r, x, y) {
   const [lx, ly] = local(r, x, y);
   const { min, max, step } = r.range;
   const u = r.range.axis === 'y' ? 1 - (ly - r.y) / r.h : (lx - r.x) / r.w;
+  if (!Number.isFinite(u)) return r.range.value;
   let v = min + Math.min(1, Math.max(0, u)) * (max - min);
   if (step) v = min + Math.round((v - min) / step) * step;
   return round(Math.min(max, Math.max(min, v)));
@@ -504,7 +575,7 @@ const topmost = (regions, x, y) => { for (let i = regions.length - 1; i >= 0; i-
  */
 export function applyInput(comp, s, j, events, drawn = []) {
   const regions = reachable(drawn);
-  const out = structuredClone(s);
+  const out = cloneState(s);
   const at = j + 1;
   const run = runner(comp, out, at);
   const byKey = (k) => regions.find((r) => r.key === k) ?? null;
@@ -528,6 +599,7 @@ export function applyInput(comp, s, j, events, drawn = []) {
   };
   const scene = out.scene, entered = out.entered;
   for (const ev of events) {
+    run.next();
     // a scene change earlier in this frame's events: the regions belong to the scene that was drawn
     if ((out.scene !== scene || out.entered !== entered) && ev.type !== 'move' && ev.type !== 'leave') continue;
     if (ev.type === 'key') {
@@ -656,6 +728,9 @@ export async function replay(comp, log, { frames = [], draw, onFrame = async () 
  */
 /** @param {any} comp @param {any[]} steps @param {{ draw: (view: any) => any, from?: number, pointer?: string }} o */
 export async function stepsToLog(comp, steps, { draw, from = 1, pointer = 'mouse' }) {
+  if (!Array.isArray(steps)) throw new Error('steps is a list: { wait } { tap } { key } { down } { move } { up }');
+  if (steps.length > MAX_STEPS) throw new Error(`at most ${MAX_STEPS} steps; give a log for a longer session`);
+  const last = maxSessionFrame(comp.fps);
   const log = [];
   let s = initialState(comp);
   // each logged frame is drawn and read exactly as a replay will: advance, draw, apply
@@ -670,10 +745,17 @@ export async function stepsToLog(comp, steps, { draw, from = 1, pointer = 'mouse
   for (const [i, step] of steps.entries()) {
     if (!isPlain(step)) throw new Error(`step ${i}: a step is { wait }, { tap }, { key }, { down }, { move } or { up }`);
     if (step.wait !== undefined) { if (!num(step.wait) || step.wait < 0) throw new Error(`step ${i}: wait is seconds ≥ 0`); n += Math.max(1, Math.round(step.wait * comp.fps)); continue; }
-    const kind = step.pointer ?? pointer;
+    if (n + 1 > last) throw new Error(`step ${i}: the steps run past the longest session (${MAX_SESSION_SECONDS} s)`);
+    // the log keeps only what a replay accepts: an unknown pointer is a mouse, as normalizeLog makes it
+    const kind = ['mouse', 'touch', 'pen'].includes(step.pointer ?? pointer) ? (step.pointer ?? pointer) : 'mouse';
     if (step.key !== undefined) { await at(n++, () => [{ f: n - 1, type: 'key', key: String(step.key), ...(step.shift ? { shift: true } : {}) }]); continue; }
     const raw = ['down', 'move', 'up'].find((k) => step[k] !== undefined);
-    if (raw) { const p = step[raw]; await at(n++, () => [{ f: n - 1, type: raw, x: p.x, y: p.y, pointer: kind }]); continue; }
+    if (raw) {
+      const p = step[raw];
+      if (!isPlain(p) || !num(p.x) || !num(p.y)) throw new Error(`step ${i}: ${raw} is { x, y } in frame pixels (numbers)`);
+      await at(n++, () => [{ f: n - 1, type: raw, x: p.x, y: p.y, pointer: kind }]);
+      continue;
+    }
     if (step.tap === undefined) throw new Error(`step ${i}: unknown step ${JSON.stringify(step)}`);
     const want = typeof step.tap === 'string' ? { item: step.tap } : step.tap;
     let point = null;
@@ -697,11 +779,17 @@ export function summary(s) {
   return { frame: s.f, scene: s.scene, vars: s.vars, focus: s.focus, history: s.history.slice(-4) };
 }
 
-/** Check a raw input log's shape; returns the sorted, normalized log. */
-export function normalizeLog(log) {
+/**
+ * Check a raw input log's shape; returns the sorted, normalized log. With fps, a frame past the longest session is refused.
+ * @param {any} log @param {{ fps?: number }} [o]
+ */
+export function normalizeLog(log, { fps } = {}) {
   if (!Array.isArray(log)) throw new Error('a log is a list of input events { f, type, x, y, key, pointer }');
+  if (log.length > MAX_LOG_EVENTS) throw new Error(`a log holds at most ${MAX_LOG_EVENTS} input events; this one has ${log.length}`);
+  const last = fps ? maxSessionFrame(fps) : Infinity;
   return log.map((ev, i) => {
     if (!isPlain(ev) || !Number.isInteger(ev.f) || ev.f < 0) throw new Error(`log[${i}]: f is the session frame (an integer ≥ 0)`);
+    if (ev.f > last) throw new Error(`log[${i}]: frame ${ev.f} is past the longest session (${MAX_SESSION_SECONDS} s, frame ${last})`);
     if (!INPUT_TYPES.includes(ev.type)) throw new Error(`log[${i}]: type is one of ${INPUT_TYPES.join(', ')}`);
     if (ev.type === 'key') { if (typeof ev.key !== 'string' || !ev.key) throw new Error(`log[${i}]: a key event names its key`); return { f: ev.f, type: 'key', key: ev.key, ...(ev.shift ? { shift: true } : {}) }; }
     if (ev.type === 'leave' || ev.type === 'cancel') return { f: ev.f, type: ev.type };

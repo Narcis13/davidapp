@@ -7,8 +7,27 @@
 //   const s = createSession(composition, { draw, onAudio, onFrame, onError })
 //   s.start()  s.pause()  s.resume()  s.stop()  s.input({ type, x, y, pointer, key, shift })
 //   s.log  s.state  s.frame  s.regions  s.regionAt(x, y)  s.paused
+//   keyFor(keydownEvent, s) → 'page' | 'drop' | 'clip'
 
 import { initialState, advance, applyInput, viewOf, inside, focusables } from '../core/interactive.js';
+
+/** Keys that are never the clip's on their own: modifiers, locks and what a keyboard layout sends while composing. */
+const NOT_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock', 'Dead', 'Process', 'Unidentified', 'AltGraph', 'Fn', 'FnLock', 'OS', 'ContextMenu']);
+
+/**
+ * What a keydown is to a running session, decided the same way wherever one runs (the share page, the studio editor), so
+ * the same keystrokes record the same log: 'page' (not the clip's: a shortcut with Ctrl, Cmd or Alt, a modifier or a function
+ * key alone, or a Tab that leaves the clip past its last control), 'drop' (the clip's, but a held key repeating: one press for
+ * a held lane key, the arrows of a focused slider excepted), or 'clip' (send it to the session).
+ * @param {KeyboardEvent} e @param {{ tabLeaves: (shift: boolean) => boolean, regions: any[], state: any }} session
+ */
+export function keyFor(e, session) {
+  if (e.ctrlKey || e.metaKey || e.altKey || NOT_KEYS.has(e.key) || /^F\d+$/.test(e.key)) return 'page';
+  if (e.key === 'Tab' && session.tabLeaves(e.shiftKey)) return 'page';
+  const focused = session.regions?.find((x) => x.key === session.state?.focus);
+  if (e.repeat && !(focused?.range && e.key.startsWith('Arrow'))) return 'drop';
+  return 'clip';
+}
 
 /**
  * @param {any} comp a normalized, pinned interactive composition

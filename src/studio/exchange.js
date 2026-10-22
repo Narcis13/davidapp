@@ -516,6 +516,17 @@ export function createExchange(ctx, { library, clips, fonts }, { rebake }) {
       refs.forEach(walk);
       return { assets, images };
     };
+    // a reused function version saved before the studio recorded the events its source declares: read them from the source,
+    // so the clip's wires find them (written with the clip, below)
+    const refreshed = new Map();   // ref → its meta with the events
+    for (const { ref, reuse, rec } of incoming.values()) {
+      if (!reuse || rec.type !== 'function') continue;
+      const row = library.versionRow(ref);
+      const meta = json(row.meta, {});
+      if (meta.events) continue;
+      const { meta: m } = await pool.run('validate', { ref, source: row.source, deps: {}, assets: {}, inspectOnly: true }, { timeout: 8000 });
+      if (m.events) refreshed.set(ref, { ...meta, events: m.events });
+    }
     // one transaction for every row (below); the files move in afterwards, as the library's own writes do
     const newAssets = new Map();   // slug → the clip it began with
     const insertVersion = (ref, d) => {
@@ -566,7 +577,7 @@ export function createExchange(ctx, { library, clips, fonts }, { rebake }) {
           if (differ.length) throw new StudioError(`${ref} compiles differently here than in the library that exported it (${differ.join(', ')}): this engine reads the source another way. Nothing was imported. Export the clip again with this build, or use the build that exported it.`, 'rejected');
           d.thumb = { rel: thumbRel, tmp: tmpPath(thumbRel) };
           writeFileSync(d.thumb.tmp, v.thumb);
-          let meta = { test: v.frames, warnings: v.warnings };
+          let meta = { test: v.frames, warnings: v.warnings, events: v.meta.events ?? undefined };
           if (v.strip) {
             const stripRel = `thumbs/${slug}@${version}.strip.png`;
             d.strip = { rel: stripRel, tmp: tmpPath(stripRel) };
@@ -638,6 +649,8 @@ export function createExchange(ctx, { library, clips, fonts }, { rebake }) {
       }
     }
 
+    if (refreshed.size) transaction(db, () => { for (const [ref, meta] of refreshed) db.prepare('UPDATE asset_versions SET meta = ? WHERE id = ?').run(JSON.stringify(meta), versionId(ref)); });
+
     // 8. the clip: the composition as exported, pinned to the versions just made
     // (the studio's own save pins and normalises it once more; it must come out as it went in, and is kept exactly as exported)
     if (!same(clips.prepare(doc.composition).composition, doc.composition)) throw new StudioError(`The composition of ${doc.slug} does not come back the same from this library (the versions were imported; the clip was not): the engine reads it differently than the library that exported it.`, 'rejected');
@@ -663,7 +676,7 @@ export function createExchange(ctx, { library, clips, fonts }, { rebake }) {
 
     const out = {
       clip: doc.slug, replaced: !!existingClip, revision: result.clip.revision,
-      versions: { created: [...toCreate].sort(refCompare), reused: [...incoming.values()].filter((i) => i.reuse).map((i) => i.ref).sort(refCompare), bundled: [...bundled].sort(refCompare) },
+      versions: { created: [...toCreate].sort(refCompare), reused: [...incoming.values()].filter((i) => i.reuse).map((i) => i.ref).sort(refCompare), refreshed: [...refreshed.keys()].sort(refCompare), bundled: [...bundled].sort(refCompare) },
       rebaked, copied: need.length, external: external.length,
     };
     if (verify) out.verify = await verifyClip(doc.slug, doc.check);

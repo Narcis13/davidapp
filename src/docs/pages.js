@@ -38,6 +38,13 @@ export const GROUPS = [
     ],
   },
   {
+    title: 'Share and play',
+    pages: [
+      { slug: 'share', title: 'Share a clip as a link', summary: 'A page that plays any clip in the viewer\'s browser: the live link, a folder you can publish anywhere, and what the viewer sees.' },
+      { slug: 'interactive', title: 'Interactive clips', summary: 'Clips that are played, not watched: scenes, variables and wires, playing one in the editor, and the checks that crawl its states.' },
+    ],
+  },
+  {
     title: 'Working with Claude',
     pages: [
       { slug: 'claude', title: 'Claude Code and the studio', summary: 'How Claude drives the studio over MCP, what to ask for, and how to work the request queue.' },
