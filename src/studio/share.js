@@ -102,6 +102,30 @@ export function playerFiles() {
   return all.map((f) => relative(SRC, f).split(sep).join('/')).sort();
 }
 
+/**
+ * A small pool of promises. `join` rejects if any of them rejected, including one that already left
+ * the in-flight set: a failure must not disappear because the pool moved on.
+ * @param {number} limit
+ */
+export function createWritePool(limit) {
+  const active = new Set();
+  const jobs = [];
+  let failure = null;
+  return {
+    async add(promise) {
+      const job = promise.catch((e) => { failure ??= e; });
+      jobs.push(job);
+      active.add(job);
+      job.finally(() => active.delete(job));
+      if (active.size >= limit) await Promise.race(active);
+    },
+    async join() {
+      await Promise.all(jobs);
+      if (failure) throw failure;
+    },
+  };
+}
+
 /** The page: page.html with the clip's title, description, shape, URLs and link-preview tags filled in. */
 function pageHtml({ title, description, root, bundle, poster, width, height, image, url }) {
   const meta = [
@@ -210,21 +234,18 @@ export function createShare(studio) {
    */
   async function writeFrames(indices, frameAt, dir, quality) {
     mkdirSync(dir, { recursive: true });
-    const byHash = new Map(), files = {}, writing = new Set();
+    const byHash = new Map(), files = {}, pool = createWritePool(4);
     for (const i of [...indices].sort((a, b) => a - b)) {
       const f = await frameAt(i);
       const h = sha1(f.data).slice(0, 16);
       if (!byHash.has(h)) {
         const name = `${h}.webp`;
         byHash.set(h, name);
-        const p = Promise.resolve(f.canvas()).then((c) => c.encode('webp', quality)).then((buf) => writeFileSync(join(dir, name), buf));
-        writing.add(p);
-        p.finally(() => writing.delete(p)).catch(() => {});
-        if (writing.size >= 4) await Promise.race(writing);
+        await pool.add(Promise.resolve(f.canvas()).then((c) => c.encode('webp', quality)).then((buf) => writeFileSync(join(dir, name), buf)));
       }
       files[i] = byHash.get(h);
     }
-    await Promise.all(writing);
+    await pool.join();
     return { files, shown: indices.size, unique: byHash.size };
   }
 

@@ -101,6 +101,34 @@ function drawer(rt, c) {
   return { draw, hashes, canvas };
 }
 
+test('a reserved id is refused, and a send to one does not change Object.prototype', () => {
+  const bad = normalizeComposition(JSON.parse(`{
+    "width": 320, "height": 180, "duration": 1, "fps": 30,
+    "tracks": [{ "id": "__proto__", "type": "visual", "items": [{ "id": "constructor", "asset": "text@1", "start": 0, "duration": 1, "params": {} }] }],
+    "interactive": { "vars": { "__proto__": 1, "score": 0 }, "scenes": [{ "id": "prototype", "start": 0, "duration": 1, "end": "hold" }],
+      "wires": [{ "on": "start", "do": [{ "send": "constructor", "event": "__proto__" }] }] }
+  }`));
+  const paths = bad.errors.map((e) => e.path);
+  for (const p of ['tracks[0].id', 'tracks[0].items[0].id', 'interactive.vars.__proto__', 'interactive.scenes[0].id', 'interactive.wires[0].do[0].event']) assert.ok(paths.includes(p), paths.join(', '));
+  const comp = {
+    fps: 30,
+    interactive: {
+      start: 'main', vars: { score: 0 },
+      scenes: [{ id: 'main', start: 0, duration: 1, end: 'hold' }],
+      wires: [{ on: 'start', do: [{ send: '__proto__', event: 'pwned', value: 1 }] }],
+    },
+  };
+  try {
+    const s = initialState(comp);
+    const proto = /** @type {any} */ (Object.prototype);
+    assert.equal(s.inbox['__proto__'].pwned.value, 1);
+    assert.equal(proto.pwned, undefined);
+    assert.equal((/** @type {any} */ ({})).pwned, undefined);
+  } finally {
+    delete (/** @type {any} */ (Object.prototype)).pwned;
+  }
+});
+
 test('interactive: the section normalizes, and its mistakes are named with their paths', () => {
   const c = comp();
   assert.equal(c.interactive.start, 'menu');

@@ -3,7 +3,8 @@
 // so the preview runs the same runtime the renderer does.
 
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { pipeline } from 'node:stream';
 import { basename, extname, join, normalize, resolve, sep } from 'node:path';
 import { ENGINE_VERSION, FORMATS, makeRef } from '../core/engine.js';
@@ -26,6 +27,51 @@ const TYPES = {
 };
 const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501, too_large: 413 };
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+const TOKEN_COOKIE = 'studio_token';
+const DROPPED = new Set(['ECONNRESET', 'EPIPE', 'ERR_STREAM_PREMATURE_CLOSE', 'ERR_STREAM_DESTROYED']);
+/** Shown instead of the studio when STUDIO_TOKEN is set and this browser has not signed in. */
+const LOGIN_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Sign in · Fablecut</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0b10; color: #f4f1ea; font: 16px/1.4 system-ui, sans-serif; }
+  form { width: min(22rem, calc(100% - 2rem)); display: grid; gap: 0.75rem; }
+  h1 { font-size: 1.25rem; margin: 0; }
+  p { margin: 0; color: #b7b3c7; }
+  input { font: inherit; padding: 0.6rem 0.7rem; border-radius: 8px; border: 1px solid #3a3848; background: #16161f; color: inherit; }
+  button { font: inherit; padding: 0.6rem 0.7rem; border: 0; border-radius: 8px; background: #ffd166; color: #0b0b10; font-weight: 700; }
+  .err { color: #ff8b8b; min-height: 1.4em; }
+</style>
+</head>
+<body>
+<form>
+  <h1>Fablecut</h1>
+  <p>This studio is not open to the network. Enter its token to continue.</p>
+  <label>Token <input name="token" type="password" autocomplete="current-password" required></label>
+  <p class="err" role="alert"></p>
+  <button type="submit">Open the studio</button>
+</form>
+<script>
+document.querySelector('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.querySelector('.err');
+  err.textContent = '';
+  const token = new FormData(e.target).get('token');
+  let res;
+  try { res = await fetch('/api/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }) }); }
+  catch { err.textContent = 'The studio server is not reachable.'; return; }
+  if (res.ok) { location.reload(); return; }
+  err.textContent = 'That token was not accepted.';
+});
+</script>
+</body>
+</html>`;
+const secretEqual = (a, b) => timingSafeEqual(createHash('sha256').update(String(a)).digest(), createHash('sha256').update(String(b)).digest());
 /** The manual's pages draw no script and no inline style, so they are served under a policy that allows neither. */
 const DOCS_CSP = "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 /** Packages the studio page may load from node_modules (Faqir UI's stylesheets for the manual, CodeMirror 6 and what it imports). */
@@ -34,10 +80,14 @@ const VENDOR = new Set(['@faqir-ui/core', 'codemirror','@codemirror/state', '@co
 
 /**
  * hosts: the Host names the server answers to (default: loopback names only), or null for any.
+ *   null is refused unless `token` is set: a studio on the network is otherwise open to whoever can reach it.
+ * token: when set (at least 16 characters), every request needs this secret, as a bearer token or the sign-in cookie.
  * env: where to look for the claude CLI for "Run now" (PATH, STUDIO_CLAUDE_BIN).
- * @param {any} studio @param {{ log?: (line: string) => void, author?: string, hosts?: string[] | null, env?: Record<string, string | undefined> }} [o]
+ * @param {any} studio @param {{ log?: (line: string) => void, author?: string, hosts?: string[] | null, token?: string, env?: Record<string, string | undefined> }} [o]
  */
-export function createStudioServer(studio, { log = () => {}, author = process.env.STUDIO_AUTHOR ?? 'studio-user', hosts = LOCAL_HOSTS, env = process.env } = {}) {
+export function createStudioServer(studio, { log = () => {}, author = process.env.STUDIO_AUTHOR ?? 'studio-user', hosts = LOCAL_HOSTS, token = undefined, env = process.env } = {}) {
+  if (token !== undefined && (typeof token !== 'string' || token.length < 16)) throw new Error('STUDIO_TOKEN must be at least 16 characters');
+  if (hosts === null && !token) throw new Error('Refusing to answer every Host name without STUDIO_TOKEN. Bind the studio to 127.0.0.1, or set STUDIO_TOKEN to a long random secret.');
   const { library, clips, renders, lineage, requests, uploads } = studio;
   const runs = createAgentRuns(studio, { env });
   const UI = join(ROOT, 'src', 'ui');
@@ -45,21 +95,37 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
 
   const send = (res, status, body, headers = {}) => {
     const data = Buffer.isBuffer(body) ? body : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
-    res.writeHead(status, { 'content-type': typeof body === 'string' ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8', 'content-length': data.length, 'cache-control': 'no-store', ...headers });
+    res.writeHead(status, { 'content-type': typeof body === 'string' ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8', 'content-length': data.length, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'same-origin', ...headers });
     res.end(data);
   };
   const png = (res, data) => send(res, 200, Buffer.from(data), { 'content-type': 'image/png' });
 
-  /** Serve a file under `base`, refusing anything that resolves outside it. Supports Range. */
-  function file(req, res, base, rel, { cache = 'no-cache' } = {}) {
+  const realRoots = new Map();
+  /** True when `full` is `base` or a file inside it, after symlinks are resolved. */
+  function insideRoot(base, full) {
+    let root = realRoots.get(base);
+    if (!root) {
+      try { root = realpathSync(base); } catch { return false; }
+      realRoots.set(base, root);
+    }
+    let real;
+    try { real = realpathSync(full); } catch { return false; }
+    const fold = (p) => (process.platform === 'win32' ? p.toLowerCase() : p);
+    const r = fold(real), b = fold(root);
+    return r === b || r.startsWith(b.endsWith(sep) ? b : b + sep);
+  }
+
+  /** Serve a file under `base`, refusing anything that resolves outside it, including through a symlink. Supports Range. */
+  function file(req, res, base, rel, { cache = 'no-cache', headers: extra = {} } = {}) {
     let decoded;
     try { decoded = decodeURIComponent(rel); } catch { return send(res, 400, { error: 'Malformed path' }); }
     const full = resolve(base, normalize(decoded).replace(/^([/\\])+/, ''));
     if (full !== base && !full.startsWith(base + sep)) return send(res, 403, { error: 'Forbidden' });
     if (!existsSync(full) || !statSync(full).isFile()) return send(res, 404, { error: `Not found: ${rel}` });
+    if (!insideRoot(base, full)) return send(res, 403, { error: 'Forbidden' });
     const { size } = statSync(full);
     // nosniff + sandbox: an SVG image asset opened directly must not run script on this origin
-    const headers = { 'content-type': TYPES[extname(full).toLowerCase()] ?? 'application/octet-stream', 'accept-ranges': 'bytes', 'cache-control': cache, 'x-content-type-options': 'nosniff', ...(extname(full).toLowerCase() === '.svg' && base !== UI ? { 'content-security-policy': 'sandbox' } : {}) };
+    const headers = { 'content-type': TYPES[extname(full).toLowerCase()] ?? 'application/octet-stream', 'accept-ranges': 'bytes', 'cache-control': cache, 'x-content-type-options': 'nosniff', 'referrer-policy': 'same-origin', ...(extname(full).toLowerCase() === '.svg' && base !== UI ? { 'content-security-policy': 'sandbox' } : {}), ...extra };
     // pipeline closes the file when the client goes away (video scrubbing aborts requests all the time)
     const stream = (opts) => pipeline(createReadStream(full, opts), res, () => {});
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
@@ -320,6 +386,19 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     ...moreRoutes({ studio, author, send, png, file, read, int: (v, fallback, min, max) => int(v, fallback, min, max) }),
   ];
 
+  const cookieToken = (req) => {
+    const m = new RegExp(`(?:^|;\\s*)${TOKEN_COOKIE}=([^;]*)`).exec(String(req.headers.cookie ?? ''));
+    if (!m) return '';
+    try { return decodeURIComponent(m[1]); } catch { return ''; }
+  };
+  const authed = (req) => {
+    if (!token) return true;
+    const header = String(req.headers.authorization ?? '');
+    const bearer = /^bearer\s+/i.test(header) ? header.replace(/^bearer\s+/i, '').trim() : '';
+    return secretEqual(bearer, token) || secretEqual(cookieToken(req), token);
+  };
+  const sessionCookie = ` ${TOKEN_COOKIE}=${encodeURIComponent(token ?? '')}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`.trim();
+
   /** Only answer requests addressed to this machine, and refuse writes that come from another site's page. */
   function guard(req) {
     const host = String(req.headers.host ?? '').toLowerCase();
@@ -390,6 +469,17 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     guard(req);
     const url = new URL(req.url, 'http://localhost');
     const path = url.pathname;
+    if (token && path === '/api/session' && req.method === 'POST') {
+      const data = await body(req);
+      if (typeof data.token !== 'string' || !secretEqual(data.token, token)) throw new StudioError('That token was not accepted', 'forbidden');
+      return send(res, 200, { ok: true }, { 'set-cookie': sessionCookie });
+    }
+    if (token && !authed(req)) {
+      const openPage = (req.method === 'GET' || req.method === 'HEAD') && !/^\/(api|media|core|fonts|vendor|ui|player|share)(\/|$)/.test(path);
+      // connect-src 'self': this page posts the token with fetch. default-src 'none' would block that request.
+      if (openPage) return send(res, 200, req.method === 'HEAD' ? '' : LOGIN_HTML, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'" });
+      return send(res, 401, { error: 'Sign in required', code: 'forbidden' });
+    }
     if (path === '/api/events' && req.method === 'GET') return events(req, res);
     if (path === '/api/uploads' && req.method === 'POST') return send(res, 200, await receiveUpload(req, url));
     if (path.startsWith('/api/')) {
@@ -425,13 +515,15 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     const doc = /^\/docs(?:\/([a-z0-9-]+))?\/?$/.exec(path);
     if (doc) return docsPage(res, doc[1] ?? 'index', url);
     // every other path is a screen of the single-page app
-    return file(req, res, UI, 'index.html');
+    return file(req, res, UI, 'index.html', { headers: { 'content-security-policy': "frame-ancestors 'none'" } });
   }
 
   const server = createServer((req, res) => {
     const t0 = performance.now();
     res.on('finish', () => { if (req.url.startsWith('/api/')) log(`${req.method} ${req.url} ${res.statusCode} ${Math.round(performance.now() - t0)}ms`); });
     handle(req, res).catch((e) => {
+      // a client that went away mid-response (scrubbing a video does this constantly) is not a server error
+      if (DROPPED.has(e?.code)) return res.headersSent || res.writableEnded ? undefined : res.end();
       // an over-limit body was read to its end first (see read), so the answer arrives; the connection is not kept
       if (e instanceof StudioError) return res.headersSent ? res.end() : send(res, STATUS[e.code] ?? 400, { error: e.message, code: e.code, details: e.details }, e.code === 'too_large' ? { connection: 'close' } : {});
       console.error(`ERROR ${req.method} ${req.url}\n${e?.stack ?? e}`);

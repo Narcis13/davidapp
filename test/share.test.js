@@ -8,7 +8,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { parse } from 'acorn';
 import { tempStudio, seedAssets, smallComposition, AUTHOR } from './helpers.js';
 import { createStudioServer } from '../src/server/http.js';
-import { shareOf, SHARE_DIR } from '../src/studio/share.js';
+import { shareOf, SHARE_DIR, createWritePool } from '../src/studio/share.js';
 import { ffmpegPath, run, probeSummary } from '../src/render/ffmpeg.js';
 import { createCanvas, loadImage } from '../src/render/host.js';
 import { connect, callTool } from '../scripts/mcp.mjs';
@@ -35,6 +35,20 @@ function urlsOf(value, path = '') {
   return [];
 }
 const relativeOnly = (u) => !/^[a-z][a-z0-9+.-]*:/i.test(u) && !u.startsWith('/') && !u.startsWith('\\') && !u.split('/').includes('..');
+
+test('a failed frame write is reported after the pool has moved on', async () => {
+  const pool = createWritePool(2);
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const first = pool.add(held);
+  await pool.add(Promise.reject(new Error('encode failed')));
+  release();
+  await first;
+  await assert.rejects(pool.join(), /encode failed/);
+  const ok = createWritePool(2);
+  await ok.add(Promise.resolve());
+  await ok.join();
+});
 
 test('an export is one folder that plays from anywhere: relative URLs, its own player and runtime, the media it uses', async () => {
   const r = await shareOf(studio).exportClip('tiny', { out, baseUrl: 'https://example.com/clips/tiny' });
@@ -75,7 +89,7 @@ test('an export is one folder that plays from anywhere: relative URLs, its own p
   // the player and the runtime, every import of every module resolving inside the folder; no rendered video in it
   const files = walk(out);
   assert.deepEqual(files.filter((f) => /\.(mp4|mov|webm|m4v)$/i.test(f)), []);
-  for (const f of ['player/player.js', 'player/engine.js', 'player/worker.js', 'player/player.css', 'core/runtime.js', 'core/lib/text.js', 'core/interactive.js']) assert.ok(files.includes(f), `${f} is exported`);
+  for (const f of ['player/player.js', 'player/engine.js', 'player/worker.js', 'player/player.css', 'core/runtime.js', 'core/lib/text.js', 'core/interactive.js', 'core/isolate.js', 'core/static-check.js']) assert.ok(files.includes(f), `${f} is exported`);
   for (const f of files.filter((x) => x.endsWith('.js'))) {
     const ast = parse(readFileSync(join(out, f), 'utf8'), { ecmaVersion: 'latest', sourceType: 'module' });
     for (const node of ast.body) {

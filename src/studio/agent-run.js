@@ -36,7 +36,11 @@ export function findClaude(env = process.env) {
  */
 export function commandFor(bin, args) {
   if (/\.[cm]?js$/i.test(bin)) return { cmd: process.execPath, args: [bin, ...args], shell: false };
-  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(bin)) return { cmd: `"${bin}"`, args: args.map((a) => `"${String(a).replaceAll('"', '')}"`), shell: true };
+  // cmd.exe expands %VAR% even inside quotes, so a path that contains % is escaped before it is quoted
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(bin)) {
+    const quote = (s) => `"${String(s).replaceAll('"', '').replaceAll('%', '%%')}"`;
+    return { cmd: quote(bin), args: args.map(quote), shell: true };
+  }
   return { cmd: bin, args, shell: false };
 }
 

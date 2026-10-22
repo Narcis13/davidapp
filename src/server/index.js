@@ -12,10 +12,19 @@ import { createStudioServer } from './http.js';
 
 const port = Number(process.env.PORT ?? 8787);
 const host = process.env.HOST ?? '127.0.0.1';
+const token = process.env.STUDIO_TOKEN ?? '';
+if (token && token.length < 16) {
+  console.error('STUDIO_TOKEN must be at least 16 characters.');
+  process.exit(1);
+}
 const studio = createStudio({ role: 'server', runner: true });
-// loopback names by default; binding another address on purpose (HOST=0.0.0.0) opens it to whoever can reach it
+// loopback by default. Another address (HOST=0.0.0.0) answers only when STUDIO_TOKEN is set; the page asks for it.
 const loopback = ['127.0.0.1', 'localhost', '::1'].includes(host);
-const server = createStudioServer(studio, { log: (line) => console.log(line), hosts: loopback ? undefined : null });
+if (!loopback && !token) {
+  console.error('Refusing to listen on a non-loopback address without STUDIO_TOKEN. Use HOST=127.0.0.1, or set STUDIO_TOKEN to a long random secret.');
+  process.exit(1);
+}
+const server = createStudioServer(studio, { log: (line) => console.log(line), hosts: loopback ? undefined : null, token: token || undefined });
 const pidFile = join(studio.dataDir, 'server.pid');
 
 server.listen(port, host, () => {
@@ -34,3 +43,10 @@ async function shutdown() {
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+process.on('uncaughtException', (e) => {
+  console.error(`ERROR uncaught exception: ${e?.stack ?? e}`);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error(`ERROR unhandled rejection: ${reason instanceof Error ? reason.stack : reason}`);
+});

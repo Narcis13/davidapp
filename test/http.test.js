@@ -3,6 +3,9 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, symlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tempStudio, seedAssets, smallComposition, AUTHOR, DOT } from './helpers.js';
 import { createStudioServer } from '../src/server/http.js';
 
@@ -145,6 +148,9 @@ test('static files, the app shell, and requests that must be refused', async () 
   const shell = await get('/clips/anything/at/all');
   assert.equal(shell.status, 200);
   assert.match(shell.headers.get('content-type'), /text\/html/);
+  assert.match(shell.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+  assert.equal(shell.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal((await get('/api/status')).headers.get('x-content-type-options'), 'nosniff');
   for (const path of ['/media/studio.db', '/media/cache/audio/x.wav', '/media/renders/%2e%2e/studio.db', '/media/thumbs/..%2f..%2fpackage.json', '/core/..%2f..%2fpackage.json', '/media/renders/..%5cstudio.db', '/ui/..%2fserver/http.js']) {
     const res = await get(path);
     assert.ok([403, 404].includes(res.status), `${path} → ${res.status}`);
@@ -177,4 +183,85 @@ test('requests from another site, or addressed to another host, are refused', as
   assert.equal((await post('/api/frame/asset', { ref: 'dot@1', width: 9000, height: 9000 })).status, 400);
   assert.equal((await get('/api/assets?limit=abc&offset=x')).status, 200);
   assert.equal((await get('/media/thumbs/%')).status, 400);
+});
+
+test('a clip edit cannot change Object.prototype', async () => {
+  const patch = { start: 0.2 };
+  Object.defineProperty(patch, '__proto__', { value: { pollutedByClip: true }, enumerable: true });
+  const params = {};
+  Object.defineProperty(params, '__proto__', { value: { pollutedByParam: true }, enumerable: true });
+  params.text = 'Safe';
+  try {
+    patch.params = params;
+    const edited = await t.studio.clips.editClip('demo', [{ op: 'update_item', id: 'label', patch }]);
+    const label = edited.clip.composition.tracks.find((tr) => tr.id === 'titles').items.find((it) => it.id === 'label');
+    assert.equal(label.start, 0.2);
+    assert.equal(label.params.text, 'Safe');
+    const proto = /** @type {any} */ (Object.prototype);
+    assert.equal(proto.pollutedByClip, undefined);
+    assert.equal(proto.pollutedByParam, undefined);
+    const markerPatch = { label: 'kept' };
+    Object.defineProperty(markerPatch, '__proto__', { value: { pollutedByMarker: true }, enumerable: true });
+    await t.studio.clips.editClip('demo', [{ op: 'add_marker', marker: { t: 0.2, type: 'note', label: 'n' } }, { op: 'update_marker', index: 0, patch: markerPatch }]);
+    assert.equal(proto.pollutedByMarker, undefined);
+  } finally {
+    const proto = /** @type {any} */ (Object.prototype);
+    delete proto.pollutedByClip;
+    delete proto.pollutedByParam;
+    delete proto.pollutedByMarker;
+  }
+});
+
+test('a symlink inside the media folders is not served when it points outside them', async (tctx) => {
+  const thumbs = join(t.dataDir, 'thumbs');
+  mkdirSync(thumbs, { recursive: true });
+  const link = join(thumbs, 'leak.json');
+  try { symlinkSync(fileURLToPath(new URL('../package.json', import.meta.url)), link); }
+  catch (e) {
+    if (e.code === 'EPERM' || e.code === 'ENOTSUP') return tctx.skip('this machine does not allow symlinks');
+    throw e;
+  }
+  const res = await get('/media/thumbs/leak.json');
+  assert.equal(res.status, 403);
+  assert.doesNotMatch(await res.text(), /"dependencies"/);
+});
+
+test('a footage upload that is not a video body is refused', async () => {
+  const res = await get('/api/footage?name=notes.mp4', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'not a video' });
+  assert.equal(res.status, 415);
+});
+
+test('with a token, the studio is closed until the token is given', async () => {
+  const secret = '0123456789abcdef';
+  assert.throws(() => createStudioServer(t.studio, { token: 'too-short' }), /16 characters/);
+  assert.throws(() => createStudioServer(t.studio, { hosts: null }), /STUDIO_TOKEN/);
+  const locked = createStudioServer(t.studio, { token: secret });
+  const openNet = createStudioServer(t.studio, { hosts: null, token: secret });
+  await new Promise((resolve) => { locked.listen(0, '127.0.0.1', () => resolve(undefined)); });
+  await new Promise((resolve) => { openNet.listen(0, '127.0.0.1', () => resolve(undefined)); });
+  const info = locked.address();
+  if (info === null || typeof info === 'string') throw new Error('the locked server did not bind a port');
+  const root = `http://127.0.0.1:${info.port}`;
+  try {
+    const page = await fetch(root + '/');
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /Enter its token/);
+    assert.match(page.headers.get('content-security-policy'), /connect-src 'self'/);
+    assert.equal((await fetch(root + '/api/status')).status, 401);
+    assert.equal((await fetch(root + '/api/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'wrong-token-value' }) })).status, 403);
+    const session = await fetch(root + '/api/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: secret }) });
+    assert.equal(session.status, 200);
+    const cookie = session.headers.getSetCookie?.()[0] ?? session.headers.get('set-cookie');
+    assert.match(cookie, /studio_token=/);
+    assert.match(cookie, /HttpOnly/);
+    const authed = await fetch(root + '/api/status', { headers: { cookie: cookie.split(';')[0] } });
+    assert.equal(authed.status, 200);
+    const bearer = await fetch(root + '/api/status', { headers: { authorization: `Bearer ${secret}` } });
+    assert.equal(bearer.status, 200);
+  } finally {
+    locked.closeAllConnections();
+    openNet.closeAllConnections();
+    await new Promise((resolve) => locked.close(resolve));
+    await new Promise((resolve) => openNet.close(resolve));
+  }
 });

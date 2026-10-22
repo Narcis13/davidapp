@@ -26,6 +26,9 @@ export const ACTIONS = ['go', 'set', 'add', 'toggle', 'send', 'play', 'if', 'res
 export const INPUT_TYPES = ['down', 'move', 'up', 'cancel', 'leave', 'key'];
 const COMPARE = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'];
 const NAME_RE = /^[A-Za-z_][\w-]*$/;
+// `__proto__` matches NAME_RE, and assigning it on an ordinary object walks Object.prototype's setter.
+const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
+const bag = () => Object.create(null);
 /** "$value.lane": a field of the event's value (a region's value may be an object). */
 const FIELD_RE = /^\$value(\.[A-Za-z_]\w*)+$/;
 /** Actions one event may run, nested wires included: a wire loop stops here instead of hanging the player. */
@@ -109,6 +112,7 @@ function checkActions(actions, path, err, ctx) {
     } else if (kind === 'send') {
       if (!ctx.items.has(a.send)) err(`${p}.send`, `no visual item "${a.send}"`);
       if (typeof a.event !== 'string' || !NAME_RE.test(a.event)) err(`${p}.event`, 'event is the name the item reacts to, e.g. "burst"');
+      else if (RESERVED.has(a.event)) err(`${p}.event`, `"${a.event}" is reserved`);
       if (a.value !== undefined) checkValue(a.value, `${p}.value`, err, ctx);
       ctx.sends.push({ item: a.send, event: a.event, path: p });
     } else if (kind === 'play') {
@@ -144,11 +148,12 @@ export function normalizeInteractive(input, { duration, fps, visual, audio }, er
   if (!isPlain(input)) { err('interactive', 'interactive is { start, vars, scenes, wires, transition, music }'); return undefined; }
   const known = ['start', 'vars', 'scenes', 'wires', 'transition', 'music'];
   for (const k of Object.keys(input)) if (!known.includes(k)) err(`interactive.${k}`, `unknown field (use ${known.join(', ')})`);
-  const vars = {};
+  const vars = bag();
   if (input.vars !== undefined) {
     if (!isPlain(input.vars)) err('interactive.vars', 'vars maps names to their first values: { score: 0, sound: true }');
     else for (const [name, v] of Object.entries(input.vars)) {
       if (!NAME_RE.test(name)) err(`interactive.vars.${name}`, 'a variable name is letters, digits, _ and -, starting with a letter');
+      else if (RESERVED.has(name)) err(`interactive.vars.${name}`, `"${name}" is reserved`);
       else if (!scalar(v)) err(`interactive.vars.${name}`, 'a variable starts as a number, a boolean or a string');
       else vars[name] = v;
     }
@@ -160,6 +165,7 @@ export function normalizeInteractive(input, { duration, fps, visual, audio }, er
     const p = `interactive.scenes[${i}]`;
     if (!isPlain(s)) return err(p, 'a scene is { id, start, duration, end }');
     if (typeof s.id !== 'string' || !NAME_RE.test(s.id)) return err(`${p}.id`, 'id names the scene: letters, digits, _ and -');
+    if (RESERVED.has(s.id)) return err(`${p}.id`, `"${s.id}" is reserved`);
     if (ids.has(s.id)) return err(`${p}.id`, `duplicate scene "${s.id}"`);
     ids.add(s.id);
     if (!num(s.start) || s.start < 0) err(`${p}.start`, 'start is where the scene begins on the timeline, in seconds ≥ 0');
@@ -332,9 +338,9 @@ export function initialState(comp, at = 0, carry = null) {
   /** @type {any} */
   const s = {
     f: at, scene: I.start, entered: at, ended: false, history: [], tx: null,
-    vars: { ...I.vars }, changed: {},
+    vars: Object.assign(bag(), I.vars), changed: bag(),
     pointer: carry?.pointer ?? null, capture: null, hover: null, focus: null, focusVisible: false,
-    pressed: {}, inbox: {}, sounds: carry?.sounds ?? [], n: carry?.n ?? 0,
+    pressed: bag(), inbox: bag(), sounds: carry?.sounds ?? [], n: carry?.n ?? 0,
   };
   // a restart here would start again for ever: the runner refuses it
   const run = runner(comp, s, at, { starting: true });
@@ -364,7 +370,7 @@ function runner(comp, s, at, { starting = false } = {}) {
     emit(`enter:${id}`);
   };
   const set = (name, v) => {
-    if (s.vars[name] === v) return;
+    if (RESERVED.has(name) || s.vars[name] === v) return;
     s.changed[name] = { from: s.vars[name], f: at };
     s.vars[name] = v;
   };
@@ -389,7 +395,8 @@ function runner(comp, s, at, { starting = false } = {}) {
         }
       } else if (a.toggle) for (const k of list(a.toggle)) set(k, !s.vars[k]);
       else if (a.send) {
-        const box = (s.inbox[a.send] ??= {});
+        // a null-prototype box: an item id or event of "__proto__" stays an own field of this state
+        const box = s.inbox[a.send] ?? (s.inbox[a.send] = bag());
         const prev = box[a.event];
         box[a.event] = { f: at, value: a.value === undefined ? event?.value ?? null : valueOf(a.value, s.vars, event), count: (prev?.count ?? 0) + 1 };
       } else if (a.play) {

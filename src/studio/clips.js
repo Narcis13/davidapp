@@ -24,6 +24,11 @@ const sha1 = (s) => createHash('sha1').update(s).digest('hex');
 
 const round3 = (v) => Math.round(v * 1000) / 1000;
 
+// Keys that assign through Object.prototype's setters. A patch from JSON can carry them as its own fields.
+const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const entriesOf = (o) => (o && typeof o === 'object' ? Object.entries(o).filter(([k]) => !BLOCKED_KEYS.has(k)) : []);
+const copyFields = (o) => Object.fromEntries(entriesOf(o));
+
 /** What an image layer takes: how the image fits its box. */
 const IMAGE_ITEM_SCHEMA = { fit: { type: 'enum', options: ['contain', 'cover', 'fill'], default: 'contain' } };
 /** A baked frame sequence plays like a layer: it fits its box, and holds its last frame or loops. */
@@ -590,7 +595,7 @@ export function createClips(ctx, library) {
     /** A copy of a scene or wire with the fields of patch set (null removes one). */
     const patched = (from, patch) => {
       const out = { ...from };
-      for (const [k, v] of Object.entries(patch ?? {})) { if (v === null) delete out[k]; else out[k] = structuredClone(v); }
+      for (const [k, v] of entriesOf(patch)) { if (v === null) delete out[k]; else out[k] = structuredClone(v); }
       return out;
     };
     for (const [n, op] of ops.entries()) {
@@ -629,7 +634,7 @@ export function createClips(ctx, library) {
           if (op.op === 'remove_marker') list.splice(op.index, 1);
           else {
             const m = { ...list[op.index] };
-            for (const [k, v] of Object.entries(op.patch ?? {})) { if (v === null) delete m[k]; else m[k] = v; }
+            for (const [k, v] of entriesOf(op.patch)) { if (v === null) delete m[k]; else m[k] = v; }
             list[op.index] = m;
           }
           list.sort((a, b) => (a.t ?? 0) - (b.t ?? 0));
@@ -638,18 +643,21 @@ export function createClips(ctx, library) {
         }
         case 'add_track':
           if (c.tracks.some((t) => t.id === op.track?.id)) throw new StudioError(`edit: a track with id "${op.track.id}" already exists`, 'conflict');
-          c.tracks.splice(op.index ?? c.tracks.length, 0, { items: [], ...op.track });
+          c.tracks.splice(op.index ?? c.tracks.length, 0, { items: [], ...copyFields(op.track) });
           break;
         case 'remove_track': c.tracks.splice(c.tracks.indexOf(trackOf(op.id)), 1); break;
         case 'add_item': trackOf(op.track).items.push(op.item); break;
         case 'remove_item': { const f = find(op.id); f.track.items.splice(f.i, 1); break; }
         case 'update_item': {
           const f = find(op.id);
-          const { params, ...rest } = op.patch ?? {};
-          Object.assign(f.item, rest);
-          if (params) {
-            f.item.params = { ...f.item.params, ...params };
-            for (const [k, v] of Object.entries(params)) if (v === null) delete f.item.params[k];
+          let params;
+          for (const [k, v] of entriesOf(op.patch)) {
+            if (k === 'params') params = v;
+            else f.item[k] = v;
+          }
+          if (params && typeof params === 'object') {
+            f.item.params = { ...f.item.params };
+            for (const [k, v] of entriesOf(params)) { if (v === null) delete f.item.params[k]; else f.item.params[k] = v; }
           }
           break;
         }
@@ -678,7 +686,7 @@ export function createClips(ctx, library) {
         case 'set_transform': {
           const at = layoutOf(find(op.id).item, op.format);
           const tr = { ...(at.transform ?? {}) };
-          for (const [k, v] of Object.entries(op.transform ?? {})) { if (v === null) delete tr[k]; else tr[k] = v; }
+          for (const [k, v] of entriesOf(op.transform)) { if (v === null) delete tr[k]; else tr[k] = v; }
           if (Object.keys(tr).length) at.transform = tr; else delete at.transform;
           prune(find(op.id).item);
           break;
@@ -776,7 +784,7 @@ export function createClips(ctx, library) {
           const section = interactiveOf(op.op);
           if (op.vars === null || typeof op.vars !== 'object' || Array.isArray(op.vars)) throw new StudioError('edit: set_vars needs vars: { name: first value } (a number, a boolean or a string; null removes a variable)');
           section.vars = { ...(section.vars ?? {}) };
-          for (const [k, v] of Object.entries(op.vars)) { if (v === null) delete section.vars[k]; else section.vars[k] = v; }
+          for (const [k, v] of entriesOf(op.vars)) { if (v === null) delete section.vars[k]; else section.vars[k] = v; }
           break;
         }
         default: throw new StudioError(`edit: operation ${n + 1} has unknown op ${JSON.stringify(op?.op)} (use set, add_track, remove_track, move_track, update_track, add_item, update_item, remove_item, move_item, set_transform, set_keyframes, add_keyframe, remove_keyframe, set_override, split_item, duplicate_item, add_marker, update_marker, remove_marker, caption_split, caption_merge, caption_break, caption_move, caption_auto, set_interactive, add_scene, update_scene, remove_scene, add_wire, update_wire, remove_wire, set_vars)`);
