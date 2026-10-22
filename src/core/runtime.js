@@ -411,9 +411,13 @@ export function createRuntime(host) {
     });
   }
 
-  /** Run fn as the drawing of a clip item: f.ui inside it (and inside its precomp layers) belongs to that item. */
+  /**
+   * Run fn as the drawing of a clip item: f.ui inside it (and inside its precomp layers) belongs to that item. A part of
+   * a split item is the whole item's continuation: its regions fire the whole item's events (the wires name it), keep
+   * their state across the cut, and it hears what is sent to the whole item.
+   */
   function asItem(item, fn) {
-    if (uiDepth++ === 0) { uiItem = item.id; uiVars = uiLinks?.get(item.id) ?? null; }
+    if (uiDepth++ === 0) { uiItem = item.seedId ?? item.id; uiVars = uiLinks?.get(item.id) ?? null; }
     try { return fn(); } finally { if (--uiDepth === 0) { uiItem = null; uiVars = null; } }
   }
 

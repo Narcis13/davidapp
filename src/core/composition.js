@@ -364,7 +364,8 @@ export function normalizeComposition(input) {
 
   let inter;
   if (interactive) {
-    const visual = new Set(tracks.filter((t) => t.type !== 'audio').flatMap((t) => t.items.map((i) => i.id)));
+    // a part of a split item answers to the whole item's id too (its seedId), even once the first part is gone
+    const visual = new Set(tracks.filter((t) => t.type !== 'audio').flatMap((t) => t.items.flatMap((i) => (i.seedId ? [i.id, i.seedId] : [i.id]))));
     const audio = new Set(tracks.filter((t) => t.type === 'audio').flatMap((t) => t.items.map((i) => i.id)));
     inter = normalizeInteractive(input.interactive, { duration: num(duration) ? duration : 0, fps: Number.isInteger(fps) ? fps : 30, visual, audio }, err);
     if (inter) for (const [w, path] of whens) checkWhen(w, path, err, inter.vars, new Set(inter.scenes.map((x) => x.id)));

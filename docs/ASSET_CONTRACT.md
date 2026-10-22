@@ -577,7 +577,10 @@ fields below is drawn exactly as before they existed, so old clips keep their pi
   `assetDuration` and `seedId` = the first part's `seedId ?? id`, and drops its `transition`. The
   asset, keyframes, motions and item effects then run on the whole item's time (`offset` + time
   on screen, over `assetDuration`), so the frames on both sides of the cut match and nothing
-  restarts. `fadeIn` and `fadeOut` stay with each part's own start and end.
+  restarts. `fadeIn` and `fadeOut` stay with each part's own start and end. In an interactive clip
+  a part's `f.ui` is the whole item's too: its hit regions fire `<seedId>.<event>` (the wires on the
+  item it was cut from keep working), their state carries over the cut, and it hears what is sent
+  to that item. A wire or a `send` that names a part's own id is refused on save.
 - **`composition.theme`**: the reference of a value asset; every asset in the clip reads its value
   as `f.theme`.
 
