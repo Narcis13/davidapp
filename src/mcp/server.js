@@ -8,29 +8,19 @@
 //   STUDIO_TOOLS   comma-separated tool names: only these are offered (a "Run now" session gets the read and answer tools)
 //   STUDIO_RUNNER  0: do not pick up queued renders (a short-lived server would take a render down with it)
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createStudio } from '../studio/studio.js';
 import { createTools } from './tools.js';
+import { buildMcpServer } from './build.js';
 import { closeFootageService } from '../render/footage.js';
 
 // stdout carries the protocol: anything else printed there would corrupt it
 console.log = (...args) => console.error(...args);
 
 const studio = createStudio({ role: 'mcp', runner: process.env.STUDIO_RUNNER !== '0' });
-const { tools, call } = createTools(studio);
-// an allowlist is enforced here, where the tools are: a tool that is not registered cannot be called
+// an allowlist is enforced where the tools are registered: a tool that is not registered cannot be called
 const only = process.env.STUDIO_TOOLS ? new Set(process.env.STUDIO_TOOLS.split(',').map((s) => s.trim()).filter(Boolean)) : null;
-
-const server = new McpServer(
-  { name: 'fablecut-studio', version: '0.1.0' },
-  { instructions: 'A studio for making videos with code. Assets are parameterized JS functions (plus images, sounds, fonts) in a versioned library; clips are compositions of assets. Call studio_guide first. Search before you create: every clip should reuse what earlier clips left behind.' },
-);
-
-for (const tool of tools) {
-  if (only && !only.has(tool.name)) continue;
-  server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: tool.input, annotations: { readOnlyHint: !!tool.readOnly } }, (args) => call(tool.name, args));
-}
+const server = buildMcpServer(createTools(studio), only);
 
 let closing = false;
 async function shutdown() {

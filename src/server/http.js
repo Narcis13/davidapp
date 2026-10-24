@@ -18,6 +18,8 @@ import { moreRoutes } from './routes/index.js';
 import { fromQuery } from '../studio/provenance.js';
 import { createDocs } from '../docs/docs.js';
 import { createTools } from '../mcp/tools.js';
+import { buildMcpServer } from '../mcp/build.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { shareOf } from '../studio/share.js';
 
 const TYPES = {
@@ -485,6 +487,17 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     return send(res, status, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': DOCS_CSP, 'x-content-type-options': 'nosniff' });
   }
 
+  // the MCP tools over Streamable HTTP, stateless: a server and a transport per request, on the same studio as the page
+  let mcpTools = null;
+  async function mcp(req, res) {
+    const parsed = req.method === 'POST' ? await body(req) : undefined;
+    const server = buildMcpServer(mcpTools ??= createTools(studio));
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    res.on('close', () => { transport.close(); server.close(); });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, parsed);
+  }
+
   async function handle(req, res) {
     guard(req);
     const url = new URL(req.url, 'http://localhost');
@@ -496,11 +509,12 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     }
     if (token && !authed(req)) {
       // a page (a screen, the manual, a share link) gets the sign-in form; data and modules get 401
-      const openPage = (req.method === 'GET' || req.method === 'HEAD') && !/^\/(api|media|core|fonts|vendor|ui|player)(\/|$)|^\/share\/[^/]+\/bundle\.json$/.test(path);
+      const openPage = (req.method === 'GET' || req.method === 'HEAD') && !/^\/(api|mcp|media|core|fonts|vendor|ui|player)(\/|$)|^\/share\/[^/]+\/bundle\.json$/.test(path);
       // connect-src 'self': this page posts the token with fetch. default-src 'none' would block that request.
       if (openPage) return send(res, 200, req.method === 'HEAD' ? '' : LOGIN_HTML, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'" });
       return send(res, 401, { error: 'Sign in required', code: 'forbidden' });
     }
+    if (path === '/mcp') return mcp(req, res);
     if (path === '/api/events' && req.method === 'GET') return events(req, res);
     if (path === '/api/uploads' && req.method === 'POST') return send(res, 200, await receiveUpload(req, url));
     if (path.startsWith('/api/')) {

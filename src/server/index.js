@@ -4,6 +4,7 @@
 //   PORT          default 8787
 //   HOST          default 127.0.0.1 (any other address needs STUDIO_TOKEN)
 //   STUDIO_TOKEN  a secret of at least 16 characters: every request must carry it (the browser signs in once)
+//   STUDIO_HOSTS  extra Host names to answer to, comma-separated (a reverse proxy's public name; needs STUDIO_TOKEN)
 //   STUDIO_DATA   data directory (default: <repo>/data)
 
 import { writeFileSync, rmSync } from 'node:fs';
@@ -30,8 +31,15 @@ if (!loopback && !token) {
   console.error('Refusing to listen on a non-loopback address without STUDIO_TOKEN. Use HOST=127.0.0.1, or set STUDIO_TOKEN to a long random secret.');
   process.exit(1);
 }
+// behind a reverse proxy the studio listens on loopback but is addressed by its public name
+const extraHosts = (process.env.STUDIO_HOSTS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+if (extraHosts.length && !token) {
+  console.error('STUDIO_HOSTS puts the studio on a public name: set STUDIO_TOKEN to a long random secret too.');
+  process.exit(1);
+}
+const hosts = !loopback ? null : extraHosts.length ? ['localhost', '127.0.0.1', '[::1]', ...extraHosts] : undefined;
 const studio = createStudio({ role: 'server', runner: true });
-const server = createStudioServer(studio, { log: (line) => console.log(line), hosts: loopback ? undefined : null, token: token || undefined });
+const server = createStudioServer(studio, { log: (line) => console.log(line), hosts, token: token || undefined });
 const pidFile = join(studio.dataDir, 'server.pid');
 
 server.listen(port, host, () => {
