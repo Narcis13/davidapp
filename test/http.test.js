@@ -287,3 +287,29 @@ test('a frame asked for at a time that is not a number is the first frame, not a
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'image/png');
 });
+
+test('the MCP tools answer over Streamable HTTP at /mcp, and behind a token only with it', async () => {
+  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+  const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+  const secret = '0123456789abcdef';
+  const locked = createStudioServer(t.studio, { hosts: ['127.0.0.1', 'studio.example.test'], token: secret });
+  await new Promise((resolve) => { locked.listen(0, '127.0.0.1', () => resolve(undefined)); });
+  const info = locked.address();
+  if (info === null || typeof info === 'string') throw new Error('the locked server did not bind a port');
+  const root = `http://127.0.0.1:${info.port}`;
+  try {
+    const init = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '1' } } };
+    const bare = await fetch(root + '/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify(init) });
+    assert.equal(bare.status, 401);
+    const client = new Client({ name: 'test', version: '1' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(root + '/mcp'), { requestInit: { headers: { authorization: `Bearer ${secret}` } } }));
+    const { tools } = await client.listTools();
+    assert.ok(tools.some((x) => x.name === 'search_assets'));
+    const found = await client.callTool({ name: 'search_assets', arguments: { query: 'badge' } });
+    assert.match(JSON.stringify(found.content), /badge/);
+    await client.close();
+  } finally {
+    locked.closeAllConnections();
+    await new Promise((resolve) => locked.close(resolve));
+  }
+});

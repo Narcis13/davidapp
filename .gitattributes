@@ -6,3 +6,5 @@
 # the content store (src/studio/exchange.js) is hashed byte for byte: git must not change a function source or a file
 library/sources/* -text
 library/files/* binary
+*.sh text eol=lf
+deploy/** text eol=lf
