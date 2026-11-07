@@ -1,7 +1,7 @@
 //- Share a clip as a link. Params: d.
 div(data-ui="prose")
   raw p("Any clip can be shared as a **web page that plays it**. The page runs the clip's own asset code in the viewer's browser and draws the frames on a canvas there, so there is no MP4 to upload and no video site in between. A link sent in a chat opens in the phone's browser and plays. An [interactive clip](/docs/interactive) is shared the same way, and the page is where it is played.")
-  raw p("There are two forms of the same page: the **live page** the running studio serves, for you and anyone who can reach your studio, and an **exported folder** that plays from any static web host with the studio stopped. That folder is what you publish.")
+  raw p("There are two forms of the same page: the **live page** the running studio serves, for you and anyone who can reach your studio, and an **exported folder** that plays from any static web host with the studio stopped. The studio publishes that folder itself at `/shared/<clip>/`, a link anyone can open without signing in.")
 
   h2#share-dialog The Share dialog
   raw p("In the clip editor, press **Share** in the header (for an interactive clip it takes the place of **Render**). The dialog has two parts:")
@@ -9,9 +9,9 @@ div(data-ui="prose")
     dt The live page
     dd
       raw md("The address `/share/<clip>` on this studio, with **Open** and **Copy link**. It plays the clip as it is **saved**: save first if the editor says “Unsaved changes”. Only people who can reach the studio can open it, and a studio started with `STUDIO_TOKEN` shows its sign-in page first (a link opened from a chat app keeps the sign-in of that browser). A link to a clip that was renamed or removed answers with a page that says so.")
-    dt Export a folder
+    dt Publish a link
     dd
-      raw md("Writes the page and everything it needs to `output/share/<clip>/` in the repository folder. **Base URL** is optional: where you will publish the folder (for example `https://example.com/clips/my-clip/`). It is used only to make the link-preview picture and address absolute; leave it empty to check the folder first. The dialog then shows the folder, the number of files, its size and any warning.")
+      raw md("**Publish** writes the page and everything it needs to `output/share/<clip>/` in the repository folder, and the studio serves that folder at `/shared/<clip>/` on its own address: the dialog shows that link, which opens without signing in even on a studio started with `STUDIO_TOKEN`. Publishing again updates the page at the same link. **Base URL** is optional: only if you will also copy the folder to another host (for example `https://example.com/clips/my-clip/`), so the link-preview picture and address point there; by default they point at the `/shared/` link.")
   raw p("Exporting again replaces what the last export wrote (`index.html`, `bundle.json`, `player/`, `core/`, `media/` and the two posters) and keeps anything else you put in the folder, such as a `CNAME` file or a `.git` folder. The new export is built next to the folder and moved in only when it is complete, so an export that fails leaves the last one as it was. The studio refuses to write into a non-empty folder that holds no earlier export.")
 
   h2#viewer What the viewer sees
@@ -69,7 +69,7 @@ div(data-ui="prose")
   raw p("Clip 11 of the showcase (16 seconds with a screen recording) comes to 13.1 MB; clip 12, an interactive game drawn only by code, to 1.6 MB.")
 
   h2#publish Publish it
-  raw p("The studio never publishes anything: putting the folder online is your step. Any static host works (GitHub Pages, Netlify, an S3 bucket, your own web server). The page loads nothing from anywhere else, and its own policy allows only files from the same folder.")
+  raw p("The studio publishes the folder it wrote to `output/share/<clip>/` at `/shared/<clip>/`, and only that: the live page, the library and the renders stay behind the sign-in. To put it somewhere else as well, any static host works (GitHub Pages, Netlify, an S3 bucket, your own web server). The page loads nothing from anywhere else, and its own policy allows only files from the same folder.")
   ol
     li
       raw md("Export with **Base URL** set to the address the folder will have, so WhatsApp, Slack and others show the card. Without it the export warns that link previews will not show a picture.")
@@ -89,11 +89,11 @@ div(data-ui="prose")
   h2#claude-and-scripts From Claude and from a shell
   ul
     li
-      raw md("**Claude:** `share_clip { clip, base_url?, poster_at?, quality?, out? }` writes the folder and answers with its size, files and warnings.")
+      raw md("**Claude:** `share_clip { clip, base_url?, poster_at?, quality?, out? }` writes the folder and answers with its size, files and warnings, and with `url`: the public `/shared/<clip>/` link on the studio's address (`STUDIO_PUBLIC_URL`, or the first `STUDIO_HOSTS` name), the one to send. With `out` the folder goes elsewhere and is not published.")
     li
       raw md("**A shell:** `node scripts/share.mjs <clip> [--out <dir>] [--base-url <url>] [--poster-at <s>] [--quality <1-100>]`, with `STUDIO_DATA` set to the studio's data directory. `--name=value` works too, and a misspelt option is refused rather than ignored.")
     li
-      raw md("**The API:** `GET /api/clips/<clip>/share` says where the clip can be shared from and when it was last exported; `POST /api/clips/<clip>/share` with `{ baseUrl, posterAt, quality }` exports it.")
+      raw md("**The API:** `GET /api/clips/<clip>/share` says where the clip can be shared from and when it was last exported; `POST /api/clips/<clip>/share` with `{ baseUrl, posterAt, quality }` exports and publishes it; both answer with `publicUrl`.")
   raw p("`quality` is the WebP quality of footage and sequence frames (1 to 100, default 80); `poster_at` the time of the poster frame (default 40 % of the way in).")
 
   h2#checks Check a share page

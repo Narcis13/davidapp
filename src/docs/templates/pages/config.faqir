@@ -31,6 +31,19 @@ div(data-ui="prose")
             raw md("A secret of at least 16 characters. When it is set, every page asks for it once (a sign-in cookie keeps it for 30 days) and every API request must carry the cookie or `Authorization: Bearer <token>`. Required for any `HOST` other than loopback.")
         tr
           td
+            raw md("`STUDIO_HOSTS`")
+          td none
+          td
+            raw md("Extra Host names the studio answers to, comma-separated: the public name of a reverse proxy in front of it (for example `fablecut.example.com`). Needs `STUDIO_TOKEN`.")
+        tr
+          td
+            raw md("`STUDIO_PUBLIC_URL`")
+          td
+            raw md("`https://` + the first `STUDIO_HOSTS` name, else `http://127.0.0.1:<PORT>`")
+          td
+            raw md("The address people open the studio at (`PUBLIC_URL` works too). The links the tools hand out start with it: a render's `urls` (signed download links, see [Renders](/docs/renders)) and a published share page (`/shared/<clip>/`, see [Share a clip](/docs/share)).")
+        tr
+          td
             raw md("`FFMPEG_PATH`")
           td
             raw md("`ffmpeg` on the `PATH`")

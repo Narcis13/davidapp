@@ -3,11 +3,14 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, symlinkSync } from 'node:fs';
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempStudio, seedAssets, smallComposition, AUTHOR, DOT } from './helpers.js';
 import { createStudioServer } from '../src/server/http.js';
+import { createLinks, publicBase } from '../src/studio/links.js';
+import { createTools } from '../src/mcp/tools.js';
+import { SHARE_DIR } from '../src/studio/share.js';
 
 let t, server, base;
 const get = (path, init) => fetch(base + path, init);
@@ -309,6 +312,103 @@ test('the MCP tools answer over Streamable HTTP at /mcp, and behind a token only
     assert.match(JSON.stringify(found.content), /badge/);
     await client.close();
   } finally {
+    locked.closeAllConnections();
+    await new Promise((resolve) => locked.close(resolve));
+  }
+});
+
+test('the public address: STUDIO_PUBLIC_URL, else the first STUDIO_HOSTS name, else loopback', () => {
+  assert.equal(publicBase({ STUDIO_PUBLIC_URL: 'https://studio.example.test/', STUDIO_HOSTS: 'other.test' }), 'https://studio.example.test');
+  assert.equal(publicBase({ STUDIO_HOSTS: ' Fablecut.Example.Test , b.test' }), 'https://fablecut.example.test');
+  assert.equal(publicBase({ PORT: '7712' }), 'http://127.0.0.1:7712');
+  assert.equal(publicBase({ PUBLIC_URL: 'https://deployed.example.test', STUDIO_HOSTS: 'other.test' }), 'https://deployed.example.test');
+  assert.throws(() => publicBase({ STUDIO_PUBLIC_URL: 'not a url' }), /not a URL/);
+  const open = createLinks({ env: { PORT: '9000' } });
+  assert.equal(open.file('renders/a.mp4'), 'http://127.0.0.1:9000/media/renders/a.mp4');
+  assert.equal(open.file('renders/../studio.db'), null);
+  assert.equal(open.file('thumbs/a.png'), null);
+  assert.equal(open.share('my-clip'), 'http://127.0.0.1:9000/shared/my-clip/');
+  const signed = createLinks({ env: { STUDIO_HOSTS: 'studio.example.test' }, token: '0123456789abcdef0123' });
+  const u = signed.file('renders/a.mp4', { download: true });
+  assert.match(u, /^https:\/\/studio\.example\.test\/dl\/[A-Za-z0-9_-]{32}\/renders\/a\.mp4\?download=1$/);
+  const sig = /\/dl\/([^/]+)\//.exec(u)[1];
+  assert.ok(signed.verify(sig, 'renders/a.mp4'));
+  assert.ok(!signed.verify(sig, 'renders/b.mp4'));
+  assert.ok(!createLinks({ env: {}, token: 'another-token-of-16+' }).verify(sig, 'renders/a.mp4'));
+  assert.equal(signed.render({ status: 'running', output: 'renders/a.mp4' }), undefined);
+  assert.deepEqual(Object.keys(signed.render({ status: 'done', output: 'renders/a.mp4', poster: 'renders/a.png', srt: null, stats: { files: { credits: 'renders/a.credits.md' } } })), ['video', 'download', 'poster', 'credits']);
+});
+
+test('behind a token: a signed link opens one rendered file without signing in, and a published share page is open', async () => {
+  const secret = '0123456789abcdef-links';
+  const env = { STUDIO_PUBLIC_URL: 'https://studio.example.test' };
+  const locked = createStudioServer(t.studio, { token: secret, env });
+  await new Promise((resolve) => { locked.listen(0, '127.0.0.1', () => resolve(undefined)); });
+  const root = `http://127.0.0.1:${/** @type {any} */ (locked.address()).port}`;
+  const slug = `links-test-${process.pid}`;
+  const links = createLinks({ env, token: secret });
+  const local = (u) => u.replace(links.base, root);
+  const tools = createTools(t.studio, { links });
+  const call = async (name, args) => {
+    const r = await tools.call(name, args);
+    assert.ok(!r.isError, r.content[0].text);
+    return JSON.parse(r.content.find((c) => c.type === 'text').text);
+  };
+  try {
+    mkdirSync(join(t.dataDir, 'renders'), { recursive: true });
+    writeFileSync(join(t.dataDir, 'renders', `${slug}.mp4`), Buffer.alloc(1000, 7));
+    writeFileSync(join(t.dataDir, 'renders', `${slug}-other.mp4`), Buffer.alloc(10, 1));
+    const watch = links.file(`renders/${slug}.mp4`);
+    const res = await fetch(local(watch));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'video/mp4');
+    assert.equal(res.headers.get('content-disposition'), null);
+    assert.equal((await res.arrayBuffer()).byteLength, 1000);
+    const part = await fetch(local(watch), { headers: { range: 'bytes=0-9' } });
+    assert.equal(part.status, 206);
+    await part.arrayBuffer();
+    const dl = await fetch(local(links.file(`renders/${slug}.mp4`, { download: true })));
+    assert.equal(dl.headers.get('content-disposition'), `attachment; filename="${slug}.mp4"`);
+    await dl.arrayBuffer();
+    // the signature names that file only; without it, the file stays behind the sign-in
+    const sig = /\/dl\/([^/]+)\//.exec(watch)[1];
+    assert.equal((await fetch(`${root}/dl/${sig}/renders/${slug}-other.mp4`)).status, 403);
+    assert.equal((await fetch(`${root}/dl/${sig}/renders/..%2Fstudio.db`)).status, 403);
+    assert.match((await fetch(`${root}/dl/${sig}/thumbs/${slug}.mp4`)).headers.get('content-type'), /text\/html/); // not a download: the sign-in page
+    assert.equal((await fetch(`${root}/dl/not-a-signature/renders/${slug}.mp4`)).status, 403);
+    assert.equal((await fetch(`${root}/media/renders/${slug}.mp4`)).status, 401);
+
+    // the MCP tools hand out the same links for a finished render
+    const done = t.studio.renders.list({ status: 'done', limit: 1 })[0];
+    if (done) {
+      const r = await call('get_render', { id: done.id });
+      assert.ok(r.urls.video.startsWith('https://studio.example.test/dl/'), JSON.stringify(r.urls));
+      const got = await fetch(local(r.urls.download));
+      assert.equal(got.status, 200);
+      assert.equal(got.headers.get('content-type'), 'video/mp4');
+      await got.arrayBuffer();
+    }
+
+    // share_clip publishes to /shared/<clip>/, open to anyone; the live /share/<clip> still asks for the token
+    await t.studio.clips.createClip({ slug, title: 'Links', author: AUTHOR, composition: smallComposition({ tracks: smallComposition().tracks.slice(0, 1) }) });
+    const shared = await call('share_clip', { clip: slug });
+    assert.equal(shared.url, `https://studio.example.test/shared/${slug}/`);
+    assert.equal(shared.published, true);
+    assert.equal(shared.studioUrl, `https://studio.example.test/share/${slug}`);
+    assert.equal(shared.warnings, undefined);
+    const page = await fetch(`${root}/shared/${slug}/`);
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.ok(html.includes(`https://studio.example.test/shared/${slug}/og.jpg`), html);
+    for (const f of ['bundle.json', 'player/player.js', 'poster.jpg']) assert.equal((await fetch(`${root}/shared/${slug}/${f}`)).status, 200, f);
+    assert.equal((await fetch(`${root}/shared/${slug}`, { redirect: 'manual' })).headers.get('location'), `/shared/${slug}/`);
+    assert.ok([403, 404].includes((await fetch(`${root}/shared/${slug}/..%2F..%2F..%2Fpackage.json`)).status));
+    const missing = await fetch(`${root}/shared/never-published-${process.pid}/`);
+    assert.equal(missing.status, 404);
+    assert.match(await missing.text(), /This clip is not here/);
+    assert.match(await (await fetch(`${root}/share/${slug}`)).text(), /Enter its token/);
+  } finally {
+    rmSync(join(SHARE_DIR, slug), { recursive: true, force: true });
     locked.closeAllConnections();
     await new Promise((resolve) => locked.close(resolve));
   }
