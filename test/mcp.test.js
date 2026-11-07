@@ -129,6 +129,10 @@ test('compose a clip, look at it, render it to MP4 and list what it used', async
   }
   assert.equal(status.status, 'done', status.error ?? '');
   assert.ok(existsSync(status.output));
+  // links to hand the person: on the studio's address, not paths on its machine (no token here: the open /media/ URLs)
+  assert.match(status.urls.video, /^http:\/\/127\.0\.0\.1:\d+\/media\/renders\/mcp-demo-r\d+\.mp4$/);
+  assert.equal(status.urls.download, `${status.urls.video}?download=1`);
+  assert.match(status.urls.poster, /\/media\/renders\/.+\.(png|jpg)$/);
   assert.equal(status.stats.probe.video.codec, 'h264');
   assert.equal(status.stats.probe.audio.codec, 'aac');
 

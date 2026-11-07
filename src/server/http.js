@@ -20,12 +20,13 @@ import { createDocs } from '../docs/docs.js';
 import { createTools } from '../mcp/tools.js';
 import { buildMcpServer } from '../mcp/build.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { shareOf } from '../studio/share.js';
+import { shareOf, SHARE_DIR } from '../studio/share.js';
+import { createLinks } from '../studio/links.js';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
-  '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf', '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.srt': 'text/plain; charset=utf-8', '.vtt': 'text/vtt; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf', '.ico': 'image/x-icon',
 };
 const STATUS = { invalid: 400, rejected: 422, not_found: 404, conflict: 409, forbidden: 403, unsupported: 415, unavailable: 501, too_large: 413 };
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
@@ -91,6 +92,7 @@ const shareMissing = (slug) => `<!doctype html>
 </head>
 <body><main><h1>This clip is not here</h1><p>There is no clip called “${slug}” on this studio. It may have been renamed or removed: ask whoever sent the link for a new one.</p></main></body>
 </html>`;
+const MISSING_CSP = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'";
 const secretEqual = (a, b) => timingSafeEqual(createHash('sha256').update(String(a)).digest(), createHash('sha256').update(String(b)).digest());
 /** The manual's pages draw no script and no inline style, so they are served under a policy that allows neither. */
 const DOCS_CSP = "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
@@ -108,6 +110,8 @@ const VENDOR = new Set(['@faqir-ui/core', 'codemirror','@codemirror/state', '@co
 export function createStudioServer(studio, { log = () => {}, author = process.env.STUDIO_AUTHOR ?? 'studio-user', hosts = LOCAL_HOSTS, token = undefined, env = process.env } = {}) {
   if (token !== undefined && (typeof token !== 'string' || token.length < 16)) throw new Error('STUDIO_TOKEN must be at least 16 characters');
   if (hosts === null && !token) throw new Error('Refusing to answer every Host name without STUDIO_TOKEN. Bind the studio to 127.0.0.1, or set STUDIO_TOKEN to a long random secret.');
+  // the URLs the tools hand out: signed links to rendered files, the published share pages (src/studio/links.js)
+  const links = createLinks({ env, token });
   const { library, clips, renders, lineage, requests, uploads } = studio;
   const runs = createAgentRuns(studio, { env });
   const UI = join(ROOT, 'src', 'ui');
@@ -403,7 +407,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
     ['GET', /^\/api\/gallery$/, () => ({ renders: renders.gallery() })],
     ['GET', /^\/api\/lineage$/, () => ({ ...lineage.graph(), report: lineage.report() })],
     // iteration 4: each area keeps its routes in its own module (src/server/routes/); { raw: true } routes read the body themselves
-    ...moreRoutes({ studio, author, send, png, file, read, int: (v, fallback, min, max) => int(v, fallback, min, max) }),
+    ...moreRoutes({ studio, author, links, send, png, file, read, int: (v, fallback, min, max) => int(v, fallback, min, max) }),
   ];
 
   const cookieToken = (req) => {
@@ -482,7 +486,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
   let docs = null, toolList = null;
   function docsPage(res, slug, url) {
     if (slug === 'index' && url.pathname !== '/docs') return send(res, 301, '', { location: '/docs' });
-    docs ??= createDocs(studio, { tools: () => (toolList ??= createTools(studio).tools), runNow: () => runs.available() });
+    docs ??= createDocs(studio, { tools: () => (toolList ??= createTools(studio, { links }).tools), runNow: () => runs.available() });
     const { status, html } = slug === 'search' ? docs.search(url.searchParams.get('q') ?? '') : docs.page(slug);
     return send(res, status, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': DOCS_CSP, 'x-content-type-options': 'nosniff' });
   }
@@ -491,7 +495,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
   let mcpTools = null;
   async function mcp(req, res) {
     const parsed = req.method === 'POST' ? await body(req) : undefined;
-    const server = buildMcpServer(mcpTools ??= createTools(studio));
+    const server = buildMcpServer(mcpTools ??= createTools(studio, { links }));
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on('close', () => { transport.close(); server.close(); });
     await server.connect(transport);
@@ -506,6 +510,30 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       const data = await body(req);
       if (typeof data.token !== 'string' || !secretEqual(data.token, token)) throw new StudioError('That token was not accepted', 'forbidden');
       return send(res, 200, { ok: true }, { 'set-cookie': sessionCookie });
+    }
+    // open without signing in: a signed link to one rendered file, and the share pages that were exported (published)
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      const dl = /^\/dl\/([A-Za-z0-9_-]+)\/(renders\/[^/]+)$/.exec(path);
+      if (dl) {
+        let rel;
+        try { rel = decodeURIComponent(dl[2]); } catch { rel = ''; }
+        if (!links.signed) return send(res, 404, { error: 'Not found' });
+        if (!links.verify(dl[1], rel)) return send(res, 403, { error: 'This download link is not valid' });
+        const name = rel.slice('renders/'.length);
+        return file(req, res, join(studio.dataDir, 'renders'), name, {
+          cache: 'private, max-age=3600',
+          headers: url.searchParams.has('download') ? { 'content-disposition': `attachment; filename="${name}"` } : {},
+        });
+      }
+      const pub = /^\/shared\/([a-z0-9-]+)(\/.*)?$/.exec(path);
+      if (pub) {
+        if (!pub[2]) return send(res, 301, '', { location: `/shared/${pub[1]}/` });
+        const rest = pub[2] === '/' ? 'index.html' : pub[2].slice(1);
+        if (rest === 'index.html' && !existsSync(join(SHARE_DIR, pub[1], 'index.html'))) {
+          return send(res, 404, req.method === 'HEAD' ? '' : shareMissing(pub[1]), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': MISSING_CSP });
+        }
+        return file(req, res, SHARE_DIR, `${pub[1]}/${rest}`, { headers: { 'x-robots-tag': 'noindex' } });
+      }
     }
     if (token && !authed(req)) {
       // a page (a screen, the manual, a share link) gets the sign-in form; data and modules get 401
@@ -549,7 +577,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       let html;
       try { html = await shareOf(studio).livePage(share[1]); } catch (e) {
         if (!(e instanceof StudioError) || e.code !== 'not_found') throw e;
-        return send(res, 404, shareMissing(share[1]), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" });
+        return send(res, 404, shareMissing(share[1]), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': MISSING_CSP });
       }
       return send(res, 200, html, { 'content-type': 'text/html; charset=utf-8' });
     }

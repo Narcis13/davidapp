@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { ENGINE_VERSION, FORMATS } from '../core/engine.js';
 import { ROOT } from '../render/host.js';
+import { createLinks } from '../studio/links.js';
 import { StudioError } from '../studio/studio.js';
 import { sideBySide, createCanvas, loadImage } from '../render/host.js';
 import { checkTranscript, checkTranscripts } from '../core/words.js';
@@ -25,12 +26,14 @@ const ISOLATE = z.object({ only: z.array(z.string()).optional().describe('Draw o
   .describe('Draw only some of the clip\'s items: { only: [item ids] } or { except: [item ids] } (exactly one of the two). Only visual items of the composition itself (not the layers of a precomp); the audio is untouched. The items keep their ids and seeds, so they draw as they do in the whole clip.');
 
 const compactAsset = (a) => ({ ref: a.ref, type: a.type, kind: a.kind, title: a.title, description: a.description, tags: a.tags, formats: a.formats, duration: a.duration, params: a.params, author: a.author, originClip: a.originClip, forkedFrom: a.forkedFrom, usedByClips: a.usedByClips });
-const compactRender = (r) => ({ id: r.id, clip: r.clip, format: r.format, width: r.width, height: r.height, options: Object.keys(r.options ?? {}).length ? r.options : undefined, status: r.status, progress: Math.round(r.progress * 1000) / 1000, framesDone: r.framesDone, framesTotal: r.framesTotal, error: r.error, output: r.outputPath, poster: r.posterPath, srt: r.srt, log: r.log || undefined,
+const compactOf = (r) => ({ id: r.id, clip: r.clip, format: r.format, width: r.width, height: r.height, options: Object.keys(r.options ?? {}).length ? r.options : undefined, status: r.status, progress: Math.round(r.progress * 1000) / 1000, framesDone: r.framesDone, framesTotal: r.framesTotal, error: r.error, output: r.outputPath, poster: r.posterPath, srt: r.srt, log: r.log || undefined,
   stats: r.status === 'done' ? { renderSeconds: r.stats.renderSeconds, draft: r.stats.draft, workers: r.stats.workers, posterFrame: r.stats.posterFrame, framesPerSecond: r.stats.framesPerSecond, realtimeFactor: r.stats.realtimeFactor, mixSeconds: r.stats.mixSeconds, reportSeconds: r.stats.reportSeconds, loudnessSeconds: r.stats.loudnessSeconds, probe: r.stats.probe, frameHashes: r.stats.frameHashes, loudness: r.stats.loudness, problems: r.stats.problems, files: r.stats.files } : undefined });
 
-/** @param {any} studio @param {{ author?: string }} [o] */
-export function createTools(studio, { author: defaultAuthor = process.env.STUDIO_AUTHOR ?? 'mcp-client' } = {}) {
+/** @param {any} studio @param {{ author?: string, links?: ReturnType<typeof createLinks> }} [o] */
+export function createTools(studio, { author: defaultAuthor = process.env.STUDIO_AUTHOR ?? 'mcp-client', links = createLinks() } = {}) {
   const { library, clips, renders, lineage } = studio;
+  // a finished render also carries the URLs of its files (src/studio/links.js): what to hand the person, not the paths
+  const compactRender = (r) => { const c = compactOf(r); const urls = links.render(r); return urls ? { ...c, urls } : c; };
   const who = (a) => a ?? defaultAuthor;
   const image = (name, png) => ({ png, path: studio.saveFrame(name, png) });
 
@@ -535,7 +538,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'start_render',
       title: 'Render a clip to MP4',
-      description: 'Queue a render of the clip to H.264/AAC MP4 (an interactive clip is played, not rendered: it is refused). Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long. Options: format renders the same composition in another shape (each item\'s overrides for that format apply); formats: ["horizontal","vertical","square"] (1–3, instead of format) queues one render per format in this one call, with the same options, and returns { batch, renders } (batch = the first render\'s id); draft: true (or { scale }) makes an animatic: the frames are drawn at full size, so a draft shows exactly the final frames and its sampled frame hashes equal a full render\'s, then scaled to 2/3, 1/2 or 1/3 (the largest that gives whole, even pixel sizes; 1920x1080 gives 1280x720) and encoded fast, to a file named ...-draft.mp4; workers: how many worker threads draw frames, 1–16 (default: by CPU count; the pixels do not depend on it); poster_at: the poster frame at this time in seconds (default: 40 % of the clip); final: true is the render to publish: every pinned asset is checked first and a placeholder (flag or tag) or a file with no licence refuses the render, naming each (check_provenance lists them without rendering), and the credits are written next to the MP4 (<name>.credits.md, stats.files.credits; clip_credits shows them); drafts and normal renders are not checked, and final cannot be combined with draft. The options are stored with the render (get_render).',
+      description: 'Queue a render of the clip to H.264/AAC MP4 (an interactive clip is played, not rendered: it is refused). Returns the render id at once; poll get_render, or pass wait_seconds to wait here for up to that long. Options: format renders the same composition in another shape (each item\'s overrides for that format apply); formats: ["horizontal","vertical","square"] (1–3, instead of format) queues one render per format in this one call, with the same options, and returns { batch, renders } (batch = the first render\'s id); draft: true (or { scale }) makes an animatic: the frames are drawn at full size, so a draft shows exactly the final frames and its sampled frame hashes equal a full render\'s, then scaled to 2/3, 1/2 or 1/3 (the largest that gives whole, even pixel sizes; 1920x1080 gives 1280x720) and encoded fast, to a file named ...-draft.mp4; workers: how many worker threads draw frames, 1–16 (default: by CPU count; the pixels do not depend on it); poster_at: the poster frame at this time in seconds (default: 40 % of the clip); final: true is the render to publish: every pinned asset is checked first and a placeholder (flag or tag) or a file with no licence refuses the render, naming each (check_provenance lists them without rendering), and the credits are written next to the MP4 (<name>.credits.md, stats.files.credits; clip_credits shows them); drafts and normal renders are not checked, and final cannot be combined with draft. The options are stored with the render (get_render). A finished render carries urls: { video (to watch), download (the MP4 as an attachment), poster, srt, vtt, credits }, links on the public address of the studio that open without signing in: give the person those, never output (a path on the machine of the studio).',
       input: {
         clip: z.string(),
         format: FORMAT.optional().describe('Render the same composition in another format; each item\'s overrides for that format apply'),
@@ -561,7 +564,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
     {
       name: 'get_render',
       title: 'Render status',
-      description: 'Status and progress of a render; when done: the MP4 path, poster, SRT, timings, ffprobe facts and sampled frame hashes.',
+      description: 'Status and progress of a render; when done: urls (video to watch, download, poster, srt, vtt, credits: public links that open without signing in, the ones to give the person), the file paths on the machine of the studio, timings, ffprobe facts and sampled frame hashes.',
       input: { id: z.number().int(), wait_seconds: z.number().min(0).max(900).optional().describe('Wait up to this long for it to finish') },
       readOnly: true,
       run: async (a) => ({ json: compactRender(a.wait_seconds ? await renders.wait(a.id, a.wait_seconds * 1000) : renders.get(a.id)) }),
@@ -786,7 +789,7 @@ export function createTools(studio, { author: defaultAuthor = process.env.STUDIO
       run: () => ({ text: lineage.report() }),
     },
     // iteration 4: each area keeps its tools in its own module (src/mcp/more/)
-    ...moreTools({ studio, who, image, z, REF, PARAMS, AUTHOR, FORMAT, COMPOSITION, compactAsset, compactRender }),
+    ...moreTools({ studio, who, image, z, REF, PARAMS, AUTHOR, FORMAT, COMPOSITION, compactAsset, compactRender, links }),
   ];
 
   /**
