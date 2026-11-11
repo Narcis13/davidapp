@@ -28,6 +28,7 @@ import { createChecks } from './checks.js';
 import { createFonts } from './fonts.js';
 import { createExchange } from './exchange.js';
 import { createProvenance } from './provenance.js';
+import { createForge } from './forge.js';
 
 export { StudioError };
 
@@ -59,6 +60,7 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   const checks = createChecks(ctx, { clips, library, compositionOf, clipFrame, saveFrame });
   const fonts = createFonts(ctx, library);
   const exchange = createExchange(ctx, { library, clips, fonts }, { rebake });
+  const forge = createForge(ctx, { library, checks, assetSheet, saveFrame });
   library.seedFonts();
   if (runner) renders.startRunner();
   const framesDir = join(dataDir, 'frames');
@@ -136,13 +138,13 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
   }
 
   /** A filmstrip of one asset across its duration → { png, width, height, times, ref }. */
-  async function assetSheet({ ref, source, slug, params = {}, count = 8, cols, duration, format, width, height, cellWidth, fps = 30, seed = 1 }) {
+  async function assetSheet({ ref, source, slug, params = {}, count = 8, cols, duration, format, width, height, cellWidth, fps = 30, seed = 1, background, times: at }) {
     const a = await loadAsset({ ref, source, slug, params });
     const size = sizeOf({ format, width, height }, a.formats);
     const d = duration ?? a.natural ?? 3;
-    const n = Math.max(1, Math.min(24, count));
-    const times = Array.from({ length: n }, (_, i) => Math.round(((i + 0.5) / n) * d * fps) / fps);
-    const r = await pool.run('assetSheet', { ref: a.target, params: a.params, times, duration: d, ...size, fps, seed, cols: cols ?? Math.min(n, size.width > size.height ? 4 : 6), cellWidth: cellWidth ?? (size.width > size.height ? 480 : 270) }, { bundle: a.bundle, timeout: 40000 }).catch(fail);
+    const n = Math.max(1, Math.min(24, at?.length ?? count));
+    const times = at?.length ? at.slice(0, 24) : Array.from({ length: n }, (_, i) => Math.round(((i + 0.5) / n) * d * fps) / fps);
+    const r = await pool.run('assetSheet', { ref: a.target, params: a.params, times, duration: d, ...size, fps, seed, background, cols: cols ?? Math.min(n, size.width > size.height ? 4 : 6), cellWidth: cellWidth ?? (size.width > size.height ? 480 : 270) }, { bundle: a.bundle, timeout: 40000 }).catch(fail);
     return { ...r, png: Buffer.from(r.png), times, ref: a.target };
   }
 
@@ -359,5 +361,5 @@ export function createStudio({ dataDir = defaultDataDir(), role = 'studio', pool
     db.close();
   }
 
-  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, speech, checks, fonts, provenance, exchange, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, play, clipAudio, draftBundle, bakeSequence, saveFrame, close };
+  return { dataDir, db, pool, events, library, clips, renders, lineage, requests, uploads, compounding, inspect, audio, speech, checks, fonts, provenance, exchange, forge, compositionOf, assetFrame, assetSheet, clipFrame, clipSheet, frameHashes, play, clipAudio, draftBundle, bakeSequence, saveFrame, close };
 }

@@ -30,7 +30,7 @@ div(data-ui="prose")
   p The filter panel on the left (the Filters button on a narrow screen) narrows what you see. Each group shows how many assets each value would give you.
   ul
     li
-      raw md("**Quick views**: **Favourites**, **Featured**, **Needs description** (uploads waiting for a description), **Recently used** and **Kit** (the motion-graphics kit, below).")
+      raw md("**Quick views**: **Favourites**, **Featured**, **Needs description** (uploads waiting for a description), **Forge candidates** (assets made ahead of a clip and not promoted yet, below), **Recently used** and **Kit** (the motion-graphics kit, below).")
     li
       raw md("**Collections**: your own named groups of assets. Make one from the detail panel or the bulk bar.")
     li
@@ -106,6 +106,17 @@ div(data-ui="prose")
               td {{ a.description }}
   else
     raw p("This library has no kit assets yet. They are in the `assets/` folder of the repository: `npm run sync-assets` adds them.")
+
+  h2#forge Forge candidates
+  raw p("Claude can make assets ahead of the clips that will need them: new ones where the library has a gap, or presets of existing ones with a different look. Each starts as a **candidate**: it is saved and versioned like any asset, but searches and suggestions leave it out, so an unchecked draft never crowds out what earlier clips proved. **Forge candidates** in the quick views lists them.")
+  ul
+    li
+      raw md("**Check** runs the clip checks on the asset alone, on a frame of each format it is made for: text outside the safe zone or cut by the frame, overlapping text, text under its size floor, low contrast, characters the fonts lack. The result stays on that version.")
+    li
+      raw md("**Promote to library** puts a candidate in the library once its latest version passes. Claude can also promote one without a passing check, giving a reason that is kept as a note.")
+    li
+      raw md("**Reject** keeps it out for good, with a reason (kept as a note, so the next run does not make the same thing again). Nothing is deleted.")
+  raw p("A clip that uses a candidate promotes it: being used is what it was made for. Claude works the forge with `asset_variants`, `check_asset`, `list_candidates`, `promote_asset` and `reject_asset`; see the [tool reference](/docs/mcp-tools).")
 
   h2#large-libraries A library with thousands of assets
   p The library is built for size: the search runs inside the database, and the grid only draws the cards on screen. On a test library of about five thousand assets a search answers in a few milliseconds. Use tags, collections and the featured flag to keep it easy to browse as it grows.

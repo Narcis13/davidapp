@@ -467,6 +467,8 @@ export function createClips(ctx, library) {
       if (row.origin_clip === null && row.type !== 'font') q('UPDATE assets SET origin_clip = ? WHERE id = ? AND origin_clip IS NULL').run(clipId, row.asset_id);
     }
     for (const ref of fonts) ins.run(clipId, library.requireVersion(ref).version_id, 0, 1);
+    // forge candidates a clip uses go into the library: being used is what they were made for
+    library.promoteUsed([...c.versions.values()].map(({ row }) => row.asset_id));
   }
 
   /** @param {any} row @param {{ withComposition?: boolean }} [o] */

@@ -251,6 +251,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       needsDescription: query.get('needsDescription') ? query.get('needsDescription') === '1' : undefined,
       favorite: query.get('favorite') === '1' || undefined, featured: query.get('featured') === '1' || undefined, recent: query.get('recent') === '1' || undefined,
       collection: query.get('collection') || undefined, sort: query.get('sort') || undefined, facets: query.get('facets') === '1',
+      stage: query.get('candidates') === '1' ? 'candidate' : query.get('stage') || undefined,
       limit: int(query.get('limit') ?? 100, 100, 1, 200), offset: int(query.get('offset') ?? 0, 0, 0, 1e9),
     })],
     ['POST', /^\/api\/assets\/bulk$/, ({ data }) => library.bulk({ slugs: data.slugs, addTags: data.addTags, removeTags: data.removeTags, favorite: data.favorite, featured: data.featured, collection: data.collection, author: data.author ?? author })],
@@ -265,7 +266,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       return { ok: true, ref: d.ref, kind: m.kind, schema: m.schema, duration: m.duration, formats: m.formats, warnings: d.validation.warnings, bundle: browserBundle(d.bundle) };
     }],
     ['POST', /^\/api\/assets$/, async ({ data }) => {
-      const r = await library.createAsset({ slug: data.name, source: data.source, note: data.note, forClip: data.forClip, author: data.author ?? author });
+      const r = await library.createAsset({ slug: data.name, source: data.source, note: data.note, forClip: data.forClip, candidate: !!data.candidate, author: data.author ?? author });
       return { asset: r.asset, warnings: r.warnings };
     }],
     ['GET', /^\/api\/assets\/([a-z0-9-]+)$/, ({ params, query }) => ({ ...library.getAsset(query.get('version') ? makeRef(params[0], Number(query.get('version'))) : params[0]), notes: studio.compounding.notesOf(params[0]), examples: studio.compounding.examples(params[0]) })],
@@ -281,7 +282,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       return { asset: r.asset, warnings: r.warnings };
     }],
     ['POST', /^\/api\/assets\/([a-z0-9-]+)\/fork$/, async ({ params, data }) => {
-      const r = await library.forkAsset({ ref: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, source: data.source, note: data.note, forClip: data.forClip, author: data.author ?? author });
+      const r = await library.forkAsset({ ref: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, source: data.source, note: data.note, forClip: data.forClip, candidate: !!data.candidate, author: data.author ?? author });
       return { asset: r.asset, warnings: r.warnings };
     }],
     // tweak and keep: new defaults, presets, metadata, diffs
@@ -290,7 +291,7 @@ export function createStudioServer(studio, { log = () => {}, author = process.en
       return { asset: r.asset, warnings: r.warnings };
     }],
     ['POST', /^\/api\/assets\/([a-z0-9-]+)\/preset$/, async ({ params, data }) => {
-      const r = await library.createPreset({ base: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, params: data.params, title: data.title, description: data.description, tags: data.tags, author: data.author ?? author });
+      const r = await library.createPreset({ base: data.version ? makeRef(params[0], data.version) : params[0], slug: data.name, params: data.params, title: data.title, description: data.description, tags: data.tags, candidate: !!data.candidate, author: data.author ?? author });
       return { asset: r.asset, warnings: r.warnings };
     }],
     ['PUT', /^\/api\/assets\/([a-z0-9-]+)\/metadata$/, ({ params, data }) => library.setMetadata({ slug: params[0], title: data.title, description: data.description, tags: data.tags, provenance: data.provenance, version: data.version, author: data.author ?? author })],

@@ -150,7 +150,13 @@ const raceOf = (e, slug) => (/UNIQUE constraint/i.test(String(e?.message)) ? new
 const VERSION_COLS = `v.id AS version_id, v.version, v.kind, v.title, v.description, v.tags, v.duration, v.formats, v.schema, v.uses, v.deps,
   v.source, v.source_hash, v.file, v.mime, v.meta, v.thumb, v.author, v.note, v.parent_version, v.clip_id, v.engine, v.created_at AS version_created_at,
   a.id AS asset_id, a.slug, a.type, a.latest_version, a.forked_from, a.origin_clip, a.created_at,
-  a.meta_title, a.meta_description, a.meta_tags, a.meta_by, a.meta_at, a.derivation, a.needs_description, a.featured, a.meta_uses`;
+  a.meta_title, a.meta_description, a.meta_tags, a.meta_by, a.meta_at, a.derivation, a.needs_description, a.featured, a.meta_uses, a.stage`;
+
+/** Where an asset stands in the forge: in the library (NULL in the database), a candidate not promoted yet, or rejected. */
+export const STAGES = ['library', 'candidate', 'rejected'];
+
+/** The last check_asset of a version (kept in its meta), shortened for lists. */
+const checkOf = (meta) => (meta?.check ? { pass: meta.check.pass, errors: meta.check.errors, warnings: meta.check.warnings, formats: meta.check.formats?.map((f) => f.format), params: meta.check.params, at: meta.check.at } : null);
 
 export function createLibrary(ctx) {
   const { db, dataDir, pool } = ctx;
@@ -210,6 +216,8 @@ export function createLibrary(ctx) {
       derivation: row.derivation ?? (row.forked_from ? (row.type === 'function' ? 'fork' : 'bake') : null),
       needsDescription: !!row.needs_description,
       featured: !!row.featured,
+      stage: row.stage ?? 'library',
+      checked: row.type === 'function' ? checkOf(json(row.meta, {})) : null,
       suggestedUses: json(row.meta_uses, []),
       formats: json(row.formats, []),
       duration: row.duration,
@@ -286,6 +294,11 @@ export function createLibrary(ctx) {
     if (f.collection && on('collection')) { where.push('a.id IN (SELECT cl.asset_id FROM collection_assets cl JOIN collections co ON co.id = cl.collection_id WHERE co.slug = ?)'); args.push(f.collection); }
     if (f.recent) where.push('a.id IN (SELECT asset_id FROM asset_recent)');
     if (f.derivation) { where.push('a.derivation = ?'); args.push(f.derivation); }
+    // the forge: candidates and rejected assets stay out of the library's lists until asked for
+    if (on('stage') && f.stage !== 'all') {
+      if (!f.stage || f.stage === 'library') where.push('a.stage IS NULL');
+      else { where.push('a.stage = ?'); args.push(f.stage); }
+    }
     return { sql: where.length ? `WHERE ${where.join(' AND ')}` : '', args };
   }
 
@@ -314,21 +327,23 @@ export function createLibrary(ctx) {
       needsDescription: flag('needsDescription', 'a.needs_description = 1'),
       favorite: flag('favorite', 'a.id IN (SELECT asset_id FROM favorites)'),
       featured: flag('featured', 'a.featured = 1'),
+      candidates: flag('stage', "a.stage = 'candidate'"),
     };
   }
 
   /**
    * Search the library. Every filter is optional: query (full text, ranked), type, kind, tags (all
    * must match), format, originClip, usedByClip, derivedFrom, author, needsDescription, favorite,
-   * featured, collection, recent, derivation. sort: relevance (default; text rank boosted by
-   * featured, favourites and use; without a query: featured, favourites, use, newest), newest, used,
-   * name. facets: also return counts per facet value. Returns { total, assets, facets? }.
+   * featured, collection, recent, derivation, stage (library: the default; candidate, rejected, or all). sort: relevance
+   * (default; text rank boosted by featured, favourites and use; without a query: featured, favourites, use, newest), newest,
+   * used, name. facets: also return counts per facet value. Returns { total, assets, facets? }.
    * @param {any} [o]
    */
-  function search({ query, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, needsDescription, favorite, featured, collection, recent, derivation, sort = 'relevance', facets = false, limit = 50, offset = 0 } = {}) {
+  function search({ query, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, needsDescription, favorite, featured, collection, recent, derivation, stage, sort = 'relevance', facets = false, limit = 50, offset = 0 } = {}) {
+    if (stage !== undefined && stage !== 'all' && !STAGES.includes(stage)) throw new StudioError(`stage is ${STAGES.join(', ')} or all; got "${stage}"`);
     const tokens = typeof query === 'string' ? query.toLowerCase().match(/[\p{L}\p{N}]+/gu) : null;
     const match = tokens?.length ? tokens.slice(0, 12).map((t) => `"${t}"*`).join(' ') : null;
-    const f = { match, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, needsDescription, favorite, featured, collection, recent, derivation };
+    const f = { match, type, kind, tags, format, originClip, usedByClip, derivedFrom, author, needsDescription, favorite, featured, collection, recent, derivation, stage };
     const w = filterSql(f);
     const total = db.prepare(`SELECT COUNT(*) AS n ${BASE} ${w.sql}`).get(...w.args).n;
     if (!SORTS.includes(sort)) sort = 'relevance';
@@ -651,11 +666,16 @@ export function createLibrary(ctx) {
     return { ...result, deps, thumb: Buffer.from(result.thumb), strip: result.strip ? Buffer.from(result.strip) : null };
   }
 
-  /** @param {{ slug: string, source: string, author: string, forClip?: string, note?: string, params?: any, mode: string, forkOf?: any, derivation?: string }} o */
-  async function saveFunction({ slug, source, author, forClip, note, params, mode, forkOf, derivation }) {
+  /**
+   * candidate: a new asset starts as a forge candidate, out of the library's lists until it is promoted (a new version of an
+   * asset keeps the asset's stage).
+   * @param {{ slug: string, source: string, author: string, forClip?: string, note?: string, params?: any, mode: string, forkOf?: any, derivation?: string, candidate?: boolean }} o
+   */
+  async function saveFunction({ slug, source, author, forClip, note, params, mode, forkOf, derivation, candidate = false }) {
     if (!SLUG_RE.test(slug ?? '')) throw new StudioError(`"${slug}" is not a valid asset name: use lowercase letters, digits and dashes (2–64 characters), e.g. "text-word-reveal"`);
     if (!author) throw new StudioError('author is required: which model or person wrote this asset');
     const existing = q('SELECT * FROM assets WHERE slug = ?').get(slug);
+    if (candidate && existing) throw new StudioError(`candidate applies to a new asset; "${slug}" exists already (its stage: ${existing.stage ?? 'library'})`);
     if (mode === 'create' && existing) throw new StudioError(`An asset named "${slug}" already exists (v${existing.latest_version}). Use update_asset to add a version, or pick another name.`, 'conflict');
     if (mode === 'update' && !existing) throw new StudioError(`No asset named "${slug}" in the library. Use create_asset to add it.`, 'not_found');
     if (existing && existing.type !== 'function') throw new StudioError(`"${slug}" is a ${existing.type} asset; its versions are files, not source`);
@@ -680,8 +700,8 @@ export function createLibrary(ctx) {
       transaction(db, () => {
       let assetId = existing?.id;
       if (!assetId) {
-        assetId = q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at, derivation) VALUES (?, ?, 0, ?, ?, ?, ?)')
-          .run(slug, 'function', forkOf?.version_id ?? null, clip?.id ?? null, at, derivation ?? (forkOf ? 'fork' : null)).lastInsertRowid;
+        assetId = q('INSERT INTO assets (slug, type, latest_version, forked_from, origin_clip, created_at, derivation, stage) VALUES (?, ?, 0, ?, ?, ?, ?, ?)')
+          .run(slug, 'function', forkOf?.version_id ?? null, clip?.id ?? null, at, derivation ?? (forkOf ? 'fork' : null), candidate ? 'candidate' : null).lastInsertRowid;
       }
       // someone else may have saved a version while we were validating
       const current = q('SELECT latest_version FROM assets WHERE id = ?').get(assetId).latest_version;
@@ -695,7 +715,7 @@ export function createLibrary(ctx) {
       q('UPDATE assets SET latest_version = ? WHERE id = ?').run(version, assetId);
       reindex(assetId, { slug, title: m.title, description: m.description, tags: m.tags, source });
       touch(slug, 'created');
-      ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, clip: forClip ?? null, fork: forkOf ? makeRef(forkOf.slug, forkOf.version) : null });
+      ctx.events?.emit('asset', slug, version === 1 ? 'created' : 'version', { ref: makeRef(slug, version), author, clip: forClip ?? null, fork: forkOf ? makeRef(forkOf.slug, forkOf.version) : null, candidate: candidate || undefined });
       });
       renameRetry(thumbTmp, join(dataDir, thumb));
       if (strip) renameRetry(stripTmp, join(dataDir, strip));
@@ -780,9 +800,9 @@ export function createLibrary(ctx) {
   /**
    * A preset: a named asset that is another asset plus a chosen parameter set (its new defaults).
    * It pins the base version, has its own thumbnail, and is searchable and usable like any asset.
-   * @param {{ base: string, slug: string, params: any, title?: string, description?: string, tags?: string[], author: string, forClip?: string }} o
+   * @param {{ base: string, slug: string, params: any, title?: string, description?: string, tags?: string[], author: string, forClip?: string, candidate?: boolean }} o
    */
-  async function createPreset({ base, slug, params, title, description, tags, author, forClip }) {
+  async function createPreset({ base, slug, params, title, description, tags, author, forClip, candidate = false }) {
     const row = requireVersion(base);
     if (row.type !== 'function') throw new StudioError(`${base} is a ${row.type} asset; presets are made from function assets`);
     const schema = json(row.schema, {});
@@ -802,7 +822,7 @@ export function createLibrary(ctx) {
       tags: [...new Set([...(tags ?? summary(row).tags), 'preset'])].slice(0, 24),
       duration: row.duration, formats: json(row.formats, []), schema, params: chosen,
     });
-    return saveFunction({ slug, source, author, forClip, note: `Preset of ${baseRef}`, mode: 'create', forkOf: row, derivation: 'preset' });
+    return saveFunction({ slug, source, author, forClip, note: `Preset of ${baseRef}`, mode: 'create', forkOf: row, derivation: 'preset', candidate });
   }
 
   /**
@@ -841,10 +861,88 @@ export function createLibrary(ctx) {
   const updateAsset = (o) => saveFunction({ ...o, mode: 'update' });
 
   /** A new asset that starts from another one's source (optionally changed). Lineage is kept. @param {any} o */
-  async function forkAsset({ ref, slug, source, author, forClip, note, params }) {
+  async function forkAsset({ ref, slug, source, author, forClip, note, params, candidate = false }) {
     const from = requireVersion(ref);
     if (from.type !== 'function') throw new StudioError(`${ref} is a ${from.type} asset; only function assets can be forked`);
-    return saveFunction({ slug, source: source ?? from.source, author, forClip, note: note ?? `Forked from ${makeRef(from.slug, from.version)}`, params, mode: 'create', forkOf: from });
+    return saveFunction({ slug, source: source ?? from.source, author, forClip, note: note ?? `Forked from ${makeRef(from.slug, from.version)}`, params, mode: 'create', forkOf: from, candidate });
+  }
+
+  // ── the forge: candidates, their checks, promotion ───────────────────────────────────────
+
+  /**
+   * Keep the result of check_asset on the version it checked (in its meta: versions are immutable, their meta is not). A
+   * promotion reads it.
+   * @param {string} ref @param {any} check
+   */
+  function recordCheck(ref, check) {
+    const row = requireVersion(ref);
+    transaction(db, () => {
+      q('UPDATE asset_versions SET meta = ? WHERE id = ?').run(JSON.stringify({ ...json(row.meta, {}), check }), row.version_id);
+      ctx.events?.emit('asset', row.slug, 'checked', { ref: makeRef(row.slug, row.version), pass: check.pass });
+    });
+  }
+
+  /** Visual function assets are promoted on a passing check; other kinds draw nothing on their own, so a clip checks them. */
+  const checkable = (row) => row.type === 'function' && row.kind === 'visual';
+
+  /**
+   * Promote a candidate (or a rejected asset) into the library. A visual asset needs a passing check_asset of its latest
+   * version first, unless force (the reason is kept as a note).
+   * @param {{ slug: string, author: string, force?: boolean, reason?: string }} o
+   */
+  function promote({ slug, author, force = false, reason }) {
+    if (!author) throw new StudioError('author is required');
+    const row = requireVersion(parseRef(slug).slug);
+    if (!row.stage) throw new StudioError(`"${row.slug}" is in the library already`, 'conflict');
+    const ref = makeRef(row.slug, row.version);
+    const check = json(row.meta, {}).check;
+    if (checkable(row) && !force) {
+      if (!check) throw new StudioError(`${ref} has not been checked: run check_asset { ref: "${ref}" } first (or promote with force and a reason)`, 'invalid');
+      if (!check.pass) throw new StudioError(`${ref} failed its check (${check.errors} error${check.errors === 1 ? '' : 's'}): fix it with update_asset and check again (or promote with force and a reason)`, 'invalid');
+    }
+    if (force && !String(reason ?? '').trim()) throw new StudioError('force needs a reason: why it goes into the library without a passing check');
+    transaction(db, () => {
+      q('UPDATE assets SET stage = NULL WHERE id = ?').run(row.asset_id);
+      ctx.events?.emit('asset', row.slug, 'stage', { stage: 'library', from: row.stage, author });
+    });
+    if (reason) addNoteRow(row.asset_id, author, `Promoted${force ? ' without a passing check' : ''}: ${String(reason).trim()}`);
+    return { asset: getAsset(ref, { includeSource: false }), from: row.stage, checked: checkable(row) ? (check ?? null) : 'not checkable on its own (a clip checks it)' };
+  }
+
+  /**
+   * Reject a candidate: it stays (versions are never deleted) but out of every list but stage: rejected. The reason is kept
+   * as a note, so the next forge run does not make the same thing again.
+   * @param {{ slug: string, author: string, reason: string }} o
+   */
+  function rejectCandidate({ slug, author, reason }) {
+    if (!author) throw new StudioError('author is required');
+    const text = String(reason ?? '').trim();
+    if (text.length < 4) throw new StudioError('reason is required: what is wrong with it (kept as a note for the next forge run)');
+    const row = requireVersion(parseRef(slug).slug);
+    if (row.stage !== 'candidate') throw new StudioError(row.stage ? `"${row.slug}" is rejected already` : `"${row.slug}" is in the library; only a candidate is rejected (a library asset is replaced by a new version)`, 'conflict');
+    transaction(db, () => {
+      q("UPDATE assets SET stage = 'rejected' WHERE id = ?").run(row.asset_id);
+      ctx.events?.emit('asset', row.slug, 'stage', { stage: 'rejected', from: row.stage, author });
+    });
+    addNoteRow(row.asset_id, author, `Rejected: ${text}`);
+    return { asset: getAsset(makeRef(row.slug, row.version), { includeSource: false }) };
+  }
+
+  function addNoteRow(assetId, author, body) {
+    q('INSERT INTO asset_notes (asset_id, author, body, created_at) VALUES (?, ?, ?, ?)').run(assetId, author, body.slice(0, 1000), now());
+  }
+
+  /** A clip that uses candidates promotes them: being used is what the library is for. → the slugs promoted. @param {number[]} assetIds */
+  function promoteUsed(assetIds) {
+    const out = [];
+    for (const id of new Set(assetIds)) {
+      const r = q("SELECT slug FROM assets WHERE id = ? AND stage = 'candidate'").get(id);
+      if (!r) continue;
+      q('UPDATE assets SET stage = NULL WHERE id = ?').run(id);
+      ctx.events?.emit('asset', r.slug, 'stage', { stage: 'library', from: 'candidate', author: 'used by a clip' });
+      out.push(r.slug);
+    }
+    return out;
   }
 
   // ── file assets: images, sounds, fonts ───────────────────────────────────────────────────
@@ -1074,6 +1172,6 @@ export function createLibrary(ctx) {
   /** The font asset for a family name, if the library has it (an uploaded family has several: this is the first, see fontCatalog for all). */
   const fontRef = (family) => fontCatalog().find(family)?.ref ?? null;
 
-  return { fontCatalog, pinFonts, fontSets, fontCoverage, isUploadedFont: isUploaded, versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, addFootage, footageMeta, canvasOf, sequenceByKey, setFavorite, setFeatured, touch, listCollections, addToCollection, removeFromCollection, bulk, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
+  return { recordCheck, promote, rejectCandidate, promoteUsed, fontCatalog, pinFonts, fontSets, fontCoverage, isUploadedFont: isUploaded, versionRow, requireVersion, getAsset, search, allTags, closure, bundle, validate, createAsset, updateAsset, forkAsset, addFileAsset, setMetadata, reindexLatest, createPreset, saveDefaults, diffVersions, addSequence, addFootage, footageMeta, canvasOf, sequenceByKey, setFavorite, setFeatured, touch, listCollections, addToCollection, removeFromCollection, bulk, seedFonts, fontFamilies, fontRef, absFile, summary, clipSlug, refOfVersionId, saveFunction, FORMATS };
 }
 

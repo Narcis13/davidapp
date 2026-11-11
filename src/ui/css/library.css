@@ -79,6 +79,8 @@
 .flag.featured { color: var(--accent); }
 .flag.featured svg { fill: currentColor; }
 .flag.needs { color: var(--accent-2); }
+.flag.candidate { color: #9ad8ff; }
+.flag.candidate.failed { color: var(--accent-2); }
 .vstar, .vcheck { position: absolute; top: 6px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 15px; background: rgba(11, 11, 16, 0.72); color: var(--muted); cursor: pointer; }
 .vstar { right: 6px; }
 .vcheck { left: 6px; opacity: 0; border: 1.5px solid var(--line-2); color: transparent; }
@@ -127,6 +129,10 @@
 .detail-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .detail-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12.5px; }
 .badge.needs { color: var(--accent-2); border-color: rgba(255, 92, 138, 0.5); }
+.badge.stage.candidate { color: #9ad8ff; border-color: rgba(154, 216, 255, 0.5); }
+.badge.stage.rejected { color: var(--accent-2); border-color: rgba(255, 92, 138, 0.5); }
+.forge .detail-actions { margin-top: 8px; }
+.forge .input { margin-top: 8px; width: 100%; }
 .detail-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .detail-actions .btn { flex: 1 1 auto; }
 .detail-actions .btn.toggle.on svg { fill: currentColor; }

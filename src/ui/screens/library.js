@@ -20,7 +20,7 @@ const SORTS = [['relevance', 'Relevance'], ['newest', 'Newest'], ['used', 'Most 
 const DENSITIES = [['comfortable', 'Comfortable'], ['compact', 'Compact'], ['list', 'List']];
 // value filters: state key = URL key = API key (q is the API's `query`)
 const VALUE_KEYS = ['type', 'kind', 'format', 'author', 'origin', 'usedBy', 'collection', 'derivation'];
-const FLAG_KEYS = ['favorite', 'featured', 'needsDescription', 'recent'];
+const FLAG_KEYS = ['favorite', 'featured', 'needsDescription', 'recent', 'candidates'];
 const FACETS = [
   { key: 'type', title: 'Type', testid: 'filter-type' },
   { key: 'kind', title: 'Kind', testid: 'filter-kind' },
@@ -30,9 +30,9 @@ const FACETS = [
   { key: 'origin', title: 'Made for clip', testid: 'filter-origin' },
   { key: 'usedBy', title: 'Used by clip', testid: 'filter-used-by' },
 ];
-const FLAGS = [['favorite', 'Favourites'], ['featured', 'Featured'], ['needsDescription', 'Needs description']];
+const FLAGS = [['favorite', 'Favourites'], ['featured', 'Featured'], ['needsDescription', 'Needs description'], ['candidates', 'Forge candidates']];
 const LABELS = { type: 'Type', kind: 'Kind', format: 'Format', author: 'Author', origin: 'Made for', usedBy: 'Used by', collection: 'Collection', derivation: 'Derived by', tag: 'Tag',
-  favorite: 'Favourites', featured: 'Featured', needsDescription: 'Needs description', recent: 'Recently used' };
+  favorite: 'Favourites', featured: 'Featured', needsDescription: 'Needs description', recent: 'Recently used', candidates: 'Forge candidates' };
 
 const svg = (paths, size = 18) => { const el = s('svg', { viewBox: '0 0 20 20', width: size, height: size, class: 'icon', 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }); el.innerHTML = paths; return el; };
 const STAR = '<path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z"/>';
@@ -161,7 +161,8 @@ export async function mount(view, ctx) {
       h('span.vflags',
         provFlags(a, known),
         a.featured ? h('span.flag.featured', { 'data-testid': 'featured-mark' }, svg(STAR, 11), 'Featured') : null,
-        a.needsDescription ? h('span.flag.needs', { 'data-testid': 'needs-description' }, 'Needs description') : null));
+        a.needsDescription ? h('span.flag.needs', { 'data-testid': 'needs-description' }, 'Needs description') : null,
+        a.stage === 'candidate' ? h(`span.flag.candidate${a.checked?.pass === false ? '.failed' : ''}`, { 'data-testid': 'candidate-mark' }, a.checked ? (a.checked.pass ? 'Candidate · checked' : 'Candidate · check failed') : 'Candidate') : null));
     const el = h('div.vcard', {
       role: 'option', 'data-testid': 'asset-card', 'data-slug': a.slug, 'aria-selected': String(sel), 'data-selected': sel ? 'true' : null,
       'aria-label': `${a.title}, ${badge}${a.favorite ? ', favourite' : ''}${a.needsDescription ? ', needs description' : ''}`,
@@ -522,6 +523,7 @@ export async function mount(view, ctx) {
         h(`span.badge.${badge}`, badge),
         a.featured ? h('span.badge.warn', 'featured') : null,
         a.needsDescription ? h('span.badge.needs', 'needs description') : null,
+        a.stage !== 'library' ? h(`span.badge.stage.${a.stage}`, { 'data-testid': 'detail-stage' }, a.stage) : null,
         a.edited ? h('span.badge', 'edited') : null,
         full && a.type !== 'function' ? issueBadges(full.provenance, a.tags ?? []) : null,
         h('span.muted', a.usedByClips ? `used by ${a.usedByClips} ${a.usedByClips === 1 ? 'clip' : 'clips'}` : 'not used yet')),
@@ -534,6 +536,7 @@ export async function mount(view, ctx) {
         h('button.btn', { type: 'button', 'data-testid': 'detail-add-to-clip', disabled: !clip, title: clip ? null : 'Open a clip in the editor first', onclick: () => addToClip([a.slug]) },
           clip ? `Add to ${clipTitle(clip.slug)}` : 'No clip open'),
         collectionPicker('detail-collection', () => [a.slug])),
+      a.stage !== 'library' ? forgePanel(a) : null,
       a.description ? h('p.detail-desc', a.description) : null,
       a.tags?.length ? h('div.tags', a.tags.map((t) => h('button.tag.tag-btn', { type: 'button', 'data-testid': 'detail-tag', 'data-tag': t, title: `Filter by ${t}`, onclick: () => { if (!state.tag.includes(t)) setFilter('tag', t); } }, t))) : null,
       palette.length ? h('div.detail-section', h('h3', 'Palette'), h('div.palette', { 'data-testid': 'palette' }, palette.map((c) => h('span.pal', { style: { background: c }, title: c }, h('span', c))))) : null,
@@ -561,6 +564,40 @@ export async function mount(view, ctx) {
           h('span.version-note', v.note || 'no note'),
           h('span.ref', [v.author, fmtDate(v.createdAt)].filter(Boolean).join(' · ')))))) : null,
       full ? null : h('div.detail-loading', loading('Loading details')));
+  }
+
+  /** A candidate's check and the forge's decisions: check it (every format), promote it into the library, or reject it with a reason. */
+  function forgePanel(a) {
+    const c = a.checked;
+    const visual = a.type === 'function' && a.kind === 'visual';
+    const status = !visual ? 'Not checked on its own: a clip that uses it checks it.'
+      : !c ? 'Not checked yet.'
+      : c.pass ? `Checked: passes in ${c.formats.join(', ')}${c.warnings ? ` (${c.warnings} warning${c.warnings === 1 ? '' : 's'})` : ''}.`
+      : `Checked: ${c.errors} error${c.errors === 1 ? '' : 's'} in ${c.formats.join(', ')}. Fix it with a new version and check again.`;
+    const reason = h('input.input', { type: 'text', placeholder: 'Why it is rejected (kept as a note)', 'data-testid': 'reject-reason', 'aria-label': 'Reason for rejecting', hidden: true });
+    const busy = (btn, on) => { btn.disabled = on; };
+    const check = h('button.btn', { type: 'button', 'data-testid': 'forge-check', hidden: !visual, onclick: async () => {
+      busy(check, true); say('Checking in every format…');
+      try { const r = await api.post(`/api/assets/${a.slug}/check`, { stills: false }); say(r.pass ? 'Check passed' : `Check found ${r.errors} error${r.errors === 1 ? '' : 's'}`, r.pass ? 'ok' : 'error'); }
+      catch (e) { say(e.message, 'error'); }
+      busy(check, false); loadDetail(a.slug, { quiet: true }); refresh();
+    } }, c ? 'Check again' : 'Check');
+    const promote = h('button.btn.primary', { type: 'button', 'data-testid': 'forge-promote', disabled: visual && !c?.pass, title: visual && !c?.pass ? 'It needs a passing check first' : null, onclick: async () => {
+      try { await api.post(`/api/assets/${a.slug}/promote`, {}); say(`${a.title} is in the library`); }
+      catch (e) { say(e.message, 'error'); return; }
+      loadDetail(a.slug, { quiet: true }); refresh();
+    } }, 'Promote to library');
+    const rejectBtn = h('button.btn', { type: 'button', 'data-testid': 'forge-reject', hidden: a.stage !== 'candidate', onclick: async () => {
+      if (reason.hidden) { reason.hidden = false; reason.focus(); return; }
+      try { await api.post(`/api/assets/${a.slug}/reject`, { reason: reason.value }); say(`${a.title} was rejected`); }
+      catch (e) { say(e.message, 'error'); return; }
+      loadDetail(a.slug, { quiet: true }); refresh();
+    } }, 'Reject');
+    return h('div.detail-section.forge', { 'data-testid': 'forge-panel' },
+      h('h3', a.stage === 'candidate' ? 'Forge candidate' : 'Rejected'),
+      h('p.hint', { 'data-testid': 'forge-status' }, a.stage === 'candidate' ? `Not in search or suggestions until it is promoted, or a clip uses it. ${status}` : `Kept out of the library. ${status}`),
+      h('div.detail-actions', check, promote, rejectBtn),
+      reason);
   }
 
   const dedupe = (rows) => [...new Map(rows.map((u) => [`${u.clip}@${u.version}`, u])).values()];

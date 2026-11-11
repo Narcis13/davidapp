@@ -12,6 +12,7 @@ export const TOOL_GROUPS = [
   { title: 'Start here', tools: ['studio_guide', 'suggest_assets'] },
   { title: 'Find and read assets', tools: ['search_assets', 'get_asset', 'list_clip_assets', 'diff_versions'] },
   { title: 'Write assets', tools: ['validate_asset', 'create_asset', 'update_asset', 'fork_asset'] },
+  { title: 'Forge assets ahead of a clip', tools: ['asset_variants', 'check_asset', 'list_candidates', 'promote_asset', 'reject_asset'] },
   { title: 'Keep a tweak and organise', tools: ['save_defaults', 'create_preset', 'save_precomp', 'set_asset_metadata', 'organize_assets', 'add_asset_note'] },
   { title: 'Pictures, sounds, footage and fonts', tools: ['upload_image', 'list_undescribed', 'describe_asset', 'add_file_asset', 'bake_asset', 'bake_sequence', 'add_footage', 'footage_frames', 'add_font', 'list_fonts'] },
   { title: 'Compose clips', tools: ['list_clips', 'get_clip', 'create_clip', 'update_clip', 'edit_clip', 'remix_clip', 'repin_clip'] },
