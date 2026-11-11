@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS assets (
   derivation        TEXT,                          -- how it came from forked_from: fork | bake | preset | precomp
   needs_description INTEGER NOT NULL DEFAULT 0,    -- an upload waiting for the agent to describe it
   featured          INTEGER NOT NULL DEFAULT 0,
-  meta_uses         TEXT                           -- JSON: uses the agent suggests for an image
+  meta_uses         TEXT,                          -- JSON: uses the agent suggests for an image
+  stage             TEXT CHECK (stage IN ('candidate', 'rejected'))  -- forge: NULL = in the library; candidate = made, not yet checked and promoted; rejected
 );
 
 CREATE TABLE IF NOT EXISTS asset_versions (
@@ -281,6 +282,7 @@ const COLUMNS = [
   ['assets', 'featured', 'INTEGER NOT NULL DEFAULT 0'],
   ['assets', 'meta_uses', 'TEXT'],
   ['renders', 'options', 'TEXT'],  // v3: JSON render options (draft, workers, poster, final, batch)
+  ['assets', 'stage', "TEXT CHECK (stage IN ('candidate', 'rejected'))"],  // forge: NULL = in the library
 ];
 
 /** Open (and create or migrate) the database at `file`. */

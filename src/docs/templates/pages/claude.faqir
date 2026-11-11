@@ -20,6 +20,9 @@ div(data-ui="prose")
     +card(title="The full process")
       @body
         raw p("“`/new-video` a 45-second vertical explainer of our onboarding, voiced, with captions, for Reels.” The **new-video** skill takes Claude from the brief through a script, style frames and an animatic to a checked final render.")
+    +card(title="Stock the library")
+      @body
+        raw p("“`/forge-assets` lower thirds and stat cards for product teasers.” The **forge-assets** skill finds what the library lacks, tries variants of what is there before writing new code, checks each new piece in every format and promotes only what passes. See [Forge candidates](/docs/library#forge).")
     +card(title="Work the requests")
       @body
         raw p("“Work the studio's request queue.” Claude answers what you typed into **Ask the agent** with proposals for you to accept. See [Ask the agent](/docs/agent).")

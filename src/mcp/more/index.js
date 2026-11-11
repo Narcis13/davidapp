@@ -9,6 +9,7 @@ import exchange from './exchange.js';
 import provenance from './provenance.js';
 import share from './share.js';
 import interactive from './interactive.js';
+import forge from './forge.js';
 
 /** @param {any} api { studio, who, image, z, REF, PARAMS, AUTHOR, FORMAT, COMPOSITION, compactAsset, compactRender } */
-export const moreTools = (api) => [footage, fonts, speech, exchange, provenance, share, interactive].flatMap((m) => m(api));
+export const moreTools = (api) => [footage, fonts, speech, exchange, provenance, share, interactive, forge].flatMap((m) => m(api));

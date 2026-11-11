@@ -84,9 +84,10 @@ export function createCompounding(ctx, library, clips) {
   /**
    * Rank the library against a brief: words of the brief matched against names, descriptions, tags
    * and source (any word, ranked by bm25), boosted by featured, favourites and use, at most `perKind`
-   * of a kind so the list covers what a clip needs.
+   * of a kind so the list covers what a clip needs. Forge candidates are left out unless asked for (candidates: true), and
+   * rejected assets always.
    */
-  function suggest({ brief, kinds, limit = 10, perKind = 4 }) {
+  function suggest({ brief, kinds, limit = 10, perKind = 4, candidates = false }) {
     const words = [...new Set(String(brief ?? '').toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])].filter((w) => w.length > 2 && !STOP.has(w)).slice(0, 24);
     if (!words.length) throw new StudioError('brief: describe what the clip or scene needs, in a sentence or two');
     const match = words.map((w) => `"${w}"*`).join(' OR ');
@@ -95,7 +96,7 @@ export function createCompounding(ctx, library, clips) {
         EXISTS (SELECT 1 FROM favorites fa WHERE fa.asset_id = a.id) AS fav
       FROM (SELECT rowid AS id, bm25(assets_fts, 10.0, 6.0, 3.0, 6.0, 0.5) AS rank FROM assets_fts WHERE assets_fts MATCH ?) m
       JOIN assets a ON a.id = m.id JOIN asset_versions v ON v.asset_id = a.id AND v.version = a.latest_version
-      WHERE a.type != 'font' ORDER BY m.rank * (1 + 0.6 * a.featured + 0.4 * fav + 0.15 * MIN(used, 5)) LIMIT 200`).all(match);
+      WHERE a.type != 'font' AND (a.stage IS NULL${candidates ? " OR a.stage = 'candidate'" : ''}) ORDER BY m.rank * (1 + 0.6 * a.featured + 0.4 * fav + 0.15 * MIN(used, 5)) LIMIT 200`).all(match);
     const per = new Map(), out = [];
     for (const r of rows) {
       const k = r.kind ?? r.type;
@@ -104,7 +105,7 @@ export function createCompounding(ctx, library, clips) {
       per.set(k, (per.get(k) ?? 0) + 1);
       const a = library.getAsset(makeRef(r.slug, r.version), { includeSource: false });
       const text = `${a.slug} ${a.title} ${a.description} ${a.tags.join(' ')}`.toLowerCase();
-      out.push({ ref: a.ref, kind: k, title: a.title, description: a.description, tags: a.tags, params: Object.keys(a.schema), usedByClips: a.usedByClips, featured: a.featured, derivation: a.derivation, matched: words.filter((w) => text.includes(w)), thumb: a.thumb, notes: notesOf(a.slug).slice(-2).map((n) => n.body) });
+      out.push({ ref: a.ref, kind: k, title: a.title, description: a.description, tags: a.tags, params: Object.keys(a.schema), usedByClips: a.usedByClips, featured: a.featured, derivation: a.derivation, matched: words.filter((w) => text.includes(w)), stage: a.stage, thumb: a.thumb, notes: notesOf(a.slug).slice(-2).map((n) => n.body) });
       if (out.length >= limit) break;
     }
     return { words, suggestions: out };
